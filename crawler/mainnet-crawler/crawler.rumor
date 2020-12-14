@@ -1,0 +1,38 @@
+external_ip="$(curl -s v4.ident.me)"
+p2p_port=9020
+
+fork_digest="0xb5303f2a"
+# Mainnet fork_digest "0xb5303f2a"
+
+default: enr gen-key
+priv_key="$__key"
+
+echo "priv key = $priv_key"
+
+mike: include enr.rumor
+
+mike: include peerstore.rumor
+
+mike: include start_host.rumor
+
+mike: include medalla_status.rumor
+
+mike: include drop_goodbyes.rumor
+
+mike: include polling.rumor
+
+mike: include sync_drop_serve.rumor
+
+mike: include gossip.rumor
+
+mike: include dv5.rumor
+
+mike: include export_metrics.rumor
+
+mike: include connectall.rumor
+
+
+
+
+
+

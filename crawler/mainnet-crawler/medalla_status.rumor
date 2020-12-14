@@ -1,0 +1,19 @@
+# Set up a genesis Medalla status
+
+set -e
+
+medalla_genesis="0xebe49843e96e538592c9e1976e155e9057c251ed9312eba517afce3ca1a0660c"
+mainnet_genesis="0xeade62f0457b2fdf48e7d3fc4b60736688286be7c7a3ac4c9a16a5e0600bd9e4"
+
+# We zero out attnets here, even though we advertise it in the ENR. We can't really support the attnets without gossip.
+peer metadata set \
+      --attnets="0x0000000000000000" \
+      --seq-number=0
+
+# change status, as if we are at the start of the Medalla chain
+peer status set \
+      --finalized-epoch=0 \
+      --finalized-root="0000000000000000000000000000000000000000000000000000000000000000" \
+      --fork-digest="$fork_digest" \
+      --head-root="$mainnet_genesis" \
+      --head-slot=0

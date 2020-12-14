@@ -1,0 +1,14 @@
+# This file will iterate throught the peers on the peerstore, and will attempt to connect them 
+# the file needs to be called by: >> mike: include medalla_peer_connect.rumor
+
+echo "peers on the peerstore"
+peer list all --details
+
+# To manualy connect the peers on the peerstore, at least until the bug is fixed, 
+# we can simply iterate through the peers on the peerstore
+for peer in ${!__peers[@]}
+do
+#    echo "peer id: $peer"
+    _peer_details peer info "$peer"
+    peer connect "$_peer_details_addrs"
+done

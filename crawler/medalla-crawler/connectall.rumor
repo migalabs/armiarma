@@ -1,0 +1,2 @@
+fork_digest="0xe7a75d5a"
+peer connectall --filter-digest="$fork_digest" --max-peers=20000 --max-retries=50 --rescan=2m --timeout=10s --workers=6

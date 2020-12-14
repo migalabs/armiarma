@@ -1,0 +1,6 @@
+
+# Set all the connections and streams as visible
+host notify all
+
+# listen on public facing network interface
+host listen --ip="0.0.0.0" --tcp="$p2p_port"

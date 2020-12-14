@@ -1,0 +1,45 @@
+# File where the gossip configuration will be set
+# The aim is to log every single gossip and message for analytic purposes
+# For that, we will try to join all the topics used on ETH2 (https://github.com/ethereum/eth2.0-specs/blob/dev/specs/phase0/p2p-interface.md#topics-and-messages)
+# List of Gossip topics:
+# beacon_block
+# beacon_aggregate_and_proof
+# beacon_attestation_{subnet_id}
+# voluntary_exit
+# proposer_slashing
+# attester_slashing
+
+gossip start
+
+fork_digest="e7a75d5a"
+encoding="ssz_snappy"
+
+# Compose the topic format
+blocks_topic="/eth2/$fork_digest/beacon_block/$encoding"
+beacon_aggregate_topic="/eth2/$fork_digest/beacon_aggregate_and_proof/$encoding"
+voluntary_exit_topic="/eth2/$fork_digest/voluntary_exit/$encoding"
+proposer_slashing_topic="/eth2/$fork_digest/proposer_slashing/$encoding"
+attester_slashing_topic="/eth2/$fork_digest/attester_slashing/$encoding"
+
+# Join the topic
+gossip join --topic=$blocks_topic 
+gossip join --topic=$beacon_aggregate_topic
+gossip join --topic=$voluntary_exit_topic
+gossip join --topic=$proposer_slashing_topic
+gossip join --topic=$attester_slashing_topic
+
+# Log the output into a .txt file 
+gossip log $blocks_topic
+gossip log $beacon_aggregate_topic
+gossip log $voluntary_exit_topic
+gossip log $proposer_slashing_topic
+gossip log $attester_slashing_topic
+
+# Log the events happening on gossip 
+gossip events --topic="$blocks_topic"
+gossip events --topic="$beacon_aggregate_topic"
+gossip events --topic="$voluntary_exit_topic"
+gossip events --topic="$proposer_slashing_topic"
+gossip events --topic="$attester_slashing_topic"
+
+echo "logged to medalla main topics"
