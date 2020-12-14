@@ -1,0 +1,7 @@
+# Don't include any of the raw datas taken from the crawler (too big to be uploaded to Git)
+/metrics/*
+/rumordata/*
+
+# Don't include the metrics/plots/jsons generated for data privacy and due to long size of the file
+/metrics/*
+
