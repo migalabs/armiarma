@@ -4,8 +4,9 @@ p2p_port=9020
 fork_digest="0xb5303f2a"
 # Mainnet fork_digest "0xb5303f2a"
 
-default: enr gen-key
-priv_key="$__key"
+#default: enr gen-key
+# Asociated priv_key to the crawler (will always kep the same privkey, and therefore it's ENR will not change that often)
+priv_key="c8b949a719e0cf0b14ae223ac7fd82cff4944e0d2c689abda44cdad221e038ed"
 
 echo "priv key = $priv_key"
 
@@ -14,6 +15,9 @@ mike: include enr.rumor
 mike: include peerstore.rumor
 
 mike: include start_host.rumor
+
+# Provide enough time to copy the enr
+mike: sleep 5s
 
 mike: include medalla_status.rumor
 
@@ -24,6 +28,8 @@ mike: include polling.rumor
 mike: include sync_drop_serve.rumor
 
 mike: include gossip.rumor
+
+mike: sleep 2s
 
 mike: include dv5.rumor
 

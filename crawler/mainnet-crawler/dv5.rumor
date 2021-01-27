@@ -26,12 +26,12 @@ echo "bootnodes: $bootnodes"
 bootnodes=$(echo -n $bootnodes | tr " " ",")
 
 # Run the dv5 service using the bootnodes 
-_dv5_run lvl_trace dv5 run --bootnodes=$bootnodes
+_dv5_run lvl_info dv5 run --bootnodes=$bootnodes
 
 # Add the get peers to the peerstore filtering by fork-digest
 #fork_digest="0xb5303f2a"
 # --stepwise=false --interval="" will make that the dv5 adds automatically the found peer to the peerstore (every 200ms, to dot saturate the CPU and the network)
-lvl_trace dv5 random --add=true --stepwise=false --interval=200ms --filter-digest=$fork_digest
+lvl_info dv5 random --add=true --stepwise=false --interval=200ms --filter-digest=$fork_digest
 
 # We can establish the log output level of the comand we are running by using lvl_{name} 
 # Different levels: trace, debug, info, warn, error, fatal, panic 

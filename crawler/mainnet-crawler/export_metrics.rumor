@@ -1,3 +1,3 @@
 mkdir metrics
 
-gossip export-metrics --file-path="metrics/gossip-metrics.json" --peerstore-path="metrics/peerstore.json" --export-period=60s
+gossip topic export-metrics --file-path="metrics/gossip-metrics.json" --peerstore-path="metrics/peerstore.json" --export-period=60s

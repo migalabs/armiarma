@@ -1,3 +1,4 @@
 #fork_digest="0xb5303f2a"
 
+#peer connectall --filter-digest="$fork_digest" --filter-port=13000 --max-peers=20000 --max-retries=50 --rescan=2m --timeout=10s --workers=6
 peer connectall --filter-digest="$fork_digest" --max-peers=20000 --max-retries=50 --rescan=2m --timeout=10s --workers=6

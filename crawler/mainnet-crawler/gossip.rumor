@@ -18,31 +18,33 @@ fork_digest="$mainnet"
 encoding="ssz_snappy"
 
 # Compose the topic format
-blocks_topic="/eth2/$fork_digest/beacon_block/$encoding"
-beacon_aggregate_topic="/eth2/$fork_digest/beacon_aggregate_and_proof/$encoding"
-voluntary_exit_topic="/eth2/$fork_digest/voluntary_exit/$encoding"
-proposer_slashing_topic="/eth2/$fork_digest/proposer_slashing/$encoding"
-attester_slashing_topic="/eth2/$fork_digest/attester_slashing/$encoding"
+blocks_topic="beacon_block"
+beacon_aggregate_topic="beacon_aggregate_and_proof"
+voluntary_exit_topic="voluntary_exit"
+proposer_slashing_topic="proposer_slashing"
+attester_slashing_topic="attester_slashing"
 
-# Join the topic
-gossip join --topic=$blocks_topic 
-gossip join --topic=$beacon_aggregate_topic
-gossip join --topic=$voluntary_exit_topic
-gossip join --topic=$proposer_slashing_topic
-gossip join --topic=$attester_slashing_topic
+# Join the topic, new versions of Rumor includes Mainnet fork-digest and snappy encoding as default
+gossip topic join --eth-topic="$blocks_topic"
+gossip topic join --eth-topic="$beacon_aggregate_topic"
+gossip topic join --eth-topic="$voluntary_exit_topic"
+gossip topic join --eth-topic="$proposer_slashing_topic"
+gossip topic join --eth-topic="$attester_slashing_topic"
+
+# Afer joining the topic, the creation of the messages must be implemented
 
 # Log the output into a .txt file 
-gossip log $blocks_topic
-gossip log $beacon_aggregate_topic
-gossip log $voluntary_exit_topic
-gossip log $proposer_slashing_topic
-gossip log $attester_slashing_topic
+gossip topic log --eth-topic="$blocks_topic"
+gossip topic log --eth-topic="$beacon_aggregate_topic"
+gossip topic log --eth-topic="$voluntary_exit_topic"
+gossip topic log --eth-topic="$proposer_slashing_topic"
+gossip topic log --eth-topic="$attester_slashing_topic"
 
 # Log the events happening on gossip 
-gossip events --topic="$blocks_topic"
-gossip events --topic="$beacon_aggregate_topic"
-gossip events --topic="$voluntary_exit_topic"
-gossip events --topic="$proposer_slashing_topic"
-gossip events --topic="$attester_slashing_topic"
+gossip topic events --eth-topic="$blocks_topic"
+gossip topic events --eth-topic="$beacon_aggregate_topic"
+gossip topic events --eth-topic="$voluntary_exit_topic"
+gossip topic events --eth-topic="$proposer_slashing_topic"
+gossip topic events --eth-topic="$attester_slashing_topic"
 
 echo "logged to medalla main topics"
