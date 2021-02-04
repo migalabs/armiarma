@@ -31,7 +31,8 @@ gossip topic join --eth-topic="$voluntary_exit_topic"
 gossip topic join --eth-topic="$proposer_slashing_topic"
 gossip topic join --eth-topic="$attester_slashing_topic"
 
-# Afer joining the topic, the creation of the messages must be implemented
+# Afer joining the topic, the creation of the messages-db must be implemented
+gossip topic create-db --eth-topic="$blocks_topic" --fork-version="$mainnet" --temp-msg-limit=20
 
 # Log the output into a .txt file 
 gossip topic log --eth-topic="$blocks_topic"

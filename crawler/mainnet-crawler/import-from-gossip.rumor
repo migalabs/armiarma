@@ -1,0 +1,5 @@
+dbName="Mainnet"
+forkdigest="b5303f2a"
+
+echo "Initializing the Blocks and States databases"
+gossip-import bname="$dbName" sname="$dbName" --ip="localhost" --port=3500 
