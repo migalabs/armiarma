@@ -7,8 +7,7 @@
 src/bin
 
 # Ignore the example folder (personal to each user)
-#examples/*
-#!examples/.gitkeep
+examples/*
 
 # Ignore System Files
 .DS_Store

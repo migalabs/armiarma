@@ -2,12 +2,12 @@
 # ------- ARMIARMA --------
 # BSC-ETH2 TEAM
 # VERSION: v0.1
+version="v0.1.0"
 
 
 
 
-
-# ---------- DEFINITION OF FUNTIONS -----------
+s ---------- DEFINITION OF FUNTIONS -----------
 
 ARMIARMA="./src/bin/armiarma"
 BIN="./src/bin"
@@ -83,6 +83,17 @@ TouchLauncher(){
 # Execution Secuence
 
 # 0. Get the options
+
+if [[ -d ./examples ]]; then
+    echo "----------- ARMIARMA $version -----------"
+else
+    echo "----------- ARMIARMA $version -----------"
+    echo ""
+    echo "Generating ./examples folder"
+    mkdir ./examples  
+fi 
+
+
 
 while getopts ":hcp" option; do
     case $option in
