@@ -7,7 +7,7 @@ version="v0.1.0"
 
 
 
-s ---------- DEFINITION OF FUNTIONS -----------
+# ---------- DEFINITION OF FUNTIONS -----------
 
 ARMIARMA="./src/bin/armiarma"
 BIN="./src/bin"
