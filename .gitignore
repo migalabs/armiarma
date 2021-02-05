@@ -1,7 +1,17 @@
-# Don't include any of the raw datas taken from the crawler (too big to be uploaded to Git)
-/metrics/*
-/rumordata/*
+# Git Ignore 
 
-# Don't include the metrics/plots/jsons generated for data privacy and due to long size of the file
-/metrics/*
 
+# All the files related to the launches 
+
+# Ignore the Armiarma Executable
+src/bin
+
+# Ignore the example folder (personal to each user)
+examples/*
+
+# Ignore System Files
+.DS_Store
+._.DS_Store
+
+# ignore the venv
+src/analyzer/venv

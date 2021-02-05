@@ -1,0 +1,13 @@
+# File that initilizes de dv5 service for our host
+# providing all the medalla-bootnodes
+
+echo "bootnodes form the cofig file: $bootnodes"
+
+bootnodes=$(echo -n $bootnodes | tr " " ",")
+
+# Run the dv5 service using the bootnodes 
+_dv5_run lvl_info dv5 run --bootnodes=$bootnodes
+
+# Add the get peers to the peerstore filtering by fork-digest
+# --stepwise=false --interval="" will make that the dv5 adds automatically the found peer to the peerstore (every 200ms, to dot saturate the CPU and the network)
+lvl_info dv5 random --add=true --stepwise=false --interval=200ms --filter-digest=$fork_digest

@@ -1,0 +1,15 @@
+# Export the generated metrics from the network
+
+echo "Exporting the metrics to the folder $metricsFolder"
+
+# Generate /metrics folder inside the example folder
+mkdir "${metricsFolder}/metrics"
+
+# Set the names of the files that will be pased as arg to the command
+filepath="${metricsFolder}/metrics/gossip-metrics.json"
+peerstorepath="${metricsFolder}/metrics/peerstore.json"
+
+echo "gossip metrics file: $filepath"
+echo "peerstore file:      $peerstorepath"
+
+gossip topic export-metrics --file-path="$filepath" --peerstore-path="$peerstorepath" --export-period=60s

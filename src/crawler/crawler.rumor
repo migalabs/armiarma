@@ -1,0 +1,48 @@
+external_ip="$(curl -s v4.ident.me)"
+p2p_port=9020
+
+# TODO: -Priv-key loader/checker needs to be implemented
+
+armiarma: enr gen-key
+# Asociated priv_key to the crawler (will always kep the same privkey, and therefore it's ENR will not change that often)
+#priv_key="c8b949a719e0cf0b14ae223ac7fd82cff4944e0d2c689abda44cdad221e038ed"
+
+priv_key="$__key"
+echo "priv key = $priv_key"
+
+armiarma: include enr.rumor
+
+armiarma: include peerstore.rumor
+
+armiarma: include start_host.rumor
+
+# Provide enough time to copy the enr
+armiarma: sleep 5s
+
+armiarma: include peer_status_metadata.rumor
+
+armiarma: include drop_goodbyes.rumor
+
+armiarma: include polling.rumor
+
+armiarma: include sync_drop_serve.rumor
+
+armiarma: include gossip.rumor
+
+armiarma: sleep 2s
+
+armiarma: include dv5.rumor
+
+armiarma: include export_metrics.rumor
+
+armiarma: include connectall.rumor
+
+sleep 10s
+
+# Generate and endless loop to keep the Rumor script alive
+
+while :
+do
+	echo "Press [CTRL+C] to stop.."
+	sleep 15s
+done

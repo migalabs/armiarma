@@ -1,0 +1,9 @@
+# Create a peerstore where the peer info will be stored
+
+
+peerstorepath="${metricsFolder}/peerstore"
+
+mkdir "$peerstorepath" 
+
+# create a shared peerstore, we can hook more actors to it later.
+peerstore create crawler --store-type=badger --store-path="$peerstorepath"
