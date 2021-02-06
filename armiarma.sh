@@ -1,10 +1,8 @@
 #!/bin/bash
 # ------- ARMIARMA --------
 # BSC-ETH2 TEAM
-# VERSION: v0.1
-version="v0.1.0"
-
-
+# VERSION: v0.0.1
+version="v0.0.1"
 
 
 # ---------- DEFINITION OF FUNTIONS -----------
@@ -17,22 +15,26 @@ Help()
 {
     # Display Help
     echo ""
-    echo "  Armiarma is the ETH2 network visualizer. Please, make sure that go on its version 15 or above is installed"
+    echo "  Please make sure the Go version is 1.15 or above."
     echo "  To run armiarma please follow the scheme:"
-    echo "      ./armiarma.sh [option] [parameters]"
-    echo "      options:"
+    echo "      ./armiarma.sh [command] [parameters...]"
+    echo "      Commands:"
     echo "          -h      Print this help."
-    echo "          -c      To run the crawler on the ETH2 Mainnet network."
-    echo "                  parameters for -c [network] [name]"
-    echo "          -p      Run the analyzer part of the tool, analyze the generate metrics and generate plots with the results."
-    echo "                  parameters for -p [name]"
+    echo "          -c      Run the crawler on one of the ETH2 networks."
+    echo "                  *Parameters for -c [network] [project-name]"
+    echo "          -p      Run the analyzer part of the tool."
+    echo "                  Analyzes the generated metrics of the given project,"
+    echo "                  generating the plots with the results."
+    echo "                  *Parameters for -p [name]"
+    echo "      Parameters:"
+    echo "          [network]       The ETH2 network where the crawler will be running"
+    echo "                          Currently supported networks:"
+    echo "                              -> mainnet" 
+    echo "          [project-name]  Specify the name of the folder where the metrics" 
+    echo "                          and plots will be stored."
+    echo "                          Find them on 'armiarma/examples/[project-name]'"
     echo ""
-    echo "      parameters:"
-    echo "          [network]   The ETH2 network where the crawler will be running"
-    echo "                      Currently supported networks:"
-    echo "                          -> mainnet" 
-    echo "          [name]      Specify the name of the folder where the metrics and plots will be stored. Find them on 'armiarma/examples/[name]'."
-    echo ""
+    echo "  BSC-ETH2 TEAM"
 }
 
 # Function that calls the crawler
@@ -85,15 +87,22 @@ TouchLauncher(){
 # 0. Get the options
 
 if [[ -d ./examples ]]; then
-    echo "----------- ARMIARMA $version -----------"
+    echo "  ----------- ARMIARMA $version -----------"
 else
-    echo "----------- ARMIARMA $version -----------"
+    echo "  ----------- ARMIARMA $version -----------"
     echo ""
     echo "Generating ./examples folder"
+    echo ""
     mkdir ./examples  
 fi 
 
-
+# Check if any argument was given. 
+# If not, print Help and exit
+if [[ -z "$1" ]]; then
+    echo "Error. No arguments were given." >&2
+    echo "Please check the '-h' command to display the Help menu" >&2
+    exit 1
+fi
 
 while getopts ":hcp" option; do
     case $option in
@@ -111,11 +120,20 @@ while getopts ":hcp" option; do
 
             echo
             echo "  Crawler selected"
+            echo
             echo "  network:        $networkName"
             echo "  metrics-folder: $folderName"
-            echo "  folder path:    $folderPath"
             echo
+            
+            # Check if the given project path was empty
+            if [[ -z  "$3" ]]; then
+                echo "Error. No project-name was given." >&2
+                echo "Please check the '-h' command to display the Help menu" >&2
+                exit 1
+            fi
 
+            
+            # Check the given network
             if [[ "$networkName" == "mainnet" ]]
             then
                 echo "Mainnet network selected"
@@ -127,7 +145,7 @@ while getopts ":hcp" option; do
                 echo "Invalid newtork."
                 echo "Available networks:"
                 echo "  -> mainnet"
-                exit
+                exit 1
             fi
 
             # Check if rumor flag has been activated to Run/compiled Rumor
@@ -145,9 +163,9 @@ while getopts ":hcp" option; do
                 # Check if the directory already exists 
                 if [[ -d $metricsFolder ]]; then
                     echo
-                    echo "Error. Project with name $folderName already exist"
+                    echo "Error. Project with name $folderName already exist" >&2
                     echo
-                    exit
+                    exit 1
                 else
                     echo "Getting the env ready"
                     mkdir $metricsFolder
@@ -172,8 +190,8 @@ while getopts ":hcp" option; do
                 echo "Exporting metrics at $metricsFolder"
                 echo
                 
-                # Finaly launch Rumor form the Network File
-                ../../src/bin/armiarma file launcher.rumor 
+                # Finaly launch Rumor form the Network File (showing the logs on terminal mode)
+                ../../src/bin/armiarma file launcher.rumor --formatter="terminal" --level="info"
                 
                 # Maybe wait untill forcing the exit        
             fi
@@ -234,7 +252,6 @@ while getopts ":hcp" option; do
 done
 
 echo ""
-# 1. Check if the armiarma go executable exists on the /src forder
-
+exit 0
 
 
