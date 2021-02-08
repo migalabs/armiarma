@@ -9,6 +9,7 @@ version="v0.0.1"
 
 ARMIARMA="./src/bin/armiarma"
 BIN="./src/bin"
+VENV="./src/analyzer/venv"
 
 ### Help function to show how to run the too
 Help()
@@ -50,7 +51,9 @@ CheckCompileRumor(){
     else
         # Rumor needs to be compiled
         echo 
-        echo "Compiling Rumor ..."
+        echo "Checking Go dependencies and compiling Rumor ..."
+        echo "NOTE: If you are runing Armiarma for first time,"
+        echo "      pease note that this might take few minutes."
         cd ./src
         # Check if the ./src/bin folder is already there
         if [[ -d "./bin" ]]; then
@@ -206,17 +209,32 @@ while getopts ":hcp" option; do
             echo
             
             # Check if the virtual environment has been created
-            if [[ -d ./src/analyzer/venv ]]; then
-                echo "venv already created"
+            if [[ -d $VENV ]]; then
+                echo "  venv already created"
             else
-                echo "Generating the virtual env"
-                python3 -m virtualenv ./src/analyzer/venv
+                echo "  Generating the virtual env"
+                python3 -m virtualenv "$VENV"
             fi
-            
+            echo ""
             # Source the virtual env 
-            source ./src/analyzer/venv/bin/activate  
-            pip3 install -r ./src/analyzer/requirements.txt
+            source "${VENV}/bin/activate"  
+
+            # ---- TEMP ----
+            # Check if the virtual env is created
+            venvPath="${PWD}/src/analyzer/venv"
+            if [[ "$VIRTUAL_ENV" = "$venvPath" ]]
+            then
+                echo "  VENV successfuly sourced"
+            else
+                echo "  ERROR. VENV was unable to source" >&2
+            fi
+            echo ""
+            # -- END TEMP --
             
+            echo "  Checking if Python dependencies are installed..." 
+            pip3 install -r ./src/analyzer/requirements.txt
+            echo ""
+
             aux="$analyzeFolder"
             # Set the Paths for the gossip-metrics.json peerstore.json and output
             metrics="./examples/${analyzeFolder}/metrics/gossip-metrics.json"
@@ -224,7 +242,6 @@ while getopts ":hcp" option; do
             plots="./examples/${aux}/plots"
             csvs="./examples/${aux}/csvs"
 
-            echo "metrics $peerstore"
             if [[ -d $plots ]]; then
                 echo ""
             else
@@ -239,7 +256,13 @@ while getopts ":hcp" option; do
             csvs="${csvs}/armiarma-metrics.csv"
 
             # Run the Analyzer
+            echo "  Launching analyzer"
+            echo ""
             python3 ./src/analyzer/armiarma-analyzer.py "json" "$peerstore" "$metrics" "$plots" "$csvs"
+            
+            # Deactivate the VENV
+            deactivate
+            
             echo "Analyzer Finished!"
             exit;;
 
