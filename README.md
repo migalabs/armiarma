@@ -20,7 +20,6 @@ Those commands are:
     ./armiarma.sh --> -h
                   '-> -c [network] [project-name]
                   '-> -p [project-name]
-
 ```
 
 The tool will get the Go packages and compile Rumor as generate the virtual env and install the python3 dependencies for the user.  
