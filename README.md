@@ -32,4 +32,4 @@ Please, note that the tool is currently on a developing stage, any bugs reports 
 
 ### LICENSE
 
-MIT, see [LICENSE](https://github.com/Cortze/armiarma/LICENSE) file.
+MIT, see [LICENSE](https://github.com/Cortze/armiarma/blob/master/LICENSE) file.
