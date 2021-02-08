@@ -30,5 +30,6 @@ Currently supported networks:
 ### NOTES
 Please, note that the tool is currently on a developing stage, any bugs reports or suggestions will be accepted.
 
+### LICENSE
 
-
+MIT, see [LICENSE](https://github.com/Cortze/armiarma/LICENSE) file.
