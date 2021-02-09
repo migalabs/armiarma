@@ -22,6 +22,7 @@ import (
 type GossipMetrics struct {
     GossipMetrics   sync.Map
     TopicDatabase   database.TopicDatabase
+    StartTime       time.Duration
 }
 
 
@@ -29,6 +30,7 @@ type GossipMetrics struct {
 func NewGossipMetrics(config *beacon.Spec) GossipMetrics{
     gm := GossipMetrics {
         TopicDatabase:  database.NewTopicDatabase(config),
+        StartTime:      time.Now(),
     }
     return gm
 }
@@ -52,7 +54,7 @@ type PeerMetrics struct {
 	Ip         string
     Country    string
     City       string
-    Latency    float64
+    Latency    int64
 
 	ConnectionEvents []ConnectionEvents
 	// Counters for the different topics
@@ -201,7 +203,7 @@ func (c *GossipMetrics) FillMetrics(ep track.ExtendedPeerstore) {
 
             // Since we want to have the latest Latency, we always update it
             fmt.Println("Latency Empty", peerMetrics.Latency, "Adding Latency:", peerData.Latency)
-            peerMetrics.Latency = float64(peerData.Latency * time.Millisecond)
+            peerMetrics.Latency = int64(peerData.Latency * time.Millisecond)
             fmt.Println("Added Latency:", peerMetrics.Latency)
 
             // After check that all the info is ready, save the item back into the Sync.Map
@@ -220,7 +222,7 @@ func (c *GossipMetrics) FillMetrics(ep track.ExtendedPeerstore) {
 }
 
 // Function that Exports the entire Metrics to a .json file (lets see if in the future we can add websockets or other implementations)
-func (c *GossipMetrics) ExportMetrics(filePath string, peerstorePath string, ep track.ExtendedPeerstore) error {
+func (c *GossipMetrics) ExportMetrics(filePath string, peerstorePath string, csvPath string, ep track.ExtendedPeerstore) error {
     metrics, err := c.MarshalMetrics()
 	if err != nil {
 		fmt.Println("Error Marshalling the metrics")
@@ -241,7 +243,16 @@ func (c *GossipMetrics) ExportMetrics(filePath string, peerstorePath string, ep 
 		fmt.Println("Error opening file: ", peerstorePath)
 		return err
 	}
-	return nil
+    // Generate the MetricsDataFrame of the Current Metrics
+    nMap := GetMetricsDuplicate(c.GossipMetrics)
+    // Export the metrics to the given CSV file
+    mdf := NewMetricsDataFrame(nMap)
+    err := mdf.ExportToCSV(csvPath)
+	if err != nil{
+        fmt.Printf("Error:", err)
+        return err
+    }
+    return nil
 }
 
 // IP-API message structure
