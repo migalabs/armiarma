@@ -16,11 +16,11 @@ type TopicExportMetricsCmd struct {
     ExportPeriod    time.Duration `ask:"--export-period" help:"Requets the frecuency in witch the Metrics will be exported to the files"`
 	FilePath        string `ask:"--file-path" help:"The path of the file where to export the metrics."`
 	PeerstorePath   string `ask:"--peerstore-path" help:"The path of the file where to export the peerstore."`
-
+    CsvPath         string `ask:"--csv-file" help:"The path where the csv file will be exported"`
 }
 
 func (c *TopicExportMetricsCmd) Defaul() {
-    c.ExportPeriod = 30 * time.Second
+    c.ExportPeriod = 60 * time.Second
 }
 
 func (c *TopicExportMetricsCmd) Help() string {
@@ -41,7 +41,7 @@ func (c *TopicExportMetricsCmd) Run(ctx context.Context, args ...string) error {
 			start := time.Now()
             c.Log.Infof("Exporting Metrics")
             c.GossipMetrics.FillMetrics(c.Store)
-	        err := c.GossipMetrics.ExportMetrics(c.FilePath, c.PeerstorePath, c.Store)
+	        err := c.GossipMetrics.ExportMetrics(c.FilePath, c.PeerstorePath, c.CsvPath, c.Store)
             if err != nil {
                 c.Log.Infof("Problems exporting the Metrics to the given file path")
             } else {
