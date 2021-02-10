@@ -4,287 +4,31 @@
 import os, sys
 import json 
 import time
-import requests
-from IPy import IP
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import numpy as np
-import durationpy
 import datetime 
 import collections
-
-# values that will determine the beginning and end of the crawling period
-startingTime = 0
-finishingTime = 0
-
-### TODO:
-#        - Organize the plotting part
-#      **- Organize the panda by groups (mainly on type of Clients)
-#      **- Could be nice also to say which kind of client/version of the client are they running
 
 def getDictFromJson(inputFile):
     print("reading json: ", inputFile)
     mf = open(inputFile)
-    peerMetrics = json.load(mf)
+    dicts = json.load(mf)
     mf.close()
 
-    return peerMetrics
-
-def getModificationTimeOfFile(inputFile):
-    statbuf = os.stat(inputFile)
-    return statbuf.st_mtime*1000
-
+    return dicts
 
 # Generate the pandaobject of all the metrics per peer
-def getPandaobjectFromJson(inputFile, peerstoreMetrics):
-    global startingTime 
-    global finishingTime
-
-    print("Panda from Json")
-    peerMetrics = getDictFromJson(inputFile)
-    fileTime = getModificationTimeOfFile(inputFile)
-
-    ## Temp -to get the Location of the IPs
-    cont=0
-    ##
-    
-    # Define the panda 
-    pMetrics = {'PeerId': [], 'NodeId':[], 'ClientType':[], 'Pubkey':[], 'Addrs':[], 'Ip':[], 'Country':[], 'City':[], 'Latency':[], 'Connections':[], 'Disconnections':[], 'ConnectedTime':[], 'BeaconBlockCnt':[], 'BeaconAggregateProofCnt':[], 'VoluntaryExitCnt':[], 'ProposerSlashingCnt':[], 'AttesterSlashingCnt':[], 'TotalMessages': []}
-    
-    for peer in peerMetrics:
-        # Flag for the private IPs
-        ipPublic = 0
-
-        pMetrics['PeerId'].append(peerMetrics[peer]["PeerId"])
-        pMetrics['NodeId'].append(peerMetrics[peer]["NodeId"])
-        try:
-            actualClientType = peerstoreMetrics[peer]["user_agent"]
-        except:
-            actualClientType = "Unknown"
-        
-        # print("Peer", peer, "is form Client:", actualClientType) 
-        pMetrics['ClientType'].append(actualClientType)
-        
-        # print("PeerStore Info:", peerstoreMetrics[peer])
-
-        # print("Peer Latency on the metrics:", peerMetrics[peer]["Latency"])
-        if peerMetrics[peer]["Latency"] == 0:
-            # print("Peer latency = 0")
-            try:
-                lat = peerstoreMetrics[peer]["latency"] / 1000000000000000 # To show them in seconds
-                # print("latency taken from peerstore:", peerstoreMetrics[peer]["latency"])
-            except:
-                lat = 0
-                # print("Unable to find latency on the peerstore") 
-        else:
-            # print("Latency correct already from the metrics")
-            lat = peerMetrics[peer]["Latency"] / 1000000000000000 # To show them in seconds
-
-        # print("Adding Latency:", lat)
-        pMetrics['Latency'].append(lat) 
-
-        pMetrics['Pubkey'].append(peerMetrics[peer]['Pubkey'])
-        
-        addrsCnt = 0
-        # print("ip of the peer", peerMetrics[peer]['Ip'])
-        # print("location: ", peerMetrics[peer]['Country'])
-        
-        auxcountry  = ""
-        auxcity     = ""
-        auxaddrs    = ""
-        auxip       = ""
-
-        try:
-            if peerMetrics[peer]['Country'].lower() == 'unknown' or peerMetrics[peer]['Country'] == "":
-                for idx, address in enumerate(peerstoreMetrics[peer]['addrs']):
-                    ipx = address.replace('/ip4/', '')
-                    ipx = ipx.split('/')[0]
-                    ipx=IP(ipx)
-                    if ipx.iptype() == 'PUBLIC':
-                        country, city = getLocationFromIp(ipx)
-                        auxcountry  = country
-                        auxcity     = city
-                        auxaddrs    = address
-                        auxip       = str(ipx)
-                        print('(Private from the beggining) Added:', ipx, ipx.iptype(),country, city)
-                        ipPublic = 1
-                        cont=cont+1
-                        print("contador:", cont)
-                        break
-                    addrsCnt=addrsCnt+1
-
-                if ipPublic == 0:
-                    # print("Private ip", peerMetrics[peer]['Ip'])
-                    auxcountry  = 'Unknown'
-                    auxcity     = 'Unknown'
-                    auxaddrs    = peerMetrics[peer]['Addrs']
-                    auxip       = peerMetrics[peer]['Ip']
-
-            else:
-                # print("Already good from Rumor")
-                auxcountry  = peerMetrics[peer]['Country']
-                auxcity     = peerMetrics[peer]['City']
-                auxaddrs    = peerMetrics[peer]['Addrs']
-                auxip       = peerMetrics[peer]['Ip']
-
-        except:
-            # print("Unknown")
-            auxcountry  = 'Unknown'
-            auxcity     = 'Unknown'
-            auxaddrs    = peerMetrics[peer]['Addrs']
-            auxip       = peerMetrics[peer]['Ip']
- 
-        pMetrics['Country'].append(auxcountry)
-        pMetrics['City'].append(auxcity)
-        pMetrics['Addrs'].append(auxaddrs)
-        pMetrics['Ip'].append(auxip)
-
-        connection, disconnection, ttime = GetConnectDisconnectAndConTime(peer, peerMetrics, fileTime)
-        pMetrics['Connections'].append(connection)
-        pMetrics['Disconnections'].append(disconnection)
-        pMetrics['ConnectedTime'].append(ttime)
-            
-        pMetrics['BeaconBlockCnt'].append(peerMetrics[peer]['BeaconBlock']['Cnt'])
-        pMetrics['BeaconAggregateProofCnt'].append(peerMetrics[peer]['BeaconAggregateProof']['Cnt'])
-        pMetrics['VoluntaryExitCnt'].append(peerMetrics[peer]['VoluntaryExit']['Cnt'])
-        pMetrics['ProposerSlashingCnt'].append(peerMetrics[peer]['ProposerSlashing']['Cnt'])
-        pMetrics['AttesterSlashingCnt'].append(peerMetrics[peer]['AttesterSlashing']['Cnt'])
-
-        # print(peerMetrics[peer]['BeaconBlock']['Cnt'], type(peerMetrics[peer]['BeaconBlock']['Cnt']))
-
-        tmess = int(peerMetrics[peer]['BeaconBlock']['Cnt'] + peerMetrics[peer]['BeaconAggregateProof']['Cnt'] + peerMetrics[peer]['VoluntaryExit']['Cnt'] + peerMetrics[peer]['ProposerSlashing']['Cnt'] + peerMetrics[peer]['AttesterSlashing']['Cnt'])
-        pMetrics['TotalMessages'].append(tmess)
-
-        # To dont exeed the limit of petitions per minute
-        if cont >= 40:
-            print("Counter over the Api possibilities")
-            time.sleep(70)
-            cont=0
-
-    print('len PeerId:', len(pMetrics['PeerId']))
-    print('len ClientType:', len(pMetrics['ClientType']))
-    print('len Addrs:', len(pMetrics['Addrs']))
-    print('len Country:', len(pMetrics['Country']))
-    print('len City:', len(pMetrics['City']))
-    print('len Latency:', len(pMetrics['Latency']))
-    print('len Connections:', len(pMetrics['Connections']))
-
-    pandaObject = pd.DataFrame(pMetrics, columns = ['PeerId', 'NodeId', 'ClientType', 'Pubkey', 'Addrs', 'Country',
-     'City', 'Latency', 'Connections', 'Disconnections', 'ConnectedTime', 'BeaconBlockCnt', 'BeaconAggregateProofCnt',
-      'VoluntaryExitCnt', 'ProposerSlashingCnt', 'AttesterSlashingCnt', 'TotalMessages'])
-
-    # Get the initial time and the end time of the crawling
-    print('initial date:', datetime.datetime.fromtimestamp(startingTime/1000))
-    print('final date:  ', datetime.datetime.fromtimestamp(finishingTime/1000))    
-
-    return pandaObject
-
-    # Generate the pandaobject of all the metrics per peer
-def getPandaobjectFromPeerstoreJson(inputFile):
+def getPandaFromPeerstoreJson(inputFile):
     global startingTime 
     global finishingTime
 
     print("Panda from Json")
     peerstoreMetrics = getDictFromJson(inputFile)
 
-    ## Temp -to get the Location of the IPs
-    cont=0
-    ##
-    
-    # Define the panda 
-    pMetrics = {'ClientType':[]}
-    
-    for peer in peerstoreMetrics:
-        try:
-            print(peerstoreMetrics[peer]["user_agent"])
-            actualClientType = peerstoreMetrics[peer]["user_agent"]
-        except:
-            actualClientType = "Unknown"
-            print('Unknown')
-
-        #print("Peer", peer, "is form Client:", actualClientType) 
-
-        pMetrics['ClientType'].append(actualClientType)
-
-
-
-    pandaObject = pd.DataFrame(pMetrics, columns = ['ClientType'])
-
-    # Get the initial time and the end time of the crawling
-    print('initial date:', datetime.datetime.fromtimestamp(startingTime/1000))
-    print('final date:  ', datetime.datetime.fromtimestamp(finishingTime/1000))    
-
-    return pandaObject
-
+    return peerstoreMetrics
       
-# request the location from api
-def getLocationFromIp(ipAddress):
-    composedUrl = f"http://ip-api.com/json/{ipAddress}"
-    resp = requests.get(url=composedUrl) 
-    print("Response from the IP-API:", resp)
-    try:
-        array = resp.json()
-        if array["status"] == "success":
-            return array["country"], array["city"]
-        else:
-            return "Unknown", "Unknown"
-    except:
-        return "Unknown", "Unknown"
-       
-# Get Connections, Disconnections and Time from each peer
-def GetConnectDisconnectAndConTime(peer, peerMetrics, fileTime):
-    global startingTime
-    global finishingTime
-
-    prevEvent = 'Disconnection'
-    prevTime = 0
-    timeRange = 500 # milliseconds
-    contConn = 0
-    contDisc = 0
-    ttime = 0
-    ctime = 0 # aux variable to calculate the final time
-
-    for connection in peerMetrics[peer]["ConnectionEvents"]:
-        if prevEvent != connection["ConnectionType"] or connection['TimeMili'] >= (prevTime + timeRange):                                
-            if connection["ConnectionType"] == 'Connection':
-                contConn = contConn +1                                  
-                ctime = connection["TimeMili"] # millis
-                prevEvent = connection["ConnectionType"]
-                prevTime = connection['TimeMili']                      
-            elif connection["ConnectionType"] == 'Disconnection':
-                contDisc = contDisc +1
-                ttime = ttime + (connection["TimeMili"] - ctime) #millis 
-                ctime = connection["TimeMili"] # millis                                  
-                prevEvent = connection["ConnectionType"]                      
-                prevTime = connection['TimeMili']
-        if startingTime == 0:
-            startingTime = connection["TimeMili"]
-            finishingTime = connection['TimeMili']  
-        else:
-            if startingTime > connection['TimeMili']:
-                startingTime = connection['TimeMili']
-            if finishingTime < connection['TimeMili']:
-                finishingTime = connection['TimeMili']
-
-#        if connection["ConnectionType"] == "Connection" :
-#            connectionCounter += 1
-#            if timeFlag == 0:
-#                ctime = connection["TimeMili"] # secs
-#                timeFlag = 1
-#        if connection["ConnectionType"] == "Disconnection" :
-#            disconnectionCounter += 1
-#            if timeFlag == 1:
-#                connectionTotalTime = connectionTotalTime + (connection["TimeMili"] - ctime)
-#                timeFlag = 0
-#    # if the flag is 1, means that on the moment of taking the metrics we were connected
-#    if timeFlag == 1:
-#        connectionTotalTime = connectionTotalTime + (fileTime - ctime)
-    return contConn, contDisc, ttime/60000 # from millis to minutes ( /60*1000)
- 
-########### ------------------ Ploting Stage/Code AKA Wonderland ------------
-# TODO: - At one point would be nice to add the ploting stuff on a library itself
-
 
 def plotBarsFromPandas(panda, opts):
     print("Bar Graph from Panda")
@@ -377,30 +121,10 @@ def sortArrayMaxtoMin(xarray, yarray):
         maxIdx = yarray.index(maxV)
         x.append(xarray[maxIdx])
         y.append(maxV)
-        print("New line:", xarray[maxIdx], maxV)
+
         xarray.pop(maxIdx)
         yarray.pop(maxIdx)
     return x, y
-
-# Reuturns on 2 arrays the names found and the values, grouped by te clientNames/arrayOfNames
-def sortArrayByNames(xarray, yarray, clientNames):
-    namesarray = []
-    valuesarray = [] 
-
-    for idx, clientType in enumerate(clientNames):
-        auxnames = []
-        auxvalues = []
-        for index, item in enumerate(xarray):
-            if clientType.lower() in item.lower():
-                auxnames.append(item)
-                auxvalues.append(int(yarray[index]))
-        namesarray.append(auxnames)
-
-        if not auxvalues:
-            auxvalues = [0]
-        valuesarray.append(auxvalues)
-
-    return namesarray, valuesarray
 
 # Funtion that plots the given array into a pie chart 
 def plotSinglePieFromArray(xarray, opts):
@@ -462,6 +186,7 @@ def plotDoublePieFromArray(xarray, opts):
         valsouter.append(total)
 
     cnt = 0
+
     # Temporal plot for the inner color_grids
     for idx, item in enumerate(opts['innercolors']):
         aux = plt.get_cmap(item, len(xarray[idx]))
@@ -522,14 +247,11 @@ def plotColumn(panda, opts):
 
     # TODO: add the sortting nativelly to the plot function
     if opts['sortmetrics'] != None:
-        print('Sorting') 
         sortedPanda = panda.sort_values(by=opts['sortmetrics'], ascending=False)
         if opts['xMetrics'] != None:
             sortedPanda.plot(ax=ax, logx=opts['xlog'], logy=opts['ylog'], x=opts['xMetrics'], y=opts['yMetrics'], style=opts['markerStyle'], marker=opts['marker'], markersize=opts['markerSize'], label=opts['legendLabel'])
         else: 
-            print(sortedPanda[opts['sortmetrics']])
             sortedPanda[opts['yMetrics']].sort_values(by=opts['sortmetrics'], ascending=False).plot(ax=ax, logx=opts['xlog'], logy=opts['ylog'], style=opts['markerStyle'], marker=opts['marker'], markersize=opts['markerSize'], label=opts['legendLabel'])
-        print('Done')
     else:
         panda.plot(ax=ax, logx=opts['xlog'], logy=opts['ylog'], x=opts['xMetrics'], y=opts['yMetrics'], style=opts['markerStyle'], marker=opts['marker'], markersize=opts['markerSize'], label=opts['legendLabel'])
     
@@ -596,10 +318,27 @@ def plotColumn(panda, opts):
 def getLengthOfPanda(panda):
     return len(panda)
 
+def getTypesPerName(panda, c1name, column1, column2):
+    types = []
+    typeCounter = []
+    totalCounter = 0
+    for index, row in panda.iterrows():
+        if c1name.lower() == str(row[column1]).lower():
+            totalCounter = totalCounter + 1
+            # Check if the version is already in types
+            if str(row[column2]) not in types:
+                types.append(str(row[column2]))
+                typeCounter.append(1)
+            else:
+                idx = types.index(str(row[column2]))
+                typeCounter[idx] = typeCounter[idx] + 1
+    if not typeCounter:
+        typeCounter.append(0)
+    return totalCounter, types, typeCounter
+
 # Function that gets the data (counter, sum, avg) of the given metric from the panda
 def getDataFromPanda(panda, ymetrics, xmetrics, xarray, flag):
     yarray = []
-    print(xarray)
     if flag == 'counter':
         for _, item in enumerate(xarray):
             auxAmount = panda.apply(lambda x: True if item.lower() in str(x[xmetrics]).lower() else False, axis=1)
@@ -680,72 +419,24 @@ def main():
     textSize = 14
 
     # End of plotting variables
-    print(sys.argv[1])
-    if sys.argv[1] == 'json':
-        peerstoreFile = sys.argv[2]
-        rumorMetricsFile = sys.argv[3]
-        outputFigsFolder = sys.argv[4]
-        outputCsvFile = sys.argv[5]
-
-        # Start preparing the data for a later plots
-        peerstoreMetrics = getDictFromJson(peerstoreFile)
-        rumorMetricsPanda = getPandaobjectFromJson(rumorMetricsFile, peerstoreMetrics)
-        
-        rumorMetricsPanda.to_csv(outputCsvFile)
-        print(rumorMetricsPanda)
-
-    if sys.argv[1] == 'csv':
-        peerstoreFile = sys.argv[2]
-        rumorMetricsFile = sys.argv[3]
-        outputFigsFolder = sys.argv[4]
-        
-        peerstoreMetrics  = getDictFromJson(peerstoreFile)
-        peerstorePanda = getPandaobjectFromPeerstoreJson(peerstoreFile)
-
-        rumorMetricsPanda = pd.read_csv(rumorMetricsFile)
-
-
-        # plot just the peerstore
-        xarray, yarray = getDataFromPanda(peerstorePanda, None, "ClientType", ['ligh', 'teku', 'nim', 'prysm', 'lod', 'Unknown'], 'counter')
-
-        plotBarsFromArrays(xarray, yarray, opts={                                            
-            'figSize': figSize,                                                          
-            'figTitle': 'PeerstoreClientType.png',                                
-            'outputPath': outputFigsFolder,                                                    
-            'align': 'center', 
-            'barValues': True,
-            'barColor': ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple', 'k' ],
-            'textSize': textSize,                                                         
-            'yLowLimit': 0,                                                             
-            'yUpperLimit': None,                                                        
-            'title': "Client Types on the Peerstore",                             
-            'xlabel': ['Lighthouse', 'Teku', 'Nimbus', 'Prysm', 'Lodestar', 'Unknown'],                                   
-            'ylabel': 'Number of peers',                                                
-            'xticks': xarray,                                                           
-            'titleSize': titleSize,                                                        
-            'labelSize': labelSize,                                                        
-            'lengendPosition': 1,                                                   
-            'legendSize': labelSize,                                                       
-            'xticksSize': ticksSize,                                                       
-            'yticksSize': ticksSize,                                                           
-            'tickRotation': 0,
-            'show': False}) 
-
-
-
+    csvFile = sys.argv[1]
+    peerstoreFile = sys.argv[2]
+    outputFigsFolder = sys.argv[3]
     
+    peerstorePanda = getPandaFromPeerstoreJson(peerstoreFile)
+    rumorMetricsPanda = pd.read_csv(csvFile)
+
+
+    # ---------- PLOT SECUENCE -----------
+
     # ------ Get data for plotting -------
     clientList = ['Lighthouse', 'Teku', 'Nimbus', 'Prysm', 'Lodestar', 'Unknown']
     clientColors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple', 'k' ]
     innerColors = ['Blues', 'Oranges', 'Greens', 'Reds', 'Purples', 'Greys' ]
-    print(clientList)
-    
 
     # get length of the peerstore
-    peerstoreSize = getLengthOfPanda(peerstoreMetrics)
-    print("Peerstore Size:", peerstoreSize)
+    peerstoreSize = getLengthOfPanda(peerstorePanda)
     peerMetricsSize = getLengthOfPanda(rumorMetricsPanda)
-    print("Peerstore Size:", peerMetricsSize)
 
     xarray = ['Peerstore', 'Connected Peers']
     yarray = [peerstoreSize, peerMetricsSize]
@@ -773,87 +464,22 @@ def main():
         'yticksSize': ticksSize,                                                       
         'tickRotation': 0,                                                     
         'show': False})
-    
-    """
-    # get the number of peers per client
-    print(clientList)
-    xarray, yarray = getDataFromPanda(rumorMetricsPanda, None, "ClientType", clientList, 'counter')
-    """
 
-    clientVersList = getItemsFromColumn(rumorMetricsPanda, 'ClientType')
-    print(clientVersList)
+    clientCounter = []
+    types         = []
+    typesCounter  = []
 
-    lightarray = []
-    tekuarray = []
-    nimbusarray = []
-    prysmarray = []
-    lodesarray = []
-    unknarray = []
-    # iterate through the items on the received names
-    for idx, item in enumerate(clientVersList):
-        if 'ligh' in item.lower():
-            aux = item.rsplit('/', 1)[0]
-            aux = aux.rsplit('-', 1)[0]
-            try: 
-                i = lightarray.index(aux); 
-            except ValueError: 
-                lightarray.append(aux)
-        if 'teku' in item.lower():
-            aux = item.rsplit('/', 2)[0]
-            aux = aux.rsplit('+', 1)[0]
-            try: 
-                i = tekuarray.index(aux); 
-            except ValueError: 
-                tekuarray.append(aux)
-        if 'nim' in item.lower():
-            aux = item.rsplit('/', 1)[0]
-            aux = aux.rsplit('+', 1)[0]
-            try: 
-                i = nimbusarray.index(aux); 
-            except ValueError: 
-                nimbusarray.append(aux)
+    for idx, item in enumerate(clientList):
+        tcnt, tp, tpc = getTypesPerName(rumorMetricsPanda, item, 'Client', 'Version')
+        clientCounter.append(tcnt)
+        types.append(tp)
+        typesCounter.append(tpc)
 
-        if 'pry' in item.lower():
-            aux = item.rsplit('/', 1)[0]
-            aux = aux.rsplit('+', 1)[0]
-            try: 
-                i = prysmarray.index(aux); 
-            except ValueError: 
-                prysmarray.append(aux)
-        if 'lod' in item.lower():
-            aux = item.rsplit('/', 1)[0]
-            aux = aux.rsplit('+', 1)[0]
-            try: 
-                i = lodesarray.index(aux); 
-            except ValueError: 
-                lodesarray.append(aux)
-        if 'unkn' in item.lower():
-            aux = item.rsplit('/', 1)[0]
-            aux = aux.rsplit('+', 1)[0]
-            try: 
-                i = unknarray.index(aux.lower())
-                
-            except ValueError: 
-                try:
-                    p = prysmarray.index(aux)
-                except:
-                    unknarray.append(aux.lower())
+    xarray = types
+    yarray = typesCounter
+    namesarray = clientList
 
-    print('light:', len(lightarray))
-    print('Teku:', len(tekuarray))
-    print('Nimbus:', len(nimbusarray))
-    print('Prysm', len(prysmarray))
-    print('Lodestar', len(lodesarray))
-    print('Unknown', len(unknarray))
-
-    clientVersList = lightarray + tekuarray + nimbusarray + prysmarray + lodesarray + unknarray
-    print(clientVersList)
-
-
-    xarray, yarray = getDataFromPanda(rumorMetricsPanda, None, "ClientType", clientVersList, 'counter')
-    namesarray, valuesarray = sortArrayByNames(xarray, yarray, clientList)
-
-    plotDoublePieFromArray(valuesarray, opts={                                   
+    plotDoublePieFromArray(yarray, opts={                                   
         'figsize': figSize,                                                      
         'figtitle': 'PeersPerClient.png',                                    
         'outputpath': outputFigsFolder,
@@ -861,7 +487,7 @@ def main():
         'autopct': "pcts", #False,
         'pctdistance': 1.65,
         'edgecolor': 'w',
-        'innerlabels': clientVersList,
+        'innerlabels': types,
         'outerlabels': clientList,
         'labeldistance': 1.25,
         'innercolors': innerColors,
@@ -875,10 +501,16 @@ def main():
         'lengendposition': None,                                                   
         'legendsize': labelSize,                                                     
         'show': False})
-    
-    print("{:<30} {:<15}".format('ClientVersion', 'NumbersPeers'))
-    for idx, iten in enumerate(xarray):
-        print("{:<30} {:<15}".format(xarray[idx], yarray[idx]))
+
+    print("| {:<35}| {:<15}|".format('ClientVersion', 'NumbersPeers'))
+    print("-------------------------------------------------------")
+    for idx, item in enumerate(clientList):
+        print("| {:<35}| {:<15}|".format(item, clientCounter[idx]))
+        print("-------------------------------------------------------")
+        v = types[idx]
+        for j, n in enumerate(v):
+            print(" -> {:<33}| {:<15}|".format(v[j], yarray[idx][j]))
+        print("-------------------------------------------------------")
 
 
 
@@ -893,16 +525,12 @@ def main():
         if auxyarray[idx] >= countryLimit:
             yarray.append(item)
             xarray.append(auxxarray[idx])
-    
-    print("X before ->", xarray)                                                       
-    print("Y before ->", yarray) 
+
     xarray, yarray = sortArrayMaxtoMin(xarray, yarray)
     # Get Color Grid
-    print("X ->", xarray)
-    print("Y ->", yarray)
     barColor = GetColorGridFromArray(yarray)
-    
-    
+
+
     plotBarsFromArrays(xarray, yarray, opts={                                            
         'figSize': (12,7),                                                          
         'figTitle': 'PeersPerCountries.png',                                
@@ -925,29 +553,9 @@ def main():
         'yticksSize': ticksSize+2,                                                            
         'tickRotation': 90,
         'show': False})   
-    """
-    plotSinglePieFromArray(yarray, opts={                                   
-        'figsize': figSize,                                                      
-        'figtitle': 'PeerstoreVsConnectedPeers.png',                                    
-        'outputpath': outputFigsFolder,
-        'piesize': 0.3,                                                      
-        'autopct': '%f.f',
-        'edgecolor': 'w',
-        'piecolors': barColor,
-        'labels': countriesList,
-        'shadow': None,
-        'startangle': 90,                                                  
-        'title': "Number of Peers From Each Client and Their Versions",                   
-        'titlesize': titleSize,                                                        
-        'labelsize': labelSize, 
-        'legend': False,                                                       
-        'lengendposition': 1,                                                   
-        'legendsize': labelSize,                                                     
-        'show': False})
-    """
 
     # get the average of connections per client
-    xarray, yarray = getDataFromPanda(rumorMetricsPanda, "Connections", "ClientType", clientList, 'avg') 
+    xarray, yarray = getDataFromPanda(rumorMetricsPanda, "Connections", "Client", clientList, 'avg') 
 
     plotBarsFromArrays(xarray, yarray, opts={                                            
         'figSize': figSize,                                                          
@@ -973,7 +581,7 @@ def main():
         'show': False}) 
 
     # get the average of disconnections per client
-    xarray, yarray = getDataFromPanda(rumorMetricsPanda, "Disconnections", "ClientType", clientList, 'avg') 
+    xarray, yarray = getDataFromPanda(rumorMetricsPanda, "Disconnections", "Client", clientList, 'avg') 
 
     plotBarsFromArrays(xarray, yarray, opts={                                            
         'figSize': figSize,                                                          
@@ -999,7 +607,7 @@ def main():
         'show': False}) 
 
     # get the average of ConnectedTime per client
-    xarray, yarray = getDataFromPanda(rumorMetricsPanda, "ConnectedTime", "ClientType", clientList, 'avg') 
+    xarray, yarray = getDataFromPanda(rumorMetricsPanda, "Connected Time", "Client", clientList, 'avg') 
 
     plotBarsFromArrays(xarray, yarray, opts={                                            
         'figSize': figSize,                                                          
@@ -1030,7 +638,7 @@ def main():
     xarray = clientList
     yarray = []
     latAuxArray = []
-    xmetrics = 'ClientType'
+    xmetrics = 'Client'
     ymetrics = 'Latency'
     contador = 0
     prysmCnt = 0
@@ -1055,15 +663,14 @@ def main():
             yarray.append(round((auxCnt/(len(auxAmount[auxAmount == True].index))),1))
         else:
             yarray.append(0)
-
+    """
     print("len of the connected peers:", len(rumorMetricsPanda))
     print("Number of peers with 0 latency:", contador)
     print("Number of Prysm clients with 0 latency:", prysmCnt )
     print("Number of Prysm clients with lat != 0:", prysmTCnt)
     print("number of peers with more than 1 sec of latency", latAuxArray)
-    print(xarray)
-    print(yarray)
-    
+    """
+
     plotBarsFromArrays(xarray, yarray, opts={                                            
         'figSize': figSize,                                                          
         'figTitle': 'AverageLatencyPerClientType.png',                                
@@ -1090,8 +697,8 @@ def main():
 
     # GossipSub
     # BeaconBlock
-    xarray, yarray = getDataFromPanda(rumorMetricsPanda, "BeaconBlockCnt", "ClientType", clientList, 'sum') 
-    
+    xarray, yarray = getDataFromPanda(rumorMetricsPanda, "Beacon Blocks", "Client", clientList, 'sum') 
+
     plotBarsFromArrays(xarray, yarray, opts={                                            
         'figSize': figSize,                                                          
         'figTitle': 'MessagesFromBeaconBlock.png',                                
@@ -1117,7 +724,7 @@ def main():
 
 
     # get the average of connections per client
-    xarray, yarray = getDataFromPanda(rumorMetricsPanda, "BeaconBlockCnt", "ClientType", clientList, 'avg') 
+    xarray, yarray = getDataFromPanda(rumorMetricsPanda, "Beacon Blocks", "Client", clientList, 'avg') 
 
     plotBarsFromArrays(xarray, yarray, opts={                                            
         'figSize': figSize,                                                          
@@ -1143,8 +750,8 @@ def main():
         'show': False}) 
 
     # BeaconAggregateAndProof
-    xarray, yarray = getDataFromPanda(rumorMetricsPanda, "BeaconAggregateProofCnt", "ClientType", clientList, 'sum') 
-    
+    xarray, yarray = getDataFromPanda(rumorMetricsPanda, "Beacon Aggregations", "Client", clientList, 'sum') 
+
     plotBarsFromArrays(xarray, yarray, opts={                                            
         'figSize': figSize,                                                          
         'figTitle': 'MessagesFromBeaconAggregateProof.png',                                
@@ -1170,7 +777,7 @@ def main():
 
 
     # get the average of connections per client
-    xarray, yarray = getDataFromPanda(rumorMetricsPanda, "BeaconAggregateProofCnt", "ClientType", clientList, 'avg') 
+    xarray, yarray = getDataFromPanda(rumorMetricsPanda, "Beacon Aggregations", "Client", clientList, 'avg') 
 
     plotBarsFromArrays(xarray, yarray, opts={                                            
         'figSize': figSize,                                                          
@@ -1196,8 +803,8 @@ def main():
         'show': False}) 
 
     # VoluntaryExit
-    xarray, yarray = getDataFromPanda(rumorMetricsPanda, "VoluntaryExitCnt", "ClientType", clientList, 'sum') 
-    
+    xarray, yarray = getDataFromPanda(rumorMetricsPanda, "Voluntary Exits", "Client", clientList, 'sum') 
+
     plotBarsFromArrays(xarray, yarray, opts={                                            
         'figSize': figSize,                                                          
         'figTitle': 'MessagesFromVoluntaryExit.png',                                
@@ -1223,7 +830,7 @@ def main():
 
 
     # get the average of connections per client
-    xarray, yarray = getDataFromPanda(rumorMetricsPanda, "VoluntaryExitCnt", "ClientType", clientList, 'avg') 
+    xarray, yarray = getDataFromPanda(rumorMetricsPanda, "Voluntary Exits", "Client", clientList, 'avg') 
 
     plotBarsFromArrays(xarray, yarray, opts={                                            
         'figSize': figSize,                                                          
@@ -1249,8 +856,8 @@ def main():
         'show': False}) 
 
     # AttesterSlashing
-    xarray, yarray = getDataFromPanda(rumorMetricsPanda, "AttesterSlashingCnt", "ClientType", clientList, 'sum') 
-    
+    xarray, yarray = getDataFromPanda(rumorMetricsPanda, "Attester Slashings", "Client", clientList, 'sum') 
+
     plotBarsFromArrays(xarray, yarray, opts={                                            
         'figSize': figSize,                                                          
         'figTitle': 'MessagesFromAttesterSlashing.png',                                
@@ -1276,7 +883,7 @@ def main():
 
 
     # get the average of connections per client
-    xarray, yarray = getDataFromPanda(rumorMetricsPanda, "AttesterSlashingCnt", "ClientType", clientList, 'avg') 
+    xarray, yarray = getDataFromPanda(rumorMetricsPanda, "Attester Slashings", "Client", clientList, 'avg') 
 
     plotBarsFromArrays(xarray, yarray, opts={                                            
         'figSize': figSize,                                                          
@@ -1302,8 +909,8 @@ def main():
         'show': False}) 
 
     # ProposerSlashing
-    xarray, yarray = getDataFromPanda(rumorMetricsPanda, "ProposerSlashingCnt", "ClientType", clientList, 'sum') 
-    
+    xarray, yarray = getDataFromPanda(rumorMetricsPanda, "Proposer Slashings", "Client", clientList, 'sum') 
+
     plotBarsFromArrays(xarray, yarray, opts={                                            
         'figSize': figSize,                                                          
         'figTitle': 'MessagesFromProposerSlashing.png',                                
@@ -1329,7 +936,7 @@ def main():
 
 
     # get the average of connections per client
-    xarray, yarray = getDataFromPanda(rumorMetricsPanda, "ProposerSlashingCnt", "ClientType", clientList, 'avg') 
+    xarray, yarray = getDataFromPanda(rumorMetricsPanda, "Proposer Slashings", "Client", clientList, 'avg') 
 
     plotBarsFromArrays(xarray, yarray, opts={                                            
         'figSize': figSize,                                                          
@@ -1419,7 +1026,7 @@ def main():
         'legend': False,                                         
         'align': 'center',
         'ylog': False,
-        'xmetrics': ['ConnectedTime'],                                                      
+        'xmetrics': ['Connected Time'],                                                      
         'barValues': None,   
         'barColor': barColor,                                               
         'yLowLimit': 0,                                                         
@@ -1448,12 +1055,12 @@ def main():
         'outputPath': outputFigsFolder,
         'legend': False,                                         
         'align': 'center',
-        'ylog': False,
+        'ylog': True,
         'xmetrics': ['Latency'],                                                      
         'barValues': None,   
         'barColor': barColor,                                               
         'yLowLimit': 0,                                                         
-        'yUpperLimit': 5,
+        'yUpperLimit': None,
         'grid': 'y',                                                    
         'title': "Latency with each Peer",                  
         'xlabel': "Peers Connected",                                                         
@@ -1473,16 +1080,12 @@ def main():
     barColor = 'black'
     messagesDics = {}
     for index, row in rumorMetricsPanda.iterrows():
-        if row['BeaconBlockCnt'] in messagesDics:
-            messagesDics[row['BeaconBlockCnt']] = messagesDics[row['BeaconBlockCnt']] + 1
+        if row['Beacon Blocks'] in messagesDics:
+            messagesDics[row['Beacon Blocks']] = messagesDics[row['Beacon Blocks']] + 1
         else:
-            messagesDics[row['BeaconBlockCnt']] = 1
-
-    #print(messagesDics)
+            messagesDics[row['Beacon Blocks']] = 1
 
     sortedDict = collections.OrderedDict(sorted(messagesDics.items()))
-
-    print(sortedDict)
 
     xarray = []
     yarray = []
@@ -1490,38 +1093,7 @@ def main():
         xarray.append(item)
         yarray.append(sortedDict[item])
 
-    print(xarray)
-    print(yarray)
-
-#    plotBarsFromPandas(rumorMetricsPanda, opts={                                   
-#        'figSize': wideFigSize,                                                      
-#        'figTitle': 'BeaconBlockMessagePerClient.png',                                    
-#        'outputPath': outputFigsFolder,
-#        'legend': False,                                         
-#        'align': 'center',
-#        'ylog': True,
-#        'xmetrics': ['BeaconBlockCnt'],                                                      
-#        'barValues': None,   
-#        'barColor': barColor,                                               
-#        'yLowLimit': 0,                                                         
-#        'yUpperLimit': None,
-#        'grid': 'y',                                                    
-#        'title': "Number of Beacon Blocks Received from each Peer",                  
-#        'xlabel': "Peers Connected",                                                         
-#        'ylabel': 'Number of Messages Sent',                                      
-#        'xticks': None,                                                       
-#        'titleSize': titleSize +2,                                                        
-#        'labelSize': labelSize +2,                                                        
-#        'lengendPosition': 1,                                                   
-#        'legendSize': labelSize +2,                                                       
-#        'xticksSize': ticksSize +2,                                                       
-#        'yticksSize': ticksSize +2,                                                     
-#        'tickRotation': 0,                                                     
-#        'show': False}) 
-
-    print(rumorMetricsPanda.loc[rumorMetricsPanda['BeaconBlockCnt'].idxmax()])
-
-    print(rumorMetricsPanda['BeaconBlockCnt'])
+    #print(rumorMetricsPanda.loc[rumorMetricsPanda['Beacon Blocks'].idxmax()])
 
     plotColumn(rumorMetricsPanda, opts={
         'figSize': wideFigSize, 
@@ -1530,8 +1102,8 @@ def main():
         'xlog': False,
         'ylog': True,
         'xMetrics': None,
-        'yMetrics': ['BeaconBlockCnt'],
-        'sortmetrics': 'BeaconBlockCnt',
+        'yMetrics': ['Beacon Blocks'],
+        'sortmetrics': 'Beacon Blocks',
         'xticks': None,
         'xLowLimit': 0,
         'xUpperLimit': len(rumorMetricsPanda),
@@ -1562,41 +1134,13 @@ def main():
         'tickSize': 16})
 
 
-
-#    plotBarsFromArrays(xarray, yarray, opts={                                            
-#        'figSize': figSize,                                                          
-#        'figTitle': 'BeaconBlockMessageDistribution.png',                                
-#        'outputPath': outputFigsFolder,                                                    
-#        'align': 'center', 
-#        'barValues': None,
-#        'barColor': barColor,
-#        'textSize': textSize,                                                         
-#        'yLowLimit': 0,                                                             
-#        'yUpperLimit': None,                                                        
-#        'title': "Beacon Block Messages Distribution among the Peers",                             
-#        'xlabel': "Number of Messages Sent ",                                   
-#        'ylabel': 'Number of Peers',                                                
-#        'xticks': xarray,                                                           
-#        'titleSize': titleSize,                                                        
-#        'labelSize': labelSize,                                                        
-#        'lengendPosition': 1,                                                   
-#        'legendSize': labelSize,                                                       
-#        'xticksSize': ticksSize-2,                                                       
-#        'yticksSize': ticksSize,                                                             
-#        'tickRotation': 90,
-#        'show': False}) 
-
     barColor = 'black'
 
-    auxPanda = rumorMetricsPanda.sort_values(by='BeaconBlockCnt', ascending=True)
+    auxPanda = rumorMetricsPanda.sort_values(by='Beacon Blocks', ascending=True)
     cont = 0
-#    for index, row in auxPanda.iterrows():
-#        print(row['BeaconBlockCnt'])
-            
 
-
-    auxrow = rumorMetricsPanda.loc[rumorMetricsPanda['ConnectedTime'].idxmax()]
-    maxX = auxrow['ConnectedTime'] 
+    auxrow = rumorMetricsPanda.loc[rumorMetricsPanda['Connected Time'].idxmax()]
+    maxX = auxrow['Connected Time'] 
 
     plotColumn(rumorMetricsPanda, opts={
         'figSize': wideFigSize, 
@@ -1604,8 +1148,8 @@ def main():
         'outputPath': outputFigsFolder,
         'xlog': False,
         'ylog': True,
-        'xMetrics': 'ConnectedTime',
-        'yMetrics': ['TotalMessages'],
+        'xMetrics': 'Connected Time',
+        'yMetrics': ['Total Messages'],
         'sortmetrics': None,
         'xticks': 1,
         'xLowLimit': 0,
@@ -1636,14 +1180,9 @@ def main():
         'legendSize': 16,
         'tickSize': 16})
 
-
-
-
     # ------ End of Get data -------
 
-    print("Finished!, Ciao!")
-
-
+    print("Succesfully Analyzed!")
 
 if __name__ == '__main__':
     main()
