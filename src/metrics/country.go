@@ -1,7 +1,7 @@
 package metrics
 
-var CountryList []string
+type CountryList []string
 
-func (cl *CountryList) NewItem(newItem string) {
-    cl = append(cl, newItem)
+func (cl *CountryList) AddItem(newItem string) {
+    *cl = append(*cl, newItem)
 }

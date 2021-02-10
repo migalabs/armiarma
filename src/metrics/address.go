@@ -1,7 +1,7 @@
 package metrics
 
-var AddressList []string
+type AddressList []string
 
-func (al *AddressList) NewItem(newItem string) {
+func (al AddressList) AddItem(newItem string) {
     al = append(al, newItem)
 }

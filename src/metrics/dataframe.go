@@ -1,6 +1,7 @@
 package metrics
 
 import (
+    "sync"
     "fmt"
     "os"
     "time"
@@ -23,7 +24,7 @@ type MetricsDataFrame struct {
     // Metrics Related
     Connections     ConnectionList
     Disconnections  DisconnectionList
-    ConnectedTimes    ConnectTimeList
+    ConnectedTimes    ConnectedTimeList
 
     RBeaconBlocks   RBeaconBlockList
     RBeaconAggregations RBeaconAggregationList
@@ -31,7 +32,9 @@ type MetricsDataFrame struct {
     RProposerSlashings  RProposerSlashingList
     RAttesterSlashings  RAttesterSlashingList
 
-    ExportTime  time.Duration
+    // Aux
+    Len         int
+    ExportTime  time.Time
 }
 
 
@@ -39,66 +42,97 @@ type MetricsDataFrame struct {
 func NewMetricsDataFrame(metricsCopy sync.Map) *MetricsDataFrame {
     // Initialize the DataFrame with the expoting time
     mdf := &MetricsDataFrame{
+        Len:        0,
         ExportTime: time.Now(),
     }
-
+    fmt.Println("Exproting, leng of the sync.Map:")
     // Generate the loop over each peer of the Metrics
-    metricsCopy.Range(func (k, v interface{}){
-        v = v.(PeerMetrics)
-        mdf.PeerIds.AddNew(v.PeerId)
-        mdf.NodeIds.AddNew(v.NodeId)
+    metricsCopy.Range(func (k, val interface{}) bool{
+        var v PeerMetrics
+        v = val.(PeerMetrics)
+        fmt.Println("Copying the od metrics to the dataframe")
+        mdf.PeerIds.AddItem(v.PeerId)
+        mdf.NodeIds.AddItem(v.NodeId)
         // Parse the client and version type from the UserAgent/ClientType
         client, version := FilterClientType(v.ClientType)
-        mdf.ClientTypes.AddNew(client)
-        mdf.ClientVersions.AddNew(version)
-        mdf.PubKeys.AddNew(v.Pubkey)
-        mdf.Addresses.AddNew(v.Addrs)
-        mdf.Ips.AddNew(v.Ip)
-        mdf.Countries.AddNew(v.Country)
-        mdf.Cities.AddNew(v.City)
-        mdf.Latency.AddNew(v.Lantency) // in milliseconds
+        mdf.ClientTypes.AddItem(client)
+        mdf.ClientVersions.AddItem(version)
+        mdf.PubKeys.AddItem(v.Pubkey)
+//        mdf.Addresses.AddItem(v.Addrs)
+        mdf.Ips.AddItem(v.Ip)
+        mdf.Countries.AddItem(v.Country)
+        mdf.Cities.AddItem(v.City)
+        mdf.Latencies.AddItem(v.Latency) // in milliseconds
         // Analyze the connections from the events
         connections, disconnections, connTime := AnalyzeConnectionEvents(v.ConnectionEvents, mdf.ExportTime)
-        mdf.ConnectionsList.AddNew(connections)
-        mdf.DisconnectionsList.AddNew(disconnections)
-        mdf.ConnectedTimes.AddNew(connTime)
+        mdf.Connections.AddItem(connections)
+        mdf.Disconnections.AddItem(disconnections)
+        mdf.ConnectedTimes.AddItem(connTime)
         // Gossip Messages
-        mdf.RBeaconBlocks.AddNew(v.BeaconBlock.Cnt)
-        mdf.RBeaconAggregations.AddNew(v.BeaconAggregateProof.Cnt)
-        mdf.RVoluntaryExit.AddNew(v.VoluntaryExit.Cnt)
-        mdf.RAttesterSlashing.AddNew(v.AttesterSlashing.Cnt)
-        mdf.RProposerSlashing.AddNew(v.ProposerSlashing.Cnt)
+        mdf.RBeaconBlocks.AddItem(v.BeaconBlock.Cnt)
+        mdf.RBeaconAggregations.AddItem(v.BeaconAggregateProof.Cnt)
+        mdf.RVoluntaryExits.AddItem(v.VoluntaryExit.Cnt)
+        mdf.RAttesterSlashings.AddItem(v.AttesterSlashing.Cnt)
+        mdf.RProposerSlashings.AddItem(v.ProposerSlashing.Cnt)
+        
+        mdf.Len = mdf.Len+1
+        fmt.Println(mdf.Addresses)
+        return true
     })
     // return the new generated dataframe
+    fmt.Println("Len of the dataframe", len(mdf.PeerIds), mdf.Len)
     return mdf
 }
 
 // export MetricsDataFrame into a CSV format
-func (mdf *MetricsDataFrame) ExportToCSV(filePath string) error {
+func (mdf MetricsDataFrame) ExportToCSV(filePath string) error {
+    fmt.Println("Exporting the metrics")
+    fmt.Println(mdf)
     csvFile, err := os.Create(filePath) // Create, New file, if exist overwrite
     if err != nil{
         return fmt.Errorf("Error Opening the file:", filePath)
     }
     defer csvFile.Close()
     // First raw of the file will be the Titles of the columns
-    _, err := csvFile.WriteString("Peer Id, Node Id, Client, Version, Pubkey, Address, Ip, 
-                                    Country, City, Latency, Connections, Disconnections, 
-                                    Connected Time, Beacon Blocks, Beacon Aggregations, 
-                                    Voluntary Exits, Proposer Slashings, Attester Slashings\n")
+    _, err = csvFile.WriteString("Peer Id,Node Id,Client,Version,Pubkey,Ip,Country,City,Latency,Connections,Disconnections,Connected Time,Beacon Blocks,Beacon Aggregations,Voluntary Exits,Proposer Slashings,Attester Slashings")
     if err != nil{
         return fmt.Errorf("Error while Writing the Titles on the csv")
     }
-    for idx, item in range mdf.PeerIds{ // all the fields must have the same length,
+    fmt.Println("len of the dataframe when exporting:", len(mdf.PeerIds))
+    fmt.Println("List of peers", mdf.Addresses)
+//    for idx, _ := range mdf.PeerIds{ // all the fields must have the same length,
+    for idx := 0; idx < mdf.Len; idx++{
         var csvRow string
+        fmt.Println("Item Number:", idx)
         // write the csv row format on a string
-        fmt.Fprintln(&csvRow, mdf.PeerIds[idx], ",", mdf.PeerIds[idx], ",", mdf.NodeIds[idx], ",", mdf.ClientTypes[idx], ",",
-                    mdf.ClientVersions[idx], ",", mdf.PubKeys[idx], ",", mdf.Addresses[idx], ",", mdf.Ips[idx], ",",
-                    mdf.Countries[idx], ",", mdf.Cities[idx], ",", mdf.Latencies[idx], ",", mdf.Connections[idx], ",",
-                    mdf.Disconnections[idx], ",", mdf.ConnectedTimes[idx], ",", mdf.RBeaconBlocks[idx], ",", mdf.RBeaconAggregateProof[idx], ",",
-                    mdf.RVoruntaryExits[idx], ",", mdf.RProposerSlashings[idx], ",", mdf.RAttesterSlashings[idx])
-        _, err := csvFile.WriteString(csvRow)
-        if err != nil {
-            return fmt.Errorf("Error writing the row:" idx, "on the CSV file. Row:", csvRow)
+        fmt.Println(mdf.PeerIds[idx].String())
+        fmt.Println(mdf.NodeIds[idx])
+        fmt.Println(mdf.ClientTypes[idx])
+        fmt.Println(mdf.ClientVersions[idx])
+        fmt.Println(mdf.PubKeys[idx])
+//        fmt.Println(mdf.Addresses[idx])
+        fmt.Println(mdf.Ips[idx])
+        fmt.Println(mdf.Countries[idx])
+        fmt.Println(mdf.Cities[idx])
+        fmt.Println(string(mdf.Latencies[idx]))
+        fmt.Println(string(mdf.Connections[idx]))
+        fmt.Println(string(mdf.Disconnections[idx]))
+        fmt.Println(string(mdf.ConnectedTimes[idx]))
+        fmt.Println(string(mdf.RBeaconBlocks[idx]))
+        fmt.Println(string(mdf.RBeaconAggregations[idx]))
+        fmt.Println(string(mdf.RVoluntaryExits[idx]))
+        fmt.Println(string(mdf.RProposerSlashings[idx]))
+        fmt.Println(string(mdf.RAttesterSlashings[idx]))
+
+        csvRow =  mdf.PeerIds[idx].String() +  "," +  mdf.NodeIds[idx] +  "," +  mdf.ClientTypes[idx] +  "," +
+                    mdf.ClientVersions[idx] +  "," +  mdf.PubKeys[idx] +  "," +  mdf.Ips[idx] +  "," + 
+                    mdf.Countries[idx] +  "," +  mdf.Cities[idx] +  "," +  string(mdf.Latencies[idx]) +  "," +  string(mdf.Connections[idx]) +  "," + 
+                    string(mdf.Disconnections[idx]) +  "," +  string(mdf.ConnectedTimes[idx]) +  "," +  string(mdf.RBeaconBlocks[idx]) +  "," +  string(mdf.RBeaconAggregations[idx]) +  "," + 
+                    string(mdf.RVoluntaryExits[idx]) +  "," +  string(mdf.RProposerSlashings[idx]) +  "," +  string(mdf.RAttesterSlashings[idx])
+        fmt.Println("New Row on the csv" , csvRow)
+         _, err = csvFile.WriteString(csvRow)
+        if err != nil{
+            return fmt.Errorf("Error while Writing the Titles on the csv")
         }
     }
     return nil
@@ -110,7 +144,7 @@ func GetMetricsDuplicate(original sync.Map) sync.Map{
     var newMap sync.Map
     // Iterate through the items on the original Map
     original.Range(func(k, v interface{})bool{
-        cp, ok := v.(metrics.PeerMetrics)
+        cp, ok := v.(PeerMetrics)
         if ok {
             newMap.Store(k, cp)
         }

@@ -1,7 +1,7 @@
 package metrics
 
-var CityList []string
+type CityList []string
 
 func (cl *CityList) AddItem(newItem string) {
-    cl = append(cl, newItem)
+    *cl = append(*cl, newItem)
 }

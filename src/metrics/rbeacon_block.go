@@ -1,7 +1,7 @@
 package metrics
 
-var RBeaconBlockList []int64
+type RBeaconBlockList []int64
 
-func (bb *RBeaconBlockList) AddNew(newItem int64) {
-    bb = append(bb, newItem)
+func (bb *RBeaconBlockList) AddItem(newItem int64) {
+    *bb = append(*bb, newItem)
 }

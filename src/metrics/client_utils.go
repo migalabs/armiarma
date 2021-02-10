@@ -1,11 +1,8 @@
 package metrics
 
 import (
-    "fmt"
     "strings"
 )
-
-var MainClients []string = {"Lighthouse", "Teku", "Prysm", "Nimbus", "Lodestar", "Unknown"}
 
 // Main function that will analyze the client type and verion out of the Peer UserAgent
 // return the Client Type and it's verison (if determined)
@@ -36,7 +33,7 @@ func FilterClientType( fullName string ) ( string, string) {
     } else if strings.Contains(fullName, "nimbus"){
         client = "Nimbus"
         version = "Unknown"
-    } else if stings.Contains(fullName, "lodestar"){
+    } else if strings.Contains(fullName, "lodestar"){
         client = "Lodestar"
         version = "Unknown"
     } else if strings.Contains(fullName, "unknown"){

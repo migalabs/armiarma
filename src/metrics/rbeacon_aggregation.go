@@ -1,7 +1,7 @@
 package metrics
 
-var RBeaconAggregationList []int64
+type RBeaconAggregationList []int64
 
-func (bb *RBeaconAggregationList) AddNew(newItem int64) {
-    bb = append(bb, newItem)
+func (bb *RBeaconAggregationList) AddItem(newItem int64) {
+    *bb = append(*bb, newItem)
 }

@@ -1,7 +1,7 @@
 package metrics
 
-var DisconnetionList []int64
+type DisconnectionList []int64
 
-func (cl *DisconnectionList) AddNew(newItem int64) {
-    cl = append(cl, newItem)
+func (cl *DisconnectionList) AddItem(newItem int64) {
+    *cl = append(*cl, newItem)
 }

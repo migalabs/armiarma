@@ -1,7 +1,7 @@
 package metrics
 
-var IpList []string
+type IpList []string
 
-func (il *IpList) NewItem(newItem string) {
-    il = append(il, newItem)
+func (il *IpList) AddItem(newItem string) {
+    *il = append(*il, newItem)
 }

@@ -22,7 +22,7 @@ import (
 type GossipMetrics struct {
     GossipMetrics   sync.Map
     TopicDatabase   database.TopicDatabase
-    StartTime       time.Duration
+    StartTime       time.Time
 }
 
 
@@ -203,7 +203,7 @@ func (c *GossipMetrics) FillMetrics(ep track.ExtendedPeerstore) {
 
             // Since we want to have the latest Latency, we always update it
             fmt.Println("Latency Empty", peerMetrics.Latency, "Adding Latency:", peerData.Latency)
-            peerMetrics.Latency = int64(peerData.Latency * time.Millisecond)
+            peerMetrics.Latency = int64(peerData.Latency / time.Millisecond)
             fmt.Println("Added Latency:", peerMetrics.Latency)
 
             // After check that all the info is ready, save the item back into the Sync.Map
@@ -244,10 +244,12 @@ func (c *GossipMetrics) ExportMetrics(filePath string, peerstorePath string, csv
 		return err
 	}
     // Generate the MetricsDataFrame of the Current Metrics
-    nMap := GetMetricsDuplicate(c.GossipMetrics)
+//    nMap := GetMetricsDuplicate(c.GossipMetrics)
     // Export the metrics to the given CSV file
-    mdf := NewMetricsDataFrame(nMap)
-    err := mdf.ExportToCSV(csvPath)
+    fmt.Println("Calling the data frame generator")
+    mdf := NewMetricsDataFrame(c.GossipMetrics)
+    fmt.Println("Calling the exporter")
+    err = mdf.ExportToCSV(csvPath)
 	if err != nil{
         fmt.Printf("Error:", err)
         return err

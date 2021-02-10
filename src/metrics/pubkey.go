@@ -1,9 +1,9 @@
 package metrics
 
-var PubKeyList []string
+type PubKeyList []string
 
 func (pl *PubKeyList) AddItem(newItem string) {
-    pl = append(pl, newItem)
+    *pl = append(*pl, newItem)
 }
 
 
