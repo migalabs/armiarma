@@ -1,0 +1,18 @@
+<!-- templates/base.html-->
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>{% block title %}Armiarma{% endblock %}</title>
+
+</head>
+<body>
+    <main>
+        <h1 style="text-align:center">Armiarma Analysis Visualyzer</h1>
+        <hr>
+        {% include 'navbar.html' %}
+        {% block content %}
+        {% endblock %}
+    </main>
+</body>
+</html>

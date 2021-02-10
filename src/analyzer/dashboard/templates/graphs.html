@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h1 style="text-align: center">Graph Summary</h1>
+<div>
+    <div style="width: 30%; float:left">
+        <h3 style="text-align: center">Graph List</h3>
+        <div style="align-content: center;">
+            <ul style="align-self: center;">
+                <li style="display: block"><a href="PeerstoreVsConnectedPeers">Crawled Peers VS Connected Peers</a></li>
+                <li style="display: block"><a href="PeersPerCountries">Peers Per Country</a></li>
+                <li style="display: block"><a href="PeersPerClient">Peers Per Client</a></li>
+                <li style="display: block"><a href="ConnectionsWithPeers">Connections With Peers</a></li>
+                <li style="display: block"><a href="DisconnectionsWithPeers">Disconnections With Peers</a></li>
+                <li style="display: block"><a href="TimeConnectedWithPeers">Time Connected With Peers</a></li>
+                <li style="display: block"><a href="LatencyWithPeers">Latency With Peers</a></li>
+                <li style="display: block"><a href="AverageLatencyPerClientType">Average Client Latency</a></li>
+                <li style="display: block"><a href="AverageOfConnectionsPerClientType">Average Client Connections</a></li>
+                <li style="display: block"><a href="AverageOfDisconnectionsPerClientType">Average Client Disconnetions</a></li>
+                <li style="display: block"><a href="AverageOfConnectedTimePerClientType">Average Client Connected Time</a></li>
+                <li style="display: block"><a href="MessagesFromBeaconBlock">Received Beacon Block Messages</a></li>
+                <li style="display: block"><a href="MessagesFromBeaconAggregateProof">Received Beacon Aggregation Messages</a></li>
+                <li style="display: block"><a href="MessagesFromVoluntaryExit">Received Voluntary Exit Messages</a></li>
+                <li style="display: block"><a href="MessagesFromAttesterSlashing">Received Attester Slashing Messages</a></li>
+                <li style="display: block"><a href="MessagesFromProposerSlashing">Received Proposer Slashing Messages</a></li>
+                <li style="display: block"><a href="MessageAverageFromBeaconBlock">Average Beacon Block Messages</a></li>
+                <li style="display: block"><a href="MessageAverageFromBeaconAggregateProof">Average Beacon Aggregation Messages</a></li>
+                <li style="display: block"><a href="MessageAverageFromVoluntaryExit">Average Voluntary Exit Messages</a></li>
+                <li style="display: block"><a href="MessageAverageFromAttesterSlashing">Average Attester Slashing Messages</a></li>
+                <li style="display: block"><a href="MessageAverageFromProposerSlashing">Average Proposer Slashing Messages</a></li>
+                <li style="display: block"><a href="BeaconBlockMessagePerClient">Beacon Block Messages Per Peer</a></li>
+                <li style="display: block"><a href="TotalMesagesPerTimeConnected">Total Received Messages Per Peer</a></li>
+            </ul>
+        </div>
+    </div>
+    <div style="width: 70%; float:left; display:flex; justify-content:center; align-items: center;">
+        <div style="max-width: 1000px; align-self: center;">        
+            {% block graph %} 
+                <h3 style="text-align: center; top: 50%">Select Graphs from the list on the left.</h3>
+            {% endblock %}
+        </div>
+    </div>
+</div>
+{% endblock %}
