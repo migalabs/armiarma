@@ -237,28 +237,21 @@ while getopts ":hcp" option; do
 
             aux="$analyzeFolder"
             # Set the Paths for the gossip-metrics.json peerstore.json and output
-            metrics="./examples/${analyzeFolder}/metrics/gossip-metrics.json"
+            csv="./examples/${aux}/metrics/metrics.csv"
             peerstore="./examples/${aux}/metrics/peerstore.json"
             plots="./examples/${aux}/plots"
-            csvs="./examples/${aux}/csvs"
+
 
             if [[ -d $plots ]]; then
                 echo ""
             else
-                mkdir "$plots"
+                mkdir "examples/${aux}/plots"
             fi
-
-            if [[ -d $csvs ]]; then
-                echo ""
-            else
-                mkdir "$csvs"
-            fi
-            csvs="${csvs}/armiarma-metrics.csv"
 
             # Run the Analyzer
             echo "  Launching analyzer"
             echo ""
-            python3 ./src/analyzer/armiarma-analyzer.py "json" "$peerstore" "$metrics" "$plots" "$csvs"
+            python3 ./src/analyzer/armiarma-analyzer.py "$csv" "$peerstore" "$plots" 
             
             # Deactivate the VENV
             deactivate
