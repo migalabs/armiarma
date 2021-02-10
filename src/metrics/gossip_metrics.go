@@ -50,7 +50,7 @@ type PeerMetrics struct {
 	Ip         string
 	Country    string
 	City       string
-	Latency    int64
+	Latency    float64
 
 	ConnectionEvents []ConnectionEvents
 	// Counters for the different topics
@@ -66,12 +66,12 @@ func NewPeerMetrics(peerId peer.ID) PeerMetrics {
 	pm := PeerMetrics{
 		PeerId:     peerId,
 		NodeId:     "",
-		ClientType: "",
+		ClientType: "Unknown",
 		Pubkey:     "",
-		Addrs:      "",
-		Ip:         "",
-		Country:    "",
-		City:       "",
+		Addrs:      "/ip4/127.0.0.1/0000",
+		Ip:         "127.0.0.1",
+		Country:    "Unknown",
+		City:       "Unknown",
 		Latency:    0,
 
 		ConnectionEvents: make([]ConnectionEvents, 1),
@@ -163,7 +163,7 @@ func (c *GossipMetrics) FillMetrics(ep track.ExtendedPeerstore) {
 				peerMetrics.NodeId = peerData.NodeID.String()
 			}
 
-			if len(peerMetrics.ClientType) == 0 {
+			if len(peerMetrics.ClientType) == 0 || peerMetrics.ClientType == "Unknown" {
 				//fmt.Println("ClientType empty", peerMetrics.ClientType, "Adding ClientType:", peerData.UserAgent)
 				peerMetrics.ClientType = peerData.UserAgent
 			}
@@ -173,13 +173,13 @@ func (c *GossipMetrics) FillMetrics(ep track.ExtendedPeerstore) {
 				peerMetrics.Pubkey = peerData.Pubkey
 			}
 
-			if len(peerMetrics.Addrs) == 0 {
+			if len(peerMetrics.Addrs) == 0 || peerMetrics.Addrs == "/ip4/127.0.0.1/0000" {
 				address := GetFullAddress(peerData.Addrs)
 				//fmt.Println("Addrs empty", peerMetrics.Addrs, "Adding Addrs:", address)
 				peerMetrics.Addrs = address
 			}
 
-			if len(peerMetrics.Country) == 0 {
+			if len(peerMetrics.Country) == 0 || peerMetrics.Country == "Unknown" {
 				if len(peerMetrics.Addrs) == 0 {
 					//fmt.Println("No Addrs on the PeerMetrics to request the Location")
 				} else {
@@ -193,7 +193,7 @@ func (c *GossipMetrics) FillMetrics(ep track.ExtendedPeerstore) {
 			}
 
 			// Since we want to have the latest Latency, we always update it
-			peerMetrics.Latency = int64(peerData.Latency / time.Millisecond)
+			peerMetrics.Latency = float64(peerData.Latency/time.Millisecond) / 1000
 
 			// After check that all the info is ready, save the item back into the Sync.Map
 			c.GossipMetrics.Store(key, peerMetrics)
@@ -291,6 +291,15 @@ func getIpAndLocationFromAddrs(multiAddrs string) (ip string, country string, ci
 
 	country = ipApiResp.Country
 	city = ipApiResp.City
+
+	// check if country and city are correctly imported
+	if len(country) == 0 || len(city) == 0 {
+		fmt.Println("There was an error getting the Location of the peer from the IP-API, please, check that there 40requests/minute limit hasn't been exceed")
+		country = "Unknown"
+		city = "Unknown"
+		return ip, country, city
+	}
+
 	// return the received values from the received message
 	return ip, country, city
 

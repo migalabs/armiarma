@@ -1,12 +1,12 @@
 package metrics
 
-type LatencyList []int64
+type LatencyList []float64
 
-func (ll *LatencyList) AddItem(newItem int64) { // In milliseconds
+func (ll *LatencyList) AddItem(newItem float64) { // In milliseconds
 	*ll = append(*ll, newItem)
 }
 
 // Get item from the list from index
-func (ll *LatencyList) GetByIndex(idx int) int64 {
+func (ll *LatencyList) GetByIndex(idx int) float64 {
 	return (*ll)[idx]
 }
