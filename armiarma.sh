@@ -10,6 +10,7 @@ version="v0.0.1"
 ARMIARMA="./src/bin/armiarma"
 BIN="./src/bin"
 VENV="./src/analyzer/venv"
+STATIC_DIR="src/analyzer/dashboard/static"
 
 ### Help function to show how to run the too
 Help()
@@ -237,9 +238,9 @@ while getopts ":hcp" option; do
 
             aux="$analyzeFolder"
             # Set the Paths for the gossip-metrics.json peerstore.json and output
-            csv="./examples/${aux}/metrics/metrics.csv"
-            peerstore="./examples/${aux}/metrics/peerstore.json"
-            plots="./examples/${aux}/plots"
+            csv="examples/${aux}/metrics/metrics.csv"
+            peerstore="examples/${aux}/metrics/peerstore.json"
+            plots="examples/${aux}/plots"
 
 
             if [[ -d $plots ]]; then
@@ -252,7 +253,20 @@ while getopts ":hcp" option; do
             echo "  Launching analyzer"
             echo ""
             python3 ./src/analyzer/armiarma-analyzer.py "$csv" "$peerstore" "$plots" 
+
+            echo ""
+
+            # Check if the plots folder for the website has been created
+            if [[ -d "${STATIC_DIR}/plots" ]]; then
+                rm -rf "${STATIC_DIR}/plots"
+            fi
+
+            cp -r "${plots}" "$STATIC_DIR"
+
+            python3 ./src/analyzer/manage.py runserver & xdg-open "http://localhost:8000/graphs" && fg
             
+
+
             # Deactivate the VENV
             deactivate
             
