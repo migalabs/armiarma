@@ -205,6 +205,7 @@ while getopts ":hcp" option; do
 
         p)  # option for the ploter/analyzer (Temporary)
             analyzeFolder="$2"
+            folderPath="$PWD"
             echo
             echo " Folder to be analyzed: $analyzeFolder"
             echo
@@ -238,9 +239,9 @@ while getopts ":hcp" option; do
 
             aux="$analyzeFolder"
             # Set the Paths for the gossip-metrics.json peerstore.json and output
-            csv="examples/${aux}/metrics/metrics.csv"
-            peerstore="examples/${aux}/metrics/peerstore.json"
-            plots="examples/${aux}/plots"
+            csv="${folderPath}/examples/${aux}/metrics/metrics.csv"
+            peerstore="${folderPath}/examples/${aux}/metrics/peerstore.json"
+            plots="${folderPath}/examples/${aux}/plots"
 
 
             if [[ -d $plots ]]; then
@@ -252,7 +253,7 @@ while getopts ":hcp" option; do
             # Run the Analyzer
             echo "  Launching analyzer"
             echo ""
-            python3 ./src/analyzer/armiarma-analyzer.py "./$csv" "./$peerstore" "./$plots" 
+            python3 ./src/analyzer/armiarma-analyzer.py "$csv" "$peerstore" "$plots" 
 
             echo ""
 
@@ -263,10 +264,8 @@ while getopts ":hcp" option; do
 
             cp -r "${plots}" "$STATIC_DIR/plots"
 
-            python3 ./src/analyzer/manage.py runserver & xdg-open "http://localhost:8000/graphs" && fg
+             xdg-open "http://localhost:8000/graphs" & python3 ./src/analyzer/manage.py runserver && tail -f 1
             
-
-
             # Deactivate the VENV
             deactivate
             
