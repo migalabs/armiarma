@@ -252,7 +252,7 @@ while getopts ":hcp" option; do
             # Run the Analyzer
             echo "  Launching analyzer"
             echo ""
-            python3 ./src/analyzer/armiarma-analyzer.py "$csv" "$peerstore" "$plots" 
+            python3 ./src/analyzer/armiarma-analyzer.py "./$csv" "./$peerstore" "./$plots" 
 
             echo ""
 
@@ -261,7 +261,7 @@ while getopts ":hcp" option; do
                 rm -rf "${STATIC_DIR}/plots"
             fi
 
-            cp -r "${plots}" "$STATIC_DIR"
+            cp -r "${plots}" "$STATIC_DIR/plots"
 
             python3 ./src/analyzer/manage.py runserver & xdg-open "http://localhost:8000/graphs" && fg
             
