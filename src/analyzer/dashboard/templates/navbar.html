@@ -2,5 +2,5 @@
     {% url 'index' as index_url %}
     <span class='navbar'>{% if request.path == index_url %}Armiarma{% else %}<a href="{{ index_url }}">Armiarma</a>{% endif %}</span>
     {% url 'graphs' as graphs_url %}
-    <span class='navbar'>{% if request.path == graphs_url %}Graphs{% else %}<a href="{{ graphs_url }}">Grahps</a>{% endif %}</span>
+    <span class='navbar'>{% if request.path == graphs_url %}Graphs{% else %}<a href="{{ graphs_url }}">Graphs</a>{% endif %}</span>
 </div>
