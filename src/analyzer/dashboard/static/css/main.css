@@ -1,0 +1,56 @@
+body{
+    font-family: Helvetica;
+    color:  #2b2c28;
+}
+
+h1{
+    font-weight: bold;
+}
+
+a, a:link{
+    color: #2b2c28;
+    text-decoration: none;
+}
+
+a:hover, a:visited{
+    color: #131515;
+    font-weight: bold;
+}
+
+a:active{
+    color: #131515;
+    text-decoration: underline;
+    font-weight: bold;
+}
+
+a.active{
+    color: #131515;
+    text-decoration: underline;
+    font-weight: bold;
+}
+
+.navbar{
+    font-size: large;
+}
+
+.graphlist{
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+}
+
+.graphitem{
+    width: 100%;
+    display:block;
+    font-size: small;
+}
+
+.graph-plot{
+    max-width: 800px; 
+    height: auto;
+    margin: 0 auto;
+    padding: 30px;
+    position: relative;
+}
