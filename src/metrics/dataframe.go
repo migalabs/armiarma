@@ -52,7 +52,6 @@ func NewMetricsDataFrame(metricsCopy sync.Map) *MetricsDataFrame {
 	metricsCopy.Range(func(k, val interface{}) bool {
 		var v PeerMetrics
 		v = val.(PeerMetrics)
-		fmt.Println("Copying the od metrics to the dataframe")
 		mdf.PeerIds.AddItem(v.PeerId)
 		mdf.NodeIds.AddItem(v.NodeId)
 		mdf.UserAgent.AddItem(v.ClientType)
@@ -81,7 +80,6 @@ func NewMetricsDataFrame(metricsCopy sync.Map) *MetricsDataFrame {
 			v.AttesterSlashing.Cnt + v.ProposerSlashing.Cnt
 		mdf.RTotalMessages.AddItem(tm)
 
-		fmt.Println("Latency", v.Latency)
 		mdf.Len = mdf.Len + 1
 		return true
 	})

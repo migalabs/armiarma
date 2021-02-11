@@ -41,32 +41,24 @@ Help()
 
 # Function that calls the crawler
 # Arguments (1)->Path of the folder 
-CheckCompileRumor(){
+CompileRumor(){
 
-    if [ -f "$ARMIARMA" ]
-    then 
-        # Rumor has been already compiled
-        echo
-        echo "Rumor was already compiled"
-        echo
+    # Re-compile Rumor 
+    echo 
+    echo "Checking Go dependencies and compiling Rumor ..."
+    echo "NOTE: If you are runing Armiarma for first time,"
+    echo "      pease note that this might take few minutes."
+    cd ./src
+    # Check if the ./src/bin folder is already there
+    if [[ -d "./bin" ]]; then
+        echo "..."  
     else
-        # Rumor needs to be compiled
-        echo 
-        echo "Checking Go dependencies and compiling Rumor ..."
-        echo "NOTE: If you are runing Armiarma for first time,"
-        echo "      pease note that this might take few minutes."
-        cd ./src
-        # Check if the ./src/bin folder is already there
-        if [[ -d "./bin" ]]; then
-            echo "..."  
-        else
-            mkdir bin
-        fi
-        go build -o ./bin/armiarma
-        cd "$1"
-        echo "Rumor Compiled!"
-        echo
+        mkdir bin
     fi
+    go build -o ./bin/armiarma
+    cd "$1"
+    echo "Rumor Compiled!"
+    echo
 }
 
 # Generate a plain launcher.rumor on the current PATH
@@ -156,7 +148,7 @@ while getopts ":hcp" option; do
             if [[ $rumorFlag -eq 1 ]]
             then
                 # Rumor would need to be run/compiled
-                CheckCompileRumor "$folderPath"
+                CompileRumor "$folderPath"
                 
                 # Switch to the crawler folder where the ".rumor" files are located
                 #cd ./src/crawler
