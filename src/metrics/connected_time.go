@@ -1,7 +1,12 @@
 package metrics
 
-var ConnectedTimeList []int64 // in minutes
+type ConnectedTimeList []float64 // in minutes
 
-func (cl *ConnectedTimeList) AddNew(newItem int64) {
-    cl = append(cl, newItem)
+func (cl *ConnectedTimeList) AddItem(newItem float64) {
+	*cl = append(*cl, newItem)
+}
+
+// Get item from the list from index
+func (cl *ConnectedTimeList) GetByIndex(idx int) float64 {
+	return (*cl)[idx]
 }

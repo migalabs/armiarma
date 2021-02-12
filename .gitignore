@@ -15,3 +15,5 @@ examples/*
 
 # ignore the venv
 src/analyzer/venv
+
+src/analyzer/dashboard/static/plots

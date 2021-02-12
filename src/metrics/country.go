@@ -1,7 +1,12 @@
 package metrics
 
-var CountryList []string
+type CountryList []string
 
-func (cl *CountryList) NewItem(newItem string) {
-    cl = append(cl, newItem)
+func (cl *CountryList) AddItem(newItem string) {
+	*cl = append(*cl, newItem)
+}
+
+// Get item from the list from index
+func (cl *CountryList) GetByIndex(idx int) string {
+	return (*cl)[idx]
 }

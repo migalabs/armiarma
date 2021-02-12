@@ -1,7 +1,12 @@
 package metrics
 
-var RAttesterSlashingList []int64
+type RAttesterSlashingList []int64
 
-func (bb *RAttesterSlashingList) AddNew(newItem int64) {
-    bb = append(bb, newItem)
+func (bb *RAttesterSlashingList) AddItem(newItem int64) {
+	*bb = append(*bb, newItem)
+}
+
+// get item form the list by index
+func (bb *RAttesterSlashingList) GetByIndex(idx int) int64 {
+	return (*bb)[idx]
 }
