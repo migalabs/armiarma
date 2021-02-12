@@ -166,42 +166,42 @@ while getopts ":hcp" option; do
                 # Check if the directory already exists 
                 if [[ -d $metricsFolder ]]; then
                     echo
-                    echo "Error. Project with name $folderName already exist" >&2
-                    echo
-                    exit 1
+                    echo "Project with name $folderName already exist" >&2
+                    echo "Loading Project"
+                    echo 
+                    cd $metricsFolder
                 else
                     echo "Getting the env ready"
                     mkdir $metricsFolder
+                
+                    # Make a temporary copy of the config.sh file on the new folder
+                    echo "Generating the config.sh"
+                    cp "./networks/${networkName}/config.sh" "./examples/${folderName}"
+                    
+                    # Move to the example folder
+                    cd "./examples/${folderName}"
+
+                    # Append the bash env variables to the temp file
+                    echo "metricsFolder=\"${metricsFolder}\"" >> config.sh
+                    echo "armiarmaPath=\"${folderPath}\"" >> config.sh
+
+                    cd $metricsFolder
+                    TouchLauncher "$folderName"
                 fi
                 
-                # Make a temporary copy of the config.sh file on the new folder
-                echo "Generating the config.sh"
-                cp "./networks/${networkName}/config.sh" "./examples/${folderName}"
-                
-                # Move to the example folder
-                cd "./examples/${folderName}"
 
-                # Append the bash env variables to the temp file
-                echo "metricsFolder=\"${metricsFolder}\"" >> config.sh
-                echo "armiarmaPath=\"${folderPath}\"" >> config.sh
-
-                cd $metricsFolder
-                TouchLauncher "$folderName"
-
-                echo
+                echo ""
                 echo "Executing file $executableNetwork"
                 echo "Exporting metrics at $metricsFolder"
-                echo
-                
+                echo ""
+
                 # Finaly launch Rumor form the Network File (showing the logs on terminal mode)
                 ../../src/bin/armiarma file launcher.rumor --formatter="terminal" --level="info"
                 
-                # Maybe wait untill forcing the exit        
             fi
-                 
             
             echo "Armiarma Finished!";;
-
+            
         p)  # option for the ploter/analyzer (Temporary)
             analyzeFolder="$2"
             echo

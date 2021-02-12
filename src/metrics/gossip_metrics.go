@@ -1,7 +1,8 @@
 package metrics
 
 import (
-	"context"
+	"os"
+    "context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -35,6 +36,46 @@ func NewGossipMetrics(config *beacon.Spec) GossipMetrics{
     return gm
 }
 
+// Exists reports whether the named file or directory exists.
+func FileExists(name string) bool {
+    if _, err := os.Stat(name); err != nil {
+        if os.IsNotExist(err) {
+            return false
+        }
+    }
+    return true
+}
+
+ // Import an old GossipMetrics from given file                                  
+// return: - return error if there was error while reading the file             
+//         - return bool for existing file (true if there was a file to read, return false if there wasn't a file to read)
+func (c *GossipMetrics) ImportMetrics(importFile string) (error, bool){
+    fmt.Println("Importing the metrics from file:", importFile)
+    // Check if file exist
+    if FileExists(importFile){ // if exists, read it
+        // get the json of the file
+        jsonFile, err := os.Open(importFile)
+        if err != nil{
+            return err, true
+        }
+        byteValue, err := ioutil.ReadAll(jsonFile)
+        if err != nil {
+            return err, true
+        }
+        temMap : make([peer.ID]PeerMetrics, 0)
+        json.Unmarshal(byteValue, &tempMap)
+        // iterate to add the metrics from the json to the the GossipMetrics
+        for k, v := range temMap {
+            c.GossipMetrics.Store(k, v)
+        }
+        fmt.Println("Loaded Metrics")
+        fmt.Println(temMap)
+        // return
+        return nil, true
+    } else {
+        return nil, false
+    }
+}
 
 type GossipState struct {
 	GsNode  pgossip.GossipSub
