@@ -1142,7 +1142,7 @@ def main():
     auxrow = rumorMetricsPanda.loc[rumorMetricsPanda['Connected Time'].idxmax()]
     maxX = auxrow['Connected Time'] 
     print(maxX)
-    xticks = maxX / 5
+    xticks = int(maxX / 5)
     
     plotColumn(rumorMetricsPanda, opts={
         'figSize': wideFigSize, 
