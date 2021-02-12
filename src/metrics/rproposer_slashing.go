@@ -1,7 +1,12 @@
 package metrics
 
-var RProposerSlashingList []int64
+type RProposerSlashingList []int64
 
-func (bb *RProposerSlashingList) AddNew(newItem int64) {
-    bb = append(bb, newItem)
+func (bb *RProposerSlashingList) AddItem(newItem int64) {
+	*bb = append(*bb, newItem)
+}
+
+// get item form the list by index
+func (bb *RProposerSlashingList) GetByIndex(idx int) int64 {
+	return (*bb)[idx]
 }

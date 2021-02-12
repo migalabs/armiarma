@@ -10,6 +10,7 @@ version="v0.0.1"
 ARMIARMA="./src/bin/armiarma"
 BIN="./src/bin"
 VENV="./src/analyzer/venv"
+STATIC_DIR="src/analyzer/dashboard/static"
 
 ### Help function to show how to run the too
 Help()
@@ -40,32 +41,24 @@ Help()
 
 # Function that calls the crawler
 # Arguments (1)->Path of the folder 
-CheckCompileRumor(){
+CompileRumor(){
 
-    if [ -f "$ARMIARMA" ]
-    then 
-        # Rumor has been already compiled
-        echo
-        echo "Rumor was already compiled"
-        echo
+    # Re-compile Rumor 
+    echo 
+    echo "Checking Go dependencies and compiling Rumor ..."
+    echo "NOTE: If you are runing Armiarma for first time,"
+    echo "      pease note that this might take few minutes."
+    cd ./src
+    # Check if the ./src/bin folder is already there
+    if [[ -d "./bin" ]]; then
+        echo "..."  
     else
-        # Rumor needs to be compiled
-        echo 
-        echo "Checking Go dependencies and compiling Rumor ..."
-        echo "NOTE: If you are runing Armiarma for first time,"
-        echo "      pease note that this might take few minutes."
-        cd ./src
-        # Check if the ./src/bin folder is already there
-        if [[ -d "./bin" ]]; then
-            echo "..."  
-        else
-            mkdir bin
-        fi
-        go build -o ./bin/armiarma
-        cd "$1"
-        echo "Rumor Compiled!"
-        echo
+        mkdir bin
     fi
+    go build -o ./bin/armiarma
+    cd "$1"
+    echo "Rumor Compiled!"
+    echo
 }
 
 # Generate a plain launcher.rumor on the current PATH
@@ -155,7 +148,7 @@ while getopts ":hcp" option; do
             if [[ $rumorFlag -eq 1 ]]
             then
                 # Rumor would need to be run/compiled
-                CheckCompileRumor "$folderPath"
+                CompileRumor "$folderPath"
                 
                 # Switch to the crawler folder where the ".rumor" files are located
                 #cd ./src/crawler
@@ -204,6 +197,7 @@ while getopts ":hcp" option; do
 
         p)  # option for the ploter/analyzer (Temporary)
             analyzeFolder="$2"
+            folderPath="$PWD"
             echo
             echo " Folder to be analyzed: $analyzeFolder"
             echo
@@ -237,28 +231,32 @@ while getopts ":hcp" option; do
 
             aux="$analyzeFolder"
             # Set the Paths for the gossip-metrics.json peerstore.json and output
-            metrics="./examples/${analyzeFolder}/metrics/gossip-metrics.json"
-            peerstore="./examples/${aux}/metrics/peerstore.json"
-            plots="./examples/${aux}/plots"
-            csvs="./examples/${aux}/csvs"
+            csv="${folderPath}/examples/${aux}/metrics/metrics.csv"
+            peerstore="${folderPath}/examples/${aux}/metrics/peerstore.json"
+            plots="${folderPath}/examples/${aux}/plots"
+
 
             if [[ -d $plots ]]; then
                 echo ""
             else
-                mkdir "$plots"
+                mkdir "examples/${aux}/plots"
             fi
-
-            if [[ -d $csvs ]]; then
-                echo ""
-            else
-                mkdir "$csvs"
-            fi
-            csvs="${csvs}/armiarma-metrics.csv"
 
             # Run the Analyzer
             echo "  Launching analyzer"
             echo ""
-            python3 ./src/analyzer/armiarma-analyzer.py "json" "$peerstore" "$metrics" "$plots" "$csvs"
+            python3 ./src/analyzer/armiarma-analyzer.py "$csv" "$peerstore" "$plots" 
+
+            echo ""
+
+            # Check if the plots folder for the website has been created
+            if [[ -d "${STATIC_DIR}/plots" ]]; then
+                rm -rf "${STATIC_DIR}/plots"
+            fi
+
+            cp -r "${plots}" "$STATIC_DIR/plots"
+
+             xdg-open "http://localhost:8000/graphs" & python3 ./src/analyzer/manage.py runserver && tail -f 1
             
             # Deactivate the VENV
             deactivate

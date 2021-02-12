@@ -6,33 +6,38 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"net/http"
+	"strings"
 	"sync"
 	"time"
-    "strings"
-    "net/http"
 
-    "github.com/protolambda/rumor/p2p/gossip/database"
 	"github.com/libp2p/go-libp2p-core/peer"
 	pgossip "github.com/protolambda/rumor/p2p/gossip"
+	"github.com/protolambda/rumor/p2p/gossip/database"
 	"github.com/protolambda/rumor/p2p/track"
-    "github.com/protolambda/zrnt/eth2/beacon"
+	"github.com/protolambda/zrnt/eth2/beacon"
 )
 
-
 type GossipMetrics struct {
-    GossipMetrics   sync.Map
-    TopicDatabase   database.TopicDatabase
-    StartTime       time.Duration
+	GossipMetrics sync.Map
+	TopicDatabase database.TopicDatabase
+	StartTime     time.Time
 }
 
+func NewGossipMetrics(config *beacon.Spec) GossipMetrics {
+	gm := GossipMetrics{
+		TopicDatabase: database.NewTopicDatabase(config),
+		StartTime:     time.Now(),
+	}
+	return gm
+}
 
-
-func NewGossipMetrics(config *beacon.Spec) GossipMetrics{
-    gm := GossipMetrics {
-        TopicDatabase:  database.NewTopicDatabase(config),
-        StartTime:      time.Now(),
-    }
-    return gm
+// Import an old GossipMetrics from given file
+// return: - return error if there was error while reading the file
+//         - return bool for existing file (true if there was a file to read, return false if there wasn't a file to read)
+func (c *GossipMetrics) ImportMetrics(importFile string) (error, bool){
+    fmt.Println("Importing the metrics from file:", importFile)
+    return nil, true
 }
 
 
@@ -52,9 +57,9 @@ type PeerMetrics struct {
 	Pubkey     string
 	Addrs      string
 	Ip         string
-    Country    string
-    City       string
-    Latency    int64
+	Country    string
+	City       string
+	Latency    float64
 
 	ConnectionEvents []ConnectionEvents
 	// Counters for the different topics
@@ -67,35 +72,35 @@ type PeerMetrics struct {
 }
 
 func NewPeerMetrics(peerId peer.ID) PeerMetrics {
-    pm := PeerMetrics {
-        PeerId:     peerId,
-        NodeId:     "",
-        ClientType: "",
-        Pubkey:     "",
-        Addrs:      "",
-        Ip:         "",
-        Country:    "",
-        City:       "",
-        Latency:    0,
+	pm := PeerMetrics{
+		PeerId:     peerId,
+		NodeId:     "",
+		ClientType: "Unknown",
+		Pubkey:     "",
+		Addrs:      "/ip4/127.0.0.1/0000",
+		Ip:         "127.0.0.1",
+		Country:    "Unknown",
+		City:       "Unknown",
+		Latency:    0,
 
-        ConnectionEvents:       make([]ConnectionEvents, 1),
-        // Counters for the different topics
-        BeaconBlock:            NewMessageMetrics(),
-        BeaconAggregateProof:   NewMessageMetrics(),
-        VoluntaryExit:          NewMessageMetrics(),
-        ProposerSlashing:       NewMessageMetrics(),
-        AttesterSlashing:       NewMessageMetrics(),
-    }
-    return pm
+		ConnectionEvents: make([]ConnectionEvents, 1),
+		// Counters for the different topics
+		BeaconBlock:          NewMessageMetrics(),
+		BeaconAggregateProof: NewMessageMetrics(),
+		VoluntaryExit:        NewMessageMetrics(),
+		ProposerSlashing:     NewMessageMetrics(),
+		AttesterSlashing:     NewMessageMetrics(),
+	}
+	return pm
 }
 
-func NewMessageMetrics() MessageMetrics{
-    mm := MessageMetrics {
-        Cnt:    0,
-        FirstMessageTime: 0,
-        LastMessageTime: 0,
-    }
-    return mm
+func NewMessageMetrics() MessageMetrics {
+	mm := MessageMetrics{
+		Cnt:              0,
+		FirstMessageTime: 0,
+		LastMessageTime:  0,
+	}
+	return mm
 }
 
 // Connection event model
@@ -113,127 +118,118 @@ type MessageMetrics struct {
 
 // Function that Wraps/Marshals the content of the sync.Map to be exported as a json
 func (c *GossipMetrics) MarshalMetrics() ([]byte, error) {
-    tmpMap := make(map[string]PeerMetrics)
-    c.GossipMetrics.Range(func(k, v interface{}) bool {
-        tmpMap[k.(peer.ID).String()] = v.(PeerMetrics)
-        return true
-    })
-    return json.Marshal(tmpMap)
+	tmpMap := make(map[string]PeerMetrics)
+	c.GossipMetrics.Range(func(k, v interface{}) bool {
+		tmpMap[k.(peer.ID).String()] = v.(PeerMetrics)
+		return true
+	})
+	return json.Marshal(tmpMap)
 }
 
 // Function that Wraps/Marshals the content of the Entire Peerstore into a json
 func (c *GossipMetrics) MarshalPeerStore(ep track.ExtendedPeerstore) ([]byte, error) {
-    var peers []peer.ID
-    peers = ep.Peers()
-    peerData := make(map[string]*track.PeerAllData)
-    for _, p := range peers {
-        peerData[p.String()] = ep.GetAllData(p)
-    }
-    return json.Marshal(peerData)
+	var peers []peer.ID
+	peers = ep.Peers()
+	peerData := make(map[string]*track.PeerAllData)
+	for _, p := range peers {
+		peerData[p.String()] = ep.GetAllData(p)
+	}
+	return json.Marshal(peerData)
 }
 
 // Get the Real Ip Address from the multi Address list
 func GetFullAddress(multiAddrs []string) string {
-    var address string
-    if len(multiAddrs) > 0{
-        for _, element := range multiAddrs {
-            if strings.Contains(element, "/ip4/192.168.") || strings.Contains(element, "/ip4/127.0.") || strings.Contains(element, "/ip6/") || strings.Contains(element, "/ip4/172.") || strings.Contains(element, "0.0.0.0") {
-                continue
-            } else {
-                address = element
-                break
-            }
-        }
-    } else {
-        fmt.Println("Empty Multiaddress on Peerstore was found")
-        address = "/ip4/127.0.0.1/tcp/9000"
-    }
-    return address
+	var address string
+	if len(multiAddrs) > 0 {
+		for _, element := range multiAddrs {
+			if strings.Contains(element, "/ip4/192.168.") || strings.Contains(element, "/ip4/127.0.") || strings.Contains(element, "/ip6/") || strings.Contains(element, "/ip4/172.") || strings.Contains(element, "0.0.0.0") {
+				continue
+			} else {
+				address = element
+				break
+			}
+		}
+	} else {
+		address = "/ip4/127.0.0.1/tcp/9000"
+	}
+	return address
 }
 
 // Function that iterates through the received peers and fills the missing information
 func (c *GossipMetrics) FillMetrics(ep track.ExtendedPeerstore) {
-    // to prevent the Filler from crashing (the url-service only accepts 45req/s)
-    requestCounter := 0
-    // Loop over the Peers on the GossipMetrics
-    c.GossipMetrics.Range(func(key interface{}, value interface{}) bool{
-        // Read the info that we have from him
-        p, ok := c.GossipMetrics.Load(key)
-        if ok {
-            peerMetrics := p.(PeerMetrics)
-            peerData := ep.GetAllData(peerMetrics.PeerId)
-            fmt.Println("Filling Metrics of Peer:", peerMetrics.PeerId.String())
-            if len(peerMetrics.NodeId) == 0 {
-                fmt.Println("NodeID empty", peerMetrics.NodeId, "Adding NodeId:", peerData.NodeID.String())
-                peerMetrics.NodeId  = peerData.NodeID.String()
-            }
+	// to prevent the Filler from crashing (the url-service only accepts 45req/s)
+	requestCounter := 0
+	// Loop over the Peers on the GossipMetrics
+	c.GossipMetrics.Range(func(key interface{}, value interface{}) bool {
+		// Read the info that we have from him
+		p, ok := c.GossipMetrics.Load(key)
+		if ok {
+			peerMetrics := p.(PeerMetrics)
+			peerData := ep.GetAllData(peerMetrics.PeerId)
+			//fmt.Println("Filling Metrics of Peer:", peerMetrics.PeerId.String())
+			if len(peerMetrics.NodeId) == 0 {
+				//fmt.Println("NodeID empty", peerMetrics.NodeId, "Adding NodeId:", peerData.NodeID.String())
+				peerMetrics.NodeId = peerData.NodeID.String()
+			}
 
-            if len(peerMetrics.ClientType) == 0 {
-                fmt.Println("ClientType empty", peerMetrics.ClientType, "Adding ClientType:", peerData.UserAgent)
-                peerMetrics.ClientType = peerData.UserAgent
-            }
+			if len(peerMetrics.ClientType) == 0 || peerMetrics.ClientType == "Unknown" {
+				//fmt.Println("ClientType empty", peerMetrics.ClientType, "Adding ClientType:", peerData.UserAgent)
+				peerMetrics.ClientType = peerData.UserAgent
+			}
 
-            if len(peerMetrics.Pubkey) == 0 {
-                fmt.Println("Pubkey empty", peerMetrics.Pubkey, "Adding Pubkey:", peerData.Pubkey)
-                peerMetrics.Pubkey = peerData.Pubkey
-            }
+			if len(peerMetrics.Pubkey) == 0 {
+				//fmt.Println("Pubkey empty", peerMetrics.Pubkey, "Adding Pubkey:", peerData.Pubkey)
+				peerMetrics.Pubkey = peerData.Pubkey
+			}
 
-            if len(peerMetrics.Addrs) == 0 {
-                address := GetFullAddress(peerData.Addrs)
-                fmt.Println("Addrs empty", peerMetrics.Addrs, "Adding Addrs:", address)
-                peerMetrics.Addrs = address
-            }
+			if len(peerMetrics.Addrs) == 0 || peerMetrics.Addrs == "/ip4/127.0.0.1/0000" {
+				address := GetFullAddress(peerData.Addrs)
+				//fmt.Println("Addrs empty", peerMetrics.Addrs, "Adding Addrs:", address)
+				peerMetrics.Addrs = address
+			}
 
-            if len(peerMetrics.Country) == 0 {
-                if len(peerMetrics.Addrs) == 0 {
-                    fmt.Println("No Addrs on the PeerMetrics to request the Location")
-                } else {
-                    fmt.Println("Requesting the Location based on the addrs:", peerMetrics.Addrs)
-                    ip, country, city := getIpAndLocationFromAddrs(peerMetrics.Addrs)
-                    requestCounter = requestCounter + 1
-                    fmt.Println("Increase the request counter to:", requestCounter)
-                    fmt.Println("Prev IP", peerMetrics.Ip, "Adding Ip:", ip)
-                    fmt.Println("Prev Country", peerMetrics.Country, "Adding Country:", country)
-                    fmt.Println("Prev City", peerMetrics.City, "Adding City:", city)
-                    peerMetrics.Ip      = ip
-                    peerMetrics.Country = country
-                    peerMetrics.City    = city
-                }
-            }
+			if len(peerMetrics.Country) == 0 || peerMetrics.Country == "Unknown" {
+				if len(peerMetrics.Addrs) == 0 {
+					//fmt.Println("No Addrs on the PeerMetrics to request the Location")
+				} else {
+					//fmt.Println("Requesting the Location based on the addrs:", peerMetrics.Addrs)
+					ip, country, city := getIpAndLocationFromAddrs(peerMetrics.Addrs)
+					requestCounter = requestCounter + 1
+					peerMetrics.Ip = ip
+					peerMetrics.Country = country
+					peerMetrics.City = city
+				}
+			}
 
-            // Since we want to have the latest Latency, we always update it
-            fmt.Println("Latency Empty", peerMetrics.Latency, "Adding Latency:", peerData.Latency)
-            peerMetrics.Latency = int64(peerData.Latency * time.Millisecond)
-            fmt.Println("Added Latency:", peerMetrics.Latency)
+			// Since we want to have the latest Latency, we always update it
+			peerMetrics.Latency = float64(peerData.Latency/time.Millisecond) / 1000
 
-            // After check that all the info is ready, save the item back into the Sync.Map
-            c.GossipMetrics.Store(key, peerMetrics)
+			// After check that all the info is ready, save the item back into the Sync.Map
+			c.GossipMetrics.Store(key, peerMetrics)
 
-        if requestCounter >= 40 { // Reminder 45 req/s
-            fmt.Println("Request Limit reached, waitig 60 secs")
-            time.Sleep(70 * time.Second)
-            requestCounter = 0
-        }
-    }
-    // Keep with the loop on the Range function
-    return true
-    })
+			if requestCounter >= 40 { // Reminder 45 req/s
+				time.Sleep(70 * time.Second)
+				requestCounter = 0
+			}
+		}
+		// Keep with the loop on the Range function
+		return true
+	})
 
 }
 
 // Function that Exports the entire Metrics to a .json file (lets see if in the future we can add websockets or other implementations)
 func (c *GossipMetrics) ExportMetrics(filePath string, peerstorePath string, csvPath string, ep track.ExtendedPeerstore) error {
-    metrics, err := c.MarshalMetrics()
+	metrics, err := c.MarshalMetrics()
 	if err != nil {
 		fmt.Println("Error Marshalling the metrics")
 	}
-    fmt.Println("Loading Peerstore to Export them")
-    peerstore, err := c.MarshalPeerStore(ep)
+	peerstore, err := c.MarshalPeerStore(ep)
 	if err != nil {
 		fmt.Println("Error Marshalling the peerstore")
 	}
 
-    err = ioutil.WriteFile(filePath, metrics, 0644)
+	err = ioutil.WriteFile(filePath, metrics, 0644)
 	if err != nil {
 		fmt.Println("Error opening file: ", filePath)
 		return err
@@ -243,84 +239,92 @@ func (c *GossipMetrics) ExportMetrics(filePath string, peerstorePath string, csv
 		fmt.Println("Error opening file: ", peerstorePath)
 		return err
 	}
-    // Generate the MetricsDataFrame of the Current Metrics
-    nMap := GetMetricsDuplicate(c.GossipMetrics)
-    // Export the metrics to the given CSV file
-    mdf := NewMetricsDataFrame(nMap)
-    err := mdf.ExportToCSV(csvPath)
-	if err != nil{
-        fmt.Printf("Error:", err)
-        return err
-    }
-    return nil
+	// Generate the MetricsDataFrame of the Current Metrics
+	// Export the metrics to the given CSV file
+	mdf := NewMetricsDataFrame(c.GossipMetrics)
+	err = mdf.ExportToCSV(csvPath)
+	if err != nil {
+		fmt.Printf("Error:", err)
+		return err
+	}
+	return nil
 }
 
 // IP-API message structure
 type IpApiMessage struct {
-    Query       string
-    Status      string
-    Continent   string
-    ContinentCode string
-    Country     string
-    CountryCode string
-    Region      string
-    RegionName  string
-    City    string
-    District    string
-    Zip     string
-    Lat         string
-    Lon         string
-    Timezone    string
-    Offset      string
-    Currency    string
-    Isp     string
-    Org     string
-    As      string
-    Asname  string
-    Mobile  string
-    Proxy   string
-    Hosting string
+	Query         string
+	Status        string
+	Continent     string
+	ContinentCode string
+	Country       string
+	CountryCode   string
+	Region        string
+	RegionName    string
+	City          string
+	District      string
+	Zip           string
+	Lat           string
+	Lon           string
+	Timezone      string
+	Offset        string
+	Currency      string
+	Isp           string
+	Org           string
+	As            string
+	Asname        string
+	Mobile        string
+	Proxy         string
+	Hosting       string
 }
 
 // get IP, location country and City from the multiaddress of the peer on the peerstore
 func getIpAndLocationFromAddrs(multiAddrs string) (ip string, country string, city string) {
-    ip = strings.TrimPrefix(multiAddrs, "/ip4/")
-    ipSlices := strings.Split(ip, "/")
-    ip = ipSlices[0]
-    url := "http://ip-api.com/json/" + ip
-    resp, err := http.Get(url)
-    if err != nil {
-        fmt.Println(err)
-        fmt.Println("There was an error getting the Location of the peer from the IP-API, please, check that there 40requests/minute limit hasn't been exceed")
-        country = "Unknown"
-        city = "Unknown"
-        return ip, country, city
-    }
-    defer resp.Body.Close()
-    bodyBytes, _ := ioutil.ReadAll(resp.Body)
+	ip = strings.TrimPrefix(multiAddrs, "/ip4/")
+	ipSlices := strings.Split(ip, "/")
+	ip = ipSlices[0]
+	url := "http://ip-api.com/json/" + ip
+	resp, err := http.Get(url)
+	if err != nil {
+		fmt.Println(err)
+		fmt.Println("There was an error getting the Location of the peer from the IP-API, please, check that there 40requests/minute limit hasn't been exceed")
+		country = "Unknown"
+		city = "Unknown"
+		return ip, country, city
+	}
+	defer resp.Body.Close()
+	bodyBytes, _ := ioutil.ReadAll(resp.Body)
 
-    // Convert response body to Todo struct
-    var ipApiResp IpApiMessage
-    json.Unmarshal(bodyBytes, &ipApiResp)
+	// Convert response body to Todo struct
+	var ipApiResp IpApiMessage
+	json.Unmarshal(bodyBytes, &ipApiResp)
 
-    country = ipApiResp.Country
-    city = ipApiResp.City
-    // return the received values from the received message
-    return ip, country, city
+	country = ipApiResp.Country
+	city = ipApiResp.City
+
+	// check if country and city are correctly imported
+	if len(country) == 0 || len(city) == 0 {
+		fmt.Println("There was an error getting the Location of the peer from the IP-API, please, check that there 40requests/minute limit hasn't been exceed")
+		country = "Unknown"
+		city = "Unknown"
+		return ip, country, city
+	}
+
+	// return the received values from the received message
+	return ip, country, city
 
 }
 
 // Add new peer with all the information from the peerstore to the metrics db
 // returns: Alredy (Bool)
 func (c *GossipMetrics) AddNewPeer(peerId peer.ID) {
-    _, ok := c.GossipMetrics.Load(peerId)
-    if !ok {
-        // We will just add the info that we have (the peerId)
-        peerMetrics := NewPeerMetrics(peerId)
-        // Include it to the Peer DB
-        c.GossipMetrics.Store(peerId, peerMetrics)
-        // return that wasn't already on the peerstore
-    }
+	_, ok := c.GossipMetrics.Load(peerId)
+	if !ok {
+		// We will just add the info that we have (the peerId)
+		peerMetrics := NewPeerMetrics(peerId)
+		// Include it to the Peer DB
+		c.GossipMetrics.Store(peerId, peerMetrics)
+		// return that wasn't already on the peerstore
+	}
 }
 
 // Add a connection Event to the given peer
@@ -329,17 +333,16 @@ func (c *GossipMetrics) AddConnectionEvent(peerId peer.ID, connectionType string
 		ConnectionType: connectionType,
 		TimeMili:       GetTimeMiliseconds(),
 	}
-	pMetrics , ok := c.GossipMetrics.Load(peerId)
-    if ok {
-        peerMetrics := pMetrics.(PeerMetrics)
-        peerMetrics.ConnectionEvents = append(peerMetrics.ConnectionEvents, newConnection)
-        c.GossipMetrics.Store(peerId, peerMetrics)
-    } else {
-        // Might be possible to add 
-        errors.New("Counld't add Event, Peer is not in the list")
+	pMetrics, ok := c.GossipMetrics.Load(peerId)
+	if ok {
+		peerMetrics := pMetrics.(PeerMetrics)
+		peerMetrics.ConnectionEvents = append(peerMetrics.ConnectionEvents, newConnection)
+		c.GossipMetrics.Store(peerId, peerMetrics)
+	} else {
+		// Might be possible to add
+		errors.New("Counld't add Event, Peer is not in the list")
 	}
 }
-
 
 // Increments the counter of the topic
 func (c *MessageMetrics) IncrementCnt() int64 {
@@ -372,8 +375,8 @@ func GetTimeMiliseconds() int64 {
 
 // Function that Manages the metrics updates for the incoming messages
 func (c *GossipMetrics) IncomingMessageManager(peerId peer.ID, topicName string) error {
-    pMetrics , _ := c.GossipMetrics.Load(peerId)
-    peerMetrics := pMetrics.(PeerMetrics)
+	pMetrics, _ := c.GossipMetrics.Load(peerId)
+	peerMetrics := pMetrics.(PeerMetrics)
 	messageMetrics, err := GetMessageMetrics(&peerMetrics, topicName)
 	if err != nil {
 		return errors.New("Topic Name no supported")
@@ -386,8 +389,8 @@ func (c *GossipMetrics) IncomingMessageManager(peerId peer.ID, topicName string)
 	messageMetrics.IncrementCnt()
 	messageMetrics.StampTime("last")
 
-    // Store back the Loaded/Modified Variable
-    c.GossipMetrics.Store(peerId, peerMetrics)
+	// Store back the Loaded/Modified Variable
+	c.GossipMetrics.Store(peerId, peerMetrics)
 
 	return nil
 }

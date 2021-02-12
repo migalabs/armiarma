@@ -1,26 +1,22 @@
 package metrics
 
-import (
-
-)
-
-var ClientTypeList []string
+type ClientTypeList []string
 
 // Add new item to the list
 func (ct *ClientTypeList) AddItem(newItem string) {
-    ct = append(ct, newItem)
+	*ct = append(*ct, newItem)
 }
 
 // Get item from the list from index
-func (ct *ClientTypeList) GetByItem(idx int) string{
-    return ct[idx]
+func (ct *ClientTypeList) GetByIndex(idx int) string {
+	return (*ct)[idx]
 }
 
 // Add new item to the list
-func (ct *ClientTypeList) GetArrayByIndexes(idxs []int) []string{
-    var sortedArray []string
-    for _, i in range idxs {
-        sortedArray = append(sortedArray, ct[i])
-    }
-    return sortedArray
+func (ct ClientTypeList) GetArrayByIndexes(idxs []int) []string {
+	var sortedArray []string
+	for _, i := range idxs {
+		sortedArray = append(sortedArray, ct[i])
+	}
+	return sortedArray
 }

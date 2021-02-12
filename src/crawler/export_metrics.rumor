@@ -13,4 +13,4 @@ csvpath="${metricsFolder}/metrics/metrics.csv"
 echo "gossip metrics file: $filepath"
 echo "peerstore file:      $peerstorepath"
 
-gossip topic export-metrics --file-path="$filepath" --peerstore-path="$peerstorepath" --csv-file="$csvpath" --export-period=60s
+gossip topic export-metrics --file-path="$filepath" --peerstore-path="$peerstorepath" --csv-file="$csvpath" --export-period=10s
