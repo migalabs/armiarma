@@ -32,6 +32,15 @@ func NewGossipMetrics(config *beacon.Spec) GossipMetrics {
 	return gm
 }
 
+// Import an old GossipMetrics from given file
+// return: - return error if there was error while reading the file
+//         - return bool for existing file (true if there was a file to read, return false if there wasn't a file to read)
+func (c *GossipMetrics) ImportMetrics(importFile string) (error, bool){
+    fmt.Println("Importing the metrics from file:", importFile)
+    return nil, true
+}
+
+
 type GossipState struct {
 	GsNode  pgossip.GossipSub
 	CloseGS context.CancelFunc
