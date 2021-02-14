@@ -255,8 +255,12 @@ while getopts ":hcp" option; do
             fi
 
             cp -r "${plots}" "$STATIC_DIR/plots"
+            
+            echo ""
+            echo "Note: If the Metrics Visualizer doesn't try opening the url: 'localhost:8000/graphs' or refresh the page"
+            echo ""
 
-             xdg-open "http://localhost:8000/graphs" & python3 ./src/analyzer/manage.py runserver && tail -f 1
+            xdg-open "http://localhost:8000/graphs" & python3 ./src/analyzer/manage.py runserver && tail -f 1
             
             # Deactivate the VENV
             deactivate

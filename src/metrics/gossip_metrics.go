@@ -22,23 +22,15 @@ import (
 type GossipMetrics struct {
 	GossipMetrics sync.Map
 	TopicDatabase database.TopicDatabase
-	StartTime     time.Time
+	StartTime     int64 // milliseconds
 }
 
 func NewGossipMetrics(config *beacon.Spec) GossipMetrics {
 	gm := GossipMetrics{
 		TopicDatabase: database.NewTopicDatabase(config),
-		StartTime:     time.Now(),
+		StartTime:     GetTimeMiliseconds(),
 	}
 	return gm
-}
-
-// Import an old GossipMetrics from given file
-// return: - return error if there was error while reading the file
-//         - return bool for existing file (true if there was a file to read, return false if there wasn't a file to read)
-func (c *GossipMetrics) ImportMetrics(importFile string) (error, bool){
-    fmt.Println("Importing the metrics from file:", importFile)
-    return nil, true
 }
 
 // Exists reports whether the named file or directory exists.
@@ -55,9 +47,9 @@ func FileExists(name string) bool {
 // return: - return error if there was error while reading the file             
 //         - return bool for existing file (true if there was a file to read, return false if there wasn't a file to read)
 func (c *GossipMetrics) ImportMetrics(importFile string) (error, bool){
-    fmt.Println("Importing the metrics from file:", importFile)
     // Check if file exist
     if FileExists(importFile){ // if exists, read it
+        fmt.Println("File:", importFile, "already existed, Importing")
         // get the json of the file
         jsonFile, err := os.Open(importFile)
         if err != nil{
@@ -67,19 +59,19 @@ func (c *GossipMetrics) ImportMetrics(importFile string) (error, bool){
         if err != nil {
             return err, true
         }
-        temMap : make([peer.ID]PeerMetrics, 0)
+        tempMap := make(map[peer.ID]PeerMetrics, 0)
         json.Unmarshal(byteValue, &tempMap)
         // iterate to add the metrics from the json to the the GossipMetrics
-        for k, v := range temMap {
+        for k, v := range tempMap {
             c.GossipMetrics.Store(k, v)
         }
-        fmt.Println("Loaded Metrics")
-        fmt.Println(temMap)
-        // return
+        fmt.Println(tempMap)
         return nil, true
     } else {
+        fmt.Println("File:", importFile, "doesn't exist, Generating")
         return nil, false
     }
+    fmt.Println(c.GossipMetrics)
 }
 
 type GossipState struct {
@@ -253,6 +245,7 @@ func (c *GossipMetrics) FillMetrics(ep track.ExtendedPeerstore) {
 				requestCounter = 0
 			}
 		}
+        fmt.Println("Metrics Filled")
 		// Keep with the loop on the Range function
 		return true
 	})

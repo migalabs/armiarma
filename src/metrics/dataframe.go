@@ -5,7 +5,6 @@ import (
 	"os"
 	"strconv"
 	"sync"
-	"time"
 )
 
 // Main Data Structure that will be used to analyze and plot the metrics
@@ -38,7 +37,7 @@ type MetricsDataFrame struct {
 
 	// Aux
 	Len        int
-	ExportTime time.Time
+	ExportTime int64
 }
 
 // Generate New DataFrame out of the GossipMetrics sync.Map copy
@@ -46,7 +45,7 @@ func NewMetricsDataFrame(metricsCopy sync.Map) *MetricsDataFrame {
 	// Initialize the DataFrame with the expoting time
 	mdf := &MetricsDataFrame{
 		Len:        0,
-		ExportTime: time.Now(),
+		ExportTime: GetTimeMiliseconds(),
 	}
 	// Generate the loop over each peer of the Metrics
 	metricsCopy.Range(func(k, val interface{}) bool {
