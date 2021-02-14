@@ -1,7 +1,6 @@
 package topic
 
 import (
-	"fmt"
     "context"
     "time"
 	"github.com/protolambda/rumor/control/actor/base"

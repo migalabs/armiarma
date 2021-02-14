@@ -8,7 +8,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strings"
-	"sync"
+	"fmt"
+    "sync"
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/peer"
