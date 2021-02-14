@@ -71,7 +71,6 @@ func (c *GossipMetrics) ImportMetrics(importFile string) (error, bool){
         fmt.Println("File:", importFile, "doesn't exist, Generating")
         return nil, false
     }
-    fmt.Println(c.GossipMetrics)
 }
 
 type GossipState struct {
