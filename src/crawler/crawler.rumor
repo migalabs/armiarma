@@ -3,10 +3,20 @@ p2p_port=9020
 
 # TODO: -Priv-key loader/checker needs to be implemented
 
-armiarma: enr gen-key
-# Asociated priv_key to the crawler (will always kep the same privkey, and therefore it's ENR will not change that often)
-#priv_key="c8b949a719e0cf0b14ae223ac7fd82cff4944e0d2c689abda44cdad221e038ed"
+#fi IN PROCESS: priv-key will be given/readed from the launcher.rumor
+##privkeyfile="${metricsFolder}/priv_key.sh" 
+#
+#if [[ -d privkeyfile ]]
+#then 
+#    echo "Privkey Existed from before:"
+#    source privkeyfile
+#else 
+#    echo "No Privkey found, generating a new one"
+#    armiarma: enr gen-key
+#    priv_key="$__key"
+#    grab __key > privkeyfile
 
+armiarma: enr gen-key
 priv_key="$__key"
 echo "priv key = $priv_key"
 

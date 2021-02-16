@@ -65,7 +65,6 @@ func (c *GossipMetrics) ImportMetrics(importFile string) (error, bool){
         for k, v := range tempMap {
             c.GossipMetrics.Store(k, v)
         }
-        fmt.Println(tempMap)
         return nil, true
     } else {
         fmt.Println("File:", importFile, "doesn't exist, Generating")
@@ -233,8 +232,11 @@ func (c *GossipMetrics) FillMetrics(ep track.ExtendedPeerstore) {
 				}
 			}
 
-			// Since we want to have the latest Latency, we always update it
-			peerMetrics.Latency = float64(peerData.Latency/time.Millisecond) / 1000
+			// Since we want to have the latest Latency, we update it only when it is different from 0
+			// latency in seconds
+            if peerData.Latency != 0{
+                peerMetrics.Latency = float64(peerData.Latency/time.Millisecond) / 1000
+            }
 
 			// After check that all the info is ready, save the item back into the Sync.Map
 			c.GossipMetrics.Store(key, peerMetrics)
@@ -244,7 +246,6 @@ func (c *GossipMetrics) FillMetrics(ep track.ExtendedPeerstore) {
 				requestCounter = 0
 			}
 		}
-        fmt.Println("Metrics Filled")
 		// Keep with the loop on the Range function
 		return true
 	})
