@@ -7,8 +7,10 @@ import time
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
+from matplotlib.backends.backend_pdf import PdfPages
+from pathlib import Path
 import numpy as np
-import datetime 
+import datetime
 import collections
 
 def getDictFromJson(inputFile):
@@ -30,7 +32,7 @@ def getPandaFromPeerstoreJson(inputFile):
     return peerstoreMetrics
       
 
-def plotBarsFromPandas(panda, opts):
+def plotBarsFromPandas(panda, pdf, opts):
     print("Bar Graph from Panda")
 
     outputFile = str(opts['outputPath']) + '/' + opts['figTitle']
@@ -66,13 +68,14 @@ def plotBarsFromPandas(panda, opts):
     plt.title(opts['title'], fontsize = opts['titleSize'])
     plt.tight_layout()
     plt.savefig(outputFile)
+    pdf.savefig(plt.gcf())
     if opts['show'] is True:
         plt.show()
 
 
 
 # CortzePlot extension to plot bar-charts
-def plotBarsFromArrays(xarray, yarray, opts):
+def plotBarsFromArrays(xarray, yarray, pdf, opts):
     print("Bar Graph from Arrays")
 
     outputFile = str(opts['outputPath']) + '/' + opts['figTitle']
@@ -108,6 +111,7 @@ def plotBarsFromArrays(xarray, yarray, opts):
     plt.title(opts['title'], fontsize = opts['titleSize'])
     plt.tight_layout()
     plt.savefig(outputFile)
+    pdf.savefig(plt.gcf())
     if opts['show'] is True:
         plt.show()
 
@@ -127,7 +131,7 @@ def sortArrayMaxtoMin(xarray, yarray):
     return x, y
 
 # Funtion that plots the given array into a pie chart 
-def plotSinglePieFromArray(xarray, opts):
+def plotSinglePieFromArray(xarray, pdf, opts):
     print("Pie Graph from Arrays")
 
     outputFile = str(opts['outputpath']) + '/' + opts['figtitle']
@@ -154,6 +158,7 @@ def plotSinglePieFromArray(xarray, opts):
     plt.title(opts['title'], fontsize = opts['titlesize'])
     plt.tight_layout()
     plt.savefig(outputFile)
+    pdf.savefig(plt.gcf())
     if opts['show'] is True:
         plt.show()
 
@@ -167,7 +172,7 @@ def autopct_format(values):
 
 
 # Funtion that plots the given array into a pie chart 
-def plotDoublePieFromArray(xarray, opts):
+def plotDoublePieFromArray(xarray, pdf, opts):
     print("Pie Graph from Arrays")
 
     outputFile = str(opts['outputpath']) + '/' + opts['figtitle']
@@ -233,11 +238,12 @@ def plotDoublePieFromArray(xarray, opts):
     plt.title(opts['title'], fontsize = opts['titlesize'])
     plt.tight_layout()
     plt.savefig(outputFile)
+    pdf.savefig(plt.gcf())
     if opts['show'] is True:
         plt.show()
 
 
-def plotColumn(panda, opts):
+def plotColumn(panda, pdf, opts):
 
     outputFile = str(opts['outputPath']) + '/' + opts['figTitle']
     print('printing image', opts['figTitle'], 'on', outputFile)
@@ -311,6 +317,7 @@ def plotColumn(panda, opts):
     plt.title(opts['title'], fontsize=opts['titleSize'])
     plt.tight_layout()
     plt.savefig(outputFile)
+    pdf.savefig(plt.gcf())
     #plt.show()
 
 
@@ -422,6 +429,8 @@ def main():
     csvFile = sys.argv[1]
     peerstoreFile = sys.argv[2]
     outputFigsFolder = sys.argv[3]
+
+    pdfFile = outputFigsFolder + "/MetricsSummary.pdf"
     
     peerstorePanda = getPandaFromPeerstoreJson(peerstoreFile)
     rumorMetricsPanda = pd.read_csv(csvFile)
@@ -442,745 +451,770 @@ def main():
     yarray = [peerstoreSize, peerMetricsSize]
     barColor = ['tab:blue', 'tab:green']
 
-    plotBarsFromArrays(xarray, yarray, opts={                                   
-        'figSize': figSize,                                                      
-        'figTitle': 'PeerstoreVsConnectedPeers.png',                                    
-        'outputPath': outputFigsFolder,                                         
-        'align': 'center',                                                      
-        'barValues': True,
-        'barColor': barColor,
-        'textSize': textSize,
-        'yLowLimit': 0,                                                         
-        'yUpperLimit': None,                                                    
-        'title': "Number of Peers Connected from the entire Peerstore",                  
-        'xlabel': None,                                                         
-        'ylabel': 'Number of Peers',                                      
-        'xticks': xarray,                       
-        'titleSize': titleSize,                                                        
-        'labelSize': labelSize,                                                        
-        'lengendPosition': 1,                                                   
-        'legendSize': labelSize,                                                       
-        'xticksSize': ticksSize,                                                       
-        'yticksSize': ticksSize,                                                       
-        'tickRotation': 0,                                                     
-        'show': False})
-
-    clientCounter = []
-    types         = []
-    typesCounter  = []
-
-    for idx, item in enumerate(clientList):
-        tcnt, tp, tpc = getTypesPerName(rumorMetricsPanda, item, 'Client', 'Version')
-        clientCounter.append(tcnt)
-        types.append(tp)
-        typesCounter.append(tpc)
-
-    xarray = types
-    yarray = typesCounter
-    namesarray = clientList
-
-    plotDoublePieFromArray(yarray, opts={                                   
-        'figsize': figSize,                                                      
-        'figtitle': 'PeersPerClient.png',                                    
-        'outputpath': outputFigsFolder,
-        'piesize': 0.3,                                                      
-        'autopct': "pcts", #False,
-        'pctdistance': 1.65,
-        'edgecolor': 'w',
-        'innerlabels': types,
-        'outerlabels': clientList,
-        'labeldistance': 1.25,
-        'innercolors': innerColors,
-        'outercolors': clientColors,
-        'shadow': None,
-        'startangle': 90,                                                  
-        'title': "Number of Peers From Each Client and Their Versions",                   
-        'titlesize': titleSize,                                                        
-        'labelsize': labelSize, 
-        'legend': True,                                                       
-        'lengendposition': None,                                                   
-        'legendsize': labelSize,                                                     
-        'show': False})
-
-    print("| {:<35}| {:<15}|".format('ClientVersion', 'NumbersPeers'))
-    print("-------------------------------------------------------")
-    for idx, item in enumerate(clientList):
-        print("| {:<35}| {:<15}|".format(item, clientCounter[idx]))
-        print("-------------------------------------------------------")
-        v = types[idx]
-        for j, n in enumerate(v):
-            print(" -> {:<33}| {:<15}|".format(v[j], yarray[idx][j]))
-        print("-------------------------------------------------------")
-
-
-
-    # get the number of peers per country 
-    countriesList = getItemsFromColumn(rumorMetricsPanda, 'Country') 
-    auxxarray, auxyarray = getDataFromPanda(rumorMetricsPanda, None, "Country", countriesList, 'counter') 
-    # Remove the Countries with less than X peers
-    countryLimit = 10
-    xarray = []
-    yarray = []
-    for idx, item in enumerate(auxyarray):
-        if auxyarray[idx] >= countryLimit:
-            yarray.append(item)
-            xarray.append(auxxarray[idx])
-
-    xarray, yarray = sortArrayMaxtoMin(xarray, yarray)
-    # Get Color Grid
-    barColor = GetColorGridFromArray(yarray)
-
-
-    plotBarsFromArrays(xarray, yarray, opts={                                            
-        'figSize': (12,7),                                                          
-        'figTitle': 'PeersPerCountries.png',                                
-        'outputPath': outputFigsFolder,                                                    
-        'align': 'center', 
-        'barValues': True,
-        'barColor': barColor,
-        'textSize': textSize+2,                                                         
-        'yLowLimit': 0,                                                             
-        'yUpperLimit': None,                                                        
-        'title': "Number of Peers Connected from each Country",                             
-        'xlabel': None,                                   
-        'ylabel': 'Number of Connections',                                                
-        'xticks': xarray,                                                           
-        'titleSize': titleSize+2,                                                        
-        'labelSize': labelSize+2,                                                        
-        'lengendPosition': 1,                                                   
-        'legendSize': labelSize+2,                                                       
-        'xticksSize': ticksSize-2,                                                       
-        'yticksSize': ticksSize+2,                                                            
-        'tickRotation': 90,
-        'show': False})   
-
-    # get the average of connections per client
-    xarray, yarray = getDataFromPanda(rumorMetricsPanda, "Connections", "Client", clientList, 'avg') 
-
-    plotBarsFromArrays(xarray, yarray, opts={                                            
-        'figSize': figSize,                                                          
-        'figTitle': 'AverageOfConnectionsPerClientType.png',                                
-        'outputPath': outputFigsFolder,                                                    
-        'align': 'center', 
-        'barValues': True,
-        'barColor': clientColors,
-        'textSize': textSize,                                                         
-        'yLowLimit': 0,                                                             
-        'yUpperLimit': None,                                                        
-        'title': "Average of Connections per Client Type",                             
-        'xlabel': None,                                   
-        'ylabel': 'Number of Connections',                                                
-        'xticks': xarray,                                                           
-        'titleSize': titleSize,                                                        
-        'labelSize': labelSize,                                                        
-        'lengendPosition': 1,                                                   
-        'legendSize': labelSize,                                                       
-        'xticksSize': ticksSize,                                                       
-        'yticksSize': ticksSize,                                                           
-        'tickRotation': 0,
-        'show': False}) 
-
-    # get the average of disconnections per client
-    xarray, yarray = getDataFromPanda(rumorMetricsPanda, "Disconnections", "Client", clientList, 'avg') 
-
-    plotBarsFromArrays(xarray, yarray, opts={                                            
-        'figSize': figSize,                                                          
-        'figTitle': 'AverageOfDisconnectionsPerClientType.png',                                
-        'outputPath': outputFigsFolder,                                                    
-        'align': 'center', 
-        'barValues': True,
-        'barColor': clientColors,
-        'textSize': textSize,                                                         
-        'yLowLimit': 0,                                                             
-        'yUpperLimit': None,                                                        
-        'title': "Average of Disconnections per Client Type",                             
-        'xlabel': None,                                   
-        'ylabel': 'Number of Disconnections',                                                
-        'xticks': xarray,                                                           
-        'titleSize': titleSize,                                                        
-        'labelSize': labelSize,                                                        
-        'lengendPosition': 1,                                                   
-        'legendSize': labelSize,                                                       
-        'xticksSize': ticksSize,                                                       
-        'yticksSize': ticksSize,                                                             
-        'tickRotation': 0,
-        'show': False}) 
-
-    # get the average of ConnectedTime per client
-    xarray, yarray = getDataFromPanda(rumorMetricsPanda, "Connected Time", "Client", clientList, 'avg') 
-
-    plotBarsFromArrays(xarray, yarray, opts={                                            
-        'figSize': figSize,                                                          
-        'figTitle': 'AverageOfConnectedTimePerClientType.png',                                
-        'outputPath': outputFigsFolder,                                                    
-        'align': 'center', 
-        'barValues': True,
-        'barColor': clientColors,
-        'textSize': textSize,                                                         
-        'yLowLimit': 0,                                                             
-        'yUpperLimit': None,                                                        
-        'title': "Average of Connected Time to Peers from Clients",                             
-        'xlabel': None,                                   
-        'ylabel': 'Time (Minutes)',                                                
-        'xticks': xarray,                                                           
-        'titleSize': titleSize,                                                        
-        'labelSize': labelSize,                                                        
-        'lengendPosition': 1,                                                   
-        'legendSize': labelSize,                                                       
-        'xticksSize': ticksSize,                                                       
-        'yticksSize': ticksSize,                                                             
-        'tickRotation': 0,
-        'show': False}) 
-
-    # get the average latency per client
-    # since few of the clients dont hace latency
-    # the calculus are made by hand
-    xarray = clientList
-    yarray = []
-    latAuxArray = []
-    xmetrics = 'Client'
-    ymetrics = 'Latency'
-    contador = 0
-    prysmCnt = 0
-    prysmTCnt = 0
-    for _, item in enumerate(xarray):            
-        auxCnt = 0
-        for index, row in rumorMetricsPanda.iterrows():
-            if item.lower() in str(row[xmetrics]).lower():
-                if row[ymetrics] != 0:
-                    auxCnt = auxCnt + float(row[ymetrics])
-                    if row[ymetrics] > 1:
-                        latAuxArray.append(row[ymetrics])
-                        if "prysm" in item.lower():
-                            prysmTCnt = prysmTCnt + 1 
-                else:
-                    if "prysm" in item.lower():
-                        prysmCnt = prysmCnt + 1    
-                    contador = contador + 1
-                    # print("client type:", row[xmetrics], "has latency", row[ymetrics] )
-        auxAmount = rumorMetricsPanda.apply(lambda x: True if item.lower() in str(x[xmetrics]).lower() else False, axis=1)
-        if auxCnt != 0:
-            yarray.append(round((auxCnt/(len(auxAmount[auxAmount == True].index))),1))
-        else:
-            yarray.append(0)
-    """
-    print("len of the connected peers:", len(rumorMetricsPanda))
-    print("Number of peers with 0 latency:", contador)
-    print("Number of Prysm clients with 0 latency:", prysmCnt )
-    print("Number of Prysm clients with lat != 0:", prysmTCnt)
-    print("number of peers with more than 1 sec of latency", latAuxArray)
-    """
-
-    plotBarsFromArrays(xarray, yarray, opts={                                            
-        'figSize': figSize,                                                          
-        'figTitle': 'AverageLatencyPerClientType.png',                                
-        'outputPath': outputFigsFolder,                                                    
-        'align': 'center', 
-        'barValues': True,
-        'barColor': clientColors,
-        'textSize': textSize,                                                         
-        'yLowLimit': 0,                                                             
-        'yUpperLimit': None,                                                        
-        'title': "Average Latency per Client Type",                             
-        'xlabel': None,                                   
-        'ylabel': 'latency (seconds)',                                                
-        'xticks': xarray,                                                           
-        'titleSize': titleSize,                                                        
-        'labelSize': labelSize,                                                        
-        'lengendPosition': 1,                                                   
-        'legendSize': labelSize,                                                       
-        'xticksSize': ticksSize,                                                       
-        'yticksSize': ticksSize,                                                           
-        'tickRotation': 0,
-        'show': False}) 
-
-
-    # GossipSub
-    # BeaconBlock
-    xarray, yarray = getDataFromPanda(rumorMetricsPanda, "Beacon Blocks", "Client", clientList, 'sum') 
-
-    plotBarsFromArrays(xarray, yarray, opts={                                            
-        'figSize': figSize,                                                          
-        'figTitle': 'MessagesFromBeaconBlock.png',                                
-        'outputPath': outputFigsFolder,                                                    
-        'align': 'center', 
-        'barValues': True,
-        'barColor': clientColors,
-        'textSize': textSize,                                                         
-        'yLowLimit': 0,                                                             
-        'yUpperLimit': None,                                                        
-        'title': "Number of Received BeaconBlock Msgs",                             
-        'xlabel': None,                                   
-        'ylabel': 'Messages Received',                                                
-        'xticks': xarray,                                                           
-        'titleSize': titleSize,                                                        
-        'labelSize': labelSize,                                                        
-        'lengendPosition': 1,                                                   
-        'legendSize': labelSize,                                                       
-        'xticksSize': ticksSize,                                                       
-        'yticksSize': ticksSize,                                                            
-        'tickRotation': 0,
-        'show': False})   
-
-
-    # get the average of connections per client
-    xarray, yarray = getDataFromPanda(rumorMetricsPanda, "Beacon Blocks", "Client", clientList, 'avg') 
-
-    plotBarsFromArrays(xarray, yarray, opts={                                            
-        'figSize': figSize,                                                          
-        'figTitle': 'MessageAverageFromBeaconBlock.png',                                
-        'outputPath': outputFigsFolder,                                                    
-        'align': 'center', 
-        'barValues': True,
-        'barColor': clientColors,
-        'textSize': textSize,                                                         
-        'yLowLimit': 0,                                                             
-        'yUpperLimit': None,                                                        
-        'title': "Average of Received BeaconBlock Msgs",                             
-        'xlabel': None,                                   
-        'ylabel': 'Messages Received',                                                
-        'xticks': xarray,                                                           
-        'titleSize': titleSize,                                                        
-        'labelSize': labelSize,                                                        
-        'lengendPosition': 1,                                                   
-        'legendSize': labelSize,                                                       
-        'xticksSize': ticksSize,                                                       
-        'yticksSize': ticksSize,                                                         
-        'tickRotation': 0,
-        'show': False}) 
-
-    # BeaconAggregateAndProof
-    xarray, yarray = getDataFromPanda(rumorMetricsPanda, "Beacon Aggregations", "Client", clientList, 'sum') 
-
-    plotBarsFromArrays(xarray, yarray, opts={                                            
-        'figSize': figSize,                                                          
-        'figTitle': 'MessagesFromBeaconAggregateProof.png',                                
-        'outputPath': outputFigsFolder,                                                    
-        'align': 'center', 
-        'barValues': True,
-        'barColor': clientColors,
-        'textSize': textSize,                                                         
-        'yLowLimit': 0,                                                             
-        'yUpperLimit': None,                                                        
-        'title': "Number of Received BeaconAggregateAndProof Msgs",                             
-        'xlabel': None,                                   
-        'ylabel': 'Messages Received',                                                
-        'xticks': xarray,                                                           
-        'titleSize': titleSize,                                                        
-        'labelSize': labelSize,                                                        
-        'lengendPosition': 1,                                                   
-        'legendSize': labelSize,                                                       
-        'xticksSize': ticksSize,                                                       
-        'yticksSize': ticksSize,                                                          
-        'tickRotation': 0,
-        'show': False})   
-
-
-    # get the average of connections per client
-    xarray, yarray = getDataFromPanda(rumorMetricsPanda, "Beacon Aggregations", "Client", clientList, 'avg') 
-
-    plotBarsFromArrays(xarray, yarray, opts={                                            
-        'figSize': figSize,                                                          
-        'figTitle': 'MessageAverageFromBeaconAggregateProof.png',                                
-        'outputPath': outputFigsFolder,                                                    
-        'align': 'center', 
-        'barValues': True,
-        'barColor': clientColors,
-        'textSize': textSize,                                                         
-        'yLowLimit': 0,                                                             
-        'yUpperLimit': None,                                                        
-        'title': "Average of Received BeaconAggregateAndProof Msgs",                             
-        'xlabel': None,                                   
-        'ylabel': 'Messages Received',                                                
-        'xticks': xarray,                                                           
-        'titleSize': titleSize,                                                        
-        'labelSize': labelSize,                                                        
-        'lengendPosition': 1,                                                   
-        'legendSize': labelSize,                                                       
-        'xticksSize': ticksSize,                                                       
-        'yticksSize': ticksSize,                                                        
-        'tickRotation': 0,
-        'show': False}) 
-
-    # VoluntaryExit
-    xarray, yarray = getDataFromPanda(rumorMetricsPanda, "Voluntary Exits", "Client", clientList, 'sum') 
-
-    plotBarsFromArrays(xarray, yarray, opts={                                            
-        'figSize': figSize,                                                          
-        'figTitle': 'MessagesFromVoluntaryExit.png',                                
-        'outputPath': outputFigsFolder,                                                    
-        'align': 'center', 
-        'barValues': None,
-        'barColor': clientColors,
-        'textSize': textSize,                                                         
-        'yLowLimit': 0,                                                             
-        'yUpperLimit': None,                                                        
-        'title': "Number of Received VoluntaryExit Messages from Clients",                             
-        'xlabel': None,                                   
-        'ylabel': 'Messages Received',                                                
-        'xticks': xarray,                                                           
-        'titleSize': titleSize,                                                        
-        'labelSize': labelSize,                                                        
-        'lengendPosition': 1,                                                   
-        'legendSize': labelSize,                                                       
-        'xticksSize': ticksSize,                                                       
-        'yticksSize': ticksSize,                                                         
-        'tickRotation': 0,
-        'show': False})   
-
-
-    # get the average of connections per client
-    xarray, yarray = getDataFromPanda(rumorMetricsPanda, "Voluntary Exits", "Client", clientList, 'avg') 
-
-    plotBarsFromArrays(xarray, yarray, opts={                                            
-        'figSize': figSize,                                                          
-        'figTitle': 'MessageAverageFromVoluntaryExit.png',                                
-        'outputPath': outputFigsFolder,                                                    
-        'align': 'center', 
-        'barValues': None,
-        'barColor': clientColors,
-        'textSize': textSize,                                                         
-        'yLowLimit': 0,                                                             
-        'yUpperLimit': None,                                                        
-        'title': "Average of Received VoluntaryExit Messages from Clients",                             
-        'xlabel': None,                                   
-        'ylabel': 'Messages Received',                                                
-        'xticks': xarray,                                                           
-        'titleSize': titleSize,                                                        
-        'labelSize': labelSize,                                                        
-        'lengendPosition': 1,                                                   
-        'legendSize': labelSize,                                                       
-        'xticksSize': ticksSize,                                                       
-        'yticksSize': ticksSize,                                                       
-        'tickRotation': 0,
-        'show': False}) 
-
-    # AttesterSlashing
-    xarray, yarray = getDataFromPanda(rumorMetricsPanda, "Attester Slashings", "Client", clientList, 'sum') 
-
-    plotBarsFromArrays(xarray, yarray, opts={                                            
-        'figSize': figSize,                                                          
-        'figTitle': 'MessagesFromAttesterSlashing.png',                                
-        'outputPath': outputFigsFolder,                                                    
-        'align': 'center', 
-        'barValues': None,
-        'barColor': clientColors,
-        'textSize': textSize,                                                         
-        'yLowLimit': 0,                                                             
-        'yUpperLimit': None,                                                        
-        'title': "Number of Received AttesterSlashing Messages from Clients",                             
-        'xlabel': None,                                   
-        'ylabel': 'Messages Received',                                                
-        'xticks': xarray,                                                           
-        'titleSize': titleSize,                                                        
-        'labelSize': labelSize,                                                        
-        'lengendPosition': 1,                                                   
-        'legendSize': labelSize,                                                       
-        'xticksSize': ticksSize,                                                       
-        'yticksSize': ticksSize,                                                     
-        'tickRotation': 0,
-        'show': False})   
-
-
-    # get the average of connections per client
-    xarray, yarray = getDataFromPanda(rumorMetricsPanda, "Attester Slashings", "Client", clientList, 'avg') 
-
-    plotBarsFromArrays(xarray, yarray, opts={                                            
-        'figSize': figSize,                                                          
-        'figTitle': 'MessageAverageFromAttesterSlashing.png',                                
-        'outputPath': outputFigsFolder,                                                    
-        'align': 'center', 
-        'barValues': None,
-        'barColor': clientColors,
-        'textSize': textSize,                                                         
-        'yLowLimit': 0,                                                             
-        'yUpperLimit': None,                                                        
-        'title': "Average of Received AttesterSlashing Messages from Clients",                             
-        'xlabel': None,                                   
-        'ylabel': 'Messages Received',                                                
-        'xticks': xarray,                                                           
-        'titleSize': titleSize,                                                        
-        'labelSize': labelSize,                                                        
-        'lengendPosition': 1,                                                   
-        'legendSize': labelSize,                                                       
-        'xticksSize': ticksSize,                                                       
-        'yticksSize': ticksSize,                                                           
-        'tickRotation': 0,
-        'show': False}) 
-
-    # ProposerSlashing
-    xarray, yarray = getDataFromPanda(rumorMetricsPanda, "Proposer Slashings", "Client", clientList, 'sum') 
-
-    plotBarsFromArrays(xarray, yarray, opts={                                            
-        'figSize': figSize,                                                          
-        'figTitle': 'MessagesFromProposerSlashing.png',                                
-        'outputPath': outputFigsFolder,                                                    
-        'align': 'center', 
-        'barValues': None,
-        'barColor': clientColors,
-        'textSize': textSize,                                                         
-        'yLowLimit': 0,                                                             
-        'yUpperLimit': None,                                                        
-        'title': "Number of Received ProposerSlashing Messages from Clients",                             
-        'xlabel': None,                                   
-        'ylabel': 'Messages Received',                                                
-        'xticks': xarray,                                                           
-        'titleSize': titleSize,                                                        
-        'labelSize': labelSize,                                                        
-        'lengendPosition': 1,                                                   
-        'legendSize': labelSize,                                                       
-        'xticksSize': ticksSize,                                                       
-        'yticksSize': ticksSize,                                                           
-        'tickRotation': 0,
-        'show': False})   
-
-
-    # get the average of connections per client
-    xarray, yarray = getDataFromPanda(rumorMetricsPanda, "Proposer Slashings", "Client", clientList, 'avg') 
-
-    plotBarsFromArrays(xarray, yarray, opts={                                            
-        'figSize': figSize,                                                          
-        'figTitle': 'MessageAverageFromProposerSlashing.png',                                
-        'outputPath': outputFigsFolder,                                                    
-        'align': 'center', 
-        'barValues': None,
-        'barColor': clientColors,
-        'textSize': textSize,                                                         
-        'yLowLimit': 0,                                                             
-        'yUpperLimit': None,                                                        
-        'title': "Average of Received ProposerSlashing Messages",                             
-        'xlabel': None,                                   
-        'ylabel': 'Messages Received',                                                
-        'xticks': xarray,                                                           
-        'titleSize': titleSize,                                                        
-        'labelSize': labelSize,                                                        
-        'lengendPosition': 1,                                                   
-        'legendSize': labelSize,                                                       
-        'xticksSize': ticksSize,                                                       
-        'yticksSize': ticksSize,                                                             
-        'tickRotation': 0,
-        'show': False}) 
-
-
-
-    # Plotting from the panda
-    barColor = 'black'
-    plotBarsFromPandas(rumorMetricsPanda, opts={                                   
-        'figSize': wideFigSize,                                                      
-        'figTitle': 'ConnectionsWithPeers.png',                                    
-        'outputPath': outputFigsFolder,
-        'legend': False,                                         
-        'align': 'center',
-        'ylog': False,
-        'xmetrics': ['Connections'],                                                      
-        'barValues': None,    
-        'barColor': barColor,                                              
-        'yLowLimit': 0,                                                         
-        'yUpperLimit': None,  
-        'grid': None,                                                   
-        'title': "Number of Connections with each Peer",                  
-        'xlabel': "Peers Connected",                                                         
-        'ylabel': 'Number of Connections',                                      
-        'xticks': None,                                                       
-        'titleSize': titleSize+2,                                                        
-        'labelSize': labelSize+2,                                                        
-        'lengendPosition': 1,                                                   
-        'legendSize': labelSize+2,                                                       
-        'xticksSize': ticksSize+2,                                                       
-        'yticksSize': ticksSize+2,                                                      
-        'tickRotation': 0,                                                     
-        'show': False}) 
-
-    barColor = 'black'
-    plotBarsFromPandas(rumorMetricsPanda, opts={                                   
-        'figSize': wideFigSize,                                                      
-        'figTitle': 'DisconnectionsWithPeers.png',                                    
-        'outputPath': outputFigsFolder,
-        'legend': False,                                         
-        'align': 'center',
-        'ylog': False,
-        'xmetrics': ['Disconnections'],                                                      
-        'barValues': None,
-        'barColor': barColor,                                                  
-        'yLowLimit': 0,                                                         
-        'yUpperLimit': None,     
-        'grid': None,                                                
-        'title': "Number of Disconnections with each Peer",                  
-        'xlabel': "Peers Connected",                                                         
-        'ylabel': 'Number of Disconnections',                                      
-        'xticks': None,                                                       
-        'titleSize': titleSize+2,                                                        
-        'labelSize': labelSize+2,                                                        
-        'lengendPosition': 1,                                                   
-        'legendSize': labelSize+2,                                                       
-        'xticksSize': ticksSize +2,                                                       
-        'yticksSize': ticksSize +2,                                                        
-        'tickRotation': 0,                                                     
-        'show': False}) 
-
-    barColor = 'black'
-    plotBarsFromPandas(rumorMetricsPanda, opts={                                   
-        'figSize': wideFigSize,                                                      
-        'figTitle': 'TimeConnectedWithPeers.png',                                    
-        'outputPath': outputFigsFolder,
-        'legend': False,                                         
-        'align': 'center',
-        'ylog': False,
-        'xmetrics': ['Connected Time'],                                                      
-        'barValues': None,   
-        'barColor': barColor,                                               
-        'yLowLimit': 0,                                                         
-        'yUpperLimit': None,
-        'grid': None,                                                    
-        'title': "Total of Time Connected with each Peer",                  
-        'xlabel': "Peers Connected",                                                         
-        'ylabel': 'Time (in Minutes)',                                      
-        'xticks': None,                                                       
-        'titleSize': titleSize +2,                                                        
-        'labelSize': labelSize +2,                                                        
-        'lengendPosition': 1,                                                   
-        'legendSize': labelSize +2,                                                       
-        'xticksSize': ticksSize +2,                                                       
-        'yticksSize': ticksSize +2,                                                     
-        'tickRotation': 0,                                                     
-        'show': False}) 
-
-    barColor = 'black'
-
-    print("Peer with highest latency", rumorMetricsPanda.loc[rumorMetricsPanda['Latency'].idxmax()])
-
-    plotBarsFromPandas(rumorMetricsPanda, opts={                                   
-        'figSize': wideFigSize,                                                      
-        'figTitle': 'LatencyWithPeers.png',                                    
-        'outputPath': outputFigsFolder,
-        'legend': False,                                         
-        'align': 'center',
-        'ylog': True,
-        'xmetrics': ['Latency'],                                                      
-        'barValues': None,   
-        'barColor': barColor,                                               
-        'yLowLimit': 0,                                                         
-        'yUpperLimit': None,
-        'grid': 'y',                                                    
-        'title': "Latency with each Peer",                  
-        'xlabel': "Peers Connected",                                                         
-        'ylabel': 'Seconds',                                      
-        'xticks': None,                                                       
-        'titleSize': titleSize +2,                                                        
-        'labelSize': labelSize +2,                                                        
-        'lengendPosition': 1,                                                   
-        'legendSize': labelSize +2,                                                       
-        'xticksSize': ticksSize +2,                                                       
-        'yticksSize': ticksSize +2,                                                     
-        'tickRotation': 0,                                                     
-        'show': False}) 
-
-    # Message distributions among the peers
-
-    barColor = 'black'
-    messagesDics = {}
-    for index, row in rumorMetricsPanda.iterrows():
-        if row['Beacon Blocks'] in messagesDics:
-            messagesDics[row['Beacon Blocks']] = messagesDics[row['Beacon Blocks']] + 1
-        else:
-            messagesDics[row['Beacon Blocks']] = 1
-
-    sortedDict = collections.OrderedDict(sorted(messagesDics.items()))
-
-    xarray = []
-    yarray = []
-    for item in sortedDict:
-        xarray.append(item)
-        yarray.append(sortedDict[item])
-
-    #print(rumorMetricsPanda.loc[rumorMetricsPanda['Beacon Blocks'].idxmax()])
-
-    plotColumn(rumorMetricsPanda, opts={
-        'figSize': wideFigSize, 
-        'figTitle': 'BeaconBlockMessagePerClient.png',
-        'outputPath': outputFigsFolder,
-        'xlog': False,
-        'ylog': True,
-        'xMetrics': None,
-        'yMetrics': ['Beacon Blocks'],
-        'sortmetrics': 'Beacon Blocks',
-        'xticks': None,
-        'xLowLimit': 0,
-        'xUpperLimit': len(rumorMetricsPanda),
-        'xRange': 1,
-        'yLowLimit': 10**0,
-        'yRange': None,
-        'yUpperLimit': None,
-        'title': "Number of Beacon Blocks Received from each Peer",
-        'xLabel': "Peers Connected",
-        'yLabel': 'Number of Messages Received',
-        'legendLabel': None,
-        'titleSize': titleSize +2,
-        'labelSize': labelSize + 2,
-        'lableColor': 'tab:orange',
-        'hGrids': True,
-        'vGrids': False,
-        'hlines': [1000],
-        'vlines': None,
-        'hlineColor': 'r',
-        'vlineColor': 'r',
-        'hlineStyle': None,
-        'vlineStyle': '--',
-        'marker': '.',
-        'markerStyle': ',',
-        'markerSize': 4,
-        'lengendPosition': 1,
-        'legendSize': 16,
-        'tickSize': 16})
-
-
-    barColor = 'black'
-
-    auxPanda = rumorMetricsPanda.sort_values(by='Beacon Blocks', ascending=True)
-    cont = 0
-
-    auxrow = rumorMetricsPanda.loc[rumorMetricsPanda['Connected Time'].idxmax()]
-    maxX = auxrow['Connected Time'] 
-    print(maxX)
-    xticks = int(maxX / 5)
+    with PdfPages(pdfFile) as pdf:
     
-    plotColumn(rumorMetricsPanda, opts={
-        'figSize': wideFigSize, 
-        'figTitle': 'TotalMesagesPerTimeConnected.png',
-        'outputPath': outputFigsFolder,
-        'xlog': False,
-        'ylog': True,
-        'xMetrics': 'Connected Time',
-        'yMetrics': ['Total Messages'],
-        'sortmetrics': None,
-        'xticks': 1,
-        'xLowLimit': 0,
-        'xUpperLimit': maxX,
-        'xRange': xticks,
-        'yLowLimit': 10**0,
-        'yRange': None,
-        'yUpperLimit': None,
-        'title': "Total of Messages for Connected Time",
-        'xLabel': "Connected Time (Minutes)",
-        'yLabel': 'Number of Messages Received',
-        'legendLabel': None,
-        'titleSize': titleSize +2,
-        'labelSize': labelSize + 2,
-        'lableColor': 'tab:orange',
-        'hGrids': True,
-        'vGrids': True,
-        'hlines': None,
-        'vlines': None,
-        'hlineColor': None,
-        'vlineColor': 'r',
-        'hlineStyle': None,
-        'vlineStyle': '--',
-        'marker': '.',
-        'markerStyle': ',',
-        'markerSize': 4,
-        'lengendPosition': 1,
-        'legendSize': 16,
-        'tickSize': 16})
+        plotBarsFromArrays(xarray, yarray, pdf, opts={                                   
+            'figSize': figSize,                                                      
+            'figTitle': 'PeerstoreVsConnectedPeers.png', 
+            'pdf': pdfFile,                                
+            'outputPath': outputFigsFolder,                                         
+            'align': 'center',                                                      
+            'barValues': True,
+            'barColor': barColor,
+            'textSize': textSize,
+            'yLowLimit': 0,                                                         
+            'yUpperLimit': None,                                                    
+            'title': "Number of Peers Connected from the entire Peerstore",                  
+            'xlabel': None,                                                         
+            'ylabel': 'Number of Peers',                                      
+            'xticks': xarray,                       
+            'titleSize': titleSize,                                                        
+            'labelSize': labelSize,                                                        
+            'lengendPosition': 1,                                                   
+            'legendSize': labelSize,                                                       
+            'xticksSize': ticksSize,                                                       
+            'yticksSize': ticksSize,                                                       
+            'tickRotation': 0,                                                     
+            'show': False})
+
+        clientCounter = []
+        types         = []
+        typesCounter  = []
+
+        for idx, item in enumerate(clientList):
+            tcnt, tp, tpc = getTypesPerName(rumorMetricsPanda, item, 'Client', 'Version')
+            clientCounter.append(tcnt)
+            types.append(tp)
+            typesCounter.append(tpc)
+
+        xarray = types
+        yarray = typesCounter
+        namesarray = clientList
+
+        plotDoublePieFromArray(yarray, pdf, opts={                                   
+            'figsize': figSize,                                                      
+            'figtitle': 'PeersPerClient.png',  
+            'pdf': pdfFile,                                   
+            'outputpath': outputFigsFolder,
+            'piesize': 0.3,                                                      
+            'autopct': "pcts", #False,
+            'pctdistance': 1.65,
+            'edgecolor': 'w',
+            'innerlabels': types,
+            'outerlabels': clientList,
+            'labeldistance': 1.25,
+            'innercolors': innerColors,
+            'outercolors': clientColors,
+            'shadow': None,
+            'startangle': 90,                                                  
+            'title': "Number of Peers From Each Client and Their Versions",                   
+            'titlesize': titleSize,                                                        
+            'labelsize': labelSize, 
+            'legend': True,                                                       
+            'lengendposition': None,                                                   
+            'legendsize': labelSize,                                                     
+            'show': False})
+
+        print("| {:<35}| {:<15}|".format('ClientVersion', 'NumbersPeers'))
+        print("-------------------------------------------------------")
+        for idx, item in enumerate(clientList):
+            print("| {:<35}| {:<15}|".format(item, clientCounter[idx]))
+            print("-------------------------------------------------------")
+            v = types[idx]
+            for j, n in enumerate(v):
+                print(" -> {:<33}| {:<15}|".format(v[j], yarray[idx][j]))
+            print("-------------------------------------------------------")
+
+
+
+        # get the number of peers per country 
+        countriesList = getItemsFromColumn(rumorMetricsPanda, 'Country') 
+        auxxarray, auxyarray = getDataFromPanda(rumorMetricsPanda, None, "Country", countriesList, 'counter') 
+        # Remove the Countries with less than X peers
+        countryLimit = 10
+        xarray = []
+        yarray = []
+        for idx, item in enumerate(auxyarray):
+            if auxyarray[idx] >= countryLimit:
+                yarray.append(item)
+                xarray.append(auxxarray[idx])
+
+        xarray, yarray = sortArrayMaxtoMin(xarray, yarray)
+        # Get Color Grid
+        barColor = GetColorGridFromArray(yarray)
+
+
+        plotBarsFromArrays(xarray, yarray, pdf, opts={                                            
+            'figSize': (12,7),                                                          
+            'figTitle': 'PeersPerCountries.png', 
+            'pdf': pdfFile,                                
+            'outputPath': outputFigsFolder,                                                    
+            'align': 'center', 
+            'barValues': True,
+            'barColor': barColor,
+            'textSize': textSize+2,                                                         
+            'yLowLimit': 0,                                                             
+            'yUpperLimit': None,                                                        
+            'title': "Number of Peers Connected from each Country",                             
+            'xlabel': None,                                   
+            'ylabel': 'Number of Connections',                                                
+            'xticks': xarray,                                                           
+            'titleSize': titleSize+2,                                                        
+            'labelSize': labelSize+2,                                                        
+            'lengendPosition': 1,                                                   
+            'legendSize': labelSize+2,                                                       
+            'xticksSize': ticksSize-2,                                                       
+            'yticksSize': ticksSize+2,                                                            
+            'tickRotation': 90,
+            'show': False})   
+
+        # get the average of connections per client
+        xarray, yarray = getDataFromPanda(rumorMetricsPanda, "Connections", "Client", clientList, 'avg') 
+
+        plotBarsFromArrays(xarray, yarray, pdf, opts={                                            
+            'figSize': figSize,                                                          
+            'figTitle': 'AverageOfConnectionsPerClientType.png', 
+            'pdf': pdfFile,                                
+            'outputPath': outputFigsFolder,                                                    
+            'align': 'center', 
+            'barValues': True,
+            'barColor': clientColors,
+            'textSize': textSize,                                                         
+            'yLowLimit': 0,                                                             
+            'yUpperLimit': None,                                                        
+            'title': "Average of Connections per Client Type",                             
+            'xlabel': None,                                   
+            'ylabel': 'Number of Connections',                                                
+            'xticks': xarray,                                                           
+            'titleSize': titleSize,                                                        
+            'labelSize': labelSize,                                                        
+            'lengendPosition': 1,                                                   
+            'legendSize': labelSize,                                                       
+            'xticksSize': ticksSize,                                                       
+            'yticksSize': ticksSize,                                                           
+            'tickRotation': 0,
+            'show': False}) 
+
+        # get the average of disconnections per client
+        xarray, yarray = getDataFromPanda(rumorMetricsPanda, "Disconnections", "Client", clientList, 'avg') 
+
+        plotBarsFromArrays(xarray, yarray, pdf, opts={                                            
+            'figSize': figSize,                                                          
+            'figTitle': 'AverageOfDisconnectionsPerClientType.png',  
+            'pdf': pdfFile,                               
+            'outputPath': outputFigsFolder,                                                    
+            'align': 'center', 
+            'barValues': True,
+            'barColor': clientColors,
+            'textSize': textSize,                                                         
+            'yLowLimit': 0,                                                             
+            'yUpperLimit': None,                                                        
+            'title': "Average of Disconnections per Client Type",                             
+            'xlabel': None,                                   
+            'ylabel': 'Number of Disconnections',                                                
+            'xticks': xarray,                                                           
+            'titleSize': titleSize,                                                        
+            'labelSize': labelSize,                                                        
+            'lengendPosition': 1,                                                   
+            'legendSize': labelSize,                                                       
+            'xticksSize': ticksSize,                                                       
+            'yticksSize': ticksSize,                                                             
+            'tickRotation': 0,
+            'show': False}) 
+
+        # get the average of ConnectedTime per client
+        xarray, yarray = getDataFromPanda(rumorMetricsPanda, "Connected Time", "Client", clientList, 'avg') 
+
+        plotBarsFromArrays(xarray, yarray, pdf, opts={                                            
+            'figSize': figSize,                                                          
+            'figTitle': 'AverageOfConnectedTimePerClientType.png',
+            'pdf': pdfFile,                                 
+            'outputPath': outputFigsFolder,                                                    
+            'align': 'center', 
+            'barValues': True,
+            'barColor': clientColors,
+            'textSize': textSize,                                                         
+            'yLowLimit': 0,                                                             
+            'yUpperLimit': None,                                                        
+            'title': "Average of Connected Time to Peers from Clients",                             
+            'xlabel': None,                                   
+            'ylabel': 'Time (Minutes)',                                                
+            'xticks': xarray,                                                           
+            'titleSize': titleSize,                                                        
+            'labelSize': labelSize,                                                        
+            'lengendPosition': 1,                                                   
+            'legendSize': labelSize,                                                       
+            'xticksSize': ticksSize,                                                       
+            'yticksSize': ticksSize,                                                             
+            'tickRotation': 0,
+            'show': False}) 
+
+        # get the average latency per client
+        # since few of the clients dont hace latency
+        # the calculus are made by hand
+        xarray = clientList
+        yarray = []
+        latAuxArray = []
+        xmetrics = 'Client'
+        ymetrics = 'Latency'
+        contador = 0
+        prysmCnt = 0
+        prysmTCnt = 0
+        for _, item in enumerate(xarray):            
+            auxCnt = 0
+            for index, row in rumorMetricsPanda.iterrows():
+                if item.lower() in str(row[xmetrics]).lower():
+                    if row[ymetrics] != 0:
+                        auxCnt = auxCnt + float(row[ymetrics])
+                        if row[ymetrics] > 1:
+                            latAuxArray.append(row[ymetrics])
+                            if "prysm" in item.lower():
+                                prysmTCnt = prysmTCnt + 1 
+                    else:
+                        if "prysm" in item.lower():
+                            prysmCnt = prysmCnt + 1    
+                        contador = contador + 1
+                        # print("client type:", row[xmetrics], "has latency", row[ymetrics] )
+            auxAmount = rumorMetricsPanda.apply(lambda x: True if item.lower() in str(x[xmetrics]).lower() else False, axis=1)
+            if auxCnt != 0:
+                yarray.append(round((auxCnt/(len(auxAmount[auxAmount == True].index))),1))
+            else:
+                yarray.append(0)
+        """
+        print("len of the connected peers:", len(rumorMetricsPanda))
+        print("Number of peers with 0 latency:", contador)
+        print("Number of Prysm clients with 0 latency:", prysmCnt )
+        print("Number of Prysm clients with lat != 0:", prysmTCnt)
+        print("number of peers with more than 1 sec of latency", latAuxArray)
+        """
+
+        plotBarsFromArrays(xarray, yarray, pdf, opts={                                            
+            'figSize': figSize,                                                          
+            'figTitle': 'AverageLatencyPerClientType.png',
+            'pdf': pdfFile,                                 
+            'outputPath': outputFigsFolder,                                                    
+            'align': 'center', 
+            'barValues': True,
+            'barColor': clientColors,
+            'textSize': textSize,                                                         
+            'yLowLimit': 0,                                                             
+            'yUpperLimit': None,                                                        
+            'title': "Average Latency per Client Type",                             
+            'xlabel': None,                                   
+            'ylabel': 'latency (seconds)',                                                
+            'xticks': xarray,                                                           
+            'titleSize': titleSize,                                                        
+            'labelSize': labelSize,                                                        
+            'lengendPosition': 1,                                                   
+            'legendSize': labelSize,                                                       
+            'xticksSize': ticksSize,                                                       
+            'yticksSize': ticksSize,                                                           
+            'tickRotation': 0,
+            'show': False}) 
+
+
+        # GossipSub
+        # BeaconBlock
+        xarray, yarray = getDataFromPanda(rumorMetricsPanda, "Beacon Blocks", "Client", clientList, 'sum') 
+
+        plotBarsFromArrays(xarray, yarray, pdf, opts={                                            
+            'figSize': figSize,                                                          
+            'figTitle': 'MessagesFromBeaconBlock.png',
+            'pdf': pdfFile,                                 
+            'outputPath': outputFigsFolder,                                                    
+            'align': 'center', 
+            'barValues': True,
+            'barColor': clientColors,
+            'textSize': textSize,                                                         
+            'yLowLimit': 0,                                                             
+            'yUpperLimit': None,                                                        
+            'title': "Number of Received BeaconBlock Msgs",                             
+            'xlabel': None,                                   
+            'ylabel': 'Messages Received',                                                
+            'xticks': xarray,                                                           
+            'titleSize': titleSize,                                                        
+            'labelSize': labelSize,                                                        
+            'lengendPosition': 1,                                                   
+            'legendSize': labelSize,                                                       
+            'xticksSize': ticksSize,                                                       
+            'yticksSize': ticksSize,                                                            
+            'tickRotation': 0,
+            'show': False})   
+
+
+        # get the average of connections per client
+        xarray, yarray = getDataFromPanda(rumorMetricsPanda, "Beacon Blocks", "Client", clientList, 'avg') 
+
+        plotBarsFromArrays(xarray, yarray, pdf, opts={                                            
+            'figSize': figSize,                                                          
+            'figTitle': 'MessageAverageFromBeaconBlock.png',
+            'pdf': pdfFile,                                 
+            'outputPath': outputFigsFolder,                                                    
+            'align': 'center', 
+            'barValues': True,
+            'barColor': clientColors,
+            'textSize': textSize,                                                         
+            'yLowLimit': 0,                                                             
+            'yUpperLimit': None,                                                        
+            'title': "Average of Received BeaconBlock Msgs",                             
+            'xlabel': None,                                   
+            'ylabel': 'Messages Received',                                                
+            'xticks': xarray,                                                           
+            'titleSize': titleSize,                                                        
+            'labelSize': labelSize,                                                        
+            'lengendPosition': 1,                                                   
+            'legendSize': labelSize,                                                       
+            'xticksSize': ticksSize,                                                       
+            'yticksSize': ticksSize,                                                         
+            'tickRotation': 0,
+            'show': False}) 
+
+        # BeaconAggregateAndProof
+        xarray, yarray = getDataFromPanda(rumorMetricsPanda, "Beacon Aggregations", "Client", clientList, 'sum') 
+
+        plotBarsFromArrays(xarray, yarray, pdf, opts={                                            
+            'figSize': figSize,                                                          
+            'figTitle': 'MessagesFromBeaconAggregateProof.png', 
+            'pdf': pdfFile,                                
+            'outputPath': outputFigsFolder,                                                    
+            'align': 'center', 
+            'barValues': True,
+            'barColor': clientColors,
+            'textSize': textSize,                                                         
+            'yLowLimit': 0,                                                             
+            'yUpperLimit': None,                                                        
+            'title': "Number of Received BeaconAggregateAndProof Msgs",                             
+            'xlabel': None,                                   
+            'ylabel': 'Messages Received',                                                
+            'xticks': xarray,                                                           
+            'titleSize': titleSize,                                                        
+            'labelSize': labelSize,                                                        
+            'lengendPosition': 1,                                                   
+            'legendSize': labelSize,                                                       
+            'xticksSize': ticksSize,                                                       
+            'yticksSize': ticksSize,                                                          
+            'tickRotation': 0,
+            'show': False})   
+
+
+        # get the average of connections per client
+        xarray, yarray = getDataFromPanda(rumorMetricsPanda, "Beacon Aggregations", "Client", clientList, 'avg') 
+
+        plotBarsFromArrays(xarray, yarray, pdf, opts={                                            
+            'figSize': figSize,                                                          
+            'figTitle': 'MessageAverageFromBeaconAggregateProof.png', 
+            'pdf': pdfFile,                                
+            'outputPath': outputFigsFolder,                                                    
+            'align': 'center', 
+            'barValues': True,
+            'barColor': clientColors,
+            'textSize': textSize,                                                         
+            'yLowLimit': 0,                                                             
+            'yUpperLimit': None,                                                        
+            'title': "Average of Received BeaconAggregateAndProof Msgs",                             
+            'xlabel': None,                                   
+            'ylabel': 'Messages Received',                                                
+            'xticks': xarray,                                                           
+            'titleSize': titleSize,                                                        
+            'labelSize': labelSize,                                                        
+            'lengendPosition': 1,                                                   
+            'legendSize': labelSize,                                                       
+            'xticksSize': ticksSize,                                                       
+            'yticksSize': ticksSize,                                                        
+            'tickRotation': 0,
+            'show': False}) 
+
+        # VoluntaryExit
+        xarray, yarray = getDataFromPanda(rumorMetricsPanda, "Voluntary Exits", "Client", clientList, 'sum') 
+
+        plotBarsFromArrays(xarray, yarray, pdf, opts={                                            
+            'figSize': figSize,                                                          
+            'figTitle': 'MessagesFromVoluntaryExit.png', 
+            'pdf': pdfFile,                                
+            'outputPath': outputFigsFolder,                                                    
+            'align': 'center', 
+            'barValues': None,
+            'barColor': clientColors,
+            'textSize': textSize,                                                         
+            'yLowLimit': 0,                                                             
+            'yUpperLimit': None,                                                        
+            'title': "Number of Received VoluntaryExit Messages from Clients",                             
+            'xlabel': None,                                   
+            'ylabel': 'Messages Received',                                                
+            'xticks': xarray,                                                           
+            'titleSize': titleSize,                                                        
+            'labelSize': labelSize,                                                        
+            'lengendPosition': 1,                                                   
+            'legendSize': labelSize,                                                       
+            'xticksSize': ticksSize,                                                       
+            'yticksSize': ticksSize,                                                         
+            'tickRotation': 0,
+            'show': False})   
+
+
+        # get the average of connections per client
+        xarray, yarray = getDataFromPanda(rumorMetricsPanda, "Voluntary Exits", "Client", clientList, 'avg') 
+
+        plotBarsFromArrays(xarray, yarray, pdf, opts={                                            
+            'figSize': figSize,                                                          
+            'figTitle': 'MessageAverageFromVoluntaryExit.png',
+            'pdf': pdfFile,                                 
+            'outputPath': outputFigsFolder,                                                    
+            'align': 'center', 
+            'barValues': None,
+            'barColor': clientColors,
+            'textSize': textSize,                                                         
+            'yLowLimit': 0,                                                             
+            'yUpperLimit': None,                                                        
+            'title': "Average of Received VoluntaryExit Messages from Clients",                             
+            'xlabel': None,                                   
+            'ylabel': 'Messages Received',                                                
+            'xticks': xarray,                                                           
+            'titleSize': titleSize,                                                        
+            'labelSize': labelSize,                                                        
+            'lengendPosition': 1,                                                   
+            'legendSize': labelSize,                                                       
+            'xticksSize': ticksSize,                                                       
+            'yticksSize': ticksSize,                                                       
+            'tickRotation': 0,
+            'show': False}) 
+
+        # AttesterSlashing
+        xarray, yarray = getDataFromPanda(rumorMetricsPanda, "Attester Slashings", "Client", clientList, 'sum') 
+
+        plotBarsFromArrays(xarray, yarray, pdf, opts={                                            
+            'figSize': figSize,                                                          
+            'figTitle': 'MessagesFromAttesterSlashing.png', 
+            'pdf': pdfFile,                                
+            'outputPath': outputFigsFolder,                                                    
+            'align': 'center', 
+            'barValues': None,
+            'barColor': clientColors,
+            'textSize': textSize,                                                         
+            'yLowLimit': 0,                                                             
+            'yUpperLimit': None,                                                        
+            'title': "Number of Received AttesterSlashing Messages from Clients",                             
+            'xlabel': None,                                   
+            'ylabel': 'Messages Received',                                                
+            'xticks': xarray,                                                           
+            'titleSize': titleSize,                                                        
+            'labelSize': labelSize,                                                        
+            'lengendPosition': 1,                                                   
+            'legendSize': labelSize,                                                       
+            'xticksSize': ticksSize,                                                       
+            'yticksSize': ticksSize,                                                     
+            'tickRotation': 0,
+            'show': False})   
+
+
+        # get the average of connections per client
+        xarray, yarray = getDataFromPanda(rumorMetricsPanda, "Attester Slashings", "Client", clientList, 'avg') 
+
+        plotBarsFromArrays(xarray, yarray, pdf, opts={                                            
+            'figSize': figSize,                                                          
+            'figTitle': 'MessageAverageFromAttesterSlashing.png', 
+            'pdf': pdfFile,                                
+            'outputPath': outputFigsFolder,                                                    
+            'align': 'center', 
+            'barValues': None,
+            'barColor': clientColors,
+            'textSize': textSize,                                                         
+            'yLowLimit': 0,                                                             
+            'yUpperLimit': None,                                                        
+            'title': "Average of Received AttesterSlashing Messages from Clients",                             
+            'xlabel': None,                                   
+            'ylabel': 'Messages Received',                                                
+            'xticks': xarray,                                                           
+            'titleSize': titleSize,                                                        
+            'labelSize': labelSize,                                                        
+            'lengendPosition': 1,                                                   
+            'legendSize': labelSize,                                                       
+            'xticksSize': ticksSize,                                                       
+            'yticksSize': ticksSize,                                                           
+            'tickRotation': 0,
+            'show': False}) 
+
+        # ProposerSlashing
+        xarray, yarray = getDataFromPanda(rumorMetricsPanda, "Proposer Slashings", "Client", clientList, 'sum') 
+
+        plotBarsFromArrays(xarray, yarray, pdf, opts={                                            
+            'figSize': figSize,                                                          
+            'figTitle': 'MessagesFromProposerSlashing.png', 
+            'pdf': pdfFile,                                
+            'outputPath': outputFigsFolder,                                                    
+            'align': 'center', 
+            'barValues': None,
+            'barColor': clientColors,
+            'textSize': textSize,                                                         
+            'yLowLimit': 0,                                                             
+            'yUpperLimit': None,                                                        
+            'title': "Number of Received ProposerSlashing Messages from Clients",                             
+            'xlabel': None,                                   
+            'ylabel': 'Messages Received',                                                
+            'xticks': xarray,                                                           
+            'titleSize': titleSize,                                                        
+            'labelSize': labelSize,                                                        
+            'lengendPosition': 1,                                                   
+            'legendSize': labelSize,                                                       
+            'xticksSize': ticksSize,                                                       
+            'yticksSize': ticksSize,                                                           
+            'tickRotation': 0,
+            'show': False})   
+
+
+        # get the average of connections per client
+        xarray, yarray = getDataFromPanda(rumorMetricsPanda, "Proposer Slashings", "Client", clientList, 'avg') 
+
+        plotBarsFromArrays(xarray, yarray, pdf, opts={                                            
+            'figSize': figSize,                                                          
+            'figTitle': 'MessageAverageFromProposerSlashing.png',
+            'pdf': pdfFile,                                 
+            'outputPath': outputFigsFolder,                                                    
+            'align': 'center', 
+            'barValues': None,
+            'barColor': clientColors,
+            'textSize': textSize,                                                         
+            'yLowLimit': 0,                                                             
+            'yUpperLimit': None,                                                        
+            'title': "Average of Received ProposerSlashing Messages",                             
+            'xlabel': None,                                   
+            'ylabel': 'Messages Received',                                                
+            'xticks': xarray,                                                           
+            'titleSize': titleSize,                                                        
+            'labelSize': labelSize,                                                        
+            'lengendPosition': 1,                                                   
+            'legendSize': labelSize,                                                       
+            'xticksSize': ticksSize,                                                       
+            'yticksSize': ticksSize,                                                             
+            'tickRotation': 0,
+            'show': False}) 
+
+
+
+        # Plotting from the panda
+        barColor = 'black'
+        plotBarsFromPandas(rumorMetricsPanda, pdf, opts={                                   
+            'figSize': wideFigSize,                                                      
+            'figTitle': 'ConnectionsWithPeers.png',
+            'pdf': pdfFile,                                     
+            'outputPath': outputFigsFolder,
+            'legend': False,                                         
+            'align': 'center',
+            'ylog': False,
+            'xmetrics': ['Connections'],                                                      
+            'barValues': None,    
+            'barColor': barColor,                                              
+            'yLowLimit': 0,                                                         
+            'yUpperLimit': None,  
+            'grid': None,                                                   
+            'title': "Number of Connections with each Peer",                  
+            'xlabel': "Peers Connected",                                                         
+            'ylabel': 'Number of Connections',                                      
+            'xticks': None,                                                       
+            'titleSize': titleSize+2,                                                        
+            'labelSize': labelSize+2,                                                        
+            'lengendPosition': 1,                                                   
+            'legendSize': labelSize+2,                                                       
+            'xticksSize': ticksSize+2,                                                       
+            'yticksSize': ticksSize+2,                                                      
+            'tickRotation': 0,                                                     
+            'show': False}) 
+
+        barColor = 'black'
+        plotBarsFromPandas(rumorMetricsPanda, pdf, opts={                                   
+            'figSize': wideFigSize,                                                      
+            'figTitle': 'DisconnectionsWithPeers.png',
+            'pdf': pdfFile,                                     
+            'outputPath': outputFigsFolder,
+            'legend': False,                                         
+            'align': 'center',
+            'ylog': False,
+            'xmetrics': ['Disconnections'],                                                      
+            'barValues': None,
+            'barColor': barColor,                                                  
+            'yLowLimit': 0,                                                         
+            'yUpperLimit': None,     
+            'grid': None,                                                
+            'title': "Number of Disconnections with each Peer",                  
+            'xlabel': "Peers Connected",                                                         
+            'ylabel': 'Number of Disconnections',                                      
+            'xticks': None,                                                       
+            'titleSize': titleSize+2,                                                        
+            'labelSize': labelSize+2,                                                        
+            'lengendPosition': 1,                                                   
+            'legendSize': labelSize+2,                                                       
+            'xticksSize': ticksSize +2,                                                       
+            'yticksSize': ticksSize +2,                                                        
+            'tickRotation': 0,                                                     
+            'show': False}) 
+
+        barColor = 'black'
+        plotBarsFromPandas(rumorMetricsPanda, pdf, opts={                                   
+            'figSize': wideFigSize,                                                      
+            'figTitle': 'TimeConnectedWithPeers.png', 
+            'pdf': pdfFile,                                    
+            'outputPath': outputFigsFolder,
+            'legend': False,                                         
+            'align': 'center',
+            'ylog': True,
+            'xmetrics': ['Connected Time'],                                                      
+            'barValues': None,   
+            'barColor': barColor,                                               
+            'yLowLimit': 0,                                                         
+            'yUpperLimit': None,
+            'grid': None,                                                    
+            'title': "Total of Time Connected with each Peer",                  
+            'xlabel': "Peers Connected",                                                         
+            'ylabel': 'Time (in Minutes)',                                      
+            'xticks': None,                                                       
+            'titleSize': titleSize +2,                                                        
+            'labelSize': labelSize +2,                                                        
+            'lengendPosition': 1,                                                   
+            'legendSize': labelSize +2,                                                       
+            'xticksSize': ticksSize +2,                                                       
+            'yticksSize': ticksSize +2,                                                     
+            'tickRotation': 0,                                                     
+            'show': False}) 
+
+        barColor = 'black'
+
+        print("Peer with highest latency", rumorMetricsPanda.loc[rumorMetricsPanda['Latency'].idxmax()])
+
+        plotBarsFromPandas(rumorMetricsPanda, pdf, opts={                                   
+            'figSize': wideFigSize,                                                      
+            'figTitle': 'LatencyWithPeers.png', 
+            'pdf': pdfFile,                                    
+            'outputPath': outputFigsFolder,
+            'legend': False,                                         
+            'align': 'center',
+            'ylog': True,
+            'xmetrics': ['Latency'],                                                      
+            'barValues': None,   
+            'barColor': barColor,                                               
+            'yLowLimit': 0,                                                         
+            'yUpperLimit': None,
+            'grid': 'y',                                                    
+            'title': "Latency with each Peer",                  
+            'xlabel': "Peers Connected",                                                         
+            'ylabel': 'Seconds',                                      
+            'xticks': None,                                                       
+            'titleSize': titleSize +2,                                                        
+            'labelSize': labelSize +2,                                                        
+            'lengendPosition': 1,                                                   
+            'legendSize': labelSize +2,                                                       
+            'xticksSize': ticksSize +2,                                                       
+            'yticksSize': ticksSize +2,                                                     
+            'tickRotation': 0,                                                     
+            'show': False}) 
+
+        # Message distributions among the peers
+
+        barColor = 'black'
+        messagesDics = {}
+        for index, row in rumorMetricsPanda.iterrows():
+            if row['Beacon Blocks'] in messagesDics:
+                messagesDics[row['Beacon Blocks']] = messagesDics[row['Beacon Blocks']] + 1
+            else:
+                messagesDics[row['Beacon Blocks']] = 1
+
+        sortedDict = collections.OrderedDict(sorted(messagesDics.items()))
+
+        xarray = []
+        yarray = []
+        for item in sortedDict:
+            xarray.append(item)
+            yarray.append(sortedDict[item])
+
+        #print(rumorMetricsPanda.loc[rumorMetricsPanda['Beacon Blocks'].idxmax()])
+
+        plotColumn(rumorMetricsPanda, pdf, opts={
+            'figSize': wideFigSize, 
+            'figTitle': 'BeaconBlockMessagePerClient.png',
+            'pdf': pdfFile, 
+            'outputPath': outputFigsFolder,
+            'xlog': False,
+            'ylog': True,
+            'xMetrics': None,
+            'yMetrics': ['Beacon Blocks'],
+            'sortmetrics': 'Beacon Blocks',
+            'xticks': None,
+            'xLowLimit': 0,
+            'xUpperLimit': len(rumorMetricsPanda),
+            'xRange': 1,
+            'yLowLimit': 10**0,
+            'yRange': None,
+            'yUpperLimit': None,
+            'title': "Number of Beacon Blocks Received from each Peer",
+            'xLabel': "Peers Connected",
+            'yLabel': 'Number of Messages Received',
+            'legendLabel': None,
+            'titleSize': titleSize +2,
+            'labelSize': labelSize + 2,
+            'lableColor': 'tab:orange',
+            'hGrids': True,
+            'vGrids': False,
+            'hlines': [1000],
+            'vlines': None,
+            'hlineColor': 'r',
+            'vlineColor': 'r',
+            'hlineStyle': None,
+            'vlineStyle': '--',
+            'marker': '.',
+            'markerStyle': ',',
+            'markerSize': 4,
+            'lengendPosition': 1,
+            'legendSize': 16,
+            'tickSize': 16})
+
+
+        barColor = 'black'
+
+        auxPanda = rumorMetricsPanda.sort_values(by='Beacon Blocks', ascending=True)
+        cont = 0
+
+        auxrow = rumorMetricsPanda.loc[rumorMetricsPanda['Connected Time'].idxmax()]
+        maxX = auxrow['Connected Time'] 
+        print(maxX)
+        xticks = int(maxX / 5)
+        
+        plotColumn(rumorMetricsPanda, pdf, opts={
+            'figSize': wideFigSize, 
+            'figTitle': 'TotalMesagesPerTimeConnected.png',
+            'pdf': pdfFile, 
+            'outputPath': outputFigsFolder,
+            'xlog': True,
+            'ylog': True,
+            'xMetrics': 'Connected Time',
+            'yMetrics': ['Total Messages'],
+            'sortmetrics': None,
+            'xticks': 1,
+            'xLowLimit': 0,
+            'xUpperLimit': None,
+            'xRange': 1,
+            'yLowLimit': 10**0,
+            'yRange': None,
+            'yUpperLimit': None,
+            'title': "Total of Messages for Connected Time",
+            'xLabel': "Connected Time (Minutes)",
+            'yLabel': 'Number of Messages Received',
+            'legendLabel': None,
+            'titleSize': titleSize +2,
+            'labelSize': labelSize + 2,
+            'lableColor': 'tab:orange',
+            'hGrids': True,
+            'vGrids': True,
+            'hlines': None,
+            'vlines': None,
+            'hlineColor': None,
+            'vlineColor': 'r',
+            'hlineStyle': None,
+            'vlineStyle': '--',
+            'marker': '.',
+            'markerStyle': ',',
+            'markerSize': 4,
+            'lengendPosition': 1,
+            'legendSize': 16,
+            'tickSize': 16})
 
     # ------ End of Get data -------
 
