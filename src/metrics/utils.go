@@ -2,13 +2,12 @@ package metrics
 
 import (
     "strings"
-    "time"
 )
 
 // Connection Utils
 
 // filter the received Connection/Disconnection events generating a counter and the connected time
-func AnalyzeConnectionEvents(eventList []ConnectionEvents, currentTime time.Time) (int64, int64, float64) {
+func AnalyzeConnectionEvents(eventList []ConnectionEvents, currentTime int64) (int64, int64, float64) {
     var startingTime int64 = 0
     var finishingTime int64 = 0
     // aux variables
@@ -19,9 +18,8 @@ func AnalyzeConnectionEvents(eventList []ConnectionEvents, currentTime time.Time
     var contDisc int64 = 0
     var ttime int64 = 0 // total connected time
     var ctime int64 = 0 // aux time counter
-//    var connFlag bool = false
-    // temporary
-    _ = currentTime
+    // flag that will be used as watchdog to see if at the moment of exporting the peer was connected
+    var connFlag bool = false
 
     for _, event := range eventList{
         if prevEvent != event.ConnectionType || event.TimeMili >= (prevTime + timeRange){
@@ -30,12 +28,14 @@ func AnalyzeConnectionEvents(eventList []ConnectionEvents, currentTime time.Time
                 ctime = event.TimeMili // in milliseconds
                 prevEvent = event.ConnectionType
                 prevTime = event.TimeMili
+                connFlag = true
             } else if event.ConnectionType == "Disconnection"{
                 contDisc = contDisc + 1
                 ttime = ttime + (event.TimeMili - ctime) // millis
                 ctime = event.TimeMili
                 prevEvent = event.ConnectionType
                 prevTime = event.TimeMili
+                connFlag = false
            }
         }
         if startingTime == 0{
@@ -49,6 +49,10 @@ func AnalyzeConnectionEvents(eventList []ConnectionEvents, currentTime time.Time
                 finishingTime = event.TimeMili
             }
         }
+    }
+    // Check if at the moment of exporting the peer was connected
+    if connFlag {
+        ttime = ttime + (currentTime - prevTime)
     }
     return contConn, contDisc, float64(ttime)/60000 // return the connection time in minutes ( / 60*1000)
 }

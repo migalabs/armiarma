@@ -1,14 +1,15 @@
 package metrics
 
 import (
-	"context"
+	"os"
+    "context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strings"
-	"sync"
+	"fmt"
+    "sync"
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -21,25 +22,55 @@ import (
 type GossipMetrics struct {
 	GossipMetrics sync.Map
 	TopicDatabase database.TopicDatabase
-	StartTime     time.Time
+	StartTime     int64 // milliseconds
 }
 
 func NewGossipMetrics(config *beacon.Spec) GossipMetrics {
 	gm := GossipMetrics{
 		TopicDatabase: database.NewTopicDatabase(config),
-		StartTime:     time.Now(),
+		StartTime:     GetTimeMiliseconds(),
 	}
 	return gm
 }
 
-// Import an old GossipMetrics from given file
-// return: - return error if there was error while reading the file
-//         - return bool for existing file (true if there was a file to read, return false if there wasn't a file to read)
-func (c *GossipMetrics) ImportMetrics(importFile string) (error, bool){
-    fmt.Println("Importing the metrics from file:", importFile)
-    return nil, true
+// Exists reports whether the named file or directory exists.
+func FileExists(name string) bool {
+    if _, err := os.Stat(name); err != nil {
+        if os.IsNotExist(err) {
+            return false
+        }
+    }
+    return true
 }
 
+ // Import an old GossipMetrics from given file                                  
+// return: - return error if there was error while reading the file             
+//         - return bool for existing file (true if there was a file to read, return false if there wasn't a file to read)
+func (c *GossipMetrics) ImportMetrics(importFile string) (error, bool){
+    // Check if file exist
+    if FileExists(importFile){ // if exists, read it
+        fmt.Println("File:", importFile, "already existed, Importing")
+        // get the json of the file
+        jsonFile, err := os.Open(importFile)
+        if err != nil{
+            return err, true
+        }
+        byteValue, err := ioutil.ReadAll(jsonFile)
+        if err != nil {
+            return err, true
+        }
+        tempMap := make(map[peer.ID]PeerMetrics, 0)
+        json.Unmarshal(byteValue, &tempMap)
+        // iterate to add the metrics from the json to the the GossipMetrics
+        for k, v := range tempMap {
+            c.GossipMetrics.Store(k, v)
+        }
+        return nil, true
+    } else {
+        fmt.Println("File:", importFile, "doesn't exist, Generating")
+        return nil, false
+    }
+}
 
 type GossipState struct {
 	GsNode  pgossip.GossipSub
@@ -201,8 +232,11 @@ func (c *GossipMetrics) FillMetrics(ep track.ExtendedPeerstore) {
 				}
 			}
 
-			// Since we want to have the latest Latency, we always update it
-			peerMetrics.Latency = float64(peerData.Latency/time.Millisecond) / 1000
+			// Since we want to have the latest Latency, we update it only when it is different from 0
+			// latency in seconds
+            if peerData.Latency != 0{
+                peerMetrics.Latency = float64(peerData.Latency/time.Millisecond) / 1000
+            }
 
 			// After check that all the info is ready, save the item back into the Sync.Map
 			c.GossipMetrics.Store(key, peerMetrics)

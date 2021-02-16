@@ -1,7 +1,7 @@
 package topic
 
 import (
-	"context"
+    "context"
     "time"
 	"github.com/protolambda/rumor/control/actor/base"
 	"github.com/protolambda/rumor/metrics"
@@ -31,11 +31,20 @@ func (c *TopicExportMetricsCmd) Run(ctx context.Context, args ...string) error {
     if c.GossipState.GsNode == nil {
         return NoGossipErr
     }
+    c.Log.Info("Checking for existing Metrics on Project ...")
+    err, fileExists := c.GossipMetrics.ImportMetrics(c.FilePath)
+    if fileExists && err != nil {
+        c.Log.Error("Error Importing the metrics from the previous file", err)
+    }
+    if !fileExists {
+        c.Log.Info("Not previous metrics found, generating new ones")
+    }
     stopping := false
 	go func() {
 		for {
             if stopping {
-                c.Log.Infof("Metrics Export Stopped, be aware that the exporting time could take more time between export and export (Only the time between them is the one designed, BETA version)")
+                _ =  c.GossipMetrics.ExportMetrics(c.FilePath, c.PeerstorePath, c.CsvPath, c.Store)
+                c.Log.Infof("Metrics Export Stopped")
                 return
             }
 			start := time.Now()

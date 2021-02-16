@@ -3,7 +3,12 @@
 echo "Exporting the metrics to the folder $metricsFolder"
 
 # Generate /metrics folder inside the example folder
-mkdir "${metricsFolder}/metrics"
+if [[ -d  "${metricsFolder}/metrics" ]]
+then
+    echo "${metricsFolder}/metrics folder already exist" 
+else
+    mkdir "${metricsFolder}/metrics"
+fi
 
 # Set the names of the files that will be pased as arg to the command
 filepath="${metricsFolder}/metrics/gossip-metrics.json"
