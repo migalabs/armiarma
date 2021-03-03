@@ -2,9 +2,11 @@
 
 # This File compiles the env variables needed to run the crawler on the ETH2 Mainnet Network
 
+# Name that will be used for the Chain/States/Blocks DBs
+dbName="Mainnet"
+
 # fork-digest of the Mainnet Network
 fork_digest="0xb5303f2a"
-
 # Gossip fork_digest (It's different from the fork_version)
 gossip_fork="b5303f2a"
 

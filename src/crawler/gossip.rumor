@@ -30,7 +30,7 @@ gossip topic join --eth-topic="$proposer_slashing_topic" --fork-version="$gossip
 gossip topic join --eth-topic="$attester_slashing_topic" --fork-version="$gossip_fork"
 
 # Afer joining the topic, the creation of the messages-db must be implemented
-#gossip topic create-db --eth-topic="$blocks_topic" --fork-version="$gossip_fork" --temp-msg-limit=20
+gossip topic create-db --eth-topic="$blocks_topic" --fork-version="$gossip_fork" --temp-msg-limit=20
 
 # Log the output into a .txt file 
 gossip topic log --eth-topic="$blocks_topic" --fork-version="$gossip_fork"

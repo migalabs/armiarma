@@ -415,7 +415,6 @@ func (c *GossipMetrics) IncomingMessageManager(peerId peer.ID, topicName string)
 	if err != nil {
 		return errors.New("Topic Name no supported")
 	}
-	fmt.Println(err, topicName, messageMetrics)
 	if messageMetrics.Cnt == 0 {
 		messageMetrics.StampTime("first")
 	}

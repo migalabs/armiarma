@@ -68,15 +68,11 @@ func (c *CircularBuffer) Write(root beacon.Root) (bool, interface{}) {
     }
     // NOTE: -Might be interesting to add certaing flags to know when there was anything to read and when the buffer got full
     c.List[c.WriteP] = root
-    fmt.Println("Included root on circular buffer")
     c.WriteP += 1
     // if the pointer exceeds the limit, back to 0
     if c.WriteP >= c.Limit {
         c.WriteP = 0
     }
-    fmt.Println("Map:", len(c.List))
-    fmt.Println("WriteP:", c.WriteP)
-    fmt.Println("ReadP:", c.ReadP)
     return full, oldestRoot
 }
 

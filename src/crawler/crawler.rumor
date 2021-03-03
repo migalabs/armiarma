@@ -39,6 +39,8 @@ armiarma: include sync_drop_serve.rumor
 
 armiarma: include gossip.rumor
 
+armiarma: include import_from_gossip.rumor
+
 armiarma: sleep 2s
 
 armiarma: include dv5.rumor
@@ -46,6 +48,8 @@ armiarma: include dv5.rumor
 armiarma: include export_metrics.rumor
 
 armiarma: include connectall.rumor
+
+armiarma: include visualizer.rumor
 
 sleep 10s
 

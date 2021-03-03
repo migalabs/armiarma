@@ -1,197 +1,192 @@
 package gossipimport
 
 import (
-    "io/ioutil"
-    "context"
-    "encoding/json"
-    "fmt"
-    "bytes"
-    "net/http"
-    "github.com/protolambda/ztyp/codec"
-    "github.com/protolambda/rumor/p2p/gossip/database"
-    "github.com/protolambda/rumor/control/actor/base"
-    "github.com/protolambda/rumor/metrics"
-    "github.com/protolambda/zrnt/eth2/beacon"
-    pgossip "github.com/protolambda/rumor/p2p/gossip"
-    "github.com/protolambda/rumor/control/actor/blocks"
-    "github.com/protolambda/rumor/control/actor/states"
-    bdb "github.com/protolambda/rumor/chain/db/blocks"
+	"context"
+	"fmt"
+	"strconv"
+    "os"
+    visualizer "github.com/protolambda/rumor/control/actor/chainvisualizer"
+	cnodes "github.com/cortze/go-eth2-beacon-nodes/nodes"
+	"github.com/protolambda/rumor/chain"
+	bdb "github.com/protolambda/rumor/chain/db/blocks"
 	sdb "github.com/protolambda/rumor/chain/db/states"
-
+	"github.com/protolambda/rumor/control/actor/base"
+	"github.com/protolambda/rumor/control/actor/blocks"
+	cchain "github.com/protolambda/rumor/control/actor/chain"
+	pstatus "github.com/protolambda/rumor/control/actor/peer/status"
+	"github.com/protolambda/rumor/control/actor/states"
+	"github.com/protolambda/rumor/metrics"
+	pgossip "github.com/protolambda/rumor/p2p/gossip"
+	"github.com/protolambda/rumor/p2p/gossip/database"
+	"github.com/protolambda/zrnt/eth2/beacon"
 )
 
 type GossipImportCmd struct {
-    *base.Base
+	*base.Base
 
-    GossipMetrics   *metrics.GossipMetrics
-    BlocksDB         bdb.DBs
-    BlockDBState    *blocks.DBState
-    StatesDB        sdb.DBs
-    StateDBState    *states.DBState
+	GossipMetrics *metrics.GossipMetrics
+	VisualizerState *visualizer.VisualizerState
+    *pstatus.PeerStatusState
 
-    BName       bdb.DBID    `ask:"<bname>"  help:"Name of the network that will be used for the Blocks and State DBs"`
-    SName       sdb.DBID    `ask:"<sname>"  help:"Name of the network that will be used for the Blocks and State DBs"`
-    ForkDigest  string  `ask:"--fork-digest" help:"Fork digest of the given network"`
-    Path        string  `ask:"[path]"        help:"The path used for the DB. It will be a memory DB if left empty."`
+	BlocksDB     bdb.DBs
+	BlockDBState *blocks.DBState
+	StatesDB     sdb.DBs
+	StateDBState *states.DBState
+	chain.Chains
+	*cchain.ChainState
 
-    IP          string  `ask:"--ip"      help:"IP where the local beacon node can be reacheable.(default "localhost")"`
-    Port        string  `ask:"--port"    help:"Port where the local beacon node offers the API to request the Beacon State.(Default 3500, endpoint of Prysm Beacon Nodes)"`
+	BName      bdb.DBID          `ask:"<bname>"  help:"Name of the network that will be used for the Blocks and State DBs"`
+	SName      sdb.DBID          `ask:"<sname>"  help:"Name of the network that will be used for the Blocks and State DBs"`
+	CName      chain.ChainID     `ask:"<cname>" help:"Name of the network that will be used for the Chain that the Rumor Node will follow"`
+	ForkDigest beacon.ForkDigest `ask:"--fork-digest" help:"Fork digest of the given network"`
+	ProjectPath string           `ask:"--project-path"  help:"Path to the folder where the BD will be created"`
+    DBPath      string           `ask:"--db-name" help:"The path used for the DB. It will be a memory DB if left empty."`
+
+	IP   string `ask:"--ip"      help:"IP where the local beacon node can be reacheable.(default "localhost")"`
+	Port string `ask:"--port"    help:"Port where the local beacon node offers the API to request the Beacon State.(Default 3500, endpoint of Prysm Beacon Nodes)"`
 }
 
-
 func (c *GossipImportCmd) Help() string {
-    return "Import Beacon Blocks and States from the gossip messages (requires, gossip BeaconBlock topic logged and both States and Blocks will be initialized)"
+	return "Import Beacon Blocks and States from the gossip messages (requires, gossip BeaconBlock topic logged and both States and Blocks will be initialized)"
 }
 
 func (c *GossipImportCmd) Default() {
-    c.SName       = "mainnet"
-    c.BName       = "mainnet"
-    c.ForkDigest    = "b5303f2a"
-    c.IP            = "localhost"
-    c.Port          = "3500"
+	c.IP = "localhost"
+	c.Port = "3500"
 }
 
-func (c *GossipImportCmd) Run( ctx context.Context, args ...string) error {
-    // Define Harcoded Variables for the mainnet gossip topic
-    encoding    := "ssz_snappy"
-    eth2Topic   := "beacon_block"
-    // Compose the full topic for the Eth2 network
-    topicName := pgossip.GenerateEth2Topics(c.ForkDigest, eth2Topic, encoding)
-    // Check if the beacon_block topic has its messageDB by checking if it has a notification channel
-    if _, ok := c.GossipMetrics.TopicDatabase.NotChan[topicName]; ok {
+func (c *GossipImportCmd) Run(ctx context.Context, args ...string) error {
+	// Define Harcoded Variables for the mainnet gossip topic
+	encoding := "ssz_snappy"
+	eth2Topic := "beacon_block"
+	// Compose the full topic for the Eth2 network
+	topicName := pgossip.GenerateEth2Topics(c.ForkDigest.String(), eth2Topic, encoding)
+	// Check if the beacon_block topic has its messageDB by checking if it has a notification channel
+	if _, ok := c.GossipMetrics.TopicDatabase.NotChan[topicName]; ok {
+		// change directory to the Project folder (maybe it will solve the error of Path)
+        err := os.Chdir(c.ProjectPath)
+        if err != nil {
+            c.Log.WithError(err).Error("Error changing directory to", c.ProjectPath)
+            return err
+        }
         // Generate the DBIDs for the block and state DB
-        // If there is a notification channel, we generate a DB for the Blocks and for the States
-        blockDB, err := c.BlocksDB.Create(c.BName, c.Path, c.GossipMetrics.TopicDatabase.Spec)
-        if err != nil {
+		// If there is a notification channel, we generate a DB for the Blocks and for the States
+  		blockDB, err := c.BlocksDB.Create(c.BName, c.DBPath, c.GossipMetrics.TopicDatabase.Spec)
+    	if err != nil {
+            c.Log.WithError(err).Error("Error creating BlockDB.")
             return err
-        }
-        c.BlockDBState.CurrentDB = c.BName
-        stateDB, err := c.StatesDB.Create(c.SName, c.Path, c.GossipMetrics.TopicDatabase.Spec)
-        if err != nil {
-            return err
-        }
-        c.StateDBState.CurrentDB = c.SName
-        reqUrl := ComposePrysmBSRequest(c.IP, c.Port, PrysmBSQuery)
-        // Generate the GO routine that will keep in the backgournd importing the Blocks and the States from the received BeaconBlocks
-        stopping := make(chan bool, 2)
-        go func() {
-            c.Log.Infof("Gossip Import has been launched. Beacon Blocks and Beacons States will be imported from the Gossip Messages on:", topicName)
-            for {
-                select {
-                case newBlock := <-c.GossipMetrics.TopicDatabase.NotChan[topicName]:
-                    if newBlock == true {
-                        fmt.Println("New block has been received on the MessageDB")
-                        // read the Received BeaconBlock from the MessageDB
-                        bblockMsg, err := c.GossipMetrics.TopicDatabase.ReadMessage(topicName)
-                        if err != nil {
-                            fmt.Println("Error Reading the message from the messageDB")
-                        } else {
-                            var state *beacon.BeaconStateView
-                            bblock := bblockMsg.(*database.ReceivedBeaconBlock)
-                            sRoot := bblock.SignedBeaconBlock.Message.StateRoot
-                            fmt.Println("Readed Block on slot:", bblock.SignedBeaconBlock.Message.Slot, "on Beacon State:", sRoot)
-                            // Rquest the stire BeaconState from the associated Beacon Node
-			    slotString := fmt.Sprint(bblock.SignedBeaconBlock.Message.Slot)
-                            rawbstate, err := RequestBeaconState(reqUrl, slotString)
+    	}
+  		c.BlockDBState.CurrentDB = c.BName
+//		stateDB, err := c.StatesDB.Create(c.SName, c.Path, c.GossipMetrics.TopicDatabase.Spec)
+//  	if err != nil {
+//  		return err
+//  	}
+//  	c.StateDBState.CurrentDB = c.SName
+        // generate the client struct from where to gather the chain metrics
+		prysmClient := cnodes.NewPrysmClient(c.IP, c.Port)
+		// Generate the GO routine that will keep in the backgournd importing the Blocks and the States from the received BeaconBlocks
+		stopping := make(chan bool, 2)
+		go func() {
+			c.Log.Infof("Gossip Import has been launched. Beacon Blocks and Beacons States will be imported from the Gossip Messages on:", topicName)
+			for {
+				select {
+				case newBlock := <-c.GossipMetrics.TopicDatabase.NotChan[topicName]:
+					if newBlock == true {
+						// read the Received BeaconBlock from the MessageDB
+						bblockMsg, err := c.GossipMetrics.TopicDatabase.ReadMessage(topicName)
+						if err != nil {
+							c.Log.WithError(err).Warn("Error Reading the message from the messageDB")
+						} else {
+                            // All the commented code was used for the attempt of following the chain through the chain CMD 
+							bblock := bblockMsg.(*database.ReceivedBeaconBlock)
+//							sRoot := bblock.SignedBeaconBlock.Message.StateRoot
+							// Rquest the stire BeaconState from the associated Beacon Node
+							slotNumber, err := strconv.Atoi(bblock.SignedBeaconBlock.Message.Slot.String())
+                            bState, err := prysmClient.GetFlatBeaconStateFromSlot(slotNumber)
                             if err != nil {
-                                fmt.Errorf("No Beacon State was received")
+                                c.Log.WithError(err).Warn("Error getting the BeaconStateView from the Client")
                                 continue
+                            }
+//							bStateView, err := prysmClient.GetBeaconStateViewFromSlot(slotNumber)
+//							if err != nil {
+//								c.Log.WithError(err).Warn("Error getting the BeaconStateView from the Client")
+//							    continue
+//                          }
+//							_, err = stateDB.Store(ctx, bStateView)
+//							if err != nil {
+//								c.Log.WithError(err).Warn("Error Storing the State on the DB", err)
+//								continue
+//							}
+  							// Store the BeaconBlock to the DB, (Maybe the Store thingy might be implemented)
+  							blockWRoot := bdb.WithRoot(c.GossipMetrics.TopicDatabase.Spec, &bblock.SignedBeaconBlock)
+  							// we dont mind if the block already exists
+  							_, err = blockDB.Store(ctx, blockWRoot)
+  							if err != nil {
+  								c.Log.WithError(err).Warn("Error Storing the Block into the Database")
+  								continue
+  							}
+                            c.Log.Info("New BeaconBlock has been added to the BlocksDBb. Block Slot: ", bblock.SignedBeaconBlock.Message.Slot.String())
+                            // Save both, the BeaconBlock and the BeaconState into cache for ChainVisualizer purposes
+                            // ------- Visualizer Part -------
+                            // Check if the Visualizer has been Set 
+                            if c.VisualizerState.ChainVisualizer != nil {
+                                // If the Visualizer has been initialized, we have to add the states and the blocks to the Buffers
+                                err = c.VisualizerState.ChainVisualizer.BlocksBuffer.AddItem(blockWRoot)
+                                if err != nil  {
+                                    c.Log.WithError(err).Warn("Error Importing the Block to the Visualizer Buffer")
+                                }
+                                err = c.VisualizerState.ChainVisualizer.StatesBuffer.AddItem(bState)
+                                if err != nil {
+                                    c.Log.WithError(err).Warn("Error Importing the State to the Visualizer Buffer")
+                                }
                             }
 
-                            stateSize := rawbstate.ByteLength(c.GossipMetrics.TopicDatabase.Spec)
-			    fmt.Println("Size of the received State:", stateSize)
-			    bbytes, err := json.Marshal(rawbstate)
-			    if err != nil {
-				fmt.Println("Error Marshaling again the BeaconState")
-			    }
-			    bsreader := bytes.NewReader(bbytes)
-			    // With the spec.BeaconState() and the raw/plain BeaconState
-                            // Import the received BeaconState from the Local Beacon Node
-                            state, err = beacon.AsBeaconStateView(c.GossipMetrics.TopicDatabase.Spec.BeaconState().Deserialize(codec.NewDecodingReader(bsreader, uint64(stateSize))))
-                            if err != nil {
-				fmt.Println("Error generating the BeaconStateView", err)
-                                fmt.Errorf("%s",err)
-                                continue
-                            } else {
-			    	fmt.Println("BeaconStateView acchieved: %+v", state)
-			    }
-			    fmt.Println("Storing the State on the DB")
-                            _, err = stateDB.Store(ctx, state)
-                            if err != nil {
-                                fmt.Println("Error Storing the State on the DB", err)
-                                continue
-                            }
-                            fmt.Println("State", sRoot.String(), "Has been Saved on the StatesDB")
-                            // Import the BeaconBlock to the DB, (Maybe the Store thingy might be implemented) 
-//                          var sbblock beacon.SignedBeaconBlock
-                            bbuff, err := json.Marshal(bblock.SignedBeaconBlock)
-                            if err != nil {
-                                fmt.Errorf("Error Marshalling the Beacon Block while trying to Import it to the DB")
-                                continue
-                            }
-//                          sbblock.Serialize(c.GossipMetrics.TopicDatabase.Spec, codec.NewEncodingWriter(bbuff))
-                            _, err = blockDB.Import(bytes.NewReader(bbuff))
-                            if err != nil {
-                                fmt.Errorf("%s", err)
-                                continue
-                            }
-                            fmt.Println("Beacon Block", bblock.SignedBeaconBlock.Message.Slot, "has been succesfully added")
-                            // Should be sucessfully added
-                            continue
-                        }
-                    }
-                case stop := <-stopping:
-                    if stop == true {
-                        fmt.Println("The GossipImport has been stopped")
-                        return
-                    }
-                }
-            }
-        }()
-        c.Control.RegisterStop(func(ctx context.Context) error{
-            stopping <- true
-            c.Log.Infof("Stopped Importing From Gossip")
-            return nil
-        })
-    } else {
-        // there is no DB with the same topic name, and therefore no NotChan
-        return fmt.Errorf("There is no Database for the given topic:",topicName)
-    }
-    return nil
+///                         // CHAIN secuence so that will allow the Rumor Node to follow/store/interacte with the data of the Block/State chains
+//							currentChain, ok := c.Chains.Find(c.CName)
+//							if !ok { // If not OK we will have to generate a new Chain
+//								// generate a new hot entry to create a chain
+//								hotEntry, err := GenerateNewHotEntry(bStateView, c.GossipMetrics.TopicDatabase.Spec)
+//								_ = currentChain
+//								_, err = c.Chains.Create(c.CName, hotEntry, c.GossipMetrics.TopicDatabase.Spec)
+//								if err != nil {
+//									c.Log.WithError(err).Warn("Error Creating a new chain")
+//									continue
+//								}
+//							} else { // If OK, just add the block to the chain
+//                              err = currentChain.AddBlock(ctx, &bblock.SignedBeaconBlock)
+//                              if err != nil {
+//                                  c.Log.WithError(err).Warn("Error while including the SignedBeaconBlock to the Chain")
+//                                  continue
+//                              }
+//                          }
+							// UPDATE the Rumor Node status (at least fake that we follow the chain)
+							st, err := NodeStatusFromBeaconState(bState, c.ForkDigest)
+							if err != nil {
+								c.Log.WithError(err).Warn("Error generating the new Status from the BeaconState")
+								continue
+							}
+							c.PeerStatusState.Local = *st
+							continue
+						}
+					}
+				case stop := <-stopping:
+					if stop == true {
+						c.Log.Info("The GossipImport has been stopped")
+						break
+					}
+					// TODO: Propably will be needed to import the attestations received from gossip messages
+					// case newAttestation:
+				}
+			}
+		}()
+		c.Control.RegisterStop(func(ctx context.Context) error {
+			stopping <- true
+			c.Log.Infof("Stopped Importing From Gossip")
+			return nil
+		})
+	} else {
+		// there is no DB with the same topic name, and therefore no NotChan
+		return fmt.Errorf("There is no Database for the given topic:", topicName)
+	}
+	return nil
 }
-
-// List of queries for the different clients that can be used to obtain the BeaconState
-// EXAMPLE:  "http://localhost:3500/eth/v1alpha1/debug/state?=2832"
-// 	      http://localhost:3500/eth/v1alpha1/debug/state?=468221
-var PrysmBSQuery string = "/eth/v1alpha1/debug/state?="
-
-func ComposePrysmBSRequest(ip string, port string, query string) string {
-    composedUrl := "http://" + ip + ":" + port + PrysmBSQuery
-    return composedUrl
-}
-
-func RequestBeaconState(url string, slot string) (beacon.BeaconState, error) {
-    reqUrl := url + slot
-    fmt.Println("Url:",reqUrl)
-    resp, err := http.Get(reqUrl)
-    if err != nil {
-        fmt.Println("Error while getting the Beacon State from the local node, request:", reqUrl)
-    }
-    fmt.Println("response:", resp)
-    defer resp.Body.Close()
-    bodyBytes, _ := ioutil.ReadAll(resp.Body)
-    // Here I don't know if the BeaconState comes serialized or in a Json.
-    var beaconState beacon.BeaconState
-    if len(bodyBytes) == 0 {
-        return beaconState, fmt.Errorf("Error Unmarshalling the response from the Local Beacon Node, response:", resp)
-    }
-    err = json.Unmarshal(bodyBytes, &beaconState)
-    if err != nil {
-	fmt.Println("Error unmarshalling the BeaconState received from the local node")
-    }
-    fmt.Println("BeaconState", slot , "successfully obtained from local node: %+v", beaconState)
-    return beaconState, nil
-}
-
-
-

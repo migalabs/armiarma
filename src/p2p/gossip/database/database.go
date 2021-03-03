@@ -147,11 +147,8 @@ func (c *MessagesDB) Write(msg ReceivedMessage) error {
 	full, oldestRoot := c.Buffer.Write(root)
 	if full != false { // The buffers is full and the oldest message needs to be deleted
 		delete(c.MessageList, oldestRoot.(beacon.Root))
-		fmt.Println("oldest message with Root:", oldestRoot, "was deleted from Temp Database")
 	}
 	c.MessageList[root] = msg
-	fmt.Println("Buffer Len:", len(c.MessageList))
-	fmt.Println("Message", root, "was included to the database")
 	return nil
 }
 

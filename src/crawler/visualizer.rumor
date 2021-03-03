@@ -1,0 +1,7 @@
+echo "Launching Visualizer"
+
+v_ip="127.0.0.1"
+v_port="9100"
+v_len=10
+
+chain-visualizer --ip="$v_ip" --port="$v_port" --len=$v_len

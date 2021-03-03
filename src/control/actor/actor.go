@@ -8,9 +8,10 @@ import (
 	"sync"
 	"time"
 
-    "github.com/protolambda/zrnt/eth2/configs"
-
-	"github.com/ethereum/go-ethereum/p2p/enode"
+	"github.com/protolambda/zrnt/eth2/configs"
+    visualizer "github.com/protolambda/rumor/control/actor/chainvisualizer"
+	vis "github.com/protolambda/rumor/visualizer"
+    "github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/protolambda/ask"
 	chaindata "github.com/protolambda/rumor/chain"
@@ -23,7 +24,7 @@ import (
 	"github.com/protolambda/rumor/control/actor/enr"
 	"github.com/protolambda/rumor/control/actor/gossip"
 	gi "github.com/protolambda/rumor/control/actor/gossipimport"
-    "github.com/protolambda/rumor/control/actor/host"
+	"github.com/protolambda/rumor/control/actor/host"
 	"github.com/protolambda/rumor/control/actor/peer"
 	"github.com/protolambda/rumor/control/actor/peer/metadata"
 	"github.com/protolambda/rumor/control/actor/peer/status"
@@ -65,7 +66,9 @@ type Actor struct {
 
 	GossipState   metrics.GossipState
 	GossipMetrics metrics.GossipMetrics
-	RPCState      rpc.RPCState
+	VisualizerState visualizer.VisualizerState
+
+    RPCState      rpc.RPCState
 
 	HostState host.HostState
 
@@ -80,13 +83,20 @@ type Actor struct {
 
 func NewActor(id ActorID, globals *GlobalActorData) *Actor {
 	ctxAll, cancelAll := context.WithCancel(globals.GlobalCtx)
-	act := &Actor{
+	cv := vis.NewChainVisualizer(10,"localhost","9100")
+    chainV := visualizer.VisualizerState{
+        ChainVisualizer: cv,
+        Already: false,
+    }
+
+    act := &Actor{
 		GlobalActorData:  globals,
 		ID:               id,
 		ActorCtx:         ctxAll,
 		actorCancel:      cancelAll,
 		CurrentPeerstore: track.NewDynamicPeerstore(),
-        GossipMetrics:    metrics.NewGossipMetrics(configs.Mainnet),  // HARCODED to Mainnet
+		GossipMetrics:    metrics.NewGossipMetrics(configs.Mainnet), // HARDCODED to Mainnet
+        VisualizerState:  chainV,
     }
 	return act
 }
@@ -211,24 +221,25 @@ func (c *ActorCmd) Cmd(route string) (cmd interface{}, err error) {
 		cmd = &gossip.GossipCmd{Base: b, GossipState: &c.GossipState, GossipMetrics: &c.GossipMetrics, Store: store}
 	case "rpc":
 		cmd = &rpc.RpcCmd{Base: b, RPCState: &c.RPCState}
-    case "gossip-import":
-//      bl, ok := c.GlobalBlocksDBs.Find(c.BlocksState.CurrentDB)
-//      if !ok {
-//          return nil, errors.New("no blocks DB available, try 'blocks create'")
-//      }
-//      st, ok := c.GlobalStatesDBs.Find(c.StatesState.CurrentDB)
-//      if !ok {
-//          return nil, errors.New("no states DB available, try 'states create'")
-//      }
-        // 
-        cmd = &gi.GossipImportCmd{
-            Base:           b,
-            BlocksDB:       c.GlobalBlocksDBs,
-            BlockDBState:   &c.BlocksState,
-            StatesDB:       c.GlobalStatesDBs,
-            StateDBState:   &c.StatesState,
-            GossipMetrics:  &c.GossipMetrics}
-	case "blocks":
+	case "gossip-import":
+		cmd = &gi.GossipImportCmd{
+			Base:            b,
+			BlocksDB:        c.GlobalBlocksDBs,
+			BlockDBState:    &c.BlocksState,
+			StatesDB:        c.GlobalStatesDBs,
+			StateDBState:    &c.StatesState,
+			Chains:          c.GlobalChains,
+			ChainState:      &c.ChainState,
+			GossipMetrics:   &c.GossipMetrics,
+			PeerStatusState: &c.PeerStatusState,
+	        VisualizerState: &c.VisualizerState}
+    case "chain-visualizer":
+        cmd = &visualizer.VisualizerCmd{
+            Base: b,
+            VisualizerState:    &c.VisualizerState,
+            BlockDBState:       &c.BlocksState,
+            StateDBState:       &c.StatesState}
+    case "blocks":
 		cmd = &blocks.BlocksCmd{Base: b, DBs: c.GlobalBlocksDBs, DBState: &c.BlocksState}
 	case "states":
 		cmd = &states.StatesCmd{Base: b, DBs: c.GlobalStatesDBs, DBState: &c.StatesState}
@@ -254,7 +265,7 @@ func (c *ActorCmd) Cmd(route string) (cmd interface{}, err error) {
 }
 
 var topRoutes = []string{"host", "enr", "peer", "peerstore", "dv5", "gossip",
-	"rpc", "blocks", "states", "gossip-import", "chain", "sleep", "tool"}
+	"rpc", "blocks", "states", "gossip-import", "chain", "chain-visualizer", "sleep", "tool"}
 var topRoutesMap = map[string]struct{}{}
 
 func init() {
