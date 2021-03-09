@@ -56,8 +56,16 @@ CompileRumor(){
         mkdir bin
     fi
     go build -o ./bin/armiarma
+    # Check if the compilation has been successful
+    comp_error="$?"
+    if [[ "$comp_error" -ne "0" ]]
+    then
+        echo " Error compiling Rumor"
+        exit 1
+    else
+        echo "Rumor Successfully Compiled!"
+    fi
     cd "$1"
-    echo "Rumor Compiled!"
     echo
 }
 
