@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strings"
+	"strconv"
 	"fmt"
     "sync"
 	"time"
@@ -241,10 +242,12 @@ func (c *GossipMetrics) FillMetrics(ep track.ExtendedPeerstore) {
 			// After check that all the info is ready, save the item back into the Sync.Map
 			c.GossipMetrics.Store(key, peerMetrics)
 
+			/*
 			if requestCounter >= 40 { // Reminder 45 req/s
 				time.Sleep(70 * time.Second)
 				requestCounter = 0
 			}
+			*/
 		}
 		// Keep with the loop on the Range function
 		return true
@@ -286,29 +289,20 @@ func (c *GossipMetrics) ExportMetrics(filePath string, peerstorePath string, csv
 
 // IP-API message structure
 type IpApiMessage struct {
-	Query         string
-	Status        string
-	Continent     string
-	ContinentCode string
-	Country       string
-	CountryCode   string
-	Region        string
-	RegionName    string
-	City          string
-	District      string
-	Zip           string
-	Lat           string
-	Lon           string
-	Timezone      string
-	Offset        string
-	Currency      string
-	Isp           string
-	Org           string
-	As            string
-	Asname        string
-	Mobile        string
-	Proxy         string
-	Hosting       string
+	Query         string  `json:"query"`
+	Status        string  `json:"status"`  
+	Country       string  `json:"country"`
+	CountryCode   string  `json:"countryCode"`
+	Region        string  `json:"region"`
+	RegionName    string  `json:"regionName"`
+	City          string  `json:"city"`
+	Zip           string  `json:"zip"`
+	Lat           string  `json:"lat"`
+	Lon           string  `json:"lon"`
+	Timezone      string  `json:"timezone"`
+	Isp           string  `json:"isp"`
+	Org           string  `json:"org"`
+	As            string  `json:"as"`
 }
 
 // get IP, location country and City from the multiaddress of the peer on the peerstore
@@ -318,6 +312,72 @@ func getIpAndLocationFromAddrs(multiAddrs string) (ip string, country string, ci
 	ip = ipSlices[0]
 	url := "http://ip-api.com/json/" + ip
 	resp, err := http.Get(url)
+	fmt.Println("Response", resp)
+	if err != nil {
+		fmt.Println(err)
+		fmt.Println("There was an error getting the Location of the peer from the IP-API, please, check that there 40requests/minute limit hasn't been exceed")
+		country = "Unknown"
+		city = "Unknown"
+		return ip, country, city
+	}
+
+	attemptsLeft, _ := strconv.Atoi(resp.Header["X-Rl"][0])  
+	timeLeft, _ := strconv.Atoi(resp.Header["X-Ttl"][0])
+
+	if attemptsLeft == 0 { // We have exceeded the limit of requests 45req/min
+		fmt.Println("Limit of messages exceeded,", attemptsLeft)
+		fmt.Println("Sleeping for,", timeLeft)
+		time.Sleep(time.Duration(timeLeft) * time.Second)
+		resp, err = http.Get(url)
+		if err != nil {
+			fmt.Println(err)
+			fmt.Println("There was an error getting the Location of the peer from the IP-API, please, check that there 40requests/minute limit hasn't been exceed")
+			country = "Unknown"
+			city = "Unknown"
+			return ip, country, city
+		}
+	}
+
+	defer resp.Body.Close()
+	bodyBytes, _ := ioutil.ReadAll(resp.Body)
+	
+	// Convert response body to Todo struct
+	var ipApiResp IpApiMessage
+	json.Unmarshal(bodyBytes, &ipApiResp)
+	fmt.Println("bodybytes", ipApiResp)
+
+	// Check if the status of the request has been succesful
+	if ipApiResp.Status != "success" {
+		fmt.Println("Error with the received response status,", ipApiResp.Status)
+		if ipApiResp.Query == ip {
+			fmt.Println("The given IP of the peer is private")
+		}
+		country = "Unknown"
+		city = "Unknown"
+		return ip, country, city
+	}
+
+	country = ipApiResp.Country
+	city = ipApiResp.City
+
+	// check if country and city are correctly imported
+	if len(country) == 0 || len(city) == 0 {
+		fmt.Println("There was an error getting the Location of the peer from the IP-API, please, check that there 40requests/minute limit hasn't been exceed")
+		fmt.Println("Error With the length, checking response", resp)
+		country = "Unknown"
+		city = "Unknown"
+		return ip, country, city
+	}
+
+
+	/*
+	ip = strings.TrimPrefix(multiAddrs, "/ip4/")
+	ipSlices := strings.Split(ip, "/")
+	ip = ipSlices[0]
+	url := "http://ip-api.com/json/" + ip
+	fmt.Println(url)
+	resp, err := http.Get(url)
+	fmt.Println("Response", resp)
 	if err != nil {
 		fmt.Println(err)
 		fmt.Println("There was an error getting the Location of the peer from the IP-API, please, check that there 40requests/minute limit hasn't been exceed")
@@ -327,10 +387,11 @@ func getIpAndLocationFromAddrs(multiAddrs string) (ip string, country string, ci
 	}
 	defer resp.Body.Close()
 	bodyBytes, _ := ioutil.ReadAll(resp.Body)
-
+	
 	// Convert response body to Todo struct
 	var ipApiResp IpApiMessage
 	json.Unmarshal(bodyBytes, &ipApiResp)
+	fmt.Println("bodybytes", ipApiResp)
 
 	country = ipApiResp.Country
 	city = ipApiResp.City
@@ -338,10 +399,13 @@ func getIpAndLocationFromAddrs(multiAddrs string) (ip string, country string, ci
 	// check if country and city are correctly imported
 	if len(country) == 0 || len(city) == 0 {
 		fmt.Println("There was an error getting the Location of the peer from the IP-API, please, check that there 40requests/minute limit hasn't been exceed")
+		fmt.Println("Error With the length, checking response", resp)
 		country = "Unknown"
 		city = "Unknown"
 		return ip, country, city
 	}
+	*/
+
 
 	// return the received values from the received message
 	return ip, country, city
