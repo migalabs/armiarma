@@ -1,0 +1,17 @@
+<h1>{{ .Title }}</h1>
+<table>
+	<thead>
+		<th>Slot</th>
+		<th>Root</th>
+		<th>Proposer Index</th>
+	</thead>
+	<tbody>
+		{{ range $index, $item := .ChainVisualizer.BlocksBuffer.Items }}
+			<tr>
+				<td>{{ $item.SignedBeaconBLock.Message.Slot }}</td>
+				<td>{{ $item.Root }}</td>
+				<td>{{ $item.SignedBeaconBLock.Message.Slot }}</td>
+			</tr>
+		{{ end }}
+	</tbody>
+</table>

@@ -47,7 +47,8 @@ func (c *VisualizerCmd) Run(ctx context.Context, args ...string) error{
     // Initialize the ChainVisualizer 
     cv := visualizer.NewChainVisualizer(c.Len, c.Ip, c.Port)
     // Generate the Pages that will be available from the Visualizer
-    bbp, err := visualizer.NewBeaconBlockPage(cv, "/blocks", "Latest Crawled Beacon Blocks")
+    // --- Beacon Block ----
+    bbp, err := visualizer.NewBeaconBlockPage(cv, "/blocks", "Beacon Blocks")
     if err != nil {
         c.Log.Error("Error Generating the Block Page on the Visualizer")
         return err
@@ -57,6 +58,18 @@ func (c *VisualizerCmd) Run(ctx context.Context, args ...string) error{
         c.Log.Error("Error Adding the Block Page on the Visualizer")
         return err
     }
+    // --- Beacon State ---
+    bsp, err := visualizer.NewBeaconStatePage(cv, "/states", "Beacon States")
+    if err != nil {
+        c.Log.Error("Error Generating the State Page on the Visualizer")
+        return err
+    }
+    err = cv.AddNewPage(bsp)
+    if err != nil {
+        c.Log.Error("Error Adding the State Page on the Visualizer")
+        return err
+    }
+    // Add the Cain Visualizer to the VisualizerState
     c.VisualizerState.ChainVisualizer = cv
     // (Pages to show needs to be ready from before)
     // Generate the host in a nother Go routine

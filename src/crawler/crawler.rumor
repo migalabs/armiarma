@@ -49,9 +49,18 @@ armiarma: include export_metrics.rumor
 
 armiarma: include connectall.rumor
 
-armiarma: include visualizer.rumor
+sleep 3m
 
-sleep 10s
+armiarma: include serve_blocks.rumor
+
+comp_error="$?"
+if [[ "$comp_error" -ne "0" ]]
+then
+    echo " Error Launching serve blocks"
+    exit 1
+fi
+
+armiarma: include visualizer.rumor
 
 # Generate and endless loop to keep the Rumor script alive
 

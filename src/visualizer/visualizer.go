@@ -12,11 +12,13 @@ type ChainVisualizer struct {
 
     Ip              string
     Port            string
+
+    HtmlFolder      string
 }
 
 // interface that all the pages will need to serve 
 type VisualPage interface {
-    HandlerFuntion(w http.ResponseWriter, r *http.Request)
+    HandlerFunction(w http.ResponseWriter, r *http.Request)
     RequestPath() string
     Info() string
 }
@@ -29,22 +31,17 @@ func NewChainVisualizer(length int, ip string, port string) *ChainVisualizer{
         Pages:  make([]VisualPage, 0),
         Ip:     ip,
         Port:   port,
+        HtmlFolder:    "htmls/",
     }
     return cv
 }
 
 // Intitilize / Set up the host
 func (c *ChainVisualizer) InitializeHost() error {
-    fmt.Println("Init the host")
-    fmt.Println("Len of the Pages:", len(c.Pages), "Pages", c.Pages)
     for _, vp := range c.Pages {
-        fmt.Println("Initializing New Page")
-        fmt.Println(vp)
-        fmt.Println("Requester Path:", vp.RequestPath())
-        http.HandleFunc(vp.RequestPath(), vp.HandlerFuntion)
+        http.HandleFunc(vp.RequestPath(), vp.HandlerFunction)
     }
     http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request){
-        fmt.Fprintf(w, "The Server is Working\n")
         fmt.Fprintf(w, "Available Pages\n")
         for _, vp := range c.Pages{
             req := vp.RequestPath() + "\n"
@@ -67,9 +64,6 @@ func (c *ChainVisualizer)AddNewPage(vp VisualPage) error {
     if vp == nil {
         return fmt.Errorf("Received new VisualPage was empty")
     }
-    fmt.Println("Addind New Page to the ChainVisualizer")
-    fmt.Println(vp.Info())
     c.Pages = append(c.Pages, vp)
-    fmt.Println("Remaining Pages on the Visualizer host:", c.Pages)
     return nil
 }

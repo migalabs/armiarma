@@ -53,6 +53,7 @@ require (
 	github.com/multiformats/go-multiaddr-dns v0.2.0
 	github.com/multiformats/go-multiaddr-net v0.1.5
 	github.com/multiformats/go-multistream v0.1.2
+	github.com/olekukonko/tablewriter v0.0.2-0.20190409134802-7e037d187b0c
 	github.com/protolambda/ask v0.0.5
 	github.com/protolambda/zrnt v0.13.2
 	github.com/protolambda/ztyp v0.1.2

@@ -71,17 +71,19 @@ func (c *GossipImportCmd) Run(ctx context.Context, args ...string) error {
         }
         // Generate the DBIDs for the block and state DB
 		// If there is a notification channel, we generate a DB for the Blocks and for the States
-  		blockDB, err := c.BlocksDB.Create(c.BName, c.DBPath, c.GossipMetrics.TopicDatabase.Spec)
-    	if err != nil {
+        blockDB, err := c.BlocksDB.Create(c.BName, c.DBPath, c.GossipMetrics.TopicDatabase.Spec)
+        if err != nil {
             c.Log.WithError(err).Error("Error creating BlockDB.")
             return err
-    	}
-  		c.BlockDBState.CurrentDB = c.BName
-//		stateDB, err := c.StatesDB.Create(c.SName, c.Path, c.GossipMetrics.TopicDatabase.Spec)
-//  	if err != nil {
-//  		return err
-//  	}
-//  	c.StateDBState.CurrentDB = c.SName
+        }
+        c.BlockDBState.CurrentDB = c.BName
+        // Currently StatesDB doesn't accept any kind of disk datbase
+//        stateDB, err := c.StatesDB.Create(c.SName, "", c.GossipMetrics.TopicDatabase.Spec)
+        _, err = c.StatesDB.Create(c.SName, "", c.GossipMetrics.TopicDatabase.Spec)
+        if err != nil {
+            return err
+        }
+        c.StateDBState.CurrentDB = c.SName
         // generate the client struct from where to gather the chain metrics
 		prysmClient := cnodes.NewPrysmClient(c.IP, c.Port)
 		// Generate the GO routine that will keep in the backgournd importing the Blocks and the States from the received BeaconBlocks
@@ -107,24 +109,14 @@ func (c *GossipImportCmd) Run(ctx context.Context, args ...string) error {
                                 c.Log.WithError(err).Warn("Error getting the BeaconStateView from the Client")
                                 continue
                             }
-//							bStateView, err := prysmClient.GetBeaconStateViewFromSlot(slotNumber)
-//							if err != nil {
-//								c.Log.WithError(err).Warn("Error getting the BeaconStateView from the Client")
-//							    continue
-//                          }
-//							_, err = stateDB.Store(ctx, bStateView)
-//							if err != nil {
-//								c.Log.WithError(err).Warn("Error Storing the State on the DB", err)
-//								continue
-//							}
-  							// Store the BeaconBlock to the DB, (Maybe the Store thingy might be implemented)
-  							blockWRoot := bdb.WithRoot(c.GossipMetrics.TopicDatabase.Spec, &bblock.SignedBeaconBlock)
-  							// we dont mind if the block already exists
-  							_, err = blockDB.Store(ctx, blockWRoot)
-  							if err != nil {
-  								c.Log.WithError(err).Warn("Error Storing the Block into the Database")
-  								continue
-  							}
+                            // Store the BeaconBlock to the DB, (Maybe the Store thingy might be implemented)
+                            blockWRoot := bdb.WithRoot(c.GossipMetrics.TopicDatabase.Spec, &bblock.SignedBeaconBlock)
+                            // we dont mind if the block already exists
+                            _, err = blockDB.Store(ctx, blockWRoot)
+                            if err != nil {
+                            c.Log.WithError(err).Warn("Error Storing the Block into the Database")
+                                continue
+                            }
                             c.Log.Info("New BeaconBlock has been added to the BlocksDBb. Block Slot: ", bblock.SignedBeaconBlock.Message.Slot.String())
                             // Save both, the BeaconBlock and the BeaconState into cache for ChainVisualizer purposes
                             // ------- Visualizer Part -------
@@ -140,25 +132,37 @@ func (c *GossipImportCmd) Run(ctx context.Context, args ...string) error {
                                     c.Log.WithError(err).Warn("Error Importing the State to the Visualizer Buffer")
                                 }
                             }
-
-///                         // CHAIN secuence so that will allow the Rumor Node to follow/store/interacte with the data of the Block/State chains
-//							currentChain, ok := c.Chains.Find(c.CName)
-//							if !ok { // If not OK we will have to generate a new Chain
-//								// generate a new hot entry to create a chain
-//								hotEntry, err := GenerateNewHotEntry(bStateView, c.GossipMetrics.TopicDatabase.Spec)
-//								_ = currentChain
-//								_, err = c.Chains.Create(c.CName, hotEntry, c.GossipMetrics.TopicDatabase.Spec)
-//								if err != nil {
-//									c.Log.WithError(err).Warn("Error Creating a new chain")
-//									continue
-//								}
-//							} else { // If OK, just add the block to the chain
-//                              err = currentChain.AddBlock(ctx, &bblock.SignedBeaconBlock)
-//                              if err != nil {
-//                                  c.Log.WithError(err).Warn("Error while including the SignedBeaconBlock to the Chain")
-//                                  continue
-//                              }
-//                          }
+              
+                          	// CHAIN secuence so that will allow the Rumor Node to follow/store/interacte with the data of the Block/State chains
+                            currentChain, ok := c.Chains.Find(c.CName)
+                            if !ok { // If not OK we will have to generate a new Chain
+                                bStateView, err := prysmClient.GetBeaconStateViewFromSlot(slotNumber)
+                                if err != nil {
+                                    c.Log.WithError(err).Warn("Error getting the BeaconStateView from the Client")
+                                    continue
+                                }
+	//							_, err = stateDB.Store(ctx, bStateView)
+	//							if err != nil {
+	//								c.Log.WithError(err).Warn("Error Storing the State on the DB", err)
+	//								continue
+	//							}
+                                // generate a new hot entry to create a chain
+                                hotEntry, err := GenerateNewHotEntry(bStateView, c.GossipMetrics.TopicDatabase.Spec)
+                                _ = currentChain
+                                _, err = c.Chains.Create(c.CName, hotEntry, c.GossipMetrics.TopicDatabase.Spec)
+                                if err != nil {
+                                    c.Log.WithError(err).Warn("Error Creating a new chain")
+                                    continue
+                                    
+                                }
+                                c.ChainState.CurrentChain = c.CName
+                            } else { // If OK, just add the block to the chain
+                                err = currentChain.AddBlock(ctx, &bblock.SignedBeaconBlock)
+                                if err != nil {
+                                    c.Log.WithError(err).Warn("Error while including the SignedBeaconBlock to the Chain")
+                                    continue
+                                }
+                            }
 							// UPDATE the Rumor Node status (at least fake that we follow the chain)
 							st, err := NodeStatusFromBeaconState(bState, c.ForkDigest)
 							if err != nil {
