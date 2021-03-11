@@ -3,17 +3,18 @@ package host
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"github.com/libp2p/go-libp2p-core/network"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/protolambda/rumor/control/actor/base"
-	"github.com/sirupsen/logrus"
 	"github.com/protolambda/rumor/metrics"
-    "strings"
+	"github.com/sirupsen/logrus"
 )
 
 type HostNotifyCmd struct {
 	*base.Base
-    *metrics.GossipMetrics
+	*metrics.GossipMetrics
 }
 
 func (c *HostNotifyCmd) Help() string {
@@ -48,20 +49,21 @@ func (c *HostNotifyCmd) listenCloseF(net network.Network, addr ma.Multiaddr) {
 }
 
 func (c *HostNotifyCmd) connectedF(net network.Network, conn network.Conn) {
-    c.GossipMetrics.AddNewPeer(conn.RemotePeer())
-    c.GossipMetrics.AddConnectionEvent(conn.RemotePeer(), "Connection")
+	fmt.Println("New Peer has been tracked!")
+	c.GossipMetrics.AddNewPeer(conn.RemotePeer())
+	c.GossipMetrics.AddConnectionEvent(conn.RemotePeer(), "Connection")
 
-    // End of metric traces to track the connections and disconnections
-    c.Log.WithFields(logrus.Fields{
+	// End of metric traces to track the connections and disconnections
+	c.Log.WithFields(logrus.Fields{
 		"event": "connection_open", "peer": conn.RemotePeer().String(),
 		"direction": fmtDirection(conn.Stat().Direction),
 	}).Debug("new peer connection")
 }
 
 func (c *HostNotifyCmd) disconnectedF(net network.Network, conn network.Conn) {
-    c.GossipMetrics.AddConnectionEvent(conn.RemotePeer(), "Disconnection")
-    // End of metric traces to track the connections and disconnections 
-    c.Log.WithFields(logrus.Fields{
+	c.GossipMetrics.AddConnectionEvent(conn.RemotePeer(), "Disconnection")
+	// End of metric traces to track the connections and disconnections
+	c.Log.WithFields(logrus.Fields{
 		"event": "connection_close", "peer": conn.RemotePeer().String(),
 		"direction": fmtDirection(conn.Stat().Direction),
 	}).Debug("peer disconnected")

@@ -8,10 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/protolambda/zrnt/eth2/configs"
-    visualizer "github.com/protolambda/rumor/control/actor/chainvisualizer"
-	vis "github.com/protolambda/rumor/visualizer"
-    "github.com/ethereum/go-ethereum/p2p/enode"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/protolambda/ask"
 	chaindata "github.com/protolambda/rumor/chain"
@@ -20,6 +17,7 @@ import (
 	"github.com/protolambda/rumor/control/actor/base"
 	"github.com/protolambda/rumor/control/actor/blocks"
 	"github.com/protolambda/rumor/control/actor/chain"
+	visualizer "github.com/protolambda/rumor/control/actor/chainvisualizer"
 	"github.com/protolambda/rumor/control/actor/dv5"
 	"github.com/protolambda/rumor/control/actor/enr"
 	"github.com/protolambda/rumor/control/actor/gossip"
@@ -35,6 +33,8 @@ import (
 	"github.com/protolambda/rumor/metrics"
 	"github.com/protolambda/rumor/p2p/addrutil"
 	"github.com/protolambda/rumor/p2p/track"
+	vis "github.com/protolambda/rumor/visualizer"
+	"github.com/protolambda/zrnt/eth2/configs"
 	"github.com/sirupsen/logrus"
 )
 
@@ -64,11 +64,11 @@ type Actor struct {
 
 	Dv5State dv5.Dv5State
 
-	GossipState   metrics.GossipState
-	GossipMetrics metrics.GossipMetrics
+	GossipState     metrics.GossipState
+	GossipMetrics   metrics.GossipMetrics
 	VisualizerState visualizer.VisualizerState
 
-    RPCState      rpc.RPCState
+	RPCState rpc.RPCState
 
 	HostState host.HostState
 
@@ -83,21 +83,21 @@ type Actor struct {
 
 func NewActor(id ActorID, globals *GlobalActorData) *Actor {
 	ctxAll, cancelAll := context.WithCancel(globals.GlobalCtx)
-	cv := vis.NewChainVisualizer(10,"localhost","9100")
-    chainV := visualizer.VisualizerState{
-        ChainVisualizer: cv,
-        Already: false,
-    }
+	cv := vis.NewChainVisualizer(10, "localhost", "9100")
+	chainV := visualizer.VisualizerState{
+		ChainVisualizer: cv,
+		Already:         false,
+	}
 
-    act := &Actor{
+	act := &Actor{
 		GlobalActorData:  globals,
 		ID:               id,
 		ActorCtx:         ctxAll,
 		actorCancel:      cancelAll,
 		CurrentPeerstore: track.NewDynamicPeerstore(),
 		GossipMetrics:    metrics.NewGossipMetrics(configs.Mainnet), // HARDCODED to Mainnet
-        VisualizerState:  chainV,
-    }
+		VisualizerState:  chainV,
+	}
 	return act
 }
 
@@ -232,14 +232,14 @@ func (c *ActorCmd) Cmd(route string) (cmd interface{}, err error) {
 			ChainState:      &c.ChainState,
 			GossipMetrics:   &c.GossipMetrics,
 			PeerStatusState: &c.PeerStatusState,
-	        VisualizerState: &c.VisualizerState}
-    case "chain-visualizer":
-        cmd = &visualizer.VisualizerCmd{
-            Base: b,
-            VisualizerState:    &c.VisualizerState,
-            BlockDBState:       &c.BlocksState,
-            StateDBState:       &c.StatesState}
-    case "blocks":
+			VisualizerState: &c.VisualizerState}
+	case "chain-visualizer":
+		cmd = &visualizer.VisualizerCmd{
+			Base:            b,
+			VisualizerState: &c.VisualizerState,
+			BlockDBState:    &c.BlocksState,
+			StateDBState:    &c.StatesState}
+	case "blocks":
 		cmd = &blocks.BlocksCmd{Base: b, DBs: c.GlobalBlocksDBs, DBState: &c.BlocksState}
 	case "states":
 		cmd = &states.StatesCmd{Base: b, DBs: c.GlobalStatesDBs, DBState: &c.StatesState}

@@ -29,7 +29,7 @@ func (c *TopicCmd) Cmd(route string) (cmd interface{}, err error) {
 		cmd = &TopicEventsCmd{Base: c.Base, GossipState: c.GossipState, Store: c.Store}
 	case "join":
 		cmd = &TopicJoinCmd{Base: c.Base, GossipState: c.GossipState}
-	case "list_peers":
+	case "list-peers":
 		cmd = &TopicListPeersCmd{Base: c.Base, GossipState: c.GossipState}
 	case "leave":
 		cmd = &TopicLeaveCmd{Base: c.Base, GossipState: c.GossipState}

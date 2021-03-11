@@ -3,12 +3,15 @@ package gossip
 import (
 	"context"
 	"encoding/base64"
+
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/minio/sha256-simd"
 )
+
+type AcceptStatus int
 
 type GossipSub interface {
 	Join(topic string, opts ...pubsub.TopicOpt) (*pubsub.Topic, error)
@@ -19,11 +22,12 @@ type gossipImpl struct {
 	*pubsub.PubSub
 }
 
-func NewGossipSub(ctx context.Context, h host.Host) (GossipSub, error) {
+func NewGossipSub(ctx context.Context, h host.Host, seenFilter bool) (GossipSub, error) {
 	psOptions := []pubsub.Option{
 		pubsub.WithMessageSigning(false),
 		pubsub.WithStrictSignatureVerification(false),
 		pubsub.WithMessageIdFn(MsgIDFunction),
+		//pubsub.WithSeenFilter(seenFilter),
 	}
 	ps, err := pubsub.NewGossipSub(ctx, h, psOptions...)
 	if err != nil {

@@ -42,6 +42,18 @@ func (c *TopicJoinCmd) Run(ctx context.Context, args ...string) error {
 		}
 		c.GossipState.Topics.Store(topicName, top)
 		c.Log.Infof("joined topic %s", topicName)
+		// if Validation Filter has been disabled, remove the Validator for the Topic
+		// TODO: Maybe in the future is more interesting to have this flag for each of the
+		//		 topics that we have joined (to reduce the bandwith or certain experimental tests)
+		if !c.GossipState.SeenFilter {
+			if err != nil {
+				c.Log.Warn("Unable to remove the Validator for the Topic", topicName, err)
+			}
+			c.Log.Info("The topic has been joined WITHOUT a msg Validator")
+		} else {
+			c.Log.Info("The topic has been joined WITH a msg Validator")
+		}
+
 	} else {
 		return fmt.Errorf("ERROR: No topic was given")
 	}

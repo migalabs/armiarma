@@ -14,9 +14,9 @@ import (
 
 type TopicEventsCmd struct {
 	*base.Base
-	GossipState *metrics.GossipState
+	GossipState   *metrics.GossipState
 	GossipMetrics *metrics.GossipMetrics
-    Store       track.ExtendedPeerstore
+	Store         track.ExtendedPeerstore
 	//TopicName string `ask:"<topic>" help:"The name of the topic to track events of"`
 	Eth2TopicName string `ask:"--eth-topic" help:"The name of the eth2 topics"`
 	ForkDigest    string `ask:"--fork-version" help:"The fork digest value of the network we want to join to (Default Mainnet)"`

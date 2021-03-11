@@ -1,16 +1,16 @@
 package metrics
 
 import (
-	"os"
-    "context"
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
-	"strings"
+	"os"
 	"strconv"
-	"fmt"
-    "sync"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -36,41 +36,41 @@ func NewGossipMetrics(config *beacon.Spec) GossipMetrics {
 
 // Exists reports whether the named file or directory exists.
 func FileExists(name string) bool {
-    if _, err := os.Stat(name); err != nil {
-        if os.IsNotExist(err) {
-            return false
-        }
-    }
-    return true
+	if _, err := os.Stat(name); err != nil {
+		if os.IsNotExist(err) {
+			return false
+		}
+	}
+	return true
 }
 
- // Import an old GossipMetrics from given file                                  
-// return: - return error if there was error while reading the file             
+// Import an old GossipMetrics from given file
+// return: - return error if there was error while reading the file
 //         - return bool for existing file (true if there was a file to read, return false if there wasn't a file to read)
-func (c *GossipMetrics) ImportMetrics(importFile string) (error, bool){
-    // Check if file exist
-    if FileExists(importFile){ // if exists, read it
-        fmt.Println("File:", importFile, "already existed, Importing")
-        // get the json of the file
-        jsonFile, err := os.Open(importFile)
-        if err != nil{
-            return err, true
-        }
-        byteValue, err := ioutil.ReadAll(jsonFile)
-        if err != nil {
-            return err, true
-        }
-        tempMap := make(map[peer.ID]PeerMetrics, 0)
-        json.Unmarshal(byteValue, &tempMap)
-        // iterate to add the metrics from the json to the the GossipMetrics
-        for k, v := range tempMap {
-            c.GossipMetrics.Store(k, v)
-        }
-        return nil, true
-    } else {
-        fmt.Println("File:", importFile, "doesn't exist, Generating")
-        return nil, false
-    }
+func (c *GossipMetrics) ImportMetrics(importFile string) (error, bool) {
+	// Check if file exist
+	if FileExists(importFile) { // if exists, read it
+		fmt.Println("File:", importFile, "already existed, Importing")
+		// get the json of the file
+		jsonFile, err := os.Open(importFile)
+		if err != nil {
+			return err, true
+		}
+		byteValue, err := ioutil.ReadAll(jsonFile)
+		if err != nil {
+			return err, true
+		}
+		tempMap := make(map[peer.ID]PeerMetrics, 0)
+		json.Unmarshal(byteValue, &tempMap)
+		// iterate to add the metrics from the json to the the GossipMetrics
+		for k, v := range tempMap {
+			c.GossipMetrics.Store(k, v)
+		}
+		return nil, true
+	} else {
+		fmt.Println("File:", importFile, "doesn't exist, Generating")
+		return nil, false
+	}
 }
 
 type GossipState struct {
@@ -78,7 +78,8 @@ type GossipState struct {
 	CloseGS context.CancelFunc
 	// string -> *pubsub.Topic
 	Topics sync.Map
-	// Metrics for Gossip Messages
+	// Validation Filter Flag
+	SeenFilter bool
 }
 
 // Base Struct for the topic name and the received messages on the different topics
@@ -235,18 +236,18 @@ func (c *GossipMetrics) FillMetrics(ep track.ExtendedPeerstore) {
 
 			// Since we want to have the latest Latency, we update it only when it is different from 0
 			// latency in seconds
-            if peerData.Latency != 0{
-                peerMetrics.Latency = float64(peerData.Latency/time.Millisecond) / 1000
-            }
+			if peerData.Latency != 0 {
+				peerMetrics.Latency = float64(peerData.Latency/time.Millisecond) / 1000
+			}
 
 			// After check that all the info is ready, save the item back into the Sync.Map
 			c.GossipMetrics.Store(key, peerMetrics)
 
 			/*
-			if requestCounter >= 40 { // Reminder 45 req/s
-				time.Sleep(70 * time.Second)
-				requestCounter = 0
-			}
+				if requestCounter >= 40 { // Reminder 45 req/s
+					time.Sleep(70 * time.Second)
+					requestCounter = 0
+				}
 			*/
 		}
 		// Keep with the loop on the Range function
@@ -289,20 +290,20 @@ func (c *GossipMetrics) ExportMetrics(filePath string, peerstorePath string, csv
 
 // IP-API message structure
 type IpApiMessage struct {
-	Query         string  `json:"query"`
-	Status        string  `json:"status"`  
-	Country       string  `json:"country"`
-	CountryCode   string  `json:"countryCode"`
-	Region        string  `json:"region"`
-	RegionName    string  `json:"regionName"`
-	City          string  `json:"city"`
-	Zip           string  `json:"zip"`
-	Lat           string  `json:"lat"`
-	Lon           string  `json:"lon"`
-	Timezone      string  `json:"timezone"`
-	Isp           string  `json:"isp"`
-	Org           string  `json:"org"`
-	As            string  `json:"as"`
+	Query       string `json:"query"`
+	Status      string `json:"status"`
+	Country     string `json:"country"`
+	CountryCode string `json:"countryCode"`
+	Region      string `json:"region"`
+	RegionName  string `json:"regionName"`
+	City        string `json:"city"`
+	Zip         string `json:"zip"`
+	Lat         string `json:"lat"`
+	Lon         string `json:"lon"`
+	Timezone    string `json:"timezone"`
+	Isp         string `json:"isp"`
+	Org         string `json:"org"`
+	As          string `json:"as"`
 }
 
 // get IP, location country and City from the multiaddress of the peer on the peerstore
@@ -321,7 +322,7 @@ func getIpAndLocationFromAddrs(multiAddrs string) (ip string, country string, ci
 		return ip, country, city
 	}
 
-	attemptsLeft, _ := strconv.Atoi(resp.Header["X-Rl"][0])  
+	attemptsLeft, _ := strconv.Atoi(resp.Header["X-Rl"][0])
 	timeLeft, _ := strconv.Atoi(resp.Header["X-Ttl"][0])
 
 	if attemptsLeft == 0 { // We have exceeded the limit of requests 45req/min
@@ -340,7 +341,7 @@ func getIpAndLocationFromAddrs(multiAddrs string) (ip string, country string, ci
 
 	defer resp.Body.Close()
 	bodyBytes, _ := ioutil.ReadAll(resp.Body)
-	
+
 	// Convert response body to Todo struct
 	var ipApiResp IpApiMessage
 	json.Unmarshal(bodyBytes, &ipApiResp)
@@ -369,44 +370,6 @@ func getIpAndLocationFromAddrs(multiAddrs string) (ip string, country string, ci
 		return ip, country, city
 	}
 
-
-	/*
-	ip = strings.TrimPrefix(multiAddrs, "/ip4/")
-	ipSlices := strings.Split(ip, "/")
-	ip = ipSlices[0]
-	url := "http://ip-api.com/json/" + ip
-	fmt.Println(url)
-	resp, err := http.Get(url)
-	fmt.Println("Response", resp)
-	if err != nil {
-		fmt.Println(err)
-		fmt.Println("There was an error getting the Location of the peer from the IP-API, please, check that there 40requests/minute limit hasn't been exceed")
-		country = "Unknown"
-		city = "Unknown"
-		return ip, country, city
-	}
-	defer resp.Body.Close()
-	bodyBytes, _ := ioutil.ReadAll(resp.Body)
-	
-	// Convert response body to Todo struct
-	var ipApiResp IpApiMessage
-	json.Unmarshal(bodyBytes, &ipApiResp)
-	fmt.Println("bodybytes", ipApiResp)
-
-	country = ipApiResp.Country
-	city = ipApiResp.City
-
-	// check if country and city are correctly imported
-	if len(country) == 0 || len(city) == 0 {
-		fmt.Println("There was an error getting the Location of the peer from the IP-API, please, check that there 40requests/minute limit hasn't been exceed")
-		fmt.Println("Error With the length, checking response", resp)
-		country = "Unknown"
-		city = "Unknown"
-		return ip, country, city
-	}
-	*/
-
-
 	// return the received values from the received message
 	return ip, country, city
 
@@ -417,8 +380,10 @@ func getIpAndLocationFromAddrs(multiAddrs string) (ip string, country string, ci
 func (c *GossipMetrics) AddNewPeer(peerId peer.ID) {
 	_, ok := c.GossipMetrics.Load(peerId)
 	if !ok {
+		fmt.Println("There was no peer with id:", peerId.String(), "Adding it to the Metrics DB")
 		// We will just add the info that we have (the peerId)
 		peerMetrics := NewPeerMetrics(peerId)
+		fmt.Println("Peer Metrics:", peerMetrics)
 		// Include it to the Peer DB
 		c.GossipMetrics.Store(peerId, peerMetrics)
 		// return that wasn't already on the peerstore
@@ -474,6 +439,7 @@ func GetTimeMiliseconds() int64 {
 // Function that Manages the metrics updates for the incoming messages
 func (c *GossipMetrics) IncomingMessageManager(peerId peer.ID, topicName string) error {
 	pMetrics, _ := c.GossipMetrics.Load(peerId)
+	fmt.Println("the loaded", pMetrics)
 	peerMetrics := pMetrics.(PeerMetrics)
 	messageMetrics, err := GetMessageMetrics(&peerMetrics, topicName)
 	if err != nil {

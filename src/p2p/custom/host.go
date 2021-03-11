@@ -31,11 +31,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	basichost "github.com/libp2p/go-libp2p/p2p/host/basic"
 	"io"
 	"net"
 	"sync"
 	"time"
+
+	basichost "github.com/libp2p/go-libp2p/p2p/host/basic"
 
 	autonat "github.com/libp2p/go-libp2p-autonat"
 	"github.com/libp2p/go-libp2p-core/connmgr"

@@ -35,7 +35,9 @@ armiarma: include drop_goodbyes.rumor
 
 armiarma: include polling.rumor
 
-armiarma: include sync_drop_serve.rumor
+# Now that we are able to generate a block DB and store
+# blocks from the gossipsub, we could serve the blocks
+#armiarma: include sync_drop_serve.rumor
 
 armiarma: include gossip.rumor
 

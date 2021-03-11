@@ -31,7 +31,7 @@ type HostCmd struct {
 }
 
 func (c *HostCmd) Cmd(route string) (cmd interface{}, err error) {
-    switch route {
+	switch route {
 	case "start":
 		cmd = &HostStartCmd{Base: c.Base, WithSetHost: c.WithSetHost, PrivSettings: c.PrivSettings,
 			GlobalPeerstores: c.GlobalPeerstores, CurrentPeerstore: c.CurrentPeerstore}
