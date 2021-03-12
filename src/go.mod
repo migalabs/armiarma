@@ -2,6 +2,8 @@ module github.com/protolambda/rumor
 
 go 1.14
 
+replace github.com/cortze/go-libp2p-pubsub v0.3.4-0.20210311180613-63e7fed5463f => github.com/libp2p/go-libp2p-pubsub v0.3.3
+
 require (
 	github.com/Cortze/go-eth2-beacon-nodes v0.0.0-20210223115135-12e4af9e10fc
 	github.com/anmitsu/go-shlex v0.0.0-20200514113438-38f4b401e2be // indirect

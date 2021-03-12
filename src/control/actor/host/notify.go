@@ -49,7 +49,6 @@ func (c *HostNotifyCmd) listenCloseF(net network.Network, addr ma.Multiaddr) {
 }
 
 func (c *HostNotifyCmd) connectedF(net network.Network, conn network.Conn) {
-	fmt.Println("New Peer has been tracked!")
 	c.GossipMetrics.AddNewPeer(conn.RemotePeer())
 	c.GossipMetrics.AddConnectionEvent(conn.RemotePeer(), "Connection")
 

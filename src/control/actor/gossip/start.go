@@ -3,7 +3,6 @@ package gossip
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/protolambda/rumor/control/actor/base"
 	"github.com/protolambda/rumor/metrics"
@@ -47,6 +46,5 @@ func (c *GossipStartCmd) Run(ctx context.Context, args ...string) error {
 	}
 	// Doesn't really matter the flag, we have to add it the GossipState anyways
 	c.GossipState.SeenFilter = c.SeenFilter
-	fmt.Println(c.GossipState.SeenFilter)
 	return nil
 }

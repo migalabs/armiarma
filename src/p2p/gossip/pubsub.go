@@ -27,7 +27,7 @@ func NewGossipSub(ctx context.Context, h host.Host, seenFilter bool) (GossipSub,
 		pubsub.WithMessageSigning(false),
 		pubsub.WithStrictSignatureVerification(false),
 		pubsub.WithMessageIdFn(MsgIDFunction),
-		//pubsub.WithSeenFilter(seenFilter),
+		pubsub.WithSeenFilter(seenFilter),
 	}
 	ps, err := pubsub.NewGossipSub(ctx, h, psOptions...)
 	if err != nil {
