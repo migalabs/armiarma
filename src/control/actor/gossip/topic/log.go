@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/golang/snappy"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -61,6 +62,9 @@ func (c *TopicLogCmd) Run(ctx context.Context, args ...string) error {
 				defer sub.Cancel()
 				for {
 					msg, err := sub.Next(ctx)
+					currTime := time.Now()
+					fmt.Println("Time when the msg was received on the Stream:", msg.ArrivalTime)
+					fmt.Println("Time when the msg was received on the App:", currTime)
 					if err != nil {
 						if err == ctx.Err() { // expected quit, context stopped.
 							break
