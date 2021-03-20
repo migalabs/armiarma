@@ -17,18 +17,17 @@ import (
 	pgossip "github.com/protolambda/rumor/p2p/gossip"
 	"github.com/protolambda/rumor/p2p/gossip/database"
 	"github.com/protolambda/rumor/p2p/track"
-	"github.com/protolambda/zrnt/eth2/beacon"
+//	"github.com/protolambda/zrnt/eth2/beacon"
 )
 
 type GossipMetrics struct {
 	GossipMetrics sync.Map
-	TopicDatabase database.TopicDatabase
+	MessageDatabase *database.MessageDatabase
 	StartTime     int64 // milliseconds
 }
 
-func NewGossipMetrics(config *beacon.Spec) GossipMetrics {
+func NewGossipMetrics() GossipMetrics {
 	gm := GossipMetrics{
-		TopicDatabase: database.NewTopicDatabase(config),
 		StartTime:     GetTimeMiliseconds(),
 	}
 	return gm
@@ -50,7 +49,6 @@ func FileExists(name string) bool {
 func (c *GossipMetrics) ImportMetrics(importFile string) (error, bool) {
 	// Check if file exist
 	if FileExists(importFile) { // if exists, read it
-		fmt.Println("File:", importFile, "already existed, Importing")
 		// get the json of the file
 		jsonFile, err := os.Open(importFile)
 		if err != nil {
@@ -68,7 +66,6 @@ func (c *GossipMetrics) ImportMetrics(importFile string) (error, bool) {
 		}
 		return nil, true
 	} else {
-		fmt.Println("File:", importFile, "doesn't exist, Generating")
 		return nil, false
 	}
 }
@@ -171,6 +168,7 @@ func (c *GossipMetrics) MarshalPeerStore(ep track.ExtendedPeerstore) ([]byte, er
 }
 
 // Get the Real Ip Address from the multi Address list
+// TODO: Implement the Private IP filter in a better way 
 func GetFullAddress(multiAddrs []string) string {
 	var address string
 	if len(multiAddrs) > 0 {
@@ -313,10 +311,8 @@ func getIpAndLocationFromAddrs(multiAddrs string) (ip string, country string, ci
 	ip = ipSlices[0]
 	url := "http://ip-api.com/json/" + ip
 	resp, err := http.Get(url)
-	fmt.Println("Response", resp)
 	if err != nil {
 		fmt.Println(err)
-		fmt.Println("There was an error getting the Location of the peer from the IP-API, please, check that there 40requests/minute limit hasn't been exceed")
 		country = "Unknown"
 		city = "Unknown"
 		return ip, country, city
@@ -326,13 +322,10 @@ func getIpAndLocationFromAddrs(multiAddrs string) (ip string, country string, ci
 	timeLeft, _ := strconv.Atoi(resp.Header["X-Ttl"][0])
 
 	if attemptsLeft == 0 { // We have exceeded the limit of requests 45req/min
-		fmt.Println("Limit of messages exceeded,", attemptsLeft)
-		fmt.Println("Sleeping for,", timeLeft)
 		time.Sleep(time.Duration(timeLeft) * time.Second)
 		resp, err = http.Get(url)
 		if err != nil {
 			fmt.Println(err)
-			fmt.Println("There was an error getting the Location of the peer from the IP-API, please, check that there 40requests/minute limit hasn't been exceed")
 			country = "Unknown"
 			city = "Unknown"
 			return ip, country, city
@@ -345,7 +338,6 @@ func getIpAndLocationFromAddrs(multiAddrs string) (ip string, country string, ci
 	// Convert response body to Todo struct
 	var ipApiResp IpApiMessage
 	json.Unmarshal(bodyBytes, &ipApiResp)
-	fmt.Println("bodybytes", ipApiResp)
 
 	// Check if the status of the request has been succesful
 	if ipApiResp.Status != "success" {
@@ -363,8 +355,6 @@ func getIpAndLocationFromAddrs(multiAddrs string) (ip string, country string, ci
 
 	// check if country and city are correctly imported
 	if len(country) == 0 || len(city) == 0 {
-		fmt.Println("There was an error getting the Location of the peer from the IP-API, please, check that there 40requests/minute limit hasn't been exceed")
-		fmt.Println("Error With the length, checking response", resp)
 		country = "Unknown"
 		city = "Unknown"
 		return ip, country, city
@@ -401,7 +391,7 @@ func (c *GossipMetrics) AddConnectionEvent(peerId peer.ID, connectionType string
 		c.GossipMetrics.Store(peerId, peerMetrics)
 	} else {
 		// Might be possible to add
-		errors.New("Counld't add Event, Peer is not in the list")
+		fmt.Println("Counld't add Event, Peer is not in the list")
 	}
 }
 
@@ -437,7 +427,7 @@ func GetTimeMiliseconds() int64 {
 // Function that Manages the metrics updates for the incoming messages
 func (c *GossipMetrics) IncomingMessageManager(peerId peer.ID, topicName string) error {
 	pMetrics, _ := c.GossipMetrics.Load(peerId)
-	fmt.Println("the loaded", pMetrics)
+	//fmt.Println("the loaded", pMetrics)
 	peerMetrics := pMetrics.(PeerMetrics)
 	messageMetrics, err := GetMessageMetrics(&peerMetrics, topicName)
 	if err != nil {

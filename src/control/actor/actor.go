@@ -34,7 +34,8 @@ import (
 	"github.com/protolambda/rumor/p2p/addrutil"
 	"github.com/protolambda/rumor/p2p/track"
 	vis "github.com/protolambda/rumor/visualizer"
-	"github.com/protolambda/zrnt/eth2/configs"
+
+	//	"github.com/protolambda/zrnt/eth2/configs"
 	"github.com/sirupsen/logrus"
 )
 
@@ -95,7 +96,7 @@ func NewActor(id ActorID, globals *GlobalActorData) *Actor {
 		ActorCtx:         ctxAll,
 		actorCancel:      cancelAll,
 		CurrentPeerstore: track.NewDynamicPeerstore(),
-		GossipMetrics:    metrics.NewGossipMetrics(configs.Mainnet), // HARDCODED to Mainnet
+		GossipMetrics:    metrics.NewGossipMetrics(),
 		VisualizerState:  chainV,
 	}
 	return act

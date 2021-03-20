@@ -37,11 +37,11 @@ armiarma: include polling.rumor
 
 # Now that we are able to generate a block DB and store
 # blocks from the gossipsub, we could serve the blocks
-#armiarma: include sync_drop_serve.rumor
+armiarma: include sync_drop_serve.rumor
 
 armiarma: include gossip.rumor
 
-armiarma: include import_from_gossip.rumor
+#armiarma: include import_from_gossip.rumor
 
 armiarma: sleep 2s
 
@@ -51,9 +51,9 @@ armiarma: include export_metrics.rumor
 
 armiarma: include connectall.rumor
 
-sleep 3m
+sleep 5m
 
-armiarma: include serve_blocks.rumor
+#armiarma: include serve_blocks.rumor
 
 comp_error="$?"
 if [[ "$comp_error" -ne "0" ]]
@@ -62,7 +62,7 @@ then
     exit 1
 fi
 
-armiarma: include visualizer.rumor
+#armiarma: include visualizer.rumor
 
 # Generate and endless loop to keep the Rumor script alive
 

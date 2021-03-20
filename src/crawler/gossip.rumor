@@ -9,7 +9,8 @@
 # proposer_slashing
 # attester_slashing
 
-gossip start
+# Set the Seen filter to False, get notified of each of the msgs seen on the network
+gossip start --seen-filter="false"
 
 echo "Fork-Version readed from config file: $gossip_fork"
 
@@ -22,15 +23,25 @@ voluntary_exit_topic="voluntary_exit"
 proposer_slashing_topic="proposer_slashing"
 attester_slashing_topic="attester_slashing"
 
+# Create the messages-db on the given directory
+msgDBpath="${metricsFolder}/message-db"
+echo "PWD= $PWD"
+echo "block storaging folder at $msgDBpath"
+
+if [[ -d "$msgDBpath" ]]
+then
+    echo "BlockDB already on the project folder"
+else
+    mkdir "$msgDBpath" 
+fi
+gossip message-db --temp-msg-limit=300 --store-path="$msgDBpath"
+
 # Join the topic, new versions of Rumor includes Mainnet fork-digest and snappy encoding as default
 gossip topic join --eth-topic="$blocks_topic" --fork-version="$gossip_fork"
 gossip topic join --eth-topic="$beacon_aggregate_topic" --fork-version="$gossip_fork"
 gossip topic join --eth-topic="$voluntary_exit_topic" --fork-version="$gossip_fork"
 gossip topic join --eth-topic="$proposer_slashing_topic" --fork-version="$gossip_fork"
 gossip topic join --eth-topic="$attester_slashing_topic" --fork-version="$gossip_fork"
-
-# Afer joining the topic, the creation of the messages-db must be implemented
-gossip topic create-db --eth-topic="$blocks_topic" --fork-version="$gossip_fork" --temp-msg-limit=20
 
 # Log the output into a .txt file 
 gossip topic log --eth-topic="$blocks_topic" --fork-version="$gossip_fork"

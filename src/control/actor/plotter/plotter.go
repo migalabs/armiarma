@@ -1,9 +1,8 @@
 package plotter
 
 import (
-    "github.com/protolambda/control/actor/base"
-    "github.com/protolambda//"
-    "github.com/protolambda/control/actor/base"
+    "github.com/protolambda/rumor/control/actor/base"
+    "github.com/protolambda/rumor/metrics/"
 )
 
 type MetricsPlotterCmd struct {
@@ -25,6 +24,7 @@ func (c *MetricsPlotterCmd) Default() {
 }
 
 func (c *MetricsPlotterCmd) Run() error{
+    fmt.Println("Ploter")
     // check if the host has been already initialized
 
     // generate the metrics dataframe into the proper Plotting format

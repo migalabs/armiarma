@@ -1,39 +1,42 @@
 package gossip
 
-import(
-    "errors"
-    "github.com/protolambda/ask"
-    "github.com/protolambda/rumor/control/actor/base"
-    "github.com/protolambda/rumor/p2p/track"
-    "github.com/protolambda/rumor/metrics"
-    "github.com/protolambda/rumor/control/actor/gossip/topic"
+import (
+	"errors"
+
+	"github.com/protolambda/ask"
+	"github.com/protolambda/rumor/control/actor/base"
+	"github.com/protolambda/rumor/control/actor/gossip/topic"
+	"github.com/protolambda/rumor/metrics"
+	"github.com/protolambda/rumor/p2p/track"
 )
 
 type GossipCmd struct {
 	*base.Base
 	*metrics.GossipState
-    *metrics.GossipMetrics
-    Store track.ExtendedPeerstore
+	*metrics.GossipMetrics
+	Store track.ExtendedPeerstore
 }
 
 func (c *GossipCmd) Cmd(route string) (cmd interface{}, err error) {
-    switch route {
+	switch route {
 	case "start":
 		cmd = &GossipStartCmd{Base: c.Base, GossipState: c.GossipState}
 	case "list":
 		cmd = &GossipListCmd{Base: c.Base, GossipState: c.GossipState}
+	case "message-db":
+		cmd = &GossipMessageDBCmd{Base: c.Base, GossipState: c.GossipState, GossipMetrics: c.GossipMetrics}
 	case "blacklist":
 		cmd = &GossipBlacklistCmd{Base: c.Base, GossipState: c.GossipState}
-    case "topic":
+	case "topic":
 		cmd = &topic.TopicCmd{Base: c.Base, GossipState: c.GossipState, GossipMetrics: c.GossipMetrics, Store: c.Store}
-    default:
+	default:
 		return nil, ask.UnrecognizedErr
 	}
 	return cmd, nil
 }
 
 func (c *GossipCmd) Routes() []string {
-	return []string{"start", "list", "blacklist", "topic"}
+	return []string{"start", "list", "message-db", "blacklist", "topic"}
 }
 
 func (c *GossipCmd) Help() string {

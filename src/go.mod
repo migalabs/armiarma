@@ -2,24 +2,23 @@ module github.com/protolambda/rumor
 
 go 1.14
 
-replace github.com/cortze/go-libp2p-pubsub v0.3.4-0.20210311180613-63e7fed5463f => github.com/libp2p/go-libp2p-pubsub v0.3.3
+replace github.com/libp2p/go-libp2p-pubsub v0.3.3 => github.com/cortze/go-libp2p-pubsub v0.3.4-0.20210318120057-ca6e67cdec42
 
 require (
-	github.com/Cortze/go-eth2-beacon-nodes v0.0.0-20210223115135-12e4af9e10fc
 	github.com/anmitsu/go-shlex v0.0.0-20200514113438-38f4b401e2be // indirect
 	github.com/aristanetworks/goarista v0.0.0-20200805130819-fd197cf57d96 // indirect
 	github.com/btcsuite/btcd v0.21.0-beta
 	github.com/chzyer/logex v1.1.10 // indirect
 	github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e
 	github.com/chzyer/test v0.0.0-20180213035817-a1ea475d72b1 // indirect
-	github.com/cortze/go-eth2-beacon-nodes v0.0.0-20210224195524-bf923dd91967
+	github.com/cortze/go-eth2-beacon-nodes v0.0.0-20210226135425-ab05ba562a6f
 	github.com/davidlazar/go-crypto v0.0.0-20200604182044-b73af7476f6c // indirect
-	github.com/ethereum/go-ethereum v1.9.24
+	github.com/ethereum/go-ethereum v1.10.1
 	github.com/gliderlabs/ssh v0.3.0
-	github.com/golang/snappy v0.0.2-0.20200707131729-196ae77b8a26
+	github.com/golang/snappy v0.0.3-0.20201103224600-674baa8c7fc3
 	github.com/google/gopacket v1.1.18 // indirect
 	github.com/gorilla/websocket v1.4.2
-	github.com/herumi/bls-eth-go-binary v0.0.0-20210218073812-92395a189ef4 // indirect
+	github.com/herumi/bls-eth-go-binary v0.0.0-20200722032157-41fc56eba7b4 // indirect
 	github.com/ipfs/go-datastore v0.4.4
 	github.com/ipfs/go-ds-badger v0.2.3
 	github.com/ipfs/go-ds-leveldb v0.4.2
@@ -49,7 +48,7 @@ require (
 	github.com/libp2p/go-tcp-transport v0.2.0
 	github.com/libp2p/go-ws-transport v0.3.1
 	github.com/libp2p/go-yamux v1.3.8 // indirect
-	github.com/minio/sha256-simd v1.0.0
+	github.com/minio/sha256-simd v0.1.1
 	github.com/multiformats/go-base32 v0.0.3
 	github.com/multiformats/go-multiaddr v0.2.2
 	github.com/multiformats/go-multiaddr-dns v0.2.0
@@ -60,10 +59,11 @@ require (
 	github.com/protolambda/zrnt v0.13.2
 	github.com/protolambda/ztyp v0.1.2
 	github.com/sirupsen/logrus v1.6.0
-	github.com/spf13/cobra v1.0.0
-	golang.org/x/crypto v0.0.0-20201208171446-5f87f3452ae9 // indirect
+	github.com/spf13/cobra v1.1.1
+	github.com/ugorji/go v1.1.4 // indirect
+	golang.org/x/crypto v0.0.0-20210317152858-513c2a44f670 // indirect
 	golang.org/x/sync v0.0.0-20200625203802-6e8e738ad208 // indirect
-	golang.org/x/sys v0.0.0-20201207223542-d4d67f95c62d // indirect
+	golang.org/x/sys v0.0.0-20210317225723-c4fcb01b228e // indirect
 	golang.org/x/text v0.3.3 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	mvdan.cc/sh/v3 v3.1.2

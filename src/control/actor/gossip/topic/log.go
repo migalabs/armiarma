@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/golang/snappy"
-	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/protolambda/rumor/control/actor/base"
 	"github.com/protolambda/rumor/metrics"
 	"github.com/protolambda/rumor/p2p/gossip"
@@ -62,9 +62,7 @@ func (c *TopicLogCmd) Run(ctx context.Context, args ...string) error {
 				defer sub.Cancel()
 				for {
 					msg, err := sub.Next(ctx)
-					currTime := time.Now()
-					fmt.Println("Time when the msg was received on the Stream:", msg.ArrivalTime)
-					fmt.Println("Time when the msg was received on the App:", currTime)
+					fmt.Println("New Message, ID:", msg.MessageID)
 					if err != nil {
 						if err == ctx.Err() { // expected quit, context stopped.
 							break
@@ -79,15 +77,12 @@ func (c *TopicLogCmd) Run(ctx context.Context, args ...string) error {
 								c.Log.WithError(err).WithField("topic", topicName).Error("Cannot decompress snappy message")
 								continue
 							}
-						} else {
-							msgData = msg.Data
 						}
-
 						// To avoid getting track of our own messages, check if we are the senders
 						if msg.ReceivedFrom != h.ID() {
 							c.Log.WithFields(logrus.Fields{
 								"from":      msg.ReceivedFrom.String(),
-								"data":      hex.EncodeToString(msgData),
+								"data":      hex.EncodeToString(msg.Data),
 								"signature": hex.EncodeToString(msg.Signature),
 								"seq_no":    hex.EncodeToString(msg.Seqno),
 							}).Infof("new message on %s", topicName)
@@ -95,8 +90,8 @@ func (c *TopicLogCmd) Run(ctx context.Context, args ...string) error {
 							// Deserialize the message depending on the topic name
 							// generate a new ReceivedMessage on the Temp Database
 							// check if the topic has a db asiciated
-							if _, ok := c.GossipMetrics.TopicDatabase.TopicDB.Load(topicName); ok {
-								err := AddMsgToTopicDB(&c.GossipMetrics.TopicDatabase, msg.ReceivedFrom, topicName, msgData)
+							if c.GossipMetrics.MessageDatabase != nil {
+								err = AddMsgToMsgDB(c.GossipMetrics.MessageDatabase, msgData, msg.ReceivedFrom, msg.ArrivalTime, msg.MessageID, topicName)
 								if err != nil {
 									c.Log.WithError(err).WithField("topic", topicName).Error("Error saving message on temp database")
 								}
@@ -127,32 +122,61 @@ func (c *TopicLogCmd) Run(ctx context.Context, args ...string) error {
 }
 
 //
-func AddMsgToTopicDB(topicDB *database.TopicDatabase, from peer.ID, topic string, rawMsg []byte) error {
-	if _, ok := topicDB.TopicDB.Load(topic); !ok {
-		return fmt.Errorf("not on gossip topic %s", topic)
-	} else {
-		// Pass from []byte to *bytes.Buffer so that we can Deserialize it and get the real content of the message
-		msgBuf := bytes.NewBuffer(rawMsg)
-		// classify the topic on the message types that we support
-		switch topic {
-		case gossip.BeaconBlock: // Hardcoded to Mainnet ForkDigest
-			var signedBB beacon.SignedBeaconBlock
-			err := signedBB.Deserialize(topicDB.Spec, codec.NewDecodingReader(msgBuf, uint64(len(msgBuf.Bytes()))))
-			if err != nil {
-				return err
-			}
-			msg := database.NewReceivedBeaconBlock(from, signedBB)
-			// after generating the msg struct (doesn't matter which message type it was) we save the msg on the corresponding topicDB
-			err = topicDB.WriteMessage(msg, topic)
-			if err != nil {
-				return err
-			}
-			return nil
-		case gossip.BeaconAggregateProof: // Hardcoded to Mainnet ForkDigest
-			fmt.Println("New Attestation")
-			return nil
-		default:
-			return fmt.Errorf("Message Struct for this topic was not defined")
+func AddMsgToMsgDB(msgDB *database.MessageDatabase, rawMsg []byte, sender peer.ID, arrTime time.Time, msgID string, topic string) error {
+	// Pass from []byte to *bytes.Buffer so that we can Deserialize it and get the real content of the message
+	msgBuf := bytes.NewBuffer(rawMsg)
+	// classify the topic on the message types that we support
+	switch topic {
+	case gossip.BeaconBlock: // Hardcoded to Mainnet ForkDigest
+		var signedBB beacon.SignedBeaconBlock
+		err := signedBB.Deserialize(msgDB.Spec, codec.NewDecodingReader(msgBuf, uint64(len(msgBuf.Bytes()))))
+		if err != nil {
+			return err
 		}
+		rm := &database.ReceivedMessage{
+			MessageID:      msgID,
+			MessageType:    "beacon-block",
+			Slot:           signedBB.Message.Slot,
+			ValidatorIndex: signedBB.Message.ProposerIndex,
+			Sender:         sender,
+			ArrivalTime:    arrTime,
+			Content:        signedBB,
+		}
+		// after generating the msg struct (doesn't matter which message type it was) we save the msg on the msg DB
+		seen, err := msgDB.AddMessage(rm)
+		if err != nil {
+			return err
+		}
+		// notify of a new block arrival if we didn't see the msg before
+		if !seen {
+			msgDB.BlockNotChan <- &signedBB
+		}
+		return nil
+
+	case gossip.BeaconAggregateProof: // Hardcoded to Mainnet ForkDigest
+		var signedBAggr beacon.SignedAggregateAndProof
+		err := signedBAggr.Deserialize(msgDB.Spec, codec.NewDecodingReader(msgBuf, uint64(len(msgBuf.Bytes()))))
+		if err != nil {
+			return err
+		}
+		rm := &database.ReceivedMessage{
+			MessageID:      msgID,
+			MessageType:    "beacon-aggregation",
+			Slot:           signedBAggr.Message.Aggregate.Data.Slot,
+			ValidatorIndex: signedBAggr.Message.AggregatorIndex,
+			Sender:         sender,
+			ArrivalTime:    arrTime,
+			Content:        signedBAggr,
+		}
+		// after generating the msg struct (doesn't matter which message type it was) we save the msg on the msg DB
+		_, err = msgDB.AddMessage(rm)
+		if err != nil {
+			return err
+		}
+		// notify of a new block arrival if we didn't see the msg before
+		// currently not needed for the attestations
+		return nil
+	default:
+		return fmt.Errorf("Message Struct for this topic was not defined")
 	}
 }
