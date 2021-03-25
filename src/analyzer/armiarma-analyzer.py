@@ -4,6 +4,7 @@
 import os, sys
 import json 
 import time
+import math
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
@@ -295,8 +296,8 @@ def plotColumn(panda, pdf, opts):
         ax.set_xlim(left=0, right=opts['xUpperLimit'])
     else:
         print("Non xLimit set") 
-        ax.xaxis.set_ticks(np.arange(0, panda[opts['xMetrics']].iloc[-1]+1, opts['xRange']))
-        ax.set_xlim(left=0, right=panda[opts['xMetrics']].iloc[-1]+1)
+        #ax.xaxis.set_ticks(np.arange(0, panda[opts['xMetrics']].iloc[-1]+1, opts['xRange']))
+        #ax.set_xlim(left=0, right=panda[opts['xMetrics']].iloc[-1]+1)
 
     if opts['yLowLimit'] != None:
         ax.set_ylim(bottom=opts['yLowLimit'])
@@ -649,8 +650,8 @@ def main():
             'tickRotation': 0,
             'show': False}) 
 
-        # get the average latency per client
-        # since few of the clients dont hace latency
+        # get the average RTT per client
+        # since few of the clients dont have RTT measures
         # the calculus are made by hand
         xarray = clientList
         yarray = []
@@ -674,7 +675,7 @@ def main():
                         if "prysm" in item.lower():
                             prysmCnt = prysmCnt + 1    
                         contador = contador + 1
-                        # print("client type:", row[xmetrics], "has latency", row[ymetrics] )
+                        # print("client type:", row[xmetrics], "has RTT", row[ymetrics] )
             auxAmount = rumorMetricsPanda.apply(lambda x: True if item.lower() in str(x[xmetrics]).lower() else False, axis=1)
             if auxCnt != 0:
                 yarray.append(round((auxCnt/(len(auxAmount[auxAmount == True].index))),1))
@@ -682,15 +683,15 @@ def main():
                 yarray.append(0)
         """
         print("len of the connected peers:", len(rumorMetricsPanda))
-        print("Number of peers with 0 latency:", contador)
-        print("Number of Prysm clients with 0 latency:", prysmCnt )
+        print("Number of peers with 0 RTT:", contador)
+        print("Number of Prysm clients with 0 RTT:", prysmCnt )
         print("Number of Prysm clients with lat != 0:", prysmTCnt)
-        print("number of peers with more than 1 sec of latency", latAuxArray)
+        print("number of peers with more than 1 sec of RTT", latAuxArray)
         """
 
         plotBarsFromArrays(xarray, yarray, pdf, opts={                                            
             'figSize': figSize,                                                          
-            'figTitle': 'AverageLatencyPerClientType.png',
+            'figTitle': 'AverageRTTPerClientType.png',
             'pdf': pdfFile,                                 
             'outputPath': outputFigsFolder,                                                    
             'align': 'center', 
@@ -699,9 +700,9 @@ def main():
             'textSize': textSize,                                                         
             'yLowLimit': 0,                                                             
             'yUpperLimit': None,                                                        
-            'title': "Average Latency per Client Type",                             
+            'title': "Average RTT per Client Type",                             
             'xlabel': None,                                   
-            'ylabel': 'latency (seconds)',                                                
+            'ylabel': 'RTT (seconds)',                                                
             'xticks': xarray,                                                           
             'titleSize': titleSize,                                                        
             'labelSize': labelSize,                                                        
@@ -1078,11 +1079,11 @@ def main():
 
         barColor = 'black'
 
-        print("Peer with highest latency", rumorMetricsPanda.loc[rumorMetricsPanda['Latency'].idxmax()])
+        print("Peer with highest RTT", rumorMetricsPanda.loc[rumorMetricsPanda['Latency'].idxmax()])
 
         plotBarsFromPandas(rumorMetricsPanda, pdf, opts={                                   
             'figSize': wideFigSize,                                                      
-            'figTitle': 'LatencyWithPeers.png', 
+            'figTitle': 'RTTWithPeers.png', 
             'pdf': pdfFile,                                    
             'outputPath': outputFigsFolder,
             'legend': False,                                         
@@ -1094,7 +1095,7 @@ def main():
             'yLowLimit': 0,                                                         
             'yUpperLimit': None,
             'grid': 'y',                                                    
-            'title': "Latency with each Peer",                  
+            'title': "RTT with each Peer",                  
             'xlabel': "Peers Connected",                                                         
             'ylabel': 'Seconds',                                      
             'xticks': None,                                                       
@@ -1172,10 +1173,9 @@ def main():
         auxPanda = rumorMetricsPanda.sort_values(by='Beacon Blocks', ascending=True)
         cont = 0
 
-        auxrow = rumorMetricsPanda.loc[rumorMetricsPanda['Connected Time'].idxmax()]
-        maxX = auxrow['Connected Time'] 
-        print(maxX)
-        xticks = int(maxX / 5)
+        #auxrow = rumorMetricsPanda.loc[rumorMetricsPanda['Connected Time'].idxmax()]
+        #maxX = auxrow['Connected Time']
+        
         
         plotColumn(rumorMetricsPanda, pdf, opts={
             'figSize': wideFigSize, 
@@ -1187,10 +1187,10 @@ def main():
             'xMetrics': 'Connected Time',
             'yMetrics': ['Total Messages'],
             'sortmetrics': None,
-            'xticks': None,
+            'xticks': True,
             'xLowLimit': None,
-            'xUpperLimit': None,
-            'xRange': None,
+            'xUpperLimit': None, # maxX
+            'xRange': None, # minX
             'yLowLimit': 10**0,
             'yRange': None,
             'yUpperLimit': None,
