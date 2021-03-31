@@ -33,15 +33,18 @@ def getPandaFromPeerstoreJson(inputFile):
     return peerstoreMetrics
       
 
-def plotBarsFromPandas(panda, pdf, opts):
+def plotFromPandas(panda, pdf, opts):
     print("Bar Graph from Panda")
 
     outputFile = str(opts['outputPath']) + '/' + opts['figTitle']
     print('printing image', opts['figTitle'], 'on', outputFile)
 
     if opts['xmetrics'] != None:
-        ax = panda[opts['xmetrics']].sort_values(by=opts['xmetrics'], ascending=False).plot(kind='bar', figsize=opts['figSize'], logy=opts['ylog'], legend=opts['legend'], color=opts['barColor']) 
-
+        if opts['kind'] != None:
+            ax = panda[opts['xmetrics']].sort_values(by=opts['xmetrics'], ascending=False).plot(kind=opts['kind'], figsize=opts['figSize'], logy=opts['ylog'], legend=opts['legend'], color=opts['barColor'], use_index=False) 
+        else:
+            ax = panda[opts['xmetrics']].sort_values(by=opts['xmetrics'], ascending=False).plot(figsize=opts['figSize'], logy=opts['ylog'], lw=opts['lw'], legend=opts['legend'], color=opts['barColor'], use_index=False)
+    
     # labels
     if opts['ylabel'] is not None:    
         plt.ylabel(opts['ylabel'], fontsize=opts['labelSize'])
@@ -84,7 +87,7 @@ def plotBarsFromArrays(xarray, yarray, pdf, opts):
 
     fig = plt.figure(figsize = opts['figSize'])
 
-    plt.bar(range(len(xarray)), yarray, align=opts['align'], color=opts['barColor'])
+    plt.bar(range(len(xarray)), yarray, log=opts['logy'], align=opts['align'], color=opts['barColor'])
 
 
     # labels
@@ -442,6 +445,7 @@ def main():
     rumorMetricsPanda = pd.read_csv(csvFile)
 
 
+
     # ---------- PLOT SECUENCE -----------
 
     # ------ Get data for plotting -------
@@ -498,8 +502,10 @@ def main():
     messageCounterArray = sorted(messageCounterArray, reverse = True)
     messagePercentageArray = sorted(messagePercentageArray, reverse = True)
 
+    print(messageCounterArray[:5])
     print("Total of received messages:", totalMessageCounter)
 
+    # Total of messages
     percAcumulated = 0
     itemsCounter   = 0
     for item in messagePercentageArray:
@@ -507,10 +513,10 @@ def main():
         percAcumulated = percAcumulated + item
         if itemsCounter > (len(messagePercentageArray) * 0.1): # to see how many messages send the 10% of the peers 
             peerPerc = itemsCounter / len(messagePercentageArray)
-            print( peerPerc, "% of peers send the ", percAcumulated,"% of the messages")
+            print( peerPerc*100, "% of peers send the ", percAcumulated*100,"% of the messages")
+            restPeers = len(messagePercentageArray) - itemsCounter
+            print((restPeers/len(messagePercentageArray))*100, "% of the peers send less than", item*totalMessageCounter, "number of messages")
             break
-    print()
-    print()
 
     percAcumulated = 0
     itemsCounter   = 0
@@ -519,11 +525,73 @@ def main():
         percAcumulated = percAcumulated + item
         if percAcumulated > 0.89:
             peerPerc = itemsCounter / len(messagePercentageArray)
-            print( peerPerc, "% of peers send the ", percAcumulated,"% of the messages")
+            print(peerPerc, "% of peers send the ", percAcumulated*100,"% of the messages")
+            restPeers = len(messagePercentageArray) - itemsCounter
+            print((restPeers/len(messagePercentageArray))*100, "% of the peers send less than", item*totalMessageCounter, "number of messages")
+            break
+    print()
+    print()
+
+    # Beacon blocks
+    totalBlockCounter = 0
+    messageCounterArray = []
+    messagePercentageArray = []
+
+    for index, row in rumorMetricsPanda.iterrows():
+        totalBlockCounter = totalBlockCounter + row['Beacon Blocks']
+        messageCounterArray.append(row['Beacon Blocks'])
+
+    for msgCount in messageCounterArray:
+        percent = msgCount/totalBlockCounter
+        messagePercentageArray.append(percent)
+
+    messageCounterArray = sorted(messageCounterArray, reverse = True)
+    messagePercentageArray = sorted(messagePercentageArray, reverse = True)
+
+    print(messageCounterArray[:5])
+    print("Total of received blocks:", totalBlockCounter)
+
+    percAcumulated = 0
+    itemsCounter   = 0
+    for item in messagePercentageArray:
+        itemsCounter = itemsCounter + 1
+        percAcumulated = percAcumulated + item
+        if itemsCounter > (len(messagePercentageArray) * 0.1): # to see how many messages send the 10% of the peers 
+            peerPerc = itemsCounter / len(messagePercentageArray)
+            print( peerPerc*100, "% of peers send the ", percAcumulated*100,"% of the blocks")
+            restPeers = len(messagePercentageArray) - itemsCounter
+            print((restPeers/len(messagePercentageArray))*100, "% of the peers send less than", item*totalBlockCounter, "number of blocks")
+            break
+
+    percAcumulated = 0
+    itemsCounter   = 0
+    for item in messagePercentageArray:
+        itemsCounter = itemsCounter + 1
+        percAcumulated = percAcumulated + item
+        if percAcumulated > 0.89:
+            peerPerc = itemsCounter / len(messagePercentageArray)
+            print(peerPerc, "% of peers send the ", percAcumulated*100,"% of the blocks")
+            restPeers = len(messagePercentageArray) - itemsCounter
+            print((restPeers/len(messagePercentageArray))*100, "% of the peers send less than", item*totalBlockCounter, "number of blocks")
             break
     print()
     print()
     # End of Temporary code for the paper
+
+    # Temp
+    # Check if any of the Lodestar nodes was recognized with the  "js-libp2p/version" user agent
+    for index, row in rumorMetricsPanda.iterrows():
+        if row['Client'] == 'Unknown':
+            try:
+                if "js-libp2p" in peerstore[row['Peer Id']]["user_agent"]:
+                    print("Lodestar", peerstore[row['Peer Id']]["user_agent"])
+                    ua = peerstore[row['Peer Id']]["user_agent"].split('/')
+                    rumorMetricsPanda.at[index,'Client'] = "Lodestar"
+                    rumorMetricsPanda.at[index,'Version'] = ua[1]
+            except:   
+                print("*") 
+
+    # End Temp
 
     with PdfPages(pdfFile) as pdf:
     
@@ -534,6 +602,7 @@ def main():
             'outputPath': outputFigsFolder,                                         
             'align': 'center',                                                      
             'barValues': True,
+            'logy': False,
             'barColor': barColor,
             'textSize': textSize,
             'yLowLimit': 0,                                                         
@@ -605,6 +674,7 @@ def main():
         # get the number of peers per country 
         countriesList = getItemsFromColumn(rumorMetricsPanda, 'Country') 
         auxxarray, auxyarray = getDataFromPanda(rumorMetricsPanda, None, "Country", countriesList, 'counter') 
+        print("Number of different Countries hosting Eth2 clients:", len(auxxarray))
         # Remove the Countries with less than X peers
         countryLimit = 10
         xarray = []
@@ -626,6 +696,7 @@ def main():
             'outputPath': outputFigsFolder,                                                    
             'align': 'center', 
             'barValues': True,
+            'logy': False,
             'barColor': barColor,
             'textSize': textSize+2,                                                         
             'yLowLimit': 0,                                                             
@@ -654,6 +725,7 @@ def main():
             'outputPath': outputFigsFolder,                                                    
             'align': 'center', 
             'barValues': True, #True
+            'logy': False,
             'barColor': clientColors,
             'textSize': textSize+3,                                                         
             'yLowLimit': 0,                                                             
@@ -661,7 +733,7 @@ def main():
             'title': "Average of Connections per Client Type",                             
             'xlabel': None,                                   
             'ylabel': 'Number of Connections',                                                
-            'xticks': ['L','T','N','P','Lod','U'], #xarray,
+            'xticks': ['Lig','Tek','Nim','Pry','Lod','Unk'], #xarray,
             'hGrids': True,                                                      
             'titleSize': titleSize+3,                                                        
             'labelSize': labelSize+3,                                                        
@@ -681,7 +753,8 @@ def main():
             'pdf': pdfFile,                                
             'outputPath': outputFigsFolder,                                                    
             'align': 'center', 
-            'barValues': None, #True
+            'barValues': True, #True
+            'logy': False,
             'barColor': clientColors,
             'textSize': textSize+3,                                                         
             'yLowLimit': 0,                                                             
@@ -689,7 +762,7 @@ def main():
             'title': "Average of Disconnections per Client Type",                             
             'xlabel': None,                                   
             'ylabel': 'Number of Disconnections',                                                
-            'xticks': ['L','T','N','P','Lod','U'], #xarray,
+            'xticks': ['Lig','Tek','Nim','Pry','Lod','Unk'], #xarray,
             'hGrids': True,                                                      
             'titleSize': titleSize+3,                                                        
             'labelSize': labelSize+3,                                                        
@@ -710,6 +783,7 @@ def main():
             'outputPath': outputFigsFolder,                                                    
             'align': 'center', 
             'barValues': True, #True
+            'logy': False,
             'barColor': clientColors,
             'textSize': textSize+3,                                                         
             'yLowLimit': 0,                                                             
@@ -717,7 +791,7 @@ def main():
             'title': "Average of Connected Time per Client Type",                             
             'xlabel': None,                                   
             'ylabel': 'Time (Minutes)',                                                
-            'xticks': ['L','T','N','P','Lod','U'], #xarray,
+            'xticks': ['Lig','Tek','Nim','Pry','Lod','Unk'], #xarray,
             'hGrids': True,                                                      
             'titleSize': titleSize+3,                                                        
             'labelSize': labelSize+3,                                                        
@@ -774,6 +848,7 @@ def main():
             'outputPath': outputFigsFolder,                                                    
             'align': 'center', 
             'barValues': True, 
+            'logy': False,
             'barColor': clientColors,
             'textSize': textSize+3,                                                         
             'yLowLimit': 0,                                                             
@@ -781,7 +856,7 @@ def main():
             'title': "Average RTT per Client Type",                             
             'xlabel': None,                                   
             'ylabel': 'RTT (seconds)',                                                
-            'xticks': ['L','T','N','P','Lod','U'],  
+            'xticks': ['Lig','Tek','Nim','Pry','Lod','Unk'],  
             'hGrids': True,                                                          
             'titleSize': titleSize+3,                                                        
             'labelSize': labelSize+3,                                                        
@@ -804,6 +879,7 @@ def main():
             'outputPath': outputFigsFolder,                                                    
             'align': 'center', 
             'barValues': True,
+            'logy': False,
             'barColor': clientColors,
             'textSize': textSize,                                                         
             'yLowLimit': 0,                                                             
@@ -811,7 +887,7 @@ def main():
             'title': "Number of Received BeaconBlock Msgs",                             
             'xlabel': None,                                   
             'ylabel': 'Messages Received',                                                
-            'xticks': ['L','T','N','P','Lod','U'],
+            'xticks': ['Lig','Tek','Nim','Pry','Lod','Unk'],
             'hGrids': True,                                                            
             'titleSize': titleSize,                                                        
             'labelSize': labelSize,                                                        
@@ -833,6 +909,7 @@ def main():
             'outputPath': outputFigsFolder,                                                    
             'align': 'center', 
             'barValues': True,
+            'logy': True,
             'barColor': clientColors,
             'textSize': textSize,                                                         
             'yLowLimit': 0,                                                             
@@ -840,7 +917,7 @@ def main():
             'title': "Average of Received BeaconBlock Msgs",                             
             'xlabel': None,                                   
             'ylabel': 'Messages Received',                                                
-            'xticks': ['L','T','N','P','Lod','U'], 
+            'xticks': ['Lig','Tek','Nim','Pry','Lod','Unk'], 
             'hGrids': True,                                                           
             'titleSize': titleSize,                                                        
             'labelSize': labelSize,                                                        
@@ -861,6 +938,7 @@ def main():
             'outputPath': outputFigsFolder,                                                    
             'align': 'center', 
             'barValues': True,
+            'logy': False,
             'barColor': clientColors,
             'textSize': textSize,                                                         
             'yLowLimit': 0,                                                             
@@ -868,7 +946,7 @@ def main():
             'title': "Number of Received BeaconAggregateAndProof Msgs",                             
             'xlabel': None,                                   
             'ylabel': 'Messages Received (10^6)',                                                
-            'xticks': ['L','T','N','P','Lod','U'],
+            'xticks': ['Lig','Tek','Nim','Pry','Lod','Unk'],
             'hGrids': True,                                                            
             'titleSize': titleSize,                                                        
             'labelSize': labelSize,                                                        
@@ -890,6 +968,7 @@ def main():
             'outputPath': outputFigsFolder,                                                    
             'align': 'center', 
             'barValues': True,
+            'logy': True,
             'barColor': clientColors,
             'textSize': textSize,                                                         
             'yLowLimit': 0,                                                             
@@ -897,7 +976,7 @@ def main():
             'title': "Average of Received BeaconAggregateAndProof Msgs",                             
             'xlabel': None,                                   
             'ylabel': 'Messages Received',                                                
-            'xticks': ['L','T','N','P','Lod','U'],
+            'xticks': ['Lig','Tek','Nim','Pry','Lod','Unk'],
             'hGrids': True,                                                           
             'titleSize': titleSize,                                                        
             'labelSize': labelSize,                                                        
@@ -918,6 +997,7 @@ def main():
             'outputPath': outputFigsFolder,                                                    
             'align': 'center', 
             'barValues': None,
+            'logy': False,
             'barColor': clientColors,
             'textSize': textSize,                                                         
             'yLowLimit': 0,                                                             
@@ -925,7 +1005,7 @@ def main():
             'title': "Number of Received VoluntaryExit Messages from Clients",                             
             'xlabel': None,                                   
             'ylabel': 'Messages Received',                                                
-            'xticks': ['L','T','N','P','Lod','U'],
+            'xticks': ['Lig','Tek','Nim','Pry','Lod','Unk'],
             'hGrids': True,                                                            
             'titleSize': titleSize,                                                        
             'labelSize': labelSize,                                                        
@@ -947,6 +1027,7 @@ def main():
             'outputPath': outputFigsFolder,                                                    
             'align': 'center', 
             'barValues': None,
+            'logy': False,
             'barColor': clientColors,
             'textSize': textSize,                                                         
             'yLowLimit': 0,                                                             
@@ -954,7 +1035,7 @@ def main():
             'title': "Average of Received VoluntaryExit Messages from Clients",                             
             'xlabel': None,                                   
             'ylabel': 'Messages Received',                                                
-            'xticks': ['L','T','N','P','Lod','U'],
+            'xticks': ['Lig','Tek','Nim','Pry','Lod','Unk'],
             'hGrids': True,                                                            
             'titleSize': titleSize,                                                        
             'labelSize': labelSize,                                                        
@@ -975,6 +1056,7 @@ def main():
             'outputPath': outputFigsFolder,                                                    
             'align': 'center', 
             'barValues': None,
+            'logy': False,
             'barColor': clientColors,
             'textSize': textSize,                                                         
             'yLowLimit': 0,                                                             
@@ -982,7 +1064,7 @@ def main():
             'title': "Number of Received AttesterSlashing Messages from Clients",                             
             'xlabel': None,                                   
             'ylabel': 'Messages Received',                                                
-            'xticks': ['L','T','N','P','Lod','U'], 
+            'xticks': ['Lig','Tek','Nim','Pry','Lod','Unk'], 
             'hGrids': True,                                                           
             'titleSize': titleSize,                                                        
             'labelSize': labelSize,                                                        
@@ -1004,6 +1086,7 @@ def main():
             'outputPath': outputFigsFolder,                                                    
             'align': 'center', 
             'barValues': None,
+            'logy': False,
             'barColor': clientColors,
             'textSize': textSize,                                                         
             'yLowLimit': 0,                                                             
@@ -1011,7 +1094,7 @@ def main():
             'title': "Average of Received AttesterSlashing Messages from Clients",                             
             'xlabel': None,                                   
             'ylabel': 'Messages Received',                                                
-            'xticks': ['L','T','N','P','Lod','U'],
+            'xticks': ['Lig','Tek','Nim','Pry','Lod','Unk'],
             'hGrids': True,                                                            
             'titleSize': titleSize,                                                        
             'labelSize': labelSize,                                                        
@@ -1035,11 +1118,12 @@ def main():
             'barColor': clientColors,
             'textSize': textSize,                                                         
             'yLowLimit': 0,                                                             
-            'yUpperLimit': None,                                                        
+            'yUpperLimit': None, 
+            'logy': False,                                                       
             'title': "Number of Received ProposerSlashing Messages from Clients",                             
             'xlabel': None,                                   
             'ylabel': 'Messages Received',                                                
-            'xticks': ['L','T','N','P','Lod','U'], 
+            'xticks': ['Lig','Tek','Nim','Pry','Lod','Unk'], 
             'hGrids': True,                                                           
             'titleSize': titleSize,                                                        
             'labelSize': labelSize,                                                        
@@ -1061,6 +1145,7 @@ def main():
             'outputPath': outputFigsFolder,                                                    
             'align': 'center', 
             'barValues': None,
+            'logy': False,
             'barColor': clientColors,
             'textSize': textSize,                                                         
             'yLowLimit': 0,                                                             
@@ -1068,7 +1153,7 @@ def main():
             'title': "Average of Received ProposerSlashing Messages",                             
             'xlabel': None,                                   
             'ylabel': 'Messages Received',                                                
-            'xticks': ['L','T','N','P','Lod','U'], 
+            'xticks': ['Lig','Tek','Nim','Pry','Lod','Unk'], 
             'hGrids': True,                                                           
             'titleSize': titleSize,                                                        
             'labelSize': labelSize,                                                        
@@ -1080,14 +1165,14 @@ def main():
             'show': False}) 
 
 
-
         # Plotting from the panda
         barColor = 'black'
-        plotBarsFromPandas(rumorMetricsPanda, pdf, opts={                                   
+        plotFromPandas(rumorMetricsPanda, pdf, opts={                                   
             'figSize': figSize,                                                      
             'figTitle': 'ConnectionsWithPeers.png',
             'pdf': pdfFile,                                     
             'outputPath': outputFigsFolder,
+            'kind': None,
             'legend': False,                                         
             'align': 'center',
             'ylog': False,
@@ -1100,7 +1185,8 @@ def main():
             'title': "Number of Connections with each Peer",                  
             'xlabel': "Peers Connected",                                                         
             'ylabel': 'Number of Connections',                                      
-            'xticks': None,                                                       
+            'xticks': None,     
+            'lw': 3,                                                  
             'titleSize': titleSize+4,                                                        
             'labelSize': labelSize+4,                                                        
             'lengendPosition': 1,                                                   
@@ -1111,11 +1197,12 @@ def main():
             'show': False}) 
 
         barColor = 'black'
-        plotBarsFromPandas(rumorMetricsPanda, pdf, opts={                                   
+        plotFromPandas(rumorMetricsPanda, pdf, opts={                                   
             'figSize': figSize,                                                   
             'figTitle': 'DisconnectionsWithPeers.png',
             'pdf': pdfFile,                                     
             'outputPath': outputFigsFolder,
+            'kind': None,
             'legend': False,                                         
             'align': 'center',
             'ylog': False,
@@ -1128,7 +1215,8 @@ def main():
             'title': "Number of Disconnections with each Peer",                  
             'xlabel': "Peers Connected",                                                         
             'ylabel': 'Number of Disconnections',                                      
-            'xticks': None,                                                       
+            'xticks': None,     
+            'lw': 3,                                                  
             'titleSize': titleSize+4,                                                        
             'labelSize': labelSize+4,                                                        
             'lengendPosition': 1,                                                   
@@ -1139,11 +1227,12 @@ def main():
             'show': False}) 
 
         barColor = 'black'
-        plotBarsFromPandas(rumorMetricsPanda, pdf, opts={                                   
+        plotFromPandas(rumorMetricsPanda, pdf, opts={                                   
             'figSize': figSize,                                                      
             'figTitle': 'TimeConnectedWithPeers.png', 
             'pdf': pdfFile,                                    
             'outputPath': outputFigsFolder,
+            'kind': None,
             'legend': False,                                         
             'align': 'center',
             'ylog': True,
@@ -1156,7 +1245,8 @@ def main():
             'title': "Total of Time Connected with each Peer",                  
             'xlabel': "Peers Connected",                                                         
             'ylabel': 'Time (in Minutes)',                                      
-            'xticks': None,                                                       
+            'xticks': None,     
+            'lw': 3,                                                  
             'titleSize': titleSize+4,                                                        
             'labelSize': labelSize+4,                                                        
             'lengendPosition': 1,                                                   
@@ -1170,11 +1260,12 @@ def main():
 
         print("Peer with highest RTT", rumorMetricsPanda.loc[rumorMetricsPanda['Latency'].idxmax()])
 
-        plotBarsFromPandas(rumorMetricsPanda, pdf, opts={                                   
+        plotFromPandas(rumorMetricsPanda, pdf, opts={                                   
             'figSize': figSize,                                                      
             'figTitle': 'RTTWithPeers.png', 
             'pdf': pdfFile,                                    
             'outputPath': outputFigsFolder,
+            'kind': None,
             'legend': False,                                         
             'align': 'center',
             'ylog': True,
@@ -1187,7 +1278,8 @@ def main():
             'title': "RTT with each Peer",                  
             'xlabel': "Peers Connected",                                                         
             'ylabel': 'Seconds',                                      
-            'xticks': None,                                                       
+            'xticks': None,   
+            'lw': 3,                                                    
             'titleSize': titleSize +2,                                                        
             'labelSize': labelSize +2,                                                        
             'lengendPosition': 1,                                                   
@@ -1262,8 +1354,8 @@ def main():
         auxPanda = rumorMetricsPanda.sort_values(by='Beacon Blocks', ascending=True)
         cont = 0
 
-        #auxrow = rumorMetricsPanda.loc[rumorMetricsPanda['Connected Time'].idxmax()]
-        #maxX = auxrow['Connected Time']
+        auxrow = rumorMetricsPanda.loc[rumorMetricsPanda['Total Messages'].idxmax()]
+        print(auxrow)
         
         
         plotColumn(rumorMetricsPanda, pdf, opts={
