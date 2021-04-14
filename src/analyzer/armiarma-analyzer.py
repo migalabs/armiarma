@@ -41,7 +41,7 @@ def plotFromPandas(panda, pdf, opts):
 
     if opts['xmetrics'] != None:
         if opts['kind'] != None:
-            ax = panda[opts['xmetrics']].sort_values(by=opts['xmetrics'], ascending=False).plot(kind=opts['kind'], figsize=opts['figSize'], logy=opts['ylog'], legend=opts['legend'], color=opts['barColor'], use_index=False) 
+            ax = panda[opts['xmetrics']].sort_values(by=opts['xmetrics'], ascending=False).plot(style=opts['kind'], figsize=opts['figSize'], logy=opts['ylog'], legend=opts['legend'], color=opts['barColor'], use_index=False) 
         else:
             ax = panda[opts['xmetrics']].sort_values(by=opts['xmetrics'], ascending=False).plot(figsize=opts['figSize'], logy=opts['ylog'], lw=opts['lw'], legend=opts['legend'], color=opts['barColor'], use_index=False)
     
@@ -1172,7 +1172,7 @@ def main():
             'figTitle': 'ConnectionsWithPeers.png',
             'pdf': pdfFile,                                     
             'outputPath': outputFigsFolder,
-            'kind': None,
+            'kind': 'o',
             'legend': False,                                         
             'align': 'center',
             'ylog': False,
@@ -1202,7 +1202,7 @@ def main():
             'figTitle': 'DisconnectionsWithPeers.png',
             'pdf': pdfFile,                                     
             'outputPath': outputFigsFolder,
-            'kind': None,
+            'kind': 'o',
             'legend': False,                                         
             'align': 'center',
             'ylog': False,
@@ -1232,7 +1232,7 @@ def main():
             'figTitle': 'TimeConnectedWithPeers.png', 
             'pdf': pdfFile,                                    
             'outputPath': outputFigsFolder,
-            'kind': None,
+            'kind':  'o',
             'legend': False,                                         
             'align': 'center',
             'ylog': True,
@@ -1265,10 +1265,10 @@ def main():
             'figTitle': 'RTTWithPeers.png', 
             'pdf': pdfFile,                                    
             'outputPath': outputFigsFolder,
-            'kind': None,
+            'kind': 'o',
             'legend': False,                                         
             'align': 'center',
-            'ylog': True,
+            'ylog': None,
             'xmetrics': ['Latency'],                                                      
             'barValues': None,   
             'barColor': barColor,                                               
