@@ -51,7 +51,7 @@ armiarma: include export_metrics.rumor
 
 armiarma: include connectall.rumor
 
-sleep 5m
+#sleep 5m
 
 #armiarma: include serve_blocks.rumor
 
@@ -63,11 +63,19 @@ then
 fi
 
 #armiarma: include visualizer.rumor
-
-# Generate and endless loop to keep the Rumor script alive
-
-while :
-do
-	echo "Press [CTRL+C] to stop.."
-	sleep 15s
-done
+echo "$timeRange minutes"
+# Check if a given execution time has been given
+if [[ -z "$timeRange" ]]
+then
+	echo "No time has been assigned" 
+	# Generate and endless loop to keep the Rumor script alive
+	while :
+	do
+		echo "Press [CTRL+C] to stop.." 
+		sleep 15s
+	done
+else
+	echo "Running the crawler for $timeRange minutes" 
+	sleep "${timeRange}m"
+	exit 0
+fi

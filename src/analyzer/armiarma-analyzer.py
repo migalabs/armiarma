@@ -481,7 +481,7 @@ def main():
 
     print('Number of clients with the TPC port at 1300:', cntU)
     print()
-    print('percentage of "Prysm" peers from the peerstore:', (cntU*100)/len(peerstore))
+    print('percentage of "Prysm" peers from the peerstore:', round((cntU*100)/len(peerstore),2))
 
     ff.close()
 
@@ -513,9 +513,9 @@ def main():
         percAcumulated = percAcumulated + item
         if itemsCounter > (len(messagePercentageArray) * 0.1): # to see how many messages send the 10% of the peers 
             peerPerc = itemsCounter / len(messagePercentageArray)
-            print( peerPerc*100, "% of peers send the ", percAcumulated*100,"% of the messages")
+            print( round(peerPerc*100,2), "% of peers send the ", round(percAcumulated*100,2), "% of the messages")
             restPeers = len(messagePercentageArray) - itemsCounter
-            print((restPeers/len(messagePercentageArray))*100, "% of the peers send less than", item*totalMessageCounter, "number of messages")
+            print(round((restPeers/len(messagePercentageArray))*100,2), "% of the peers send less than", item*totalMessageCounter, "number of messages")
             break
 
     percAcumulated = 0
@@ -525,9 +525,9 @@ def main():
         percAcumulated = percAcumulated + item
         if percAcumulated > 0.89:
             peerPerc = itemsCounter / len(messagePercentageArray)
-            print(peerPerc, "% of peers send the ", percAcumulated*100,"% of the messages")
+            print(round(peerPerc,2), "% of peers send the ", round(percAcumulated*100,2),"% of the messages")
             restPeers = len(messagePercentageArray) - itemsCounter
-            print((restPeers/len(messagePercentageArray))*100, "% of the peers send less than", item*totalMessageCounter, "number of messages")
+            print(round((restPeers/len(messagePercentageArray))*100,2), "% of the peers send less than", item*totalMessageCounter, "number of messages")
             break
     print()
     print()
@@ -558,9 +558,9 @@ def main():
         percAcumulated = percAcumulated + item
         if itemsCounter > (len(messagePercentageArray) * 0.1): # to see how many messages send the 10% of the peers 
             peerPerc = itemsCounter / len(messagePercentageArray)
-            print( peerPerc*100, "% of peers send the ", percAcumulated*100,"% of the blocks")
+            print( round(peerPerc*100,2), "% of peers send the ", round(percAcumulated*100,2),"% of the blocks")
             restPeers = len(messagePercentageArray) - itemsCounter
-            print((restPeers/len(messagePercentageArray))*100, "% of the peers send less than", item*totalBlockCounter, "number of blocks")
+            print(round((restPeers/len(messagePercentageArray))*100,2), "% of the peers send less than", item*totalBlockCounter, "number of blocks")
             break
 
     percAcumulated = 0
@@ -570,9 +570,9 @@ def main():
         percAcumulated = percAcumulated + item
         if percAcumulated > 0.89:
             peerPerc = itemsCounter / len(messagePercentageArray)
-            print(peerPerc, "% of peers send the ", percAcumulated*100,"% of the blocks")
+            print(round(peerPerc*100,2), "% of peers send the ", round(percAcumulated*100,2),"% of the blocks")
             restPeers = len(messagePercentageArray) - itemsCounter
-            print((restPeers/len(messagePercentageArray))*100, "% of the peers send less than", item*totalBlockCounter, "number of blocks")
+            print(round((restPeers/len(messagePercentageArray))*100,2), "% of the peers send less than", item*totalBlockCounter, "number of blocks")
             break
     print()
     print()

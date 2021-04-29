@@ -341,10 +341,12 @@ func getIpAndLocationFromAddrs(multiAddrs string) (ip string, country string, ci
 
 	// Check if the status of the request has been succesful
 	if ipApiResp.Status != "success" {
+		/*
 		fmt.Println("Error with the received response status,", ipApiResp.Status)
 		if ipApiResp.Query == ip {
 			fmt.Println("The given IP of the peer is private")
 		}
+		*/
 		country = "Unknown"
 		city = "Unknown"
 		return ip, country, city

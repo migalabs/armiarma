@@ -62,7 +62,7 @@ func (c *TopicLogCmd) Run(ctx context.Context, args ...string) error {
 				defer sub.Cancel()
 				for {
 					msg, err := sub.Next(ctx)
-					fmt.Println("New Message, ID:", msg.MessageID)
+					//fmt.Println("New Message, ID:", msg.MessageID)
 					if err != nil {
 						if err == ctx.Err() { // expected quit, context stopped.
 							break

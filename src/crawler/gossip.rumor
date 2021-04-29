@@ -34,7 +34,7 @@ then
 else
     mkdir "$msgDBpath" 
 fi
-gossip message-db --temp-msg-limit=300 --store-path="$msgDBpath"
+#gossip message-db --temp-msg-limit=300 --store-path="$msgDBpath"
 
 # Join the topic, new versions of Rumor includes Mainnet fork-digest and snappy encoding as default
 gossip topic join --eth-topic="$blocks_topic" --fork-version="$gossip_fork"
