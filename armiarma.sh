@@ -368,7 +368,6 @@ while getopts ":hcpfdt" option; do
                 echo "Mainnet network selected"
                 # source the config file for the Eth2 Mainnet network
                 source ./networks/mainnet/config.sh
-                rumorFlag=$((rumorFlag+1))
                 executableNetwork="mainnet-launcher.rumor"
             else
                 echo "Invalid newtork."
@@ -377,58 +376,54 @@ while getopts ":hcpfdt" option; do
                 exit 1
             fi
 
-            # Check if rumor flag has been activated to Run/compiled Rumor
-            if [[ $rumorFlag -eq 1 ]]
-            then     
-                # Switch to the crawler folder where the ".rumor" files are located
-                #cd ./src/crawler
-                
-                # Generate the full-path for the metrics folder
-                metricsFolder="${folderPath}/examples/${folderName}"
-                echo "Getting the env ready"
-                mkdir $metricsFolder
+            # Switch to the crawler folder where the ".rumor" files are located
+            #cd ./src/crawler
             
-                # Make a temporary copy of the config.sh file on the new folder
-                echo "Generating the config.sh"
-                cp "./networks/${networkName}/config.sh" "./examples/${folderName}"
-                
-                # Move to the example folder
-                cd "./examples/${folderName}"
+            # Generate the full-path for the metrics folder
+            metricsFolder="${folderPath}/examples/${folderName}"
+            echo "Getting the env ready"
+            mkdir $metricsFolder
+        
+            # Make a temporary copy of the config.sh file on the new folder
+            echo "Generating the config.sh"
+            cp "./networks/${networkName}/config.sh" "./examples/${folderName}"
+            
+            # Move to the example folder
+            cd "./examples/${folderName}"
 
-                # Append the bash env variables to the temp file
-                echo "metricsFolder=\"${metricsFolder}\"" >> config.sh
-                echo "armiarmaPath=\"${folderPath}\"" >> config.sh
+            # Append the bash env variables to the temp file
+            echo "metricsFolder=\"${metricsFolder}\"" >> config.sh
+            echo "armiarmaPath=\"${folderPath}\"" >> config.sh
 
-                if [[ -z  "$4" ]]
-                then
-                    echo "time range has not been assigned"
-                else    
-                    timeRange="$4"
-                    echo "Time range: $timeRange mins"
-                    echo "timeRange=\"${timeRange}\"" >> config.sh
-                fi
-
-                cd $metricsFolder
-                TouchLauncher "$folderName"
-                
-                echo ""
-                echo "Executing file $executableNetwork"
-                echo "Exporting metrics at $metricsFolder"
-                echo ""
-
-                # Finaly launch Rumor form the Network File (showing the logs on terminal mode)
-                ../../src/bin/armiarma file launcher.rumor --formatter="terminal" --level="error"
-                # Check if the compilation has been successful
-                exec_error="$?"
-                if [[ "$exec_error" -ne "0" ]]
-                then
-                    echo " Error, somethign went wrong, Exit status $exec_error"
-                    exit 1
-                else
-                    echo "Armiarma Successfully Worked!"
-                fi
+            if [[ -z  "$4" ]]
+            then
+                echo "time range has not been assigned"
+            else    
+                timeRange="$4"
+                echo "Time range: $timeRange mins"
+                echo "timeRange=\"${timeRange}\"" >> config.sh
             fi
 
+            cd $metricsFolder
+            TouchLauncher "$folderName"
+            
+            echo ""
+            echo "Executing file $executableNetwork"
+            echo "Exporting metrics at $metricsFolder"
+            echo ""
+
+            # Finaly launch Rumor form the Network File (showing the logs on terminal mode)
+            ../../src/bin/armiarma file launcher.rumor --formatter="terminal" --level="error"
+            # Check if the compilation has been successful
+            exec_error="$?"
+            if [[ "$exec_error" -ne "0" ]]
+            then
+                echo " Error, somethign went wrong, Exit status $exec_error"
+                exit 1
+            else
+                echo "Armiarma Successfully Worked!"
+            fi
+            
             ## ---- END OF CRAWLER ----
             
             cd "$folderPath"
@@ -482,13 +477,20 @@ while getopts ":hcpfdt" option; do
 
         t) 
             echo "testing internet connection"
-            sleep 30
+            sleep 5
             ping -c 4 google.com 
             echo "Working or not?"
+            cd src
+            echo "testing Rumor"
+            ./bin/armiarma file crawler/test.rumor --formatter="terminal" --level="info"
+            echo "end test of Rumor"
+            echo "testing python env"
+            python3 analyzer/python-env-test.py
+            echo "end python env test"
             echo "{ \"deterministic-output-path\" : \"/iexec_out/$folderName\" }" > "${IEXEC_OUT}/computed.json"
             exit;;
 
-        \?)         # incorrect option
+        \?) # incorrect option
             echo "Invalid option"
             echo
             Help

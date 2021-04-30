@@ -2,16 +2,12 @@
 # Script that ussing the rumor-metrics.py package generates the plots
 
 import os, sys
-import json 
-import time
-import math
+import json
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 from matplotlib.backends.backend_pdf import PdfPages
-from pathlib import Path
 import numpy as np
-import datetime
 import collections
 
 def getDictFromJson(inputFile):

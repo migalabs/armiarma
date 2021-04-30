@@ -1,0 +1,6 @@
+# To keep the image of the tool clean, we will ignore the example folder
+./examples
+LICENSE
+README.md
+.git 
+.gitignore
