@@ -466,7 +466,6 @@ while getopts ":hcpfdts" option; do
                 mkdir "examples/${folderName}/plots"
             fi
 
-            : '
             # Run the Analyzer
             echo "  Launching analyzer"
             echo ""
@@ -480,7 +479,7 @@ while getopts ":hcpfdts" option; do
 
             echo "Exporting results to $IEXEC_OUT"
             cp -r "${folderName}/plots" "$IEXEC_OUT"
-            '
+            
             
             # Generate the proof of computation
             echo "{ \"deterministic-output-path\" : \"/iexec_out/$folderName\" }" > "${IEXEC_OUT}/computed.json"
