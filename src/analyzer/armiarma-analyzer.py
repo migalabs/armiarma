@@ -441,7 +441,6 @@ def main():
     rumorMetricsPanda = pd.read_csv(csvFile)
 
 
-
     # ---------- PLOT SECUENCE -----------
 
     # ------ Get data for plotting -------
@@ -829,13 +828,13 @@ def main():
                 yarray.append(round((auxCnt/(len(auxAmount[auxAmount == True].index))),1))
             else:
                 yarray.append(0)
-        """
-        print("len of the connected peers:", len(rumorMetricsPanda))
-        print("Number of peers with 0 RTT:", contador)
-        print("Number of Prysm clients with 0 RTT:", prysmCnt )
-        print("Number of Prysm clients with lat != 0:", prysmTCnt)
-        print("number of peers with more than 1 sec of RTT", latAuxArray)
-        """
+        
+        #print("len of the connected peers:", len(rumorMetricsPanda))
+        #print("Number of peers with 0 RTT:", contador)
+        #print("Number of Prysm clients with 0 RTT:", prysmCnt )
+        #print("Number of Prysm clients with lat != 0:", prysmTCnt)
+        #print("number of peers with more than 1 sec of RTT", latAuxArray)
+        
 
         plotBarsFromArrays(xarray, yarray, pdf, opts={                                            
             'figSize': figSize,                                                          
@@ -1398,4 +1397,5 @@ def main():
     print("Succesfully Analyzed!")
 
 if __name__ == '__main__':
+    #print("Hello World, seems that the precompilation of the code compiled?!?!?!?!?")
     main()
