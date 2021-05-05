@@ -159,6 +159,8 @@ LaunchCrawler(){
             TouchLauncher "$folderName"
         fi
         
+        cd $metricsFolder
+
         echo ""
         echo "Executing file $executableNetwork"
         echo "Exporting metrics at $metricsFolder"
@@ -280,7 +282,7 @@ if [[ -z "$1" ]]; then
     exit 1
 fi
 
-while getopts ":hcpfdt" option; do
+while getopts ":hcpfdts" option; do
     case $option in
         h)  # display Help
             Help
@@ -382,30 +384,41 @@ while getopts ":hcpfdt" option; do
             # Generate the full-path for the metrics folder
             metricsFolder="${folderPath}/examples/${folderName}"
             echo "Getting the env ready"
-            mkdir $metricsFolder
-        
-            # Make a temporary copy of the config.sh file on the new folder
-            echo "Generating the config.sh"
-            cp "./networks/${networkName}/config.sh" "./examples/${folderName}"
+
+            # Check if the directory already exists 
+            if [[ -d $metricsFolder ]]; then
+                echo
+                echo "Project with name $folderName already exist" >&2
+                echo "Loading Project"
+                echo 
+                cd $metricsFolder
+            else
+                echo "Getting the env ready"
+                mkdir $metricsFolder
             
-            # Move to the example folder
-            cd "./examples/${folderName}"
+                # Make a temporary copy of the config.sh file on the new folder
+                echo "Generating the config.sh"
+                cp "./networks/${networkName}/config.sh" "./examples/${folderName}"
+                
+                # Move to the example folder
+                cd "./examples/${folderName}"
 
-            # Append the bash env variables to the temp file
-            echo "metricsFolder=\"${metricsFolder}\"" >> config.sh
-            echo "armiarmaPath=\"${folderPath}\"" >> config.sh
+                # Append the bash env variables to the temp file
+                echo "metricsFolder=\"${metricsFolder}\"" >> config.sh
+                echo "armiarmaPath=\"${folderPath}\"" >> config.sh
 
-            if [[ -z  "$4" ]]
-            then
-                echo "time range has not been assigned"
-            else    
-                timeRange="$4"
-                echo "Time range: $timeRange mins"
-                echo "timeRange=\"${timeRange}\"" >> config.sh
+                if [[ -z  "$4" ]]
+                then
+                    echo "time range has not been assigned"
+                else    
+                    timeRange="$4"
+                    echo "Time range: $timeRange mins"
+                    echo "timeRange=\"${timeRange}\"" >> config.sh
+                fi
+
+                cd $metricsFolder
+                TouchLauncher "$folderName"
             fi
-
-            cd $metricsFolder
-            TouchLauncher "$folderName"
             
             echo ""
             echo "Executing file $executableNetwork"
@@ -414,6 +427,7 @@ while getopts ":hcpfdt" option; do
 
             # Finaly launch Rumor form the Network File (showing the logs on terminal mode)
             ../../src/bin/armiarma file launcher.rumor --formatter="terminal" --level="error"
+
             # Check if the compilation has been successful
             exec_error="$?"
             if [[ "$exec_error" -ne "0" ]]
@@ -430,7 +444,8 @@ while getopts ":hcpfdt" option; do
 
             ls -l "./examples/${folderName}"
             ls -l "./examples/${folderName}/metrics"
-
+            
+            
             ## ---- ANALYZER LAUNCH ----
             echo "Calling the Analyzer"
 
@@ -439,8 +454,6 @@ while getopts ":hcpfdt" option; do
             echo ""
             
             # Since we are launching it from a Docker, no need for a VENV
-
-            # -- END TEMP --
 
             # Set the Paths for the gossip-metrics.json peerstore.json and output
             csv="${folderPath}/examples/${folderName}/metrics/metrics.csv"
@@ -453,6 +466,7 @@ while getopts ":hcpfdt" option; do
                 mkdir "examples/${folderName}/plots"
             fi
 
+            : '
             # Run the Analyzer
             echo "  Launching analyzer"
             echo ""
@@ -466,6 +480,8 @@ while getopts ":hcpfdt" option; do
 
             echo "Exporting results to $IEXEC_OUT"
             cp -r "${folderName}/plots" "$IEXEC_OUT"
+            '
+            
             # Generate the proof of computation
             echo "{ \"deterministic-output-path\" : \"/iexec_out/$folderName\" }" > "${IEXEC_OUT}/computed.json"
 
@@ -475,19 +491,46 @@ while getopts ":hcpfdt" option; do
             echo "Exit KUMO execution"
             exit;;
 
-        t) 
+        t)  # Test flag, testing the environment to check if everything is working fine
             echo "testing internet connection"
             sleep 5
             ping -c 4 google.com 
             echo "Working or not?"
             cd src
+            echo ""
+
+            # Test is the shell environment actually works
+            echo "testing shell environment"
+            for i in {1..10..1}
+            do
+                echo "printing test test/$i"
+            done
+
             echo "testing Rumor"
-            ./bin/armiarma file crawler/test.rumor --formatter="terminal" --level="info"
+            ./bin/armiarma file crawler/iexec_test.rumor --formatter="terminal" --level="info"
             echo "end test of Rumor"
+            echo ""
             echo "testing python env"
             python3 analyzer/python-env-test.py
             echo "end python env test"
+            echo ""
             echo "{ \"deterministic-output-path\" : \"/iexec_out/$folderName\" }" > "${IEXEC_OUT}/computed.json"
+            exit;;
+
+        s)  # Test the analyzer part in the iexec platform
+
+            echo "  Launching analyzer"
+            echo ""
+
+            #csv="${IEXEC_IN}/${IEXEC_INPUT_FILE_NAME_1}"
+            #peerstore="${IEXEC_IN}/${IEXEC_INPUT_FILE_NAME_2}"
+            #plots="${IEXEC_OUT}"
+            #python3 ./src/analyzer/armiarma-analyzer.py "$csv" "$peerstore" "$plots"            
+            python3 ./src/analyzer/armiarma-analyzer.py
+
+            echo ""
+
+            echo "Analyzer Finished!"
             exit;;
 
         \?) # incorrect option
