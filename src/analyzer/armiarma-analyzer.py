@@ -654,6 +654,7 @@ def main():
             'legendsize': labelSize,                                                     
             'show': False})
 
+        """
         print("| {:<35}| {:<15}|".format('ClientVersion', 'NumbersPeers'))
         print("-------------------------------------------------------")
         for idx, item in enumerate(clientList):
@@ -664,7 +665,13 @@ def main():
                 print(" -> {:<33}| {:<15}|".format(v[j], yarray[idx][j]))
             print("-------------------------------------------------------")
 
-
+        """
+        print('ClientVersion, NumbersPeers')
+        for idx, item in enumerate(clientList):
+            print(item, ",", clientCounter[idx])
+            v = types[idx]
+            for j, n in enumerate(v):
+                print(v[j], ",", yarray[idx][j])
 
         # get the number of peers per country 
         countriesList = getItemsFromColumn(rumorMetricsPanda, 'Country') 
@@ -1349,8 +1356,8 @@ def main():
         auxPanda = rumorMetricsPanda.sort_values(by='Beacon Blocks', ascending=True)
         cont = 0
 
-        auxrow = rumorMetricsPanda.loc[rumorMetricsPanda['Total Messages'].idxmax()]
-        print(auxrow)
+        #auxrow = rumorMetricsPanda.loc[rumorMetricsPanda['Total Messages'].idxmax()]
+        #print(auxrow)
         
         
         plotColumn(rumorMetricsPanda, pdf, opts={
