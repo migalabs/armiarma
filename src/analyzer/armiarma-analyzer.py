@@ -1397,5 +1397,4 @@ def main():
     print("Succesfully Analyzed!")
 
 if __name__ == '__main__':
-    #print("Hello World, seems that the precompilation of the code compiled?!?!?!?!?")
     main()

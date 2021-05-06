@@ -442,9 +442,7 @@ while getopts ":hcpfdts" option; do
             
             cd "$folderPath"
 
-            ls -l "./examples/${folderName}"
             ls -l "./examples/${folderName}/metrics"
-            
             
             ## ---- ANALYZER LAUNCH ----
             echo "Calling the Analyzer"
@@ -478,18 +476,18 @@ while getopts ":hcpfdts" option; do
             cd "${folderPath}/examples"
 
             echo "Exporting results to $IEXEC_OUT"
-            cp -r "${folderName}/plots" "$IEXEC_OUT"
+            cp -r "${folderName}/plots/MetricsSummary.pdf" "${IEXEC_OUT}"
             
             
             # Generate the proof of computation
-            echo "{ \"deterministic-output-path\" : \"/iexec_out/$folderName\" }" > "${IEXEC_OUT}/computed.json"
+            echo "{ \"deterministic-output-path\" : \"/iexec_out/MetricsSummary.pdf\" }" > "${IEXEC_OUT}/computed.json"
 
             
             ls -l $IEXEC_OUT
             
             echo "Exit KUMO execution"
             exit;;
-
+        
         t)  # Test flag, testing the environment to check if everything is working fine
             echo "testing internet connection"
             sleep 5
@@ -509,29 +507,35 @@ while getopts ":hcpfdts" option; do
             ./bin/armiarma file crawler/iexec_test.rumor --formatter="terminal" --level="info"
             echo "end test of Rumor"
             echo ""
+
+            echo "Copying the results"
+            cp -r metrics/ "${IEXEC_OUT}/metrics/"
+
             echo "testing python env"
             python3 analyzer/python-env-test.py
             echo "end python env test"
             echo ""
-            echo "{ \"deterministic-output-path\" : \"/iexec_out/$folderName\" }" > "${IEXEC_OUT}/computed.json"
+            echo "{ \"deterministic-output-path\" : \"/iexec_out/metrics/\" }" > "${IEXEC_OUT}/computed.json"
             exit;;
 
         s)  # Test the analyzer part in the iexec platform
 
             echo "  Launching analyzer"
+            echo "$PWD"
+
+            csv="${IEXEC_IN}/${IEXEC_INPUT_FILE_NAME_1}"
+            peerstore="${IEXEC_IN}/${IEXEC_INPUT_FILE_NAME_2}"
+            plots="${IEXEC_OUT}/plots"
+
+            mkdir "${IEXEC_OUT}/plots/"
+            python3 ./src/analyzer/armiarma-analyzer.py "$csv" "$peerstore" "$plots"            
+            #python3 ./src/analyzer/python-test.py 
+
             echo ""
-
-            #csv="${IEXEC_IN}/${IEXEC_INPUT_FILE_NAME_1}"
-            #peerstore="${IEXEC_IN}/${IEXEC_INPUT_FILE_NAME_2}"
-            #plots="${IEXEC_OUT}"
-            #python3 ./src/analyzer/armiarma-analyzer.py "$csv" "$peerstore" "$plots"            
-            python3 ./src/analyzer/armiarma-analyzer.py
-
-            echo ""
-
+            echo "{ \"deterministic-output-path\" : \"/iexec_out/plots/\" }" > "${IEXEC_OUT}/computed.json"
             echo "Analyzer Finished!"
             exit;;
-
+        
         \?) # incorrect option
             echo "Invalid option"
             echo
