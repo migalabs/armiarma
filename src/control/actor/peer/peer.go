@@ -6,6 +6,7 @@ import (
 	"github.com/protolambda/rumor/control/actor/base"
 	"github.com/protolambda/rumor/control/actor/peer/metadata"
 	"github.com/protolambda/rumor/control/actor/peer/status"
+	"github.com/protolambda/rumor/metrics"
 	trackcmd "github.com/protolambda/rumor/control/actor/peer/track"
 	"github.com/protolambda/rumor/p2p/track"
 )
@@ -15,6 +16,7 @@ type PeerCmd struct {
 	*status.PeerStatusState
 	*metadata.PeerMetadataState
 	Store track.ExtendedPeerstore
+	*metrics.GossipMetrics
 }
 
 func (c *PeerCmd) Cmd(route string) (cmd interface{}, err error) {
@@ -28,6 +30,8 @@ func (c *PeerCmd) Cmd(route string) (cmd interface{}, err error) {
 		cmd = &PeerDisconnectCmd{Base: c.Base}
 	case "connectall":
 		cmd = &PeerConnectAllCmd{Base: c.Base, Store: c.Store}
+	case "connect-random":
+		cmd = &PeerConnectRandomCmd{Base: c.Base, Store: c.Store, GossipMetrics: c.GossipMetrics}
 	case "protect":
 		cmd = &PeerProtectCmd{Base: c.Base}
 	case "unprotect":
@@ -57,7 +61,7 @@ func (c *PeerCmd) Cmd(route string) (cmd interface{}, err error) {
 }
 
 func (c *PeerCmd) Routes() []string {
-	return []string{"connect", "disconnect", "connectall", "protect", "unprotect", "add", "trim",
+	return []string{"connect", "disconnect", "connectall", "connect-random", "protect", "unprotect", "add", "trim",
 		"list", "info", "identify", "track", "addrs", "status", "metadata"}
 }
 

@@ -49,16 +49,17 @@ armiarma: include dv5.rumor
 
 armiarma: include export_metrics.rumor
 
-armiarma: include connectall.rumor
-
+#armiarma: include connectall.rumor
+armiarma: include random-connect.rumor
+echo "::::::: After Random-connect"
 #sleep 5m
 
 #armiarma: include serve_blocks.rumor
 
-comp_error="$?"
-if [[ "$comp_error" -ne "0" ]]
+error="$?"
+if [[ "$error" -ne "0" ]]
 then
-    echo " Error Launching serve blocks"
+    echo " Error Launching random connector"
     exit 1
 fi
 

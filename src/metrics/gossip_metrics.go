@@ -22,6 +22,7 @@ import (
 
 type GossipMetrics struct {
 	GossipMetrics sync.Map
+	ExtraMetrics ExtraMetrics
 	MessageDatabase *database.MessageDatabase
 	StartTime     int64 // milliseconds
 }
@@ -255,7 +256,7 @@ func (c *GossipMetrics) FillMetrics(ep track.ExtendedPeerstore) {
 }
 
 // Function that Exports the entire Metrics to a .json file (lets see if in the future we can add websockets or other implementations)
-func (c *GossipMetrics) ExportMetrics(filePath string, peerstorePath string, csvPath string, ep track.ExtendedPeerstore) error {
+func (c *GossipMetrics) ExportMetrics(filePath string, peerstorePath string, csvPath string, extraMetricsPath string, ep track.ExtendedPeerstore) error {
 	metrics, err := c.MarshalMetrics()
 	if err != nil {
 		fmt.Println("Error Marshalling the metrics")
@@ -281,6 +282,12 @@ func (c *GossipMetrics) ExportMetrics(filePath string, peerstorePath string, csv
 	err = mdf.ExportToCSV(csvPath)
 	if err != nil {
 		fmt.Printf("Error:", err)
+		return err
+	}
+	// Export the extra metrics to a csv
+	err = c.ExtraMetrics.ExportCSV(extraMetricsPath)
+	if err != nil {
+		fmt.Printf("Error exporting the Extra metrics:", err)
 		return err
 	}
 	return nil

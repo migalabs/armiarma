@@ -167,7 +167,7 @@ LaunchCrawler(){
         echo ""
 
         # Finaly launch Rumor form the Network File (showing the logs on terminal mode)
-        ../../src/bin/armiarma file launcher.rumor --formatter="terminal" --level="error"
+        ../../src/bin/armiarma file launcher.rumor --formatter="terminal" --level="info"
         # Check if the compilation has been successful
         exec_error="$?"
         if [[ "$exec_error" -ne "0" ]]

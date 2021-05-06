@@ -17,6 +17,7 @@ type TopicExportMetricsCmd struct {
 	FilePath        string `ask:"--file-path" help:"The path of the file where to export the metrics."`
 	PeerstorePath   string `ask:"--peerstore-path" help:"The path of the file where to export the peerstore."`
     CsvPath         string `ask:"--csv-file" help:"The path where the csv file will be exported"`
+    ExtraMetricsPath string `ask:"--extra-metrics-path" help:"The path to the csv file where the extra metrics will be exported"`
 }
 
 func (c *TopicExportMetricsCmd) Defaul() {
@@ -43,14 +44,14 @@ func (c *TopicExportMetricsCmd) Run(ctx context.Context, args ...string) error {
 	go func() {
 		for {
             if stopping {
-                _ =  c.GossipMetrics.ExportMetrics(c.FilePath, c.PeerstorePath, c.CsvPath, c.Store)
+                _ =  c.GossipMetrics.ExportMetrics(c.FilePath, c.PeerstorePath, c.CsvPath, c.ExtraMetricsPath, c.Store)
                 c.Log.Infof("Metrics Export Stopped")
                 return
             }
 			start := time.Now()
             c.Log.Infof("Exporting Metrics")
             c.GossipMetrics.FillMetrics(c.Store)
-	        err := c.GossipMetrics.ExportMetrics(c.FilePath, c.PeerstorePath, c.CsvPath, c.Store)
+	        err := c.GossipMetrics.ExportMetrics(c.FilePath, c.PeerstorePath, c.CsvPath, c.ExtraMetricsPath, c.Store)
             if err != nil {
                 c.Log.Infof("Problems exporting the Metrics to the given file path")
             } else {

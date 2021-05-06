@@ -666,13 +666,18 @@ def main():
             print("-------------------------------------------------------")
 
         """
+        print("")
+        print("")
+        print("-------------------------------------------------------")
         print('ClientVersion, NumbersPeers')
         for idx, item in enumerate(clientList):
             print(item, ",", clientCounter[idx])
             v = types[idx]
             for j, n in enumerate(v):
                 print(v[j], ",", yarray[idx][j])
-
+        print("-------------------------------------------------------")
+        print("")
+        print("")
         # get the number of peers per country 
         countriesList = getItemsFromColumn(rumorMetricsPanda, 'Country') 
         auxxarray, auxyarray = getDataFromPanda(rumorMetricsPanda, None, "Country", countriesList, 'counter') 
@@ -1260,7 +1265,7 @@ def main():
 
         barColor = 'black'
 
-        print("Peer with highest RTT", rumorMetricsPanda.loc[rumorMetricsPanda['Latency'].idxmax()])
+        #print("Peer with highest RTT", rumorMetricsPanda.loc[rumorMetricsPanda['Latency'].idxmax()])
 
         plotFromPandas(rumorMetricsPanda, pdf, opts={                                   
             'figSize': figSize,                                                      
