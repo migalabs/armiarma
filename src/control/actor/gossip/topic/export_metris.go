@@ -1,11 +1,12 @@
 package topic
 
 import (
-    "context"
-    "time"
+	"context"
+	"time"
+
 	"github.com/protolambda/rumor/control/actor/base"
 	"github.com/protolambda/rumor/metrics"
-    "github.com/protolambda/rumor/p2p/track"
+	"github.com/protolambda/rumor/p2p/track"
 )
 
 type TopicExportMetricsCmd struct {

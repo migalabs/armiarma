@@ -17,19 +17,19 @@ import (
 	pgossip "github.com/protolambda/rumor/p2p/gossip"
 	"github.com/protolambda/rumor/p2p/gossip/database"
 	"github.com/protolambda/rumor/p2p/track"
-//	"github.com/protolambda/zrnt/eth2/beacon"
+	//	"github.com/protolambda/zrnt/eth2/beacon"
 )
 
 type GossipMetrics struct {
-	GossipMetrics sync.Map
-	ExtraMetrics ExtraMetrics
+	GossipMetrics   sync.Map
+	ExtraMetrics    ExtraMetrics
 	MessageDatabase *database.MessageDatabase
-	StartTime     int64 // milliseconds
+	StartTime       int64 // milliseconds
 }
 
 func NewGossipMetrics() GossipMetrics {
 	gm := GossipMetrics{
-		StartTime:     GetTimeMiliseconds(),
+		StartTime: GetTimeMiliseconds(),
 	}
 	return gm
 }
@@ -169,7 +169,7 @@ func (c *GossipMetrics) MarshalPeerStore(ep track.ExtendedPeerstore) ([]byte, er
 }
 
 // Get the Real Ip Address from the multi Address list
-// TODO: Implement the Private IP filter in a better way 
+// TODO: Implement the Private IP filter in a better way
 func GetFullAddress(multiAddrs []string) string {
 	var address string
 	if len(multiAddrs) > 0 {
@@ -349,10 +349,10 @@ func getIpAndLocationFromAddrs(multiAddrs string) (ip string, country string, ci
 	// Check if the status of the request has been succesful
 	if ipApiResp.Status != "success" {
 		/*
-		fmt.Println("Error with the received response status,", ipApiResp.Status)
-		if ipApiResp.Query == ip {
-			fmt.Println("The given IP of the peer is private")
-		}
+			fmt.Println("Error with the received response status,", ipApiResp.Status)
+			if ipApiResp.Query == ip {
+				fmt.Println("The given IP of the peer is private")
+			}
 		*/
 		country = "Unknown"
 		city = "Unknown"
@@ -379,6 +379,7 @@ func getIpAndLocationFromAddrs(multiAddrs string) (ip string, country string, ci
 func (c *GossipMetrics) AddNewPeer(peerId peer.ID) {
 	_, ok := c.GossipMetrics.Load(peerId)
 	if !ok {
+		fmt.Println("Gossip-Metrics: Adding new peer to the metrics:", peerId.String())
 		// We will just add the info that we have (the peerId)
 		peerMetrics := NewPeerMetrics(peerId)
 		// Include it to the Peer DB

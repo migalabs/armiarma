@@ -167,7 +167,7 @@ LaunchCrawler(){
         echo ""
 
         # Finaly launch Rumor form the Network File (showing the logs on terminal mode)
-        ../../src/bin/armiarma file launcher.rumor --formatter="terminal" --level="info"
+        ../../src/bin/armiarma file launcher.rumor --formatter="terminal" --level="error"
         # Check if the compilation has been successful
         exec_error="$?"
         if [[ "$exec_error" -ne "0" ]]
@@ -236,6 +236,7 @@ LaunchAnalyzer(){
     # Set the Paths for the gossip-metrics.json peerstore.json and output
     csv="${folderPath}/examples/${aux}/metrics/metrics.csv"
     peerstore="${folderPath}/examples/${aux}/metrics/peerstore.json"
+    extrametrics="${folderPath}/examples/${aux}/metrics/extra-metrics.csv"
     plots="${folderPath}/examples/${aux}/plots"
 
 
@@ -248,7 +249,7 @@ LaunchAnalyzer(){
     # Run the Analyzer
     echo "  Launching analyzer"
     echo ""
-    python ./src/analyzer/armiarma-analyzer.py "$csv" "$peerstore" "$plots"
+    python ./src/analyzer/armiarma-analyzer.py "$csv" "$peerstore" "$extrametrics" "$plots"
     
     # Deactivate the VENV
     deactivate
@@ -360,7 +361,7 @@ while getopts ":hcpfdts" option; do
             echo "  Crawler selected"
             echo
             echo "  network:        $networkName"
-            echo "  metrics-folder: ${IEXEC_OUT}/$folderName"
+            echo "  metrics-folder: examples/$folderName"
             echo
             
                         
@@ -456,6 +457,7 @@ while getopts ":hcpfdts" option; do
             # Set the Paths for the gossip-metrics.json peerstore.json and output
             csv="${folderPath}/examples/${folderName}/metrics/metrics.csv"
             peerstore="${folderPath}/examples/${folderName}/metrics/peerstore.json"
+            extrametrics="${folderPath}/examples/${aux}/metrics/extra-metrics.csv"
             plots="${folderPath}/examples/${folderName}/plots"
 
             if [[ -d $plots ]]; then
@@ -467,7 +469,7 @@ while getopts ":hcpfdts" option; do
             # Run the Analyzer
             echo "  Launching analyzer"
             echo ""
-            python3 ./src/analyzer/armiarma-analyzer.py "$csv" "$peerstore" "$plots"
+            python3 ./src/analyzer/armiarma-analyzer.py "$csv" "$peerstore" "$extrametrics" "$plots"
             
             ## ---- END OF ANALYZER ----
 
@@ -476,64 +478,13 @@ while getopts ":hcpfdts" option; do
             cd "${folderPath}/examples"
 
             echo "Exporting results to $IEXEC_OUT"
-            cp -r "${folderName}/plots/MetricsSummary.pdf" "${IEXEC_OUT}"
+            cp -r "${folderName}/plots/MetricsSummary.pdf" "${IEXEC_OUT}/"
             
             
             # Generate the proof of computation
             echo "{ \"deterministic-output-path\" : \"/iexec_out/MetricsSummary.pdf\" }" > "${IEXEC_OUT}/computed.json"
-
-            
-            ls -l $IEXEC_OUT
             
             echo "Exit KUMO execution"
-            exit;;
-        
-        t)  # Test flag, testing the environment to check if everything is working fine
-            echo "testing internet connection"
-            sleep 5
-            ping -c 4 google.com 
-            echo "Working or not?"
-            cd src
-            echo ""
-
-            # Test is the shell environment actually works
-            echo "testing shell environment"
-            for i in {1..10..1}
-            do
-                echo "printing test test/$i"
-            done
-
-            echo "testing Rumor"
-            ./bin/armiarma file crawler/iexec_test.rumor --formatter="terminal" --level="info"
-            echo "end test of Rumor"
-            echo ""
-
-            echo "Copying the results"
-            cp -r metrics/ "${IEXEC_OUT}/metrics/"
-
-            echo "testing python env"
-            python3 analyzer/python-env-test.py
-            echo "end python env test"
-            echo ""
-            echo "{ \"deterministic-output-path\" : \"/iexec_out/metrics/\" }" > "${IEXEC_OUT}/computed.json"
-            exit;;
-
-        s)  # Test the analyzer part in the iexec platform
-
-            echo "  Launching analyzer"
-            echo "$PWD"
-
-            csv="${IEXEC_IN}/${IEXEC_INPUT_FILE_NAME_1}"
-            peerstore="${IEXEC_IN}/${IEXEC_INPUT_FILE_NAME_2}"
-            plots="${IEXEC_OUT}/plots"
-
-            mkdir "${IEXEC_OUT}/plots/"
-            python3 ./src/analyzer/armiarma-analyzer.py "$csv" "$peerstore" "$plots"            
-            #python3 ./src/analyzer/python-test.py 
-
-            echo ""
-            echo "{ \"deterministic-output-path\" : \"/iexec_out/plots/\" }" > "${IEXEC_OUT}/computed.json"
-            echo "Analyzer Finished!"
             exit;;
         
         \?) # incorrect option

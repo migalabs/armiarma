@@ -27,7 +27,7 @@ armiarma: include peerstore.rumor
 armiarma: include start_host.rumor
 
 # Provide enough time to copy the enr
-armiarma: sleep 5s
+armiarma: sleep 2s
 
 armiarma: include peer_status_metadata.rumor
 
@@ -51,7 +51,7 @@ armiarma: include export_metrics.rumor
 
 #armiarma: include connectall.rumor
 armiarma: include random-connect.rumor
-echo "::::::: After Random-connect"
+
 #sleep 5m
 
 #armiarma: include serve_blocks.rumor

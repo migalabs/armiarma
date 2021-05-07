@@ -72,7 +72,46 @@ def plotFromPandas(panda, pdf, opts):
     if opts['show'] is True:
         plt.show()
 
+# CortzePlot extension to plot bar-charts
+def plotStackBarsFromArrays(xarray, yarray, pdf, opts):
+    print("Bar Graph from Arrays")
 
+    outputFile = str(opts['outputPath']) + '/' + opts['figTitle']
+    print('printing image', opts['figTitle'], 'on', outputFile)
+
+    fig, ax = plt.subplots(figsize = opts['figSize'])
+
+    auxI = 0
+    bottom = [0,0] # done by hand
+    for subarray in xarray:
+        ax.bar(yarray, subarray, bottom=bottom, label=opts['labels'][auxI])
+        auxI = auxI + 1
+        for i in range(0,2):
+            bottom[i] = bottom[i] + subarray[i]
+
+    # labels
+    if opts['ylabel'] is not None:    
+        plt.ylabel(opts['ylabel'], fontsize=opts['labelSize'])
+    if opts['xlabel'] is not None:
+        plt.xlabel(opts['xlabel'], fontsize=opts['labelSize'])
+
+    # Check is there is Value on top of the charts
+    if opts['barValues'] is not None:
+        bottom = [0, 0]
+        for subarray in xarray:
+            for ind, value in enumerate(subarray):
+                if value == 0:
+                    continue
+                else:
+                    plt.text(ind, value , str(value), fontsize=opts['textSize'], horizontalalignment='center')
+
+    # Title
+    plt.title(opts['title'], fontsize = opts['titleSize'])
+    plt.tight_layout()
+    plt.savefig(outputFile)
+    pdf.savefig(plt.gcf())
+    if opts['show'] is True:
+        plt.show()
 
 # CortzePlot extension to plot bar-charts
 def plotBarsFromArrays(xarray, yarray, pdf, opts):
@@ -433,12 +472,14 @@ def main():
     # End of plotting variables
     csvFile = sys.argv[1]
     peerstoreFile = sys.argv[2]
-    outputFigsFolder = sys.argv[3]
+    extraMetrics = sys.argv[3]
+    outputFigsFolder = sys.argv[4]
 
     pdfFile = outputFigsFolder + "/MetricsSummary.pdf"
     
     peerstorePanda = getPandaFromPeerstoreJson(peerstoreFile)
     rumorMetricsPanda = pd.read_csv(csvFile)
+    extraPeerData = pd.read_csv(extraMetrics)
 
 
     # ---------- PLOT SECUENCE -----------
@@ -447,14 +488,6 @@ def main():
     clientList = ['Lighthouse', 'Teku', 'Nimbus', 'Prysm', 'Lodestar', 'Unknown']
     clientColors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple', 'k' ]
     innerColors = ['Blues', 'Oranges', 'Greens', 'Reds', 'Purples', 'Greys' ]
-
-    # get length of the peerstore
-    peerstoreSize = getLengthOfPanda(peerstorePanda)
-    peerMetricsSize = getLengthOfPanda(rumorMetricsPanda)
-
-    xarray = ['Peerstore', 'Connected Peers']
-    yarray = [peerstoreSize, peerMetricsSize]
-    barColor = ['tab:blue', 'tab:green']
 
     # Temporary measurments for the Armiarma Paper
 
@@ -465,8 +498,9 @@ def main():
     cntU = 0
     cntN = 0
     
+    peerstoreLen = len(peerstore)
     print()
-    print('Total amount of peers on the peerstore:',len(peerstore))
+    print('Total amount of peers on the peerstore:',peerstoreLen)
     for peer in peerstore:
         try:
             if '/13000/' in peerstore[peer]["addrs"][0]:
@@ -476,7 +510,7 @@ def main():
 
     print('Number of clients with the TPC port at 1300:', cntU)
     print()
-    print('percentage of "Prysm" peers from the peerstore:', round((cntU*100)/len(peerstore),2))
+    print('percentage of "Prysm" peers from the peerstore:', round((cntU*100)/peerstoreLen,2))
 
     ff.close()
 
@@ -589,8 +623,38 @@ def main():
     # End Temp
 
     with PdfPages(pdfFile) as pdf:
-    
-        plotBarsFromArrays(xarray, yarray, pdf, opts={                                   
+        # plot the metrics gathered on the extra-metrics
+        nonAttempted = 0
+        succeed = 0
+        failed = 0
+        print("extra metrics len:", len(extraPeerData))
+        for index, row in extraPeerData.iterrows():
+            if row['Attempted'] == False:
+                nonAttempted = nonAttempted + 1
+            else:
+                if row['Succeed'] == False:
+                    failed = failed + 1
+                else:
+                    succeed = succeed + 1
+        
+        print("Not tried from the last peerstore copy:",nonAttempted)
+        print("Tried and succeed:", succeed)
+        print("Tried and failed", failed)
+        nonAttempted = nonAttempted + (peerstoreLen - (len(extraPeerData)))
+        print("Total Not tried from the entrire peerstore", nonAttempted)
+
+        # get length of the peerstore
+        peerstoreSize = getLengthOfPanda(peerstorePanda)
+        peerMetricsSize = getLengthOfPanda(rumorMetricsPanda)
+
+        print("Attempted and succeed", succeed, "| On the metrics", peerMetricsSize)
+        xarray = [[0, succeed], [0, failed], [0, nonAttempted], [peerstoreLen, 0]]
+        yarray = ['Peerstore', 'Experienced Behaviour']
+        labels = ['connected', 'failed', 'not attempted', 'peerstore']
+        barColor = ['tab:blue', 'tab:green']
+
+
+        plotStackBarsFromArrays(xarray, yarray, pdf, opts={                                   
             'figSize': figSize,                                                      
             'figTitle': 'PeerstoreVsConnectedPeers.png', 
             'pdf': pdfFile,                                
@@ -602,10 +666,11 @@ def main():
             'textSize': textSize,
             'yLowLimit': 0,                                                         
             'yUpperLimit': None,                                                    
-            'title': "Number of Peers Connected from the entire Peerstore",                  
+            'title': "Number of Peers Connected from the entire Peerstore", 
+            'labels': labels,              
             'xlabel': None,                                                         
             'ylabel': 'Number of Peers',                                      
-            'xticks': xarray,
+            'xticks': None,
             'hGrids': False,                        
             'titleSize': titleSize,                                                        
             'labelSize': labelSize,                                                        

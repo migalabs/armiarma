@@ -3,6 +3,10 @@ package peer
 import (
 	"context"
 	"fmt"
+	"reflect"
+	"sync"
+	"time"
+
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -11,9 +15,6 @@ import (
 	"github.com/protolambda/rumor/p2p/addrutil"
 	"github.com/protolambda/rumor/p2p/track"
 	"github.com/protolambda/zrnt/eth2/beacon"
-    "reflect"
-	"sync"
-	"time"
 )
 
 type PeerConnectAllCmd struct {
@@ -26,8 +27,8 @@ type PeerConnectAllCmd struct {
 	MaxPeers   uint64        `ask:"--max-peers" help:"max amount of peers, pause auto-connecting when above this"`
 
 	FilterDigest beacon.ForkDigest `ask:"--filter-digest" help:"Only connect when the peer is known to have the given fork digest in ENR. Or connect to any if not specified."`
-	FilterPort   int   `ask:"--filter-port" help:"Only connect to peers that has the given port advertised on the ENR."`
-    Filtering    bool  `changed:"filter-digest"`
+	FilterPort   int               `ask:"--filter-port" help:"Only connect to peers that has the given port advertised on the ENR."`
+	Filtering    bool              `changed:"filter-digest"`
 }
 
 func (c *PeerConnectAllCmd) Default() {
@@ -36,7 +37,7 @@ func (c *PeerConnectAllCmd) Default() {
 	c.MaxRetries = 5
 	c.Workers = 1
 	c.MaxPeers = 200
-    c.FilterPort = -1
+	c.FilterPort = -1
 }
 
 func (c *PeerConnectAllCmd) Help() string {
@@ -255,18 +256,18 @@ func (c *PeerConnectAllCmd) run(ctx context.Context, h host.Host) {
 					if err != nil || !ok {
 						continue
 					}
-                    peerPort := enr.TCP()
-				    if eth2Data.ForkDigest != c.FilterDigest {
-                        continue
-                    }
-                    if c.FilterPort >= 0 {
-                        if  peerPort != c.FilterPort {
-                            fmt.Println("Deprecated peer, port:", peerPort, "| parsed port:", c.FilterPort)
-                            continue
-                        } else {
-                            fmt.Println("Listed peer, port:", peerPort)
-                        }
-                    }
+					peerPort := enr.TCP()
+					if eth2Data.ForkDigest != c.FilterDigest {
+						continue
+					}
+					if c.FilterPort >= 0 {
+						if peerPort != c.FilterPort {
+							fmt.Println("Deprecated peer, port:", peerPort, "| parsed port:", c.FilterPort)
+							continue
+						} else {
+							fmt.Println("Listed peer, port:", peerPort)
+						}
+					}
 
 				}
 				// Check if we're connected already
