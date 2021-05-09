@@ -81,10 +81,12 @@ def plotStackBarsFromArrays(xarray, yarray, pdf, opts):
 
     fig, ax = plt.subplots(figsize = opts['figSize'])
 
+    colors = ['mediumseagreen', 'indianred', 'goldenrod','cornflowerblue']
+    legends=[]
     auxI = 0
     bottom = [0,0] # done by hand
     for subarray in xarray:
-        ax.bar(yarray, subarray, bottom=bottom, label=opts['labels'][auxI])
+        legends.append(ax.barh(yarray, subarray, left=bottom, label=opts['labels'][auxI], color=colors[auxI]))
         auxI = auxI + 1
         for i in range(0,2):
             bottom[i] = bottom[i] + subarray[i]
@@ -104,6 +106,8 @@ def plotStackBarsFromArrays(xarray, yarray, pdf, opts):
                     continue
                 else:
                     plt.text(ind, value , str(value), fontsize=opts['textSize'], horizontalalignment='center')
+    
+    ax.legend(handles=legends, loc='upper center', bbox_to_anchor=(0.5, -0.05), fancybox=True, shadow=True, ncol=4)    
 
     # Title
     plt.title(opts['title'], fontsize = opts['titleSize'])
@@ -649,7 +653,7 @@ def main():
 
         print("Attempted and succeed", succeed, "| On the metrics", peerMetricsSize)
         xarray = [[0, succeed], [0, failed], [0, nonAttempted], [peerstoreLen, 0]]
-        yarray = ['Peerstore', 'Experienced Behaviour']
+        yarray = ['Peerstore', 'Peering Results']
         labels = ['connected', 'failed', 'not attempted', 'peerstore']
         barColor = ['tab:blue', 'tab:green']
 
@@ -719,18 +723,6 @@ def main():
             'legendsize': labelSize,                                                     
             'show': False})
 
-        """
-        print("| {:<35}| {:<15}|".format('ClientVersion', 'NumbersPeers'))
-        print("-------------------------------------------------------")
-        for idx, item in enumerate(clientList):
-            print("| {:<35}| {:<15}|".format(item, clientCounter[idx]))
-            print("-------------------------------------------------------")
-            v = types[idx]
-            for j, n in enumerate(v):
-                print(" -> {:<33}| {:<15}|".format(v[j], yarray[idx][j]))
-            print("-------------------------------------------------------")
-
-        """
         print("")
         print("")
         print("-------------------------------------------------------")

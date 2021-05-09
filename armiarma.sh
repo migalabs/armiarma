@@ -300,7 +300,6 @@ while getopts ":hcpfdts" option; do
 
             LaunchAnalyzer "$2" "$PWD"
             
-            echo "Note: If the Metrics Visualizer doesn't try opening the url: 'localhost:8000/graphs' or refresh the page"
             echo ""
             xdg-open "${plots}/MetricsSummary.pdf"
 
