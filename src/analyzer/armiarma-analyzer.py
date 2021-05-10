@@ -92,7 +92,7 @@ def plotStackBarsFromArrays(xarray, yarray, pdf, opts):
             bottom[i] = bottom[i] + subarray[i]
 
     # labels
-    if opts['ylabel'] is not None:    
+    if opts['ylabel'] is not None:     
         plt.ylabel(opts['ylabel'], fontsize=opts['labelSize'])
     if opts['xlabel'] is not None:
         plt.xlabel(opts['xlabel'], fontsize=opts['labelSize'])
@@ -162,6 +162,53 @@ def plotBarsFromArrays(xarray, yarray, pdf, opts):
     pdf.savefig(plt.gcf())
     if opts['show'] is True:
         plt.show()
+
+# CortzePlot extension to plot bar-charts
+def plotHorizontalBarsFromArrays(xarray, yarray, pdf, opts):
+    print("Bar Graph from Arrays")
+
+    outputFile = str(opts['outputPath']) + '/' + opts['figTitle']
+    print('printing image', opts['figTitle'], 'on', outputFile)
+
+    fig = plt.figure(figsize = opts['figSize'])
+
+    barh = plt.barh(range(len(xarray)), yarray, log=opts['logy'], align=opts['align'], color=opts['barColor'], label=xarray)
+
+
+    # labels
+    if opts['ylabel'] is not None:    
+        plt.ylabel(opts['ylabel'], fontsize=opts['labelSize'])
+    if opts['xlabel'] is not None:
+        plt.xlabel(opts['xlabel'], fontsize=opts['labelSize'])
+
+    # Ticks LABELS
+    if opts['yticks'] is not None:
+        plt.yticks(range(len(xarray)), opts['yticks'], rotation=opts['tickRotation'], fontsize=opts['yticksSize'])
+    else:
+        plt.yticks(range(len(xarray)), {},)
+        #plt.xticks(range(len(xarray)))
+
+    plt.margins(x=0)
+    plt.yticks(fontsize=opts['yticksSize'])
+    plt.ylim(opts['yLowLimit'], opts['yUpperLimit'])
+
+    # Set/No the grids if specified
+    if opts['vGrids'] != False:
+        plt.grid(which='major', axis='x', linestyle='--')
+    
+    #  loc='upper center'
+
+    plt.legend(barh, xarray, loc='upper center', ncol=len(xarray), fancybox=True, title=opts['legendTitle'], title_fontsize=opts['legendSize'] )
+    #plt.legend(handles=legends, bbox_to_anchor=(0.5, -0.05), fancybox=True, shadow=True, ncol=len(xarray))
+
+    # Title
+    plt.title(opts['title'], fontsize = opts['titleSize'])
+    plt.tight_layout()
+    plt.savefig(outputFile)
+    pdf.savefig(plt.gcf())
+    if opts['show'] is True:
+        plt.show()
+
 
 # Sort xarray and y array By Values from Max to Min
 def sortArrayMaxtoMin(xarray, yarray):
@@ -631,6 +678,7 @@ def main():
         nonAttempted = 0
         succeed = 0
         failed = 0
+
         print("extra metrics len:", len(extraPeerData))
         for index, row in extraPeerData.iterrows():
             if row['Attempted'] == False:
@@ -684,6 +732,43 @@ def main():
             'yticksSize': ticksSize,                                                       
             'tickRotation': 0,                                                     
             'show': False})
+
+        ## Classify the non connected peers by error
+
+        errorList = getItemsFromColumn(extraPeerData, 'Error')
+        errorList.remove('None')
+        auxxarray, auxyarray = getDataFromPanda(extraPeerData, None, "Error", errorList, 'counter') 
+        xarray, yarray = sortArrayMaxtoMin(auxxarray, auxyarray)
+        # Get Color Grid
+        barColor = GetColorGridFromArray(yarray)
+
+
+        plotHorizontalBarsFromArrays(xarray, yarray, pdf, opts={                                            
+            'figSize': (12,7),                                                          
+            'figTitle': 'DetectedErrorDistribution.png', 
+            'pdf': pdfFile,                                
+            'outputPath': outputFigsFolder,                                                    
+            'align': 'center', 
+            'barValues': False,
+            'logy': False,
+            'barColor': barColor,
+            'textSize': textSize+2,                                                         
+            'yLowLimit': None,                                                             
+            'yUpperLimit': None,                                                        
+            'title': "Distribution of the detected errors",                             
+            'xlabel': 'Number of peers',                                   
+            'ylabel': None,                                                
+            'yticks': None, 
+            'vGrids': True,                                                           
+            'titleSize': titleSize+2,                                                        
+            'labelSize': labelSize+2,                                                        
+            'legendPosition': 1,
+            'legendTitle': 'Experienced errors',                                                   
+            'legendSize': labelSize-4,                                                       
+            'xticksSize': ticksSize,                                                       
+            'yticksSize': ticksSize+2,                                                            
+            'tickRotation': 0,
+            'show': False})  
 
         clientCounter = []
         types         = []
