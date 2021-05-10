@@ -134,12 +134,12 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host) {
 						if err := h.Connect(ctx, addrInfo); err != nil {
 							// the connetion failed
 							attempts += 1
-							c.GossipMetrics.ExtraMetrics.AddNewAttempt(p, false)
+							c.GossipMetrics.ExtraMetrics.AddNewAttempt(p, false, err.Error())
 							c.Log.WithError(err).Warnf("attempts %d failed connection attempt", attempts)
 						} else { // connection successfuly made
 							c.Log.Infof("peer_id %s successful connection made", p)
 							fmt.Println("Random-Connector: connected to new peer:", p)
-							c.GossipMetrics.ExtraMetrics.AddNewAttempt(p, true)
+							c.GossipMetrics.ExtraMetrics.AddNewAttempt(p, true, "None")
 							// break the loop
 							break
 						}

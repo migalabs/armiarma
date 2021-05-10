@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -26,6 +27,7 @@ func (em *ExtraMetrics) AddNewPeer(id peer.ID) bool {
 		Attempted: false,
 		Succeed:   false,
 		Attempts:  0,
+		Error:     "None",
 	}
 	em.Peers.Store(id, pem)
 	return false
@@ -33,14 +35,14 @@ func (em *ExtraMetrics) AddNewPeer(id peer.ID) bool {
 
 // AddNewAttempts adds the resuts of a new attempt over an existing peer
 // increasing the attempt counter and the respective fields
-func (em *ExtraMetrics) AddNewAttempt(id peer.ID, succeed bool) error {
+func (em *ExtraMetrics) AddNewAttempt(id peer.ID, succeed bool, err string) error {
 	v, ok := em.Peers.Load(id)
 	if !ok { // the peer was already in the sync.Map return true
 		return fmt.Errorf("Not peer found with that ID %s", id.String())
 	}
 	// Update the counter and connection status
 	pem := v.(PeerExtraMetrics)
-	pem.NewAttempt(succeed)
+	pem.NewAttempt(succeed, err)
 	// Store the new struct in the sync.Map
 	em.Peers.Store(id, pem)
 	return nil
@@ -84,7 +86,7 @@ func (em ExtraMetrics) ExportCSV(filePath string) error {
 	}
 	defer csvFile.Close()
 	// First raw of the file will be the Titles of the columns
-	_, err = csvFile.WriteString("Peer Id,Attempted,Succeed,Attempts\n")
+	_, err = csvFile.WriteString("Peer Id,Attempted,Succeed,Attempts,Error\n")
 	if err != nil {
 		return fmt.Errorf("Error while Writing the Titles on the csv")
 	}
@@ -93,7 +95,7 @@ func (em ExtraMetrics) ExportCSV(filePath string) error {
 		var csvRow string
 		peerMetrics := v
 		csvRow = k + "," + strconv.FormatBool(peerMetrics.Attempted) + "," +
-			strconv.FormatBool(peerMetrics.Succeed) + "," + strconv.Itoa(peerMetrics.Attempts) + "\n"
+			strconv.FormatBool(peerMetrics.Succeed) + "," + strconv.Itoa(peerMetrics.Attempts) + "," + peerMetrics.Error + "\n"
 		_, err = csvFile.WriteString(csvRow)
 		if err != nil {
 			return fmt.Errorf("Error while Writing the Titles on the csv")
@@ -107,17 +109,40 @@ type PeerExtraMetrics struct {
 	Attempted bool    // If the peer has been attempted to stablish a connection
 	Succeed   bool    // If the connection attempt has been successful
 	Attempts  int     // Number of attempts done
+	Error     string  // Type of error that we detected
 }
 
 // Funtion that updates the values of the new connection trial increasing the counter
 // as the result of the connection trial
-func (p *PeerExtraMetrics) NewAttempt(success bool) {
+func (p *PeerExtraMetrics) NewAttempt(success bool, err string) {
 	if p.Attempted == false {
 		p.Attempted = true
+		//fmt.Println("Original ", err)
+		if err != "" || err != "dial backoff" {
+			p.Error = FilterError(err)
+		}
 	}
 	if success == true {
 		p.Succeed = success
+		p.Error = "None"
 	}
 	p.Attempts += 1
+}
 
+// funtion that formats the error into a Pretty understandable (standard) way
+// also important to cohesionate the extra-metrics output csv
+func FilterError(err string) string {
+	errorPretty := "Uncertain"
+	// filter the error type
+	if strings.Contains(err, "connection reset by peer") {
+		errorPretty = "Connection reset by peer"
+	} else if strings.Contains(err, "i/o timeout") {
+		errorPretty = "i/o timeout"
+	} else if strings.Contains(err, "dial to self attempted") {
+		errorPretty = "dial to self attempted"
+	} else if strings.Contains(err, "dial backoff") {
+		errorPretty = "dial backoff"
+	}
+
+	return errorPretty
 }
