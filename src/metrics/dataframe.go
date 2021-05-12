@@ -5,6 +5,9 @@ import (
 	"os"
 	"strconv"
 	"sync"
+	"sort"
+
+    "github.com/protolambda/rumor/metrics/custom"
 )
 
 // Main Data Structure that will be used to analyze and plot the metrics
@@ -130,4 +133,34 @@ func GetMetricsDuplicate(original sync.Map) sync.Map {
 		return true
 	})
 	return newMap
+}
+
+
+// Function that iterates through the peers keeping track of the client type, and versions
+func (df MetricsDataFrame) AnalyzeClientType(clientname string) custom.Client{
+	client := custom.NewClient()
+	clicnt := 0
+	versions := make(map[string]int, 0)
+
+	// iterate through the peer metrics with reading the client List
+	for idx, item := range df.ClientTypes {
+		if item == clientname { // peer with the same client type as the one we are searching for
+			clicnt += 1
+			// add the version to the map or increase the actual counter
+			ver := df.ClientVersions.GetByIndex(idx)
+			//x := versions[ver]
+			versions[ver] += 1				
+		}
+	}
+	// after reading the entire metrics we can generate the custom.Client struct
+	client.SetTotal(clicnt)
+	v := make([]string, 0, len(versions))
+	for val := range versions {
+		v = append(v, val)
+	}
+	sort.Strings(v)
+	for _, item := range v {
+		client.AddVersion(item, versions[item])
+	}
+	return client
 }
