@@ -72,7 +72,50 @@ def plotFromPandas(panda, pdf, opts):
     if opts['show'] is True:
         plt.show()
 
+# CortzePlot extension to plot bar-charts
+def plotStackBarsFromArrays(xarray, yarray, pdf, opts):
+    print("Bar Graph from Arrays")
 
+    outputFile = str(opts['outputPath']) + '/' + opts['figTitle']
+    print('printing image', opts['figTitle'], 'on', outputFile)
+
+    fig, ax = plt.subplots(figsize = opts['figSize'])
+
+    colors = ['mediumseagreen', 'indianred', 'goldenrod','cornflowerblue']
+    legends=[]
+    auxI = 0
+    bottom = [0,0] # done by hand
+    for subarray in xarray:
+        legends.append(ax.barh(yarray, subarray, left=bottom, label=opts['labels'][auxI], color=colors[auxI]))
+        auxI = auxI + 1
+        for i in range(0,2):
+            bottom[i] = bottom[i] + subarray[i]
+
+    # labels
+    if opts['ylabel'] is not None:     
+        plt.ylabel(opts['ylabel'], fontsize=opts['labelSize'])
+    if opts['xlabel'] is not None:
+        plt.xlabel(opts['xlabel'], fontsize=opts['labelSize'])
+
+    # Check is there is Value on top of the charts
+    if opts['barValues'] is not None:
+        bottom = [0, 0]
+        for subarray in xarray:
+            for ind, value in enumerate(subarray):
+                if value == 0:
+                    continue
+                else:
+                    plt.text(ind, value , str(value), fontsize=opts['textSize'], horizontalalignment='center')
+    
+    ax.legend(handles=legends, loc='upper center', bbox_to_anchor=(0.5, -0.05), fancybox=True, shadow=True, ncol=4)    
+
+    # Title
+    plt.title(opts['title'], fontsize = opts['titleSize'])
+    plt.tight_layout()
+    plt.savefig(outputFile)
+    pdf.savefig(plt.gcf())
+    if opts['show'] is True:
+        plt.show()
 
 # CortzePlot extension to plot bar-charts
 def plotBarsFromArrays(xarray, yarray, pdf, opts):
@@ -120,6 +163,53 @@ def plotBarsFromArrays(xarray, yarray, pdf, opts):
     if opts['show'] is True:
         plt.show()
 
+# CortzePlot extension to plot bar-charts
+def plotHorizontalBarsFromArrays(xarray, yarray, pdf, opts):
+    print("Bar Graph from Arrays")
+
+    outputFile = str(opts['outputPath']) + '/' + opts['figTitle']
+    print('printing image', opts['figTitle'], 'on', outputFile)
+
+    fig = plt.figure(figsize = opts['figSize'])
+
+    barh = plt.barh(range(len(xarray)), yarray, log=opts['logy'], align=opts['align'], color=opts['barColor'], label=xarray)
+
+
+    # labels
+    if opts['ylabel'] is not None:    
+        plt.ylabel(opts['ylabel'], fontsize=opts['labelSize'])
+    if opts['xlabel'] is not None:
+        plt.xlabel(opts['xlabel'], fontsize=opts['labelSize'])
+
+    # Ticks LABELS
+    if opts['yticks'] is not None:
+        plt.yticks(range(len(xarray)), opts['yticks'], rotation=opts['tickRotation'], fontsize=opts['yticksSize'])
+    else:
+        plt.yticks(range(len(xarray)), {},)
+        #plt.xticks(range(len(xarray)))
+
+    plt.margins(x=0)
+    plt.yticks(fontsize=opts['yticksSize'])
+    plt.ylim(opts['yLowLimit'], opts['yUpperLimit'])
+
+    # Set/No the grids if specified
+    if opts['vGrids'] != False:
+        plt.grid(which='major', axis='x', linestyle='--')
+    
+    #  loc='upper center'
+
+    plt.legend(barh, xarray, loc='upper center', ncol=len(xarray), fancybox=True, title=opts['legendTitle'], title_fontsize=opts['legendSize'] )
+    #plt.legend(handles=legends, bbox_to_anchor=(0.5, -0.05), fancybox=True, shadow=True, ncol=len(xarray))
+
+    # Title
+    plt.title(opts['title'], fontsize = opts['titleSize'])
+    plt.tight_layout()
+    plt.savefig(outputFile)
+    pdf.savefig(plt.gcf())
+    if opts['show'] is True:
+        plt.show()
+
+
 # Sort xarray and y array By Values from Max to Min
 def sortArrayMaxtoMin(xarray, yarray):
     iterations = len(xarray)
@@ -145,19 +235,22 @@ def plotSinglePieFromArray(xarray, pdf, opts):
     fig, ax = plt.subplots(figsize=opts['figsize'])
 
     size = opts['piesize']
-    
-    """
-    cmap = plt.get_cmap(opts['piecolors'])
-    pcolors = cmap(np.arange(1)*len(xarray))
-    """
 
-    patches1, labels1 = ax.pie(xarray, radius=1, colors=opts['piecolors'], labels=opts['labels'],
-           wedgeprops=dict(width=size, edgecolor=opts['edgecolor']))
-
+    patches1, labels1, autotext = ax.pie(xarray, radius=1, colors=opts['piecolors'], labels=opts['labels'], startangle = 90,
+            autopct='%1.1f%%',  pctdistance=opts['pctdistance'], wedgeprops=dict(width=size, edgecolor=opts['edgecolor']))
+    # autopct='%1.1f', pctdistance=opts['pctdistance'],
 
     if opts['legend'] == True:
-        plt.legend(patches1, labels1, loc=opts['lengendposition'])
+        plt.legend(opts['labels'], bbox_to_anchor=(1, 0.75), loc=opts['lengendposition'], fontsize=opts['labelsize'], 
+           bbox_transform=plt.gcf().transFigure)
+        plt.subplots_adjust(left=0.0, bottom=0.1, right=0.85)
     ax.set(aspect="equal")
+
+    for idx, _ in enumerate(labels1):
+        autotext[idx].set_fontsize(opts['labelsize'])
+        autotext[idx].set_c(opts['piecolors'][idx])
+        if opts['autopct'] != False:
+            labels1[idx].remove()
 
     # Title
     plt.title(opts['title'], fontsize = opts['titlesize'])
@@ -433,12 +526,14 @@ def main():
     # End of plotting variables
     csvFile = sys.argv[1]
     peerstoreFile = sys.argv[2]
-    outputFigsFolder = sys.argv[3]
+    extraMetrics = sys.argv[3]
+    outputFigsFolder = sys.argv[4]
 
     pdfFile = outputFigsFolder + "/MetricsSummary.pdf"
     
     peerstorePanda = getPandaFromPeerstoreJson(peerstoreFile)
     rumorMetricsPanda = pd.read_csv(csvFile)
+    extraPeerData = pd.read_csv(extraMetrics)
 
 
     # ---------- PLOT SECUENCE -----------
@@ -448,35 +543,41 @@ def main():
     clientColors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple', 'k' ]
     innerColors = ['Blues', 'Oranges', 'Greens', 'Reds', 'Purples', 'Greys' ]
 
-    # get length of the peerstore
-    peerstoreSize = getLengthOfPanda(peerstorePanda)
-    peerMetricsSize = getLengthOfPanda(rumorMetricsPanda)
-
-    xarray = ['Peerstore', 'Connected Peers']
-    yarray = [peerstoreSize, peerMetricsSize]
-    barColor = ['tab:blue', 'tab:green']
-
     # Temporary measurments for the Armiarma Paper
 
     # Count number of Prysm Peers on the Peerstore
     ff = open(peerstoreFile)
     peerstore = json.load(ff)
 
-    cntU = 0
-    cntN = 0
+    cnt13000 = 0
+    cnt9000 = 0
+    cntOthers = 0
+    noAddrs = 0
     
+    peerstoreLen = len(peerstore)
+    metricsLen = len(rumorMetricsPanda)
     print()
-    print('Total amount of peers on the peerstore:',len(peerstore))
+    print('Total amount of peers on the peerstore:',peerstoreLen)
     for peer in peerstore:
         try:
             if '/13000/' in peerstore[peer]["addrs"][0]:
-                cntU = cntU +1
+                cnt13000 = cnt13000 +1
+            elif '/9000/' in peerstore[peer]["addrs"][0]:
+                cnt9000 = cnt9000 +1
+            else: 
+                cntOthers = cntOthers + 1
         except:
-            pass
+            noAddrs = noAddrs + 1
 
-    print('Number of clients with the TPC port at 1300:', cntU)
-    print()
-    print('percentage of "Prysm" peers from the peerstore:', round((cntU*100)/len(peerstore),2))
+    print('Number of clients with the TPC port at 13000:', cnt13000)
+    print('Number of clients with the TPC port at 9000: ', cnt9000)
+    print('Number of clients with other TCP ports:      ', cntOthers)
+    print('Number of clients without address:           ', noAddrs)
+    summ = cnt13000 + cnt9000 + cntOthers + noAddrs
+    noPrysmPort = cnt9000 + cntOthers + noAddrs
+    if summ != peerstoreLen:
+        print("----> WARN: port total count doesn't match with the total peerstore")
+    print('percentage of "Prysm" peers from the peerstore:', round((cnt13000*100)/peerstoreLen,2))
 
     ff.close()
 
@@ -497,8 +598,8 @@ def main():
     messageCounterArray = sorted(messageCounterArray, reverse = True)
     messagePercentageArray = sorted(messagePercentageArray, reverse = True)
 
-    print(messageCounterArray[:5])
-    print("Total of received messages:", totalMessageCounter)
+    #print(messageCounterArray[:5])
+    print("\nTotal of received messages:", totalMessageCounter)
 
     # Total of messages
     percAcumulated = 0
@@ -543,8 +644,8 @@ def main():
     messageCounterArray = sorted(messageCounterArray, reverse = True)
     messagePercentageArray = sorted(messagePercentageArray, reverse = True)
 
-    print(messageCounterArray[:5])
-    print("Total of received blocks:", totalBlockCounter)
+    #print(messageCounterArray[:5])
+    print("\nTotal of received blocks:", totalBlockCounter)
 
     percAcumulated = 0
     itemsCounter   = 0
@@ -584,13 +685,86 @@ def main():
                     rumorMetricsPanda.at[index,'Client'] = "Lodestar"
                     rumorMetricsPanda.at[index,'Version'] = ua[1]
             except:   
-                print("*") 
+                pass
 
     # End Temp
 
     with PdfPages(pdfFile) as pdf:
-    
-        plotBarsFromArrays(xarray, yarray, pdf, opts={                                   
+        # plot the metrics gathered on the extra-metrics
+        nonAttempted = 0
+        succeed = 0
+        failed = 0
+
+        print("extra metrics len:", len(extraPeerData))
+        for index, row in extraPeerData.iterrows():
+            if row['Attempted'] == False:
+                nonAttempted = nonAttempted + 1
+            else:
+                if row['Succeed'] == False:
+                    failed = failed + 1
+                else:
+                    succeed = succeed + 1
+        
+        print("Not tried from the last peerstore copy:",nonAttempted)
+        print("Tried and succeed:", succeed)
+        print("Tried and failed", failed)
+        nonAttempted = nonAttempted + (peerstoreLen - (len(extraPeerData)))
+        print("Total Not tried from the entrire peerstore", nonAttempted)
+
+        # get length of the peerstore
+        peerstoreSize = getLengthOfPanda(peerstorePanda)
+        peerMetricsSize = getLengthOfPanda(rumorMetricsPanda)
+
+        print("Attempted and succeed", succeed, "| On the metrics", peerMetricsSize)
+
+        if succeed < peerMetricsSize:
+            print("- Dismatch on the extra metrics and metrics -")
+            for idx, row in rumorMetricsPanda.iterrows():
+                index = extraPeerData.index[extraPeerData['Peer Id'] == row['Peer Id']]
+                extraPeerData.loc[index, 'Attempted'] = True
+                extraPeerData.loc[index, 'Succeed'] = True
+                extraPeerData.loc[index, 'Error'] = "None"
+            # plot the metrics gathered on the extra-metrics
+            nonAttempted = 0
+            succeed = 0
+            failed = 0
+            print("\n -- Updating extra-results -- \n")
+            print("extra metrics len:", len(extraPeerData))
+            for index, row in extraPeerData.iterrows():
+                if row['Attempted'] == False:
+                    nonAttempted = nonAttempted + 1
+                else:
+                    if row['Succeed'] == False:
+                        failed = failed + 1
+                    else:
+                        succeed = succeed + 1
+            
+            print("Not tried from the last peerstore copy:",nonAttempted)
+            print("Tried and succeed:", succeed)
+            print("Tried and failed", failed)
+            nonAttempted = nonAttempted + (peerstoreLen - (len(extraPeerData)))
+            print("Total Not tried from the entrire peerstore", nonAttempted)
+
+
+        print("Attempted and succeed", succeed, "| On the metrics", peerMetricsSize)
+        if succeed != peerMetricsSize:
+            print("----> WARN: Random connected peers and peers on the metrics don't match")
+        
+        ## -- website code --
+        print("\n")
+        print("Results from crawler run on [month] running for [crawling time].<br>Total amount of peers on the peerstore:", peerstoreLen,".<br>Number of clients with the TPC port at 13000 (Prysm?):", cnt13000,".<br>Percentage of 'Prysm' peers from the peerstore (based on the TCP port):", round((cnt13000*100)/peerstoreLen,2),"%.<br>We manage to connect with", succeed,"peers from the peerstore.<br>This would be the distribution.")
+        print("\n")
+        
+        
+        
+        
+        xarray = [[0, succeed], [0, failed], [0, nonAttempted], [peerstoreLen, 0]]
+        yarray = ['Peerstore', 'Peering Results']
+        labels = ['connected', 'failed', 'not attempted', 'peerstore']
+        barColor = ['tab:blue', 'tab:green']
+
+
+        plotStackBarsFromArrays(xarray, yarray, pdf, opts={                                   
             'figSize': figSize,                                                      
             'figTitle': 'PeerstoreVsConnectedPeers.png', 
             'pdf': pdfFile,                                
@@ -602,10 +776,11 @@ def main():
             'textSize': textSize,
             'yLowLimit': 0,                                                         
             'yUpperLimit': None,                                                    
-            'title': "Number of Peers Connected from the entire Peerstore",                  
+            'title': "Number of Peers Connected from the entire Peerstore", 
+            'labels': labels,              
             'xlabel': None,                                                         
             'ylabel': 'Number of Peers',                                      
-            'xticks': xarray,
+            'xticks': None,
             'hGrids': False,                        
             'titleSize': titleSize,                                                        
             'labelSize': labelSize,                                                        
@@ -615,6 +790,48 @@ def main():
             'yticksSize': ticksSize,                                                       
             'tickRotation': 0,                                                     
             'show': False})
+
+        ## Classify the non connected peers by error
+
+        errorList = getItemsFromColumn(extraPeerData, 'Error')
+        errorList.remove('None')
+        auxxarray, auxyarray = getDataFromPanda(extraPeerData, None, "Error", errorList, 'counter') 
+        xarray, yarray = sortArrayMaxtoMin(auxxarray, auxyarray)
+        # Get Color Grid
+        barColor = GetColorGridFromArray(yarray)
+        
+        print()
+        for idx,item in enumerate(xarray):
+            print(item, ',', yarray[idx])
+        
+        print()
+
+        plotHorizontalBarsFromArrays(xarray, yarray, pdf, opts={                                            
+            'figSize': (12,7),                                                          
+            'figTitle': 'DetectedErrorDistribution.png', 
+            'pdf': pdfFile,                                
+            'outputPath': outputFigsFolder,                                                    
+            'align': 'center', 
+            'barValues': False,
+            'logy': False,
+            'barColor': barColor,
+            'textSize': textSize+2,                                                         
+            'yLowLimit': None,                                                             
+            'yUpperLimit': None,                                                        
+            'title': "Distribution of the detected errors",                             
+            'xlabel': 'Number of peers',                                   
+            'ylabel': None,                                                
+            'yticks': None, 
+            'vGrids': True,                                                           
+            'titleSize': titleSize+2,                                                        
+            'labelSize': labelSize+2,                                                        
+            'legendPosition': 1,
+            'legendTitle': 'Experienced errors',                                                   
+            'legendSize': labelSize-4,                                                       
+            'xticksSize': ticksSize,                                                       
+            'yticksSize': ticksSize+2,                                                            
+            'tickRotation': 0,
+            'show': False})  
 
         clientCounter = []
         types         = []
@@ -654,24 +871,79 @@ def main():
             'legendsize': labelSize,                                                     
             'show': False})
 
-        """
-        print("| {:<35}| {:<15}|".format('ClientVersion', 'NumbersPeers'))
+        print("")
+        print("")
         print("-------------------------------------------------------")
-        for idx, item in enumerate(clientList):
-            print("| {:<35}| {:<15}|".format(item, clientCounter[idx]))
-            print("-------------------------------------------------------")
-            v = types[idx]
-            for j, n in enumerate(v):
-                print(" -> {:<33}| {:<15}|".format(v[j], yarray[idx][j]))
-            print("-------------------------------------------------------")
-
-        """
         print('ClientVersion, NumbersPeers')
+        # get the exact number of peers for each client into a Dict
+        clientsCnt = {}
+        totalPeersPerClient = 0
         for idx, item in enumerate(clientList):
             print(item, ",", clientCounter[idx])
+            clientsCnt[item] = clientCounter[idx]
+            totalPeersPerClient = totalPeersPerClient + clientCounter[idx]
             v = types[idx]
             for j, n in enumerate(v):
                 print(v[j], ",", yarray[idx][j])
+        print("-------------------------------------------------------")
+        print("")
+        print("")
+
+        if totalPeersPerClient != metricsLen:
+            print("----> WARN: Sum of peers per client and peers on the metrics don't match")
+        # Extrapole the number of peers from the connected metrics to the peerstore
+        # Delete Prysm from the extrapoling
+        del clientsCnt['Prysm']
+        print(clientsCnt)
+        # Get total of non prysm peers
+        nonPrysmObserved = 0
+        for k in clientsCnt:
+            nonPrysmObserved = nonPrysmObserved + clientsCnt[k]
+        # Get for each of the clients the extrapolation to the peerstore
+        extrapolatedClientList = {}
+        for k in clientsCnt:
+            extrapolatedClientList[k] = round((noPrysmPort*clientsCnt[k])/nonPrysmObserved, 2)
+        
+        print(extrapolatedClientList)
+
+        auxSum = 0
+        labels = []
+        values = []
+        for k in extrapolatedClientList:
+            auxSum = auxSum + extrapolatedClientList[k]
+            labels.append(k)
+            values.append(extrapolatedClientList[k])
+
+        if round(auxSum,0) != noPrysmPort:
+            print("----> WARN: Sum of peers per client that are not Prysm and peers without port 13000 don't match", auxSum, noPrysmPort)
+       
+
+        labels.insert(3,'Prysm')
+        values.insert(3, cnt13000)
+
+        # Plot the extrapolation
+        plotSinglePieFromArray(values, pdf, opts={                                   
+            'figsize': figSize,                                                      
+            'figtitle': 'PeerstoreClientExtrapolation.png',  
+            'pdf': pdfFile,                                   
+            'outputpath': outputFigsFolder,
+            'piesize': 0.3,                                                      
+            'autopct': '%1.0f%%', # "pcts",
+            'pctdistance': 1.15,
+            'edgecolor': 'w',
+            'labels': labels,
+            'labeldistance': 1,
+            'piecolors': clientColors,
+            'shadow': None,
+            'startangle': 90,                                                  
+            'title': "Extrapolation of Peers per Clients in the Peerstore",                   
+            'titlesize': titleSize,                                                        
+            'labelsize': labelSize-4, 
+            'legend': True,                                                       
+            'lengendposition': None,                                                   
+            'legendsize': labelSize,                                                     
+            'show': False})
+
 
         # get the number of peers per country 
         countriesList = getItemsFromColumn(rumorMetricsPanda, 'Country') 
@@ -1260,7 +1532,7 @@ def main():
 
         barColor = 'black'
 
-        print("Peer with highest RTT", rumorMetricsPanda.loc[rumorMetricsPanda['Latency'].idxmax()])
+        #print("Peer with highest RTT", rumorMetricsPanda.loc[rumorMetricsPanda['Latency'].idxmax()])
 
         plotFromPandas(rumorMetricsPanda, pdf, opts={                                   
             'figSize': figSize,                                                      

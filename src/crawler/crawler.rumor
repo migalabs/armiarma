@@ -16,8 +16,9 @@ p2p_port=9020
 #    priv_key="$__key"
 #    grab __key > privkeyfile
 
-armiarma: enr gen-key
-priv_key="$__key"
+#armiarma: enr gen-key
+#priv_key="$__key"
+priv_key="16dd72c556f51685d1cff89e759c5fda18adc4bc640a493a9e6b56c93af12941"
 echo "priv key = $priv_key"
 
 armiarma: include enr.rumor
@@ -27,7 +28,7 @@ armiarma: include peerstore.rumor
 armiarma: include start_host.rumor
 
 # Provide enough time to copy the enr
-armiarma: sleep 5s
+armiarma: sleep 2s
 
 armiarma: include peer_status_metadata.rumor
 
@@ -49,18 +50,21 @@ armiarma: include dv5.rumor
 
 armiarma: include export_metrics.rumor
 
-armiarma: include connectall.rumor
+#armiarma: include connectall.rumor
+armiarma: include random-connect.rumor
 
 #sleep 5m
 
 #armiarma: include serve_blocks.rumor
 
-comp_error="$?"
-if [[ "$comp_error" -ne "0" ]]
+error="$?"
+if [[ "$error" -ne "0" ]]
 then
-    echo " Error Launching serve blocks"
+    echo " Error Launching random connector"
     exit 1
 fi
+
+# Export the Host-Info
 
 #armiarma: include visualizer.rumor
 echo "$timeRange minutes"

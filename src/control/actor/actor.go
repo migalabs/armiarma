@@ -197,10 +197,11 @@ func (c *ActorCmd) Cmd(route string) (cmd interface{}, err error) {
 			store = nil
 		}
 		cmd = &peer.PeerCmd{
-			Base:              b,
-			PeerStatusState:   &c.PeerStatusState,
-			PeerMetadataState: &c.PeerMetadataState,
-			Store:             store,
+			Base:              	b,
+			PeerStatusState:   	&c.PeerStatusState,
+			PeerMetadataState: 	&c.PeerMetadataState,
+			Store:             	store,
+			GossipMetrics: 		&c.GossipMetrics,
 		}
 	case "peerstore":
 		cmd = &peerstore.PeerstoreCmd{

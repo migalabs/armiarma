@@ -17,18 +17,19 @@ import (
 	pgossip "github.com/protolambda/rumor/p2p/gossip"
 	"github.com/protolambda/rumor/p2p/gossip/database"
 	"github.com/protolambda/rumor/p2p/track"
-//	"github.com/protolambda/zrnt/eth2/beacon"
+	//	"github.com/protolambda/zrnt/eth2/beacon"
 )
 
 type GossipMetrics struct {
-	GossipMetrics sync.Map
+	GossipMetrics   sync.Map
+	ExtraMetrics    ExtraMetrics
 	MessageDatabase *database.MessageDatabase
-	StartTime     int64 // milliseconds
+	StartTime       int64 // milliseconds
 }
 
 func NewGossipMetrics() GossipMetrics {
 	gm := GossipMetrics{
-		StartTime:     GetTimeMiliseconds(),
+		StartTime: GetTimeMiliseconds(),
 	}
 	return gm
 }
@@ -168,7 +169,7 @@ func (c *GossipMetrics) MarshalPeerStore(ep track.ExtendedPeerstore) ([]byte, er
 }
 
 // Get the Real Ip Address from the multi Address list
-// TODO: Implement the Private IP filter in a better way 
+// TODO: Implement the Private IP filter in a better way
 func GetFullAddress(multiAddrs []string) string {
 	var address string
 	if len(multiAddrs) > 0 {
@@ -255,7 +256,7 @@ func (c *GossipMetrics) FillMetrics(ep track.ExtendedPeerstore) {
 }
 
 // Function that Exports the entire Metrics to a .json file (lets see if in the future we can add websockets or other implementations)
-func (c *GossipMetrics) ExportMetrics(filePath string, peerstorePath string, csvPath string, ep track.ExtendedPeerstore) error {
+func (c *GossipMetrics) ExportMetrics(filePath string, peerstorePath string, csvPath string, extraMetricsPath string, ep track.ExtendedPeerstore) error {
 	metrics, err := c.MarshalMetrics()
 	if err != nil {
 		fmt.Println("Error Marshalling the metrics")
@@ -281,6 +282,12 @@ func (c *GossipMetrics) ExportMetrics(filePath string, peerstorePath string, csv
 	err = mdf.ExportToCSV(csvPath)
 	if err != nil {
 		fmt.Printf("Error:", err)
+		return err
+	}
+	// Export the extra metrics to a csv
+	err = c.ExtraMetrics.ExportCSV(extraMetricsPath)
+	if err != nil {
+		fmt.Printf("Error exporting the Extra metrics:", err)
 		return err
 	}
 	return nil
@@ -342,10 +349,10 @@ func getIpAndLocationFromAddrs(multiAddrs string) (ip string, country string, ci
 	// Check if the status of the request has been succesful
 	if ipApiResp.Status != "success" {
 		/*
-		fmt.Println("Error with the received response status,", ipApiResp.Status)
-		if ipApiResp.Query == ip {
-			fmt.Println("The given IP of the peer is private")
-		}
+			fmt.Println("Error with the received response status,", ipApiResp.Status)
+			if ipApiResp.Query == ip {
+				fmt.Println("The given IP of the peer is private")
+			}
 		*/
 		country = "Unknown"
 		city = "Unknown"
