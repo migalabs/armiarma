@@ -159,6 +159,9 @@ func (df MetricsDataFrame) AnalyzeClientType(clientname string) custom.Client{
 		v = append(v, val)
 	}
 	sort.Strings(v)
+	for i, j := 0, len(v)-1; i < j; i, j = i+1, j-1 {
+		v[i], v[j] = v[j], v[i]
+	}
 	for _, item := range v {
 		client.AddVersion(item, versions[item])
 	}
