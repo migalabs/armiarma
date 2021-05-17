@@ -2,7 +2,6 @@ package peer
 
 import (
 	"context"
-	"fmt"
 	"math/rand"
 	"time"
 
@@ -56,7 +55,6 @@ func (c *PeerConnectRandomCmd) Run(ctx context.Context, args ...string) error {
 	c.Control.RegisterStop(func(ctx context.Context) error {
 		bgCancel()
 		c.Log.Infof("Stopped auto-connecting")
-		fmt.Println("------------->Stopped auto-connecting")
 		<-done
 		return nil
 	})
@@ -91,8 +89,6 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host) {
 				c.Log.Infof("the peerstore has been re-scanned")
 				peerstoreLen := len(peerList)
 				c.Log.Infof("len peerlist: %s", peerstoreLen)
-				fmt.Println("Peerstore rescaned")
-				fmt.Println("len peerlist:", peerstoreLen)
 				// loop to attempt connetions for the given time
 				for reset != nil {
 					p := randomPeer(peerList)
@@ -101,10 +97,8 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host) {
 					if exists == true {
 						connected := c.GossipMetrics.ExtraMetrics.CheckIdConnected(p)
 						if connected == true {
-							c.Log.Infof("Peer %s was already contacted", p)
 							continue
 						} else if len(peerCache) == peerstoreLen {
-							fmt.Println("we already asked all the peers in this reset, breaking loop")
 							return // Temporary commented
 						} else { // if we didn't crawl all the peers in the peerstore, don't loose time trying to reconnect failed peers in the past
 							continue
@@ -138,7 +132,6 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host) {
 							c.Log.WithError(err).Warnf("attempts %d failed connection attempt", attempts)
 						} else { // connection successfuly made
 							c.Log.Infof("peer_id %s successful connection made", p)
-							fmt.Println("Random-Connector: connected to new peer:", p)
 							c.GossipMetrics.ExtraMetrics.AddNewAttempt(p, true, "None")
 							// break the loop
 							break

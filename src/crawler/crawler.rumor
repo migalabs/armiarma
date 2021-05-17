@@ -16,8 +16,9 @@ p2p_port=9020
 #    priv_key="$__key"
 #    grab __key > privkeyfile
 
-armiarma: enr gen-key
-priv_key="$__key"
+#armiarma: enr gen-key
+#priv_key="$__key"
+priv_key="16dd72c556f51685d1cff89e759c5fda18adc4bc640a493a9e6b56c93af12941"
 echo "priv key = $priv_key"
 
 armiarma: include enr.rumor
@@ -62,6 +63,8 @@ then
     echo " Error Launching random connector"
     exit 1
 fi
+
+# Export the Host-Info
 
 #armiarma: include visualizer.rumor
 echo "$timeRange minutes"
