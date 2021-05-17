@@ -8,12 +8,12 @@ src/bin
 
 # Ignore the example folder (personal to each user)
 examples/*
+# Ignore the example folder (personal to each user)
+results/*
 
-# Ignore System Files
+# Ignore System Files (from MAC)
 .DS_Store
 ._.DS_Store
 
 # ignore the venv
 src/analyzer/venv
-
-src/analyzer/dashboard/static/plots

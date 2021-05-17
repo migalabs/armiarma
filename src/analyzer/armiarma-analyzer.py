@@ -752,7 +752,7 @@ def main():
         
         ## -- website code --
         print("\n")
-        print("Results from crawler run on [month] running for [crawling time].<br>Total amount of peers on the peerstore:", peerstoreLen,".<br>Number of clients with the TPC port at 13000 (Prysm?):", cnt13000,".<br>Percentage of 'Prysm' peers from the peerstore (based on the TCP port):", round((cnt13000*100)/peerstoreLen,2),"%.<br>We manage to connect with", succeed,"peers from the peerstore.<br>This would be the distribution.")
+        print("Results from crawler run on [month] running for [crawling time].\n<br>Total amount of peers on the peerstore:", peerstoreLen,".\n<br>Number of clients with the TPC port at 13000 (Prysm?):", cnt13000,".\n<br>Percentage of 'Prysm' peers from the peerstore (based on the TCP port):", round((cnt13000*100)/peerstoreLen,2),"%.\n<br>We manage to connect with", succeed,"peers from the peerstore.\n<br>This would be the distribution.")
         print("\n")
         
         
