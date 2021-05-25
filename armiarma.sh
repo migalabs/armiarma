@@ -30,6 +30,9 @@ Help()
     echo "                  *Parameters for -p [name]"
     echo "          -f      Run a time specified test, performing the analysis"
     echo "                  of the obtained"
+    echo "                  *Parameters for -f [network] [project-name] [time](minutes)"
+    echo "          -o      Run the general analysis over the entire projects' folder."
+    echo ""
     echo "      Parameters:"
     echo "          [network]       The ETH2 network where the crawler will be running"
     echo "                          Currently supported networks:"
@@ -37,6 +40,9 @@ Help()
     echo "          [project-name]  Specify the name of the folder where the metrics" 
     echo "                          and plots will be stored."
     echo "                          Find them on 'armiarma/examples/[project-name]'"
+    echo "          [time]          Specific time in minutes to run the crawler, performing afterwards"
+    echo "                          the general analysis."
+    echo ""
     echo ""
     echo "  BSC-ETH2 TEAM"
 }
@@ -142,7 +148,7 @@ LaunchCrawler(){
             # Move to the example folder
             cd "./examples/${folderName}"
 
-            # Append the bash env variables to the temp file
+            # Append the bash env variables to the temp fhiustile
             echo "metricsFolder=\"${metricsFolder}\"" >> config.sh
             echo "armiarmaPath=\"${folderPath}\"" >> config.sh
 
@@ -211,7 +217,7 @@ LaunchAnalyzer(){
         echo "venv already created"
     else
         echo "Generating the virtual env"
-        python -m virtualenv "$VENV"
+        python3 -m virtualenv "$VENV"
     fi
     echo ""
     # Source the virtual env 
@@ -230,7 +236,7 @@ LaunchAnalyzer(){
     # -- END TEMP --
     
     echo "Checking if Python dependencies are installed..." 
-    pip install -r ./src/analyzer/requirements.txt
+    pip3 install -r ./src/analyzer/requirements.txt
     echo ""
 
     # Set the Paths for the gossip-metrics.json peerstore.json and output
@@ -249,12 +255,44 @@ LaunchAnalyzer(){
     # Run the Analyzer
     echo "  Launching analyzer"
     echo ""
-    python ./src/analyzer/armiarma-analyzer.py "$csv" "$peerstore" "$extrametrics" "$plots"
+    python3 ./src/analyzer/armiarma-analyzer.py "$csv" "$peerstore" "$extrametrics" "$plots"
     
     # Deactivate the VENV
     deactivate
             
 }
+
+# Launch the General Overview of all the projects in the examples folder
+LaunchGeneralResults(){
+    if [[ -d "./general-results/plots" ]]; then
+        echo ""
+    else
+        mkdir "./general-results/plots"
+    fi
+
+    # Source the virtual env 
+    source "${VENV}/bin/activate"  
+
+    # Check if the virtual env is created
+    venvPath="${PWD}/src/analyzer/venv"
+    if [[ "$VIRTUAL_ENV" = "$venvPath" ]]
+    then
+        echo "VENV successfuly sourced"
+    else
+        echo "ERROR. VENV was unable to source" >&2
+    fi
+    echo ""
+
+    # Run the Analyzer
+    echo "  Launching General Overview Analyzer"
+    echo ""
+    python3 ./src/analyzer/total-overview-analysis.py ./examples ./results
+    echo "results available in \$ARMIARMA/results"
+    echo ""
+    # Deactivate the VENV
+    deactivate
+}
+
 
 # -------- END OF FUNCTION DEFINITION ---------
 
@@ -263,6 +301,7 @@ LaunchAnalyzer(){
 # 0. Get the options
 go version
 
+# Generate the examples folder
 if [[ -d ./examples ]]; then
     echo ""
     echo "  ----------- ARMIARMA $version -----------"
@@ -274,6 +313,15 @@ else
     echo ""
     mkdir ./examples  
 fi 
+# Generate the general-results folder
+if [[ -d ./general-results ]]; then
+    echo ""
+else
+    echo ""
+    echo "Generating ./general-results folder"
+    echo ""
+    mkdir ./general-results  
+fi
 
 # Check if any argument was given. 
 # If not, print Help and exit
@@ -283,7 +331,7 @@ if [[ -z "$1" ]]; then
     exit 1
 fi
 
-while getopts ":hcpfdts" option; do
+while getopts ":hcpfdo" option; do
     case $option in
         h)  # display Help
             Help
@@ -329,8 +377,16 @@ while getopts ":hcpfdts" option; do
 
             echo "Calling the Analyzer"
             LaunchAnalyzer "$folderName" "$folderPath"
-
+            
             echo "Exit Crawler execution"
+            exit;;
+
+        o)  # Generate the general overview of the previously generated projects
+
+            LaunchGeneralResults
+
+            echo "Overview Analyzer Finished!"
+            echo ""
             exit;;
 
         d)  # Option to run Armiarma Crawler for a specific given time on the iexec decentralice platform
