@@ -9,17 +9,21 @@ To use the tool the following tools needs to be installed on the machine:
 
 ### Usage
 The crawler can be easily executed from the `armiarma.sh` file (make sure that is an executable file). 
-The executable `armiarma.sh` launching shell script supports three different commands that correspond to the main functionalities of the tool.
+The executable `armiarma.sh` launching shell script supports five different commands that correspond to the main functionalities of the tool.
 Those commands are:
 
 - `./armiarma.sh -h` to display the help text of the tool. 
 - `./armiarma.sh -c [network] [project-name]` to launch the armiarma crawler on the given network. The given project-name is the name of the folder where the gathered metrics and where all the related information will be saved. The folder will be placed on the `./examples` folder. 
 - `./armiarma.sh -p [project-name]` to launch the armiarma analyzer over the metrics from the given project. The generted plots of the analysis will be saved on the `./examples/[project-name]/plots` folder.
+- `./armiarma.sh -f [network] [project-name] [time]` to launch the armiarma crawler on the given network for the given `time` in minutes. The given project-name is the name of the folder where the gathered metrics and where all the related information will be saved. The folder will be placed on the `./examples` folder. After the crawling for the given time, the analyzer will be launched automatically. The summary results will be saved on the `./examples/[project-name]/plots` folder.
+- `./armiarma.sh -o` to launch the armiarma general overview analyzer over the metrics from the projects' folder. The generted results of the analysis will be saved on the `./general-resutls` folder.
 
 ```
     ./armiarma.sh --> -h
                   '-> -c [network] [project-name]
                   '-> -p [project-name]
+                  '-> -f [network] [project-name] [time](minutes)
+                  '-> -o 
 ```
 
 The tool will get the Go packages and compile Rumor as generate the virtual env and install the python3 dependencies for the user.  

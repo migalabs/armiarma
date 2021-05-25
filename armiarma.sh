@@ -286,7 +286,7 @@ LaunchGeneralResults(){
     # Run the Analyzer
     echo "  Launching General Overview Analyzer"
     echo ""
-    python3 ./src/analyzer/total-overview-analysis.py ./examples ./results
+    python3 ./src/analyzer/total-overview-analysis.py ./examples ./general-results
     echo "results available in \$ARMIARMA/results"
     echo ""
     # Deactivate the VENV

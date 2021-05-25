@@ -9,7 +9,7 @@ src/bin
 # Ignore the example folder (personal to each user)
 examples/*
 # Ignore the example folder (personal to each user)
-results/*
+general-results/*
 
 # Ignore System Files (from MAC)
 .DS_Store
