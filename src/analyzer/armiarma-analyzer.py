@@ -752,7 +752,7 @@ def main():
         
         ## -- website code --
         print("\n")
-        print("Results from crawler run on [month] running for [crawling time].<br>Total amount of peers on the peerstore:", peerstoreLen,".<br>Number of clients with the TPC port at 13000 (Prysm?):", cnt13000,".<br>Percentage of 'Prysm' peers from the peerstore (based on the TCP port):", round((cnt13000*100)/peerstoreLen,2),"%.<br>We manage to connect with", succeed,"peers from the peerstore.<br>This would be the distribution.")
+        print("Results from crawler run on [month] running for [crawling time].\n<br>Total amount of peers on the peerstore:", peerstoreLen,".\n<br>Number of clients with the TPC port at 13000 (Prysm?):", cnt13000,".\n<br>Percentage of 'Prysm' peers from the peerstore (based on the TCP port):", round((cnt13000*100)/peerstoreLen,2),"%.\n<br>We manage to connect with", succeed,"peers from the peerstore.\n<br>This would be the distribution.")
         print("\n")
         
         
@@ -818,15 +818,15 @@ def main():
             'textSize': textSize+2,                                                         
             'yLowLimit': None,                                                             
             'yUpperLimit': None,                                                        
-            'title': "Distribution of the detected errors",                             
-            'xlabel': 'Number of peers',                                   
+            'title': "Distribution of the Experienced Connection Errors",                             
+            'xlabel': 'Peers With Same Connection Error',                                   
             'ylabel': None,                                                
             'yticks': None, 
             'vGrids': True,                                                           
             'titleSize': titleSize+2,                                                        
             'labelSize': labelSize+2,                                                        
             'legendPosition': 1,
-            'legendTitle': 'Experienced errors',                                                   
+            'legendTitle': 'Recorded errors',                                                   
             'legendSize': labelSize-4,                                                       
             'xticksSize': ticksSize,                                                       
             'yticksSize': ticksSize+2,                                                            
