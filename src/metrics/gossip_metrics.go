@@ -14,6 +14,8 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/protolambda/rumor/metrics/export"
+	"github.com/protolambda/rumor/metrics/utils"
 	pgossip "github.com/protolambda/rumor/p2p/gossip"
 	"github.com/protolambda/rumor/p2p/gossip/database"
 	"github.com/protolambda/rumor/p2p/track"
@@ -22,14 +24,13 @@ import (
 
 type GossipMetrics struct {
 	GossipMetrics   sync.Map
-	ExtraMetrics    ExtraMetrics
 	MessageDatabase *database.MessageDatabase
 	StartTime       int64 // milliseconds
 }
 
 func NewGossipMetrics() GossipMetrics {
 	gm := GossipMetrics{
-		StartTime: GetTimeMiliseconds(),
+		StartTime: utils.GetTimeMiliseconds(),
 	}
 	return gm
 }
@@ -59,7 +60,7 @@ func (c *GossipMetrics) ImportMetrics(importFile string) (error, bool) {
 		if err != nil {
 			return err, true
 		}
-		tempMap := make(map[peer.ID]PeerMetrics, 0)
+		tempMap := make(map[peer.ID]utils.PeerMetrics, 0)
 		json.Unmarshal(byteValue, &tempMap)
 		// iterate to add the metrics from the json to the the GossipMetrics
 		for k, v := range tempMap {
@@ -80,78 +81,11 @@ type GossipState struct {
 	SeenFilter bool
 }
 
-// Base Struct for the topic name and the received messages on the different topics
-type PeerMetrics struct {
-	PeerId     peer.ID
-	NodeId     string
-	ClientType string
-	Pubkey     string
-	Addrs      string
-	Ip         string
-	Country    string
-	City       string
-	Latency    float64
-
-	ConnectionEvents []ConnectionEvents
-	// Counters for the different topics
-	BeaconBlock          MessageMetrics
-	BeaconAggregateProof MessageMetrics
-	VoluntaryExit        MessageMetrics
-	ProposerSlashing     MessageMetrics
-	AttesterSlashing     MessageMetrics
-	// Variables related to the SubNets (only needed for when Shards will be implemented)
-}
-
-func NewPeerMetrics(peerId peer.ID) PeerMetrics {
-	pm := PeerMetrics{
-		PeerId:     peerId,
-		NodeId:     "",
-		ClientType: "Unknown",
-		Pubkey:     "",
-		Addrs:      "/ip4/127.0.0.1/0000",
-		Ip:         "127.0.0.1",
-		Country:    "Unknown",
-		City:       "Unknown",
-		Latency:    0,
-
-		ConnectionEvents: make([]ConnectionEvents, 1),
-		// Counters for the different topics
-		BeaconBlock:          NewMessageMetrics(),
-		BeaconAggregateProof: NewMessageMetrics(),
-		VoluntaryExit:        NewMessageMetrics(),
-		ProposerSlashing:     NewMessageMetrics(),
-		AttesterSlashing:     NewMessageMetrics(),
-	}
-	return pm
-}
-
-func NewMessageMetrics() MessageMetrics {
-	mm := MessageMetrics{
-		Cnt:              0,
-		FirstMessageTime: 0,
-		LastMessageTime:  0,
-	}
-	return mm
-}
-
-// Connection event model
-type ConnectionEvents struct {
-	ConnectionType string
-	TimeMili       int64
-}
-
-// Information regarding the messages received on the beacon_lock topic
-type MessageMetrics struct {
-	Cnt              int64
-	FirstMessageTime int64
-	LastMessageTime  int64
-}
-
 // Function that Wraps/Marshals the content of the sync.Map to be exported as a json
 func (c *GossipMetrics) MarshalMetrics() ([]byte, error) {
-	tmpMap := make(map[string]PeerMetrics)
+	tmpMap := make(map[string]utils.PeerMetrics)
 	c.GossipMetrics.Range(func(k, v interface{}) bool {
-		tmpMap[k.(peer.ID).String()] = v.(PeerMetrics)
+		tmpMap[k.(peer.ID).String()] = v.(utils.PeerMetrics)
 		return true
 	})
 	return json.Marshal(tmpMap)
@@ -187,6 +121,22 @@ func GetFullAddress(multiAddrs []string) string {
 	return address
 }
 
+// Function that resets to 0 the connections/disconnections, and message counters
+// this way the Ram Usage gets limited (up to ~10k nodes for a 12h-24h )
+// NOTE: Keep in mind that the peers that we ended up connected to, will experience a weid connection time
+// TODO: Fix peers that stayed connected to the tool
+func (c *GossipMetrics) ResetDynamicMetrics() {
+	fmt.Println("Reseting Dynamic Metrics in Peer")
+	// Iterate throught the peers in the metrics, restarting connection events and messages
+	c.GossipMetrics.Range(func(key interface{}, value interface{}) bool {
+		p := value.(utils.PeerMetrics)
+		p.ResetDynamicMetrics()
+		c.GossipMetrics.Store(key, p)
+		return true
+	})
+	fmt.Println("Finished Reseting Dynamic Metrics")
+}
+
 // Function that iterates through the received peers and fills the missing information
 func (c *GossipMetrics) FillMetrics(ep track.ExtendedPeerstore) {
 	// to prevent the Filler from crashing (the url-service only accepts 45req/s)
@@ -196,7 +146,7 @@ func (c *GossipMetrics) FillMetrics(ep track.ExtendedPeerstore) {
 		// Read the info that we have from him
 		p, ok := c.GossipMetrics.Load(key)
 		if ok {
-			peerMetrics := p.(PeerMetrics)
+			peerMetrics := p.(utils.PeerMetrics)
 			peerData := ep.GetAllData(peerMetrics.PeerId)
 			//fmt.Println("Filling Metrics of Peer:", peerMetrics.PeerId.String())
 			if len(peerMetrics.NodeId) == 0 {
@@ -256,7 +206,7 @@ func (c *GossipMetrics) FillMetrics(ep track.ExtendedPeerstore) {
 }
 
 // Function that Exports the entire Metrics to a .json file (lets see if in the future we can add websockets or other implementations)
-func (c *GossipMetrics) ExportMetrics(filePath string, peerstorePath string, csvPath string, extraMetricsPath string, ep track.ExtendedPeerstore) error {
+func (c *GossipMetrics) ExportMetrics(filePath string, peerstorePath string, csvPath string, ep track.ExtendedPeerstore) error {
 	metrics, err := c.MarshalMetrics()
 	if err != nil {
 		fmt.Println("Error Marshalling the metrics")
@@ -278,16 +228,10 @@ func (c *GossipMetrics) ExportMetrics(filePath string, peerstorePath string, csv
 	}
 	// Generate the MetricsDataFrame of the Current Metrics
 	// Export the metrics to the given CSV file
-	mdf := NewMetricsDataFrame(c.GossipMetrics)
+	mdf := export.NewMetricsDataFrame(c.GossipMetrics)
 	err = mdf.ExportToCSV(csvPath)
 	if err != nil {
 		fmt.Printf("Error:", err)
-		return err
-	}
-	// Export the extra metrics to a csv
-	err = c.ExtraMetrics.ExportCSV(extraMetricsPath)
-	if err != nil {
-		fmt.Printf("Error exporting the Extra metrics:", err)
 		return err
 	}
 	return nil
@@ -376,27 +320,34 @@ func getIpAndLocationFromAddrs(multiAddrs string) (ip string, country string, ci
 
 // Add new peer with all the information from the peerstore to the metrics db
 // returns: Alredy (Bool)
-func (c *GossipMetrics) AddNewPeer(peerId peer.ID) {
+func (c *GossipMetrics) AddNewPeer(peerId peer.ID) bool {
+	fmt.Println("New Peer:", peerId.String())
 	_, ok := c.GossipMetrics.Load(peerId)
 	if !ok {
 		// We will just add the info that we have (the peerId)
-		peerMetrics := NewPeerMetrics(peerId)
+		peerMetrics := utils.NewPeerMetrics(peerId)
 		// Include it to the Peer DB
 		c.GossipMetrics.Store(peerId, peerMetrics)
 		// return that wasn't already on the peerstore
+		return false
 	}
+	return true
 }
 
 // Add a connection Event to the given peer
 func (c *GossipMetrics) AddConnectionEvent(peerId peer.ID, connectionType string) {
-	newConnection := ConnectionEvents{
+	newConnection := utils.ConnectionEvents{
 		ConnectionType: connectionType,
-		TimeMili:       GetTimeMiliseconds(),
+		TimeMili:       utils.GetTimeMiliseconds(),
 	}
+
 	pMetrics, ok := c.GossipMetrics.Load(peerId)
 	if ok {
-		peerMetrics := pMetrics.(PeerMetrics)
+		peerMetrics := pMetrics.(utils.PeerMetrics)
 		peerMetrics.ConnectionEvents = append(peerMetrics.ConnectionEvents, newConnection)
+		if connectionType == "Connection" {
+			peerMetrics.Connected = true
+		}
 		c.GossipMetrics.Store(peerId, peerMetrics)
 	} else {
 		// Might be possible to add
@@ -404,40 +355,11 @@ func (c *GossipMetrics) AddConnectionEvent(peerId peer.ID, connectionType string
 	}
 }
 
-// Increments the counter of the topic
-func (c *MessageMetrics) IncrementCnt() int64 {
-	c.Cnt++
-	return c.Cnt
-}
-
-// Stamps linux_time(millis) on the FirstMessageTime/LastMessageTime from given args: time (int64), flag string("first"/"last")
-func (c *MessageMetrics) StampTime(flag string) {
-	unixMillis := GetTimeMiliseconds()
-
-	switch flag {
-	case "first":
-		c.FirstMessageTime = unixMillis
-	case "last":
-		c.LastMessageTime = unixMillis
-	default:
-		fmt.Println("Metrics Package -> StampTime.flag wrongly parsed")
-	}
-}
-
-func GetTimeMiliseconds() int64 {
-	now := time.Now()
-	//secs := now.Unix()
-	nanos := now.UnixNano()
-	millis := nanos / 1000000
-
-	return millis
-}
-
 // Function that Manages the metrics updates for the incoming messages
 func (c *GossipMetrics) IncomingMessageManager(peerId peer.ID, topicName string) error {
 	pMetrics, _ := c.GossipMetrics.Load(peerId)
 	//fmt.Println("the loaded", pMetrics)
-	peerMetrics := pMetrics.(PeerMetrics)
+	peerMetrics := pMetrics.(utils.PeerMetrics)
 	messageMetrics, err := GetMessageMetrics(&peerMetrics, topicName)
 	if err != nil {
 		return errors.New("Topic Name no supported")
@@ -455,7 +377,7 @@ func (c *GossipMetrics) IncomingMessageManager(peerId peer.ID, topicName string)
 	return nil
 }
 
-func GetMessageMetrics(c *PeerMetrics, topicName string) (mesMetr *MessageMetrics, err error) {
+func GetMessageMetrics(c *utils.PeerMetrics, topicName string) (mesMetr *utils.MessageMetrics, err error) {
 	// All this could be inside a different function
 	switch topicName {
 	case pgossip.BeaconBlock:

@@ -93,9 +93,9 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host) {
 				for reset != nil {
 					p := randomPeer(peerList)
 					// loop until we arrive to a peer that we didn't connect before
-					exists := c.GossipMetrics.ExtraMetrics.AddNewPeer(p)
+					exists := c.GossipMetrics.AddNewPeer(p)
 					if exists == true {
-						connected := c.GossipMetrics.ExtraMetrics.CheckIdConnected(p)
+						connected := c.GossipMetrics.CheckIfConnected(p)
 						if connected == true {
 							continue
 						} else if len(peerCache) == peerstoreLen {
@@ -128,11 +128,12 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host) {
 						if err := h.Connect(ctx, addrInfo); err != nil {
 							// the connetion failed
 							attempts += 1
-							c.GossipMetrics.ExtraMetrics.AddNewAttempt(p, false, err.Error())
+							c.GossipMetrics.AddNewConnectionAttempt(p, false, err.Error())
 							c.Log.WithError(err).Warnf("attempts %d failed connection attempt", attempts)
+							continue
 						} else { // connection successfuly made
 							c.Log.Infof("peer_id %s successful connection made", p)
-							c.GossipMetrics.ExtraMetrics.AddNewAttempt(p, true, "None")
+							c.GossipMetrics.AddNewConnectionAttempt(p, true, "None")
 							// break the loop
 							break
 						}
@@ -143,6 +144,7 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host) {
 					// if the reset flag is active, kill the go-routine
 					if reset == nil {
 						c.Log.Infof("Channel reset has been closed")
+						return
 					}
 
 				}
@@ -153,6 +155,7 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host) {
 			// Check if we have received any quit signal
 			if quit == nil {
 				c.Log.Infof("Channel Quit has been closed")
+				return
 			}
 		}
 		c.Log.Infof("Go routine to randomly connect has been canceled")

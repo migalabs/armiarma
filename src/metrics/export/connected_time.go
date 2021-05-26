@@ -1,4 +1,4 @@
-package metrics
+package export
 
 type ConnectedTimeList []float64 // in minutes
 

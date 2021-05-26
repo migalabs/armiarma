@@ -1,13 +1,15 @@
-package metrics
+package export
 
 import (
 	"strings"
+
+	"github.com/protolambda/rumor/metrics/utils"
 )
 
 // Connection Utils
 
 // filter the received Connection/Disconnection events generating a counter and the connected time
-func AnalyzeConnectionEvents(eventList []ConnectionEvents, currentTime int64) (int64, int64, float64) {
+func AnalyzeConnectionEvents(eventList []utils.ConnectionEvents, currentTime int64) (int64, int64, float64) {
 	var startingTime int64 = 0
 	var finishingTime int64 = 0
 	// aux variables

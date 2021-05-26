@@ -1,13 +1,14 @@
-package metrics
+package export
 
 import (
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
 	"sync"
-	"sort"
 
-    "github.com/protolambda/rumor/metrics/custom"
+	"github.com/protolambda/rumor/metrics/custom"
+	"github.com/protolambda/rumor/metrics/utils"
 )
 
 // Main Data Structure that will be used to analyze and plot the metrics
@@ -24,6 +25,13 @@ type MetricsDataFrame struct {
 	Countries      CountryList
 	Cities         CityList
 	Latencies      LatencyList
+
+	// Connection Related
+	Attempted AttemptedList
+	Succeed   SucceedList
+	Connected ConnectedList
+	Attempts  AttemptsList
+	Errors    ErrorList
 
 	// Metrics Related
 	Connections    ConnectionList
@@ -48,12 +56,12 @@ func NewMetricsDataFrame(metricsCopy sync.Map) *MetricsDataFrame {
 	// Initialize the DataFrame with the expoting time
 	mdf := &MetricsDataFrame{
 		Len:        0,
-		ExportTime: GetTimeMiliseconds(),
+		ExportTime: utils.GetTimeMiliseconds(),
 	}
 	// Generate the loop over each peer of the Metrics
 	metricsCopy.Range(func(k, val interface{}) bool {
-		var v PeerMetrics
-		v = val.(PeerMetrics)
+		var v utils.PeerMetrics
+		v = val.(utils.PeerMetrics)
 		mdf.PeerIds.AddItem(v.PeerId)
 		mdf.NodeIds.AddItem(v.NodeId)
 		mdf.UserAgent.AddItem(v.ClientType)
@@ -67,6 +75,12 @@ func NewMetricsDataFrame(metricsCopy sync.Map) *MetricsDataFrame {
 		mdf.Countries.AddItem(v.Country)
 		mdf.Cities.AddItem(v.City)
 		mdf.Latencies.AddItem(v.Latency) // in milliseconds
+		// Add connection status to the CSV
+		mdf.Attempted.AddItem(v.Attempted)
+		mdf.Succeed.AddItem(v.Succeed)
+		mdf.Connected.AddItem(v.Connected)
+		mdf.Attempts.AddItem(v.Attempts)
+		mdf.Errors.AddItem(v.Error)
 		// Analyze the connections from the events
 		connections, disconnections, connTime := AnalyzeConnectionEvents(v.ConnectionEvents, mdf.ExportTime)
 		mdf.Connections.AddItem(connections)
@@ -97,7 +111,7 @@ func (mdf MetricsDataFrame) ExportToCSV(filePath string) error {
 	}
 	defer csvFile.Close()
 	// First raw of the file will be the Titles of the columns
-	_, err = csvFile.WriteString("Peer Id,Node Id,User Agent,Client,Version,Pubkey,Address,Ip,Country,City,Latency,Connections,Disconnections,Connected Time,Beacon Blocks,Beacon Aggregations,Voluntary Exits,Proposer Slashings,Attester Slashings,Total Messages\n")
+	_, err = csvFile.WriteString("Peer Id,Node Id,User Agent,Client,Version,Pubkey,Address,Ip,Country,City,Attempted,Succeed,Connected,Attempts,Error,Latency,Connections,Disconnections,Connected Time,Beacon Blocks,Beacon Aggregations,Voluntary Exits,Proposer Slashings,Attester Slashings,Total Messages\n")
 	if err != nil {
 		return fmt.Errorf("Error while Writing the Titles on the csv")
 	}
@@ -106,12 +120,14 @@ func (mdf MetricsDataFrame) ExportToCSV(filePath string) error {
 		var csvRow string
 		// special case for the latency
 		lat := fmt.Sprint(mdf.Latencies.GetByIndex(idx))
-        conTime := fmt.Sprintf("%.3f", mdf.ConnectedTimes.GetByIndex(idx))
+		conTime := fmt.Sprintf("%.3f", mdf.ConnectedTimes.GetByIndex(idx))
 		csvRow = mdf.PeerIds.GetByIndex(idx).String() + "," + mdf.NodeIds.GetByIndex(idx) + "," + mdf.UserAgent.GetByIndex(idx) + "," + mdf.ClientTypes.GetByIndex(idx) + "," +
 			mdf.ClientVersions.GetByIndex(idx) + "," + mdf.PubKeys.GetByIndex(idx) + "," + mdf.Addresses.GetByIndex(idx) + "," + mdf.Ips.GetByIndex(idx) + "," +
-			mdf.Countries.GetByIndex(idx) + "," + mdf.Cities.GetByIndex(idx) + "," + lat + "," + strconv.Itoa(int(mdf.Connections.GetByIndex(idx))) + "," +
+			mdf.Countries.GetByIndex(idx) + "," + mdf.Cities.GetByIndex(idx) + "," + lat + "," + strconv.FormatBool(mdf.Attempted.GetByIndex(idx)) + "," +
+			strconv.FormatBool(mdf.Succeed.GetByIndex(idx)) + "," + strconv.FormatBool(mdf.Connected.GetByIndex(idx)) + "," + strconv.Itoa(mdf.Attempts.GetByIndex(idx)) + "," + mdf.Errors.GetByIndex(idx) + "," + strconv.Itoa(int(mdf.Connections.GetByIndex(idx))) + "," +
 			strconv.Itoa(int(mdf.Disconnections.GetByIndex(idx))) + "," + conTime + "," + strconv.Itoa(int(mdf.RBeaconBlocks.GetByIndex(idx))) + "," + strconv.Itoa(int(mdf.RBeaconAggregations.GetByIndex(idx))) + "," +
-			strconv.Itoa(int(mdf.RVoluntaryExits.GetByIndex(idx))) + "," + strconv.Itoa(int(mdf.RProposerSlashings.GetByIndex(idx))) + "," + strconv.Itoa(int(mdf.RAttesterSlashings.GetByIndex(idx))) + "," + strconv.Itoa(int(mdf.RTotalMessages.GetByIndex(idx))) + "\n"
+			strconv.Itoa(int(mdf.RVoluntaryExits.GetByIndex(idx))) + "," + strconv.Itoa(int(mdf.RProposerSlashings.GetByIndex(idx))) + "," + strconv.Itoa(int(mdf.RAttesterSlashings.GetByIndex(idx))) + "," +
+			strconv.Itoa(int(mdf.RTotalMessages.GetByIndex(idx))) + "\n"
 		_, err = csvFile.WriteString(csvRow)
 		if err != nil {
 			return fmt.Errorf("Error while Writing the Titles on the csv")
@@ -126,7 +142,7 @@ func GetMetricsDuplicate(original sync.Map) sync.Map {
 	var newMap sync.Map
 	// Iterate through the items on the original Map
 	original.Range(func(k, v interface{}) bool {
-		cp, ok := v.(PeerMetrics)
+		cp, ok := v.(utils.PeerMetrics)
 		if ok {
 			newMap.Store(k, cp)
 		}
@@ -135,9 +151,8 @@ func GetMetricsDuplicate(original sync.Map) sync.Map {
 	return newMap
 }
 
-
 // Function that iterates through the peers keeping track of the client type, and versions
-func (df MetricsDataFrame) AnalyzeClientType(clientname string) custom.Client{
+func (df MetricsDataFrame) AnalyzeClientType(clientname string) custom.Client {
 	client := custom.NewClient()
 	clicnt := 0
 	versions := make(map[string]int, 0)
@@ -149,7 +164,7 @@ func (df MetricsDataFrame) AnalyzeClientType(clientname string) custom.Client{
 			// add the version to the map or increase the actual counter
 			ver := df.ClientVersions.GetByIndex(idx)
 			//x := versions[ver]
-			versions[ver] += 1				
+			versions[ver] += 1
 		}
 	}
 	// after reading the entire metrics we can generate the custom.Client struct
