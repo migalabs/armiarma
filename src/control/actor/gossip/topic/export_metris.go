@@ -2,7 +2,9 @@ package topic
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"strconv"
 	"time"
@@ -50,7 +52,7 @@ func (c *TopicExportMetricsCmd) Run(ctx context.Context, args ...string) error {
 	customMetrics := custom.NewCustomMetrics()
 	c.Log.Info("Checking for existing Metrics on Project ...")
 	// Check if Previous GossipMetrics were generated
-	err, fileExists := c.GossipMetrics.ImportMetrics(c.RawFilePath)
+	err, fileExists := c.GossipMetrics.ImportMetrics(c.MetricsFolderPath)
 	if fileExists && err != nil {
 		c.Log.Error("Error Importing the metrics from the previous file", err)
 	}
@@ -166,7 +168,13 @@ func (c *TopicExportMetricsCmd) UpdateFilesAndFolders(t time.Time) {
 	year := strconv.Itoa(t.Year())
 	month := t.Month().String()
 	day := strconv.Itoa(t.Day())
-	hour := strconv.Itoa(t.Hour())
+	h := t.Hour()
+	var hour string
+	if h < 10 {
+		hour = "0" + strconv.Itoa(h)
+	} else {
+		hour = strconv.Itoa(h)
+	}
 	m := t.Minute()
 	var minute string
 	if m < 10 {
@@ -174,7 +182,8 @@ func (c *TopicExportMetricsCmd) UpdateFilesAndFolders(t time.Time) {
 	} else {
 		minute = strconv.Itoa(m)
 	}
-	folderName := c.MetricsFolderPath + "/" + "metrics" + "/" + year + "-" + month + "-" + day + "-" + hour + ":" + minute
+	date := year + "-" + month + "-" + day + "-" + hour + ":" + minute
+	folderName := c.MetricsFolderPath + "/" + "metrics" + "/" + date
 	// generate new metrics folder
 	if _, err := os.Stat(folderName); os.IsNotExist(err) {
 		c.Log.Warnf("making folder:", folderName)
@@ -186,6 +195,13 @@ func (c *TopicExportMetricsCmd) UpdateFilesAndFolders(t time.Time) {
 	c.PeerstorePath = folderName + "/" + "peerstore.json"
 	c.CsvPath = folderName + "/" + "metrics.csv"
 	c.Log.Warnf("New exporting folder:", folderName)
+
+	// Update the last checkpoint
+	err := GenCheckpointFile(c.MetricsFolderPath, date)
+	if err != nil {
+		c.Log.Warn(err)
+		fmt.Println(err)
+	}
 }
 
 func (c *TopicExportMetricsCmd) ExportSecuence(start time.Time, cm *custom.CustomMetrics) {
@@ -212,4 +228,25 @@ func (c *TopicExportMetricsCmd) ExportSecuence(start time.Time, cm *custom.Custo
 	if err != nil {
 		c.Log.Warn(err)
 	}
+}
+
+// Function that writes in a file the folder name of the last checkpoint generated in the project
+// DOUBT: Write path relative or absolute? dunno
+func GenCheckpointFile(cpPath string, lastCP string) error {
+	cp := metrics.Checkpoint{
+		Checkpoint: lastCP,
+	}
+	cpFile := cpPath + "/metrics/checkpoint-folder.json"
+	fmt.Println("Checkpoint File:", cpFile)
+	jb, err := json.Marshal(cp)
+	if err != nil {
+		fmt.Println("Error Marshalling last Checkpoint")
+		return err
+	}
+	err = ioutil.WriteFile(cpFile, jb, 0644)
+	if err != nil {
+		fmt.Println("Error opening file: ", cpFile)
+		return err
+	}
+	return nil
 }

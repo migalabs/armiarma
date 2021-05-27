@@ -45,30 +45,54 @@ func FileExists(name string) bool {
 	return true
 }
 
+type Checkpoint struct {
+	Checkpoint string `json:"checkpoint"`
+}
+
 // Import an old GossipMetrics from given file
 // return: - return error if there was error while reading the file
 //         - return bool for existing file (true if there was a file to read, return false if there wasn't a file to read)
-func (c *GossipMetrics) ImportMetrics(importFile string) (error, bool) {
-	// Check if file exist
-	if FileExists(importFile) { // if exists, read it
+func (c *GossipMetrics) ImportMetrics(importFolder string) (error, bool) {
+	// Check if there is any checkpoint file in the folder
+	cpFile := importFolder + "/metrics/checkpoint-folder.json"
+	if FileExists(cpFile) { // if exists, read it
 		// get the json of the file
-		fmt.Println("Importing Previous Json:", importFile)
-		jsonFile, err := os.Open(importFile)
+		fmt.Println("Importing Checkpoint Json:", cpFile)
+		cp, err := os.Open(cpFile)
 		if err != nil {
 			return err, true
 		}
-		byteValue, err := ioutil.ReadAll(jsonFile)
+		cpBytes, err := ioutil.ReadAll(cp)
 		if err != nil {
 			return err, true
 		}
-		tempMap := make(map[peer.ID]utils.PeerMetrics)
-		json.Unmarshal(byteValue, &tempMap)
-		// iterate to add the metrics from the json to the the GossipMetrics
-		for k, v := range tempMap {
-			c.GossipMetrics.Store(k, v)
+		cpFolder := Checkpoint{}
+		json.Unmarshal(cpBytes, &cpFolder)
+		importFile := importFolder + "/metrics/" + cpFolder.Checkpoint + "/gossip-metrics.json"
+		// Check if file exist
+		if FileExists(importFile) { // if exists, read it
+			// get the json of the file
+			fmt.Println("Importing Gossip-Metrics Json:", importFile)
+			jsonFile, err := os.Open(importFile)
+			if err != nil {
+				return err, true
+			}
+			byteValue, err := ioutil.ReadAll(jsonFile)
+			if err != nil {
+				return err, true
+			}
+			tempMap := make(map[peer.ID]utils.PeerMetrics)
+			json.Unmarshal(byteValue, &tempMap)
+			// iterate to add the metrics from the json to the the GossipMetrics
+			for k, v := range tempMap {
+				c.GossipMetrics.Store(k, v)
+			}
+			return nil, true
+		} else {
+			return nil, false
 		}
-		return nil, true
 	} else {
+		fmt.Println("NO previous Checkpoint")
 		return nil, false
 	}
 }

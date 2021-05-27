@@ -10,10 +10,5 @@ else
     mkdir "${metricsFolder}/metrics"
 fi
 
-# Set the names of the files that will be pased as arg to the command
-#filepath="${metricsFolder}/metrics/gossip-metrics.json"
-#peerstorepath="${metricsFolder}/metrics/peerstore.json"
-#customMetricsPath="${metricsFolder}/metrics/custom-metrics.json"
-#csvpath="${metricsFolder}/metrics/metrics.csv"
 
-gossip topic export-metrics --metrics-folder-path="$metricsFolder" --export-period=1h --backup-period=15m
+gossip topic export-metrics --metrics-folder-path="$metricsFolder" --export-period=1m --backup-period=15s
