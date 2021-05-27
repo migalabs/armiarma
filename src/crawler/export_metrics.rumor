@@ -15,6 +15,5 @@ fi
 #peerstorepath="${metricsFolder}/metrics/peerstore.json"
 #customMetricsPath="${metricsFolder}/metrics/custom-metrics.json"
 #csvpath="${metricsFolder}/metrics/metrics.csv"
-#extraMetricsPath="${metricsFolder}/metrics/extra-metrics.csv"
 
-gossip topic export-metrics --metrics-folder-path="$metricsFolder" --export-period=5m --backup-period=30s
+gossip topic export-metrics --metrics-folder-path="$metricsFolder" --export-period=1h --backup-period=15m

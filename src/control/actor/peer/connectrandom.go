@@ -4,6 +4,7 @@ import (
 	"context"
 	"math/rand"
 	"time"
+	"fmt"
 
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -139,25 +140,30 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host) {
 						}
 						if attempts > c.MaxRetries {
 							c.Log.Warnf("attempts %d failed connection attempt, reached maximum, no retry", attempts)
+							break
 						}
 					}
 					// if the reset flag is active, kill the go-routine
 					if reset == nil {
 						c.Log.Infof("Channel reset has been closed")
+						fmt.Println("reset has been activated, closing loop?")
 						return
 					}
-
 				}
+				fmt.Println("reset has been activated, closing the routine")
 			}()
 			time.Sleep(c.Rescan)
+			fmt.Println("closing reset")
 			close(reset)
 
 			// Check if we have received any quit signal
 			if quit == nil {
 				c.Log.Infof("Channel Quit has been closed")
+				fmt.Println("Quit has been closed")
 				return
 			}
 		}
 		c.Log.Infof("Go routine to randomly connect has been canceled")
+		fmt.Println("Go routine to randomly connect has been canceled")
 	}()
 }

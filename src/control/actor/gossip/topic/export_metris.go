@@ -58,13 +58,16 @@ func (c *TopicExportMetricsCmd) Run(ctx context.Context, args ...string) error {
 		c.Log.Info("Not previous metrics found, generating new ones")
 	}
 	c.Log.Infof("Exporting Every %d , with a backup every %d", c.ExportPeriod, c.BackupPeriod)
+	fmt.Println("Exporting Every ", c.ExportPeriod, " with a backup every", c.BackupPeriod)
 	stopping := false
 	go func() {
 		t := time.Now()
+		fmt.Println("Initial time:", t)
 		c.UpdateFilesAndFolders(t)
 
 		// loop to export the metrics every Backup and Period time
 		for {
+			fmt.Println("Begining of the exporting loop")
 			if stopping {
 				_ = c.GossipMetrics.ExportMetrics(c.RawFilePath, c.PeerstorePath, c.CsvPath, c.Store)
 				c.Log.Infof("Metrics Export Stopped")
@@ -91,7 +94,10 @@ func (c *TopicExportMetricsCmd) Run(ctx context.Context, args ...string) error {
 			// Check Backup period to wait for next round
 			exportStepDuration := time.Since(start)
 			if exportStepDuration < c.BackupPeriod {
-				time.Sleep(c.ExportPeriod - exportStepDuration)
+				fmt.Println("Waiting to run new backup export")
+				wt := c.BackupPeriod - exportStepDuration
+				fmt.Println("Waiting time:", wt)
+				time.Sleep(wt)
 			}
 			// Check if the Export Period has been accomplished (generate new forlde for the metrics)
 			tnow := time.Since(t)
@@ -115,8 +121,6 @@ func (c *TopicExportMetricsCmd) Run(ctx context.Context, args ...string) error {
 
 // fulfil the info from the Custom Metrics
 func FilCustomMetrics(gm *metrics.GossipMetrics, ps track.ExtendedPeerstore, cm *custom.CustomMetrics, h host.Host) error {
-	// TODO: - Generate and do the client version stuff
-
 	// Get total peers in peerstore
 	peerstoreLen := custom.TotalPeers(h)
 	// get the connection status for each of the peers in the extra-metrics
@@ -187,6 +191,7 @@ func (c *TopicExportMetricsCmd) UpdateFilesAndFolders(t time.Time) {
 
 func (c *TopicExportMetricsCmd) ExportSecuence(start time.Time, cm *custom.CustomMetrics) {
 	// Export The metrics
+	fmt.Println("exporting metrics")
 	c.GossipMetrics.FillMetrics(c.Store)
 	err := c.GossipMetrics.ExportMetrics(c.RawFilePath, c.PeerstorePath, c.CsvPath, c.Store)
 	if err != nil {

@@ -173,7 +173,7 @@ LaunchCrawler(){
         echo ""
 
         # Finaly launch Rumor form the Network File (showing the logs on terminal mode)
-        ../../src/bin/armiarma file launcher.rumor --formatter="terminal" --level="info"
+        sh -c 'echo "PID of the crawler: $$"; echo ""; exec ../../src/bin/armiarma file launcher.rumor --formatter="terminal" --level="error"'
         # Check if the compilation has been successful
         exec_error="$?"
         if [[ "$exec_error" -ne "0" ]]
@@ -300,6 +300,8 @@ LaunchGeneralResults(){
 
 # 0. Get the options
 go version
+pid="$!"
+echo "PID: $pid"
 
 # Generate the examples folder
 if [[ -d ./examples ]]; then
