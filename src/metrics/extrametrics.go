@@ -19,7 +19,7 @@ func (gm *GossipMetrics) AddNewConnectionAttempt(id peer.ID, succeed bool, err s
 	// Update the counter and connection status
 	p := v.(utils.PeerMetrics)
 
-	if p.Attempted == false {
+	if !p.Attempted {
 		p.Attempted = true
 		//fmt.Println("Original ", err)
 		// MIGHT be nice to try if we can change the uncertain errors for the dial backoff
@@ -27,7 +27,7 @@ func (gm *GossipMetrics) AddNewConnectionAttempt(id peer.ID, succeed bool, err s
 			p.Error = FilterError(err)
 		}
 	}
-	if succeed == true {
+	if succeed {
 		p.Succeed = succeed
 		p.Error = "None"
 	}
@@ -64,7 +64,7 @@ func (gm *GossipMetrics) CheckIfConnected(id peer.ID) bool {
 	}
 	// Check if the peer was connected
 	p := v.(utils.PeerMetrics)
-	if p.Succeed == true {
+	if p.Succeed {
 		return true
 	} else {
 		return false
@@ -98,12 +98,6 @@ func (gm *GossipMetrics) GetConnectionMetrics(h host.Host) (int, int, int) {
 	peerList := h.Peerstore().Peers()
 	peerstoreLen := len(peerList)
 	notattempted = notattempted + (peerstoreLen - totalrecorded)
-	fmt.Println("Total Peerstore, Total Tracked, Succeed, Failed, Not Attempted")
-	fmt.Println(peerstoreLen, totalrecorded, succeed, failed, notattempted)
-	t := (succeed + failed + notattempted)
-	if t != peerstoreLen {
-		fmt.Println("Extra Metrics and Peerstore don't match", t, peerstoreLen)
-	}
 	// MAYBE -> include here the error reader?
 	return succeed, failed, notattempted
 }
@@ -121,7 +115,7 @@ func (gm *GossipMetrics) GetErrorCounter(h host.Host) (int, int, int, int, int) 
 	gm.GossipMetrics.Range(func(key interface{}, value interface{}) bool {
 		p := value.(utils.PeerMetrics)
 		// Catalog each of the peers for the experienced status
-		if p.Attempted && p.Succeed == false { // atempted and failed should have generated an error
+		if p.Attempted && !p.Succeed { // atempted and failed should have generated an error
 			erro := p.Error
 			totalfailed += 1
 			switch erro {
@@ -141,8 +135,6 @@ func (gm *GossipMetrics) GetErrorCounter(h host.Host) (int, int, int, int, int) 
 		}
 		return true
 	})
-	fmt.Println("totalerrors, resetbypeer, timeout, dialtoself, dialbackoff, uncertain")
-	fmt.Println(totalfailed, resetbypeer, timeout, dialtoself, dialbackoff, uncertain)
 	return resetbypeer, timeout, dialtoself, dialbackoff, uncertain
 }
 

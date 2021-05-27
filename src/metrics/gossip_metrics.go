@@ -52,6 +52,7 @@ func (c *GossipMetrics) ImportMetrics(importFile string) (error, bool) {
 	// Check if file exist
 	if FileExists(importFile) { // if exists, read it
 		// get the json of the file
+		fmt.Println("Importing Previous Json:", importFile)
 		jsonFile, err := os.Open(importFile)
 		if err != nil {
 			return err, true
@@ -60,7 +61,7 @@ func (c *GossipMetrics) ImportMetrics(importFile string) (error, bool) {
 		if err != nil {
 			return err, true
 		}
-		tempMap := make(map[peer.ID]utils.PeerMetrics, 0)
+		tempMap := make(map[peer.ID]utils.PeerMetrics)
 		json.Unmarshal(byteValue, &tempMap)
 		// iterate to add the metrics from the json to the the GossipMetrics
 		for k, v := range tempMap {
@@ -93,8 +94,7 @@ func (c *GossipMetrics) MarshalMetrics() ([]byte, error) {
 
 // Function that Wraps/Marshals the content of the Entire Peerstore into a json
 func (c *GossipMetrics) MarshalPeerStore(ep track.ExtendedPeerstore) ([]byte, error) {
-	var peers []peer.ID
-	peers = ep.Peers()
+	peers := ep.Peers()
 	peerData := make(map[string]*track.PeerAllData)
 	for _, p := range peers {
 		peerData[p.String()] = ep.GetAllData(p)
@@ -231,7 +231,7 @@ func (c *GossipMetrics) ExportMetrics(filePath string, peerstorePath string, csv
 	mdf := export.NewMetricsDataFrame(c.GossipMetrics)
 	err = mdf.ExportToCSV(csvPath)
 	if err != nil {
-		fmt.Printf("Error:", err)
+		fmt.Println("Error:", err)
 		return err
 	}
 	return nil

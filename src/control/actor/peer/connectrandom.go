@@ -2,9 +2,9 @@ package peer
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 	"time"
-	"fmt"
 
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -45,7 +45,7 @@ func (c *PeerConnectRandomCmd) Run(ctx context.Context, args ...string) error {
 	if err != nil {
 		return err
 	}
-
+	fmt.Println("Peerstore Rescan Every:", c.Rescan)
 	bgCtx, bgCancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 	go func() {
@@ -56,6 +56,7 @@ func (c *PeerConnectRandomCmd) Run(ctx context.Context, args ...string) error {
 	c.Control.RegisterStop(func(ctx context.Context) error {
 		bgCancel()
 		c.Log.Infof("Stopped auto-connecting")
+		fmt.Println("Stop Autoconnected")
 		<-done
 		return nil
 	})
@@ -80,7 +81,7 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host) {
 	// set up the loop where every given time we will stop it to refresh the peerstore
 	go func() {
 		for quit != nil {
-			reset := make(chan struct{})
+			reset := false
 			go func() {
 				// generate a "cache of peers in this raw"
 				peerCache := make(map[peer.ID]bool)
@@ -91,13 +92,13 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host) {
 				peerstoreLen := len(peerList)
 				c.Log.Infof("len peerlist: %s", peerstoreLen)
 				// loop to attempt connetions for the given time
-				for reset != nil {
+				for !reset {
 					p := randomPeer(peerList)
 					// loop until we arrive to a peer that we didn't connect before
 					exists := c.GossipMetrics.AddNewPeer(p)
-					if exists == true {
+					if exists {
 						connected := c.GossipMetrics.CheckIfConnected(p)
-						if connected == true {
+						if connected {
 							continue
 						} else if len(peerCache) == peerstoreLen {
 							return // Temporary commented
@@ -143,24 +144,16 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host) {
 							break
 						}
 					}
-					// if the reset flag is active, kill the go-routine
-					if reset == nil {
-						c.Log.Infof("Channel reset has been closed")
-						fmt.Println("reset has been activated, closing loop?")
-						return
-					}
 				}
-				fmt.Println("reset has been activated, closing the routine")
 			}()
 			time.Sleep(c.Rescan)
-			fmt.Println("closing reset")
-			close(reset)
+			reset = true
 
 			// Check if we have received any quit signal
 			if quit == nil {
 				c.Log.Infof("Channel Quit has been closed")
 				fmt.Println("Quit has been closed")
-				return
+				break
 			}
 		}
 		c.Log.Infof("Go routine to randomly connect has been canceled")

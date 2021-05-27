@@ -67,7 +67,6 @@ func (c *TopicExportMetricsCmd) Run(ctx context.Context, args ...string) error {
 
 		// loop to export the metrics every Backup and Period time
 		for {
-			fmt.Println("Begining of the exporting loop")
 			if stopping {
 				_ = c.GossipMetrics.ExportMetrics(c.RawFilePath, c.PeerstorePath, c.CsvPath, c.Store)
 				c.Log.Infof("Metrics Export Stopped")
