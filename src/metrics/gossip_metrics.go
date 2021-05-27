@@ -321,7 +321,6 @@ func getIpAndLocationFromAddrs(multiAddrs string) (ip string, country string, ci
 // Add new peer with all the information from the peerstore to the metrics db
 // returns: Alredy (Bool)
 func (c *GossipMetrics) AddNewPeer(peerId peer.ID) bool {
-	fmt.Println("New Peer:", peerId.String())
 	_, ok := c.GossipMetrics.Load(peerId)
 	if !ok {
 		// We will just add the info that we have (the peerId)
