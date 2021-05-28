@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"runtime/debug"
 	"strconv"
 	"time"
 
@@ -100,7 +101,7 @@ func (c *TopicExportMetricsCmd) Run(ctx context.Context, args ...string) error {
 				fmt.Println("Waiting time:", wt)
 				time.Sleep(wt)
 			}
-			// Check if the Export Period has been accomplished (generate new forlde for the metrics)
+			// Check if the Export Period has been accomplished (generate new folder for the metrics)
 			tnow := time.Since(t)
 			if tnow >= c.ExportPeriod {
 				c.Log.Infof("Exporting Metrics changing to Folder")
@@ -108,6 +109,8 @@ func (c *TopicExportMetricsCmd) Run(ctx context.Context, args ...string) error {
 				c.UpdateFilesAndFolders(t)
 				c.ExportSecuence(t, &customMetrics)
 				c.GossipMetrics.ResetDynamicMetrics()
+				// Force Memmory Free from the Garbage Collector
+				debug.FreeOSMemory()
 			}
 		}
 	}()

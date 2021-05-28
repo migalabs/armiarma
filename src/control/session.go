@@ -5,12 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/protolambda/rumor/control/actor"
-	"github.com/sirupsen/logrus"
 	"io"
-	"mvdan.cc/sh/v3/expand"
-	"mvdan.cc/sh/v3/interp"
-	"mvdan.cc/sh/v3/syntax"
 	"os"
 	"path"
 	"path/filepath"
@@ -19,6 +14,12 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/protolambda/rumor/control/actor"
+	"github.com/sirupsen/logrus"
+	"mvdan.cc/sh/v3/expand"
+	"mvdan.cc/sh/v3/interp"
+	"mvdan.cc/sh/v3/syntax"
 )
 
 type EnvGlobal interface {
