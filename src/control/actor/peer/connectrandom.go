@@ -80,10 +80,16 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host) {
 	defer close(quit)
 	// set up the loop where every given time we will stop it to refresh the peerstore
 	go func() {
+		loopCount := 0
+		peerCache := make(map[peer.ID]bool)
 		for quit != nil {
-			go func() {
+			if loopCount >= 10 {
+				fmt.Println("Reseting cache")
 				// generate a "cache of peers in this raw"
-				peerCache := make(map[peer.ID]bool)
+				peerCache = make(map[peer.ID]bool)
+				loopCount = 0
+			}
+			go func() {
 				// make the first copy of the peerstore
 				p := h.Peerstore()
 				peerList := p.Peers()
@@ -96,16 +102,12 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host) {
 				for {
 					p := randomPeer(peerList)
 					// loop until we arrive to a peer that we didn't connect before
-					exists := c.GossipMetrics.AddNewPeer(p)
-					if exists {
-						connected := c.GossipMetrics.CheckIfConnected(p)
-						if connected {
-							continue
-						} else if len(peerCache) == peerstoreLen {
-							return // Temporary commented
-						} else { // if we didn't crawl all the peers in the peerstore, don't loose time trying to reconnect failed peers in the past
-							continue
-						}
+					_ = c.GossipMetrics.AddNewPeer(p)
+					val, _ := peerCache[p]
+					if val {
+						continue
+					} else if len(peerCache) == peerstoreLen {
+						return // Temporary commented
 					}
 					// add peer to the peerCache for this round
 					peerCache[p] = true
@@ -161,6 +163,7 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host) {
 				fmt.Println("Quit has been closed")
 				break
 			}
+			loopCount += 1
 		}
 		c.Log.Infof("Go routine to randomly connect has been canceled")
 		fmt.Println("Go routine to randomly connect has been canceled")

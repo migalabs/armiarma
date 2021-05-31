@@ -3,12 +3,13 @@ package metadata
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/protolambda/rumor/control/actor/base"
 	"github.com/protolambda/rumor/control/actor/flags"
 	"github.com/protolambda/rumor/p2p/rpc/reqresp"
 	"github.com/protolambda/rumor/p2p/track"
 	"github.com/sirupsen/logrus"
-	"time"
 )
 
 type PeerMetadataReqCmd struct {

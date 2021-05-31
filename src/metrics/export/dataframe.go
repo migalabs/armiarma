@@ -33,6 +33,10 @@ type MetricsDataFrame struct {
 	Attempts  AttemptsList
 	Errors    ErrorList
 
+	// Metadata Related
+	RequestedMetadata RequestedMetadataList
+	SuccessMetadata   SuccessMetadataList
+
 	// Metrics Related
 	Connections    ConnectionList
 	Disconnections DisconnectionList
@@ -81,6 +85,9 @@ func NewMetricsDataFrame(metricsCopy sync.Map) *MetricsDataFrame {
 		mdf.Connected.AddItem(v.Connected)
 		mdf.Attempts.AddItem(v.Attempts)
 		mdf.Errors.AddItem(v.Error)
+		// Metadata infomation
+		mdf.RequestedMetadata.AddItem(v.MetadataRequest)
+		mdf.SuccessMetadata.AddItem(v.MetadataSucceed)
 		// Analyze the connections from the events
 		connections, disconnections, connTime := AnalyzeConnectionEvents(v.ConnectionEvents, mdf.ExportTime)
 		mdf.Connections.AddItem(connections)
@@ -123,7 +130,7 @@ func (mdf MetricsDataFrame) ExportToCSV(filePath string) error {
 		conTime := fmt.Sprintf("%.3f", mdf.ConnectedTimes.GetByIndex(idx))
 		csvRow = mdf.PeerIds.GetByIndex(idx).String() + "," + mdf.NodeIds.GetByIndex(idx) + "," + mdf.UserAgent.GetByIndex(idx) + "," + mdf.ClientTypes.GetByIndex(idx) + "," +
 			mdf.ClientVersions.GetByIndex(idx) + "," + mdf.PubKeys.GetByIndex(idx) + "," + mdf.Addresses.GetByIndex(idx) + "," + mdf.Ips.GetByIndex(idx) + "," +
-			mdf.Countries.GetByIndex(idx) + "," + mdf.Cities.GetByIndex(idx) + "," + strconv.FormatBool(mdf.Attempted.GetByIndex(idx)) + "," +
+			mdf.Countries.GetByIndex(idx) + "," + mdf.Cities.GetByIndex(idx) + "," + strconv.FormatBool(mdf.SuccessMetadata.GetByIndex(idx)) + "," + strconv.FormatBool(mdf.RequestedMetadata.GetByIndex(idx)) + "," + strconv.FormatBool(mdf.Attempted.GetByIndex(idx)) + "," +
 			strconv.FormatBool(mdf.Succeed.GetByIndex(idx)) + "," + strconv.FormatBool(mdf.Connected.GetByIndex(idx)) + "," + strconv.Itoa(mdf.Attempts.GetByIndex(idx)) + "," + mdf.Errors.GetByIndex(idx) + "," + lat + "," + strconv.Itoa(int(mdf.Connections.GetByIndex(idx))) + "," +
 			strconv.Itoa(int(mdf.Disconnections.GetByIndex(idx))) + "," + conTime + "," + strconv.Itoa(int(mdf.RBeaconBlocks.GetByIndex(idx))) + "," + strconv.Itoa(int(mdf.RBeaconAggregations.GetByIndex(idx))) + "," +
 			strconv.Itoa(int(mdf.RVoluntaryExits.GetByIndex(idx))) + "," + strconv.Itoa(int(mdf.RProposerSlashings.GetByIndex(idx))) + "," + strconv.Itoa(int(mdf.RAttesterSlashings.GetByIndex(idx))) + "," +

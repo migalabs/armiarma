@@ -180,14 +180,15 @@ func (c *ActorCmd) Cmd(route string) (cmd interface{}, err error) {
 	switch route {
 	case "host":
 		cmd = &host.HostCmd{
-			Base:             b,
-			WithSetHost:      &c.HostState,
-			PrivSettings:     c,
-			WithEnrNode:      c,
-			WithCloseHost:    &c.HostState,
-			GlobalPeerstores: c.GlobalPeerstores,
-			CurrentPeerstore: c.CurrentPeerstore,
-			GossipMetrics:    &c.GossipMetrics,
+			Base:              b,
+			WithSetHost:       &c.HostState,
+			PrivSettings:      c,
+			WithEnrNode:       c,
+			WithCloseHost:     &c.HostState,
+			GlobalPeerstores:  c.GlobalPeerstores,
+			CurrentPeerstore:  c.CurrentPeerstore,
+			PeerMetadataState: &c.PeerMetadataState,
+			GossipMetrics:     &c.GossipMetrics,
 		}
 	case "enr":
 		cmd = &enr.EnrCmd{Base: b, Lazy: &c.LazyEnrState, PrivSettings: c, WithHostPriv: &c.HostState}
@@ -197,11 +198,11 @@ func (c *ActorCmd) Cmd(route string) (cmd interface{}, err error) {
 			store = nil
 		}
 		cmd = &peer.PeerCmd{
-			Base:              	b,
-			PeerStatusState:   	&c.PeerStatusState,
-			PeerMetadataState: 	&c.PeerMetadataState,
-			Store:             	store,
-			GossipMetrics: 		&c.GossipMetrics,
+			Base:              b,
+			PeerStatusState:   &c.PeerStatusState,
+			PeerMetadataState: &c.PeerMetadataState,
+			Store:             store,
+			GossipMetrics:     &c.GossipMetrics,
 		}
 	case "peerstore":
 		cmd = &peerstore.PeerstoreCmd{

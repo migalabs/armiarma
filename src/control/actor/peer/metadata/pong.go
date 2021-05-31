@@ -2,6 +2,8 @@ package metadata
 
 import (
 	"context"
+	"time"
+
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/protolambda/rumor/control/actor/base"
@@ -10,7 +12,6 @@ import (
 	"github.com/protolambda/rumor/p2p/rpc/reqresp"
 	"github.com/protolambda/rumor/p2p/track"
 	"github.com/protolambda/zrnt/eth2/beacon"
-	"time"
 )
 
 type PeerMetadataPongCmd struct {

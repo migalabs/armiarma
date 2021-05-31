@@ -19,7 +19,6 @@ import (
 	pgossip "github.com/protolambda/rumor/p2p/gossip"
 	"github.com/protolambda/rumor/p2p/gossip/database"
 	"github.com/protolambda/rumor/p2p/track"
-	//	"github.com/protolambda/zrnt/eth2/beacon"
 )
 
 type GossipMetrics struct {
@@ -370,6 +369,22 @@ func (c *GossipMetrics) AddConnectionEvent(peerId peer.ID, connectionType string
 		peerMetrics.ConnectionEvents = append(peerMetrics.ConnectionEvents, newConnection)
 		if connectionType == "Connection" {
 			peerMetrics.Connected = true
+		}
+		c.GossipMetrics.Store(peerId, peerMetrics)
+	} else {
+		// Might be possible to add
+		fmt.Println("Counld't add Event, Peer is not in the list")
+	}
+}
+
+// Add a connection Event to the given peer
+func (c *GossipMetrics) AddMetadataEvent(peerId peer.ID, success bool) {
+	pMetrics, ok := c.GossipMetrics.Load(peerId)
+	if ok {
+		peerMetrics := pMetrics.(utils.PeerMetrics)
+		peerMetrics.MetadataRequest = true
+		if success {
+			peerMetrics.MetadataSucceed = true
 		}
 		c.GossipMetrics.Store(peerId, peerMetrics)
 	} else {

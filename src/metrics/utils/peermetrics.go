@@ -22,6 +22,9 @@ type PeerMetrics struct {
 	Attempts  int    // Number of attempts done
 	Error     string // Type of error that we detected
 
+	MetadataRequest bool // If the peer has been attempted to request its metadata
+	MetadataSucceed bool // If the peer has been successfully requested its metadata
+
 	ConnectionEvents []ConnectionEvents
 	// Counters for the different topics
 	BeaconBlock          MessageMetrics
@@ -49,6 +52,9 @@ func NewPeerMetrics(peerId peer.ID) PeerMetrics {
 		Connected: false,
 		Attempts:  0,
 		Error:     "None",
+
+		MetadataRequest: false,
+		MetadataSucceed: false,
 
 		ConnectionEvents: make([]ConnectionEvents, 0),
 		// Counters for the different topics
