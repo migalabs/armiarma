@@ -80,8 +80,8 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host) {
 	defer close(quit)
 	// set up the loop where every given time we will stop it to refresh the peerstore
 	go func() {
+		reset := false
 		for quit != nil {
-			reset := false
 			go func() {
 				// generate a "cache of peers in this raw"
 				peerCache := make(map[peer.ID]bool)
@@ -91,6 +91,7 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host) {
 				c.Log.Infof("the peerstore has been re-scanned")
 				peerstoreLen := len(peerList)
 				c.Log.Infof("len peerlist: %s", peerstoreLen)
+				fmt.Println("Peerstore Re-Scanned with", peerstoreLen, "peers")
 				// loop to attempt connetions for the given time
 				for !reset {
 					p := randomPeer(peerList)
@@ -148,6 +149,7 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host) {
 			}()
 			time.Sleep(c.Rescan)
 			reset = true
+			fmt.Println("Restarting the peering")
 
 			// Check if we have received any quit signal
 			if quit == nil {

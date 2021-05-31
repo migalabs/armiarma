@@ -526,14 +526,12 @@ def main():
     # End of plotting variables
     csvFile = sys.argv[1]
     peerstoreFile = sys.argv[2]
-    extraMetrics = sys.argv[3]
-    outputFigsFolder = sys.argv[4]
+    outputFigsFolder = sys.argv[3]
 
     pdfFile = outputFigsFolder + "/MetricsSummary.pdf"
     
     peerstorePanda = getPandaFromPeerstoreJson(peerstoreFile)
     rumorMetricsPanda = pd.read_csv(csvFile)
-    extraPeerData = pd.read_csv(extraMetrics)
 
 
     # ---------- PLOT SECUENCE -----------
@@ -695,8 +693,8 @@ def main():
         succeed = 0
         failed = 0
 
-        print("extra metrics len:", len(extraPeerData))
-        for index, row in extraPeerData.iterrows():
+        print("extra metrics len:", len(rumorMetricsPanda))
+        for index, row in rumorMetricsPanda.iterrows():
             if row['Attempted'] == False:
                 nonAttempted = nonAttempted + 1
             else:
@@ -708,29 +706,30 @@ def main():
         print("Not tried from the last peerstore copy:",nonAttempted)
         print("Tried and succeed:", succeed)
         print("Tried and failed", failed)
-        nonAttempted = nonAttempted + (peerstoreLen - (len(extraPeerData)))
+        nonAttempted = nonAttempted + (peerstoreLen - (len(rumorMetricsPanda)))
         print("Total Not tried from the entrire peerstore", nonAttempted)
 
         # get length of the peerstore
         peerstoreSize = getLengthOfPanda(peerstorePanda)
         peerMetricsSize = getLengthOfPanda(rumorMetricsPanda)
 
-        print("Attempted and succeed", succeed, "| On the metrics", peerMetricsSize)
+        print("Attempted and succeed", succeed, "| On the peerstore", peerstoreSize)
 
+        """
         if succeed < peerMetricsSize:
             print("- Dismatch on the extra metrics and metrics -")
             for idx, row in rumorMetricsPanda.iterrows():
-                index = extraPeerData.index[extraPeerData['Peer Id'] == row['Peer Id']]
-                extraPeerData.loc[index, 'Attempted'] = True
-                extraPeerData.loc[index, 'Succeed'] = True
-                extraPeerData.loc[index, 'Error'] = "None"
+                index = rumorMetricsPanda.index[rumorMetricsPanda['Peer Id'] == row['Peer Id']]
+                rumorMetricsPanda.loc[index, 'Attempted'] = True
+                rumorMetricsPanda.loc[index, 'Succeed'] = True
+                rumorMetricsPanda.loc[index, 'Error'] = "None"
             # plot the metrics gathered on the extra-metrics
             nonAttempted = 0
             succeed = 0
             failed = 0
             print("\n -- Updating extra-results -- \n")
-            print("extra metrics len:", len(extraPeerData))
-            for index, row in extraPeerData.iterrows():
+            print("extra metrics len:", len(rumorMetricsPanda))
+            for index, row in rumorMetricsPanda.iterrows():
                 if row['Attempted'] == False:
                     nonAttempted = nonAttempted + 1
                 else:
@@ -742,14 +741,16 @@ def main():
             print("Not tried from the last peerstore copy:",nonAttempted)
             print("Tried and succeed:", succeed)
             print("Tried and failed", failed)
-            nonAttempted = nonAttempted + (peerstoreLen - (len(extraPeerData)))
+            nonAttempted = nonAttempted + (peerstoreLen - (len(rumorMetricsPanda)))
             print("Total Not tried from the entrire peerstore", nonAttempted)
 
 
         print("Attempted and succeed", succeed, "| On the metrics", peerMetricsSize)
+        
         if succeed != peerMetricsSize:
             print("----> WARN: Random connected peers and peers on the metrics don't match")
-        
+        """
+
         ## -- website code --
         print("\n")
         print("Results from crawler run on [month] running for [crawling time].\n<br>Total amount of peers on the peerstore:", peerstoreLen,".\n<br>Number of clients with the TPC port at 13000 (Prysm?):", cnt13000,".\n<br>Percentage of 'Prysm' peers from the peerstore (based on the TCP port):", round((cnt13000*100)/peerstoreLen,2),"%.\n<br>We manage to connect with", succeed,"peers from the peerstore.\n<br>This would be the distribution.")
@@ -793,9 +794,12 @@ def main():
 
         ## Classify the non connected peers by error
 
-        errorList = getItemsFromColumn(extraPeerData, 'Error')
-        errorList.remove('None')
-        auxxarray, auxyarray = getDataFromPanda(extraPeerData, None, "Error", errorList, 'counter') 
+        errorList = getItemsFromColumn(rumorMetricsPanda, 'Error')
+        try:
+            errorList.remove('None')
+        except:
+            pass
+        auxxarray, auxyarray = getDataFromPanda(rumorMetricsPanda, None, "Error", errorList, 'counter') 
         xarray, yarray = sortArrayMaxtoMin(auxxarray, auxyarray)
         # Get Color Grid
         barColor = GetColorGridFromArray(yarray)

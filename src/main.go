@@ -2,13 +2,21 @@ package main
 
 import (
 	"fmt"
+	"log"
+	"os"
+
 	"github.com/protolambda/rumor/sh"
 	"github.com/spf13/cobra"
-	"os"
+
+	"net/http"
+	_ "net/http/pprof"
 )
 
 func main() {
-
+	// For memmory profiling
+	go func() {
+		log.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
 	mainCmd := cobra.Command{
 		Use:   "rumor",
 		Short: "Start Rumor",
