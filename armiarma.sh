@@ -240,9 +240,8 @@ LaunchAnalyzer(){
     echo ""
 
     # Set the Paths for the gossip-metrics.json peerstore.json and output
-    csv="${folderPath}/examples/${aux}/metrics/metrics.csv"
-    peerstore="${folderPath}/examples/${aux}/metrics/peerstore.json"
-    extrametrics="${folderPath}/examples/${aux}/metrics/extra-metrics.csv"
+    csv="${folderPath}/examples/${aux}/metrics.csv"
+    peerstore="${folderPath}/examples/${aux}/peerstore.json"
     plots="${folderPath}/examples/${aux}/plots"
 
 
@@ -255,7 +254,7 @@ LaunchAnalyzer(){
     # Run the Analyzer
     echo "  Launching analyzer"
     echo ""
-    python3 ./src/analyzer/armiarma-analyzer.py "$csv" "$peerstore" "$extrametrics" "$plots"
+    python3 ./src/analyzer/armiarma-analyzer.py "$csv" "$peerstore" "$plots"
     
     # Deactivate the VENV
     deactivate

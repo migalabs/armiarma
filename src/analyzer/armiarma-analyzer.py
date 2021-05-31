@@ -81,7 +81,7 @@ def plotStackBarsFromArrays(xarray, yarray, pdf, opts):
 
     fig, ax = plt.subplots(figsize = opts['figSize'])
 
-    colors = ['mediumseagreen', 'indianred', 'goldenrod','cornflowerblue']
+    colors = ['mediumseagreen', 'springgreen', 'indianred', 'goldenrod', 'cornflowerblue']
     legends=[]
     auxI = 0
     bottom = [0,0] # done by hand
@@ -551,7 +551,7 @@ def main():
     cnt9000 = 0
     cntOthers = 0
     noAddrs = 0
-    
+
     peerstoreLen = len(peerstore)
     metricsLen = len(rumorMetricsPanda)
     print()
@@ -567,10 +567,25 @@ def main():
         except:
             noAddrs = noAddrs + 1
 
+    # Unknown Peers with 13000 port
+    unk13000 = 0
+    tcp13000 = 0
+    cunk1300 = 0
+    for index, row in rumorMetricsPanda.iterrows():
+
+        if '/13000' in str(row['Address']):
+            tcp13000 = tcp13000 +1
+            if row['Client'] == 'Unknown':
+                unk13000 = unk13000 +1
+                if row['Connected'] == True:
+                    cunk1300 = cunk1300 +1
+    print(tcp13000, unk13000, cunk1300)
+
     print('Number of clients with the TPC port at 13000:', cnt13000)
     print('Number of clients with the TPC port at 9000: ', cnt9000)
     print('Number of clients with other TCP ports:      ', cntOthers)
     print('Number of clients without address:           ', noAddrs)
+    print('Number of Unknown clients with 13000 TCP port:', unk13000)
     summ = cnt13000 + cnt9000 + cntOthers + noAddrs
     noPrysmPort = cnt9000 + cntOthers + noAddrs
     if summ != peerstoreLen:
@@ -692,11 +707,15 @@ def main():
         nonAttempted = 0
         succeed = 0
         failed = 0
+        connected = 0
 
         print("extra metrics len:", len(rumorMetricsPanda))
         for index, row in rumorMetricsPanda.iterrows():
             if row['Attempted'] == False:
-                nonAttempted = nonAttempted + 1
+                if row['Connected'] == True:
+                    connected = connected + 1
+                else:
+                    nonAttempted = nonAttempted + 1
             else:
                 if row['Succeed'] == False:
                     failed = failed + 1
@@ -706,6 +725,7 @@ def main():
         print("Not tried from the last peerstore copy:",nonAttempted)
         print("Tried and succeed:", succeed)
         print("Tried and failed", failed)
+        print("Incoming connections:", connected)
         nonAttempted = nonAttempted + (peerstoreLen - (len(rumorMetricsPanda)))
         print("Total Not tried from the entrire peerstore", nonAttempted)
 
@@ -713,7 +733,7 @@ def main():
         peerstoreSize = getLengthOfPanda(peerstorePanda)
         peerMetricsSize = getLengthOfPanda(rumorMetricsPanda)
 
-        print("Attempted and succeed", succeed, "| On the peerstore", peerstoreSize)
+        print("Peers in metrics", peerMetricsSize, "| On the peerstore", peerstoreSize)
 
         """
         if succeed < peerMetricsSize:
@@ -759,9 +779,9 @@ def main():
         
         
         
-        xarray = [[0, succeed], [0, failed], [0, nonAttempted], [peerstoreLen, 0]]
+        xarray = [[0, succeed], [0, connected], [0, failed], [0, nonAttempted], [peerstoreLen, 0]]
         yarray = ['Peerstore', 'Peering Results']
-        labels = ['connected', 'failed', 'not attempted', 'peerstore']
+        labels = ['connected', 'incoming', 'failed', 'not tried', 'peerstore']
         barColor = ['tab:blue', 'tab:green']
 
 
@@ -899,14 +919,21 @@ def main():
         # Delete Prysm from the extrapoling
         del clientsCnt['Prysm']
         print(clientsCnt)
+        # Get number of unknown peers that has the 13000 port 
+        print('Number of unknown with 13000 port', unk13000)
         # Get total of non prysm peers
         nonPrysmObserved = 0
         for k in clientsCnt:
             nonPrysmObserved = nonPrysmObserved + clientsCnt[k]
+        # Remove Unknown with 13000 port from nonPrysmObserved
+        nonPrysmObserved = nonPrysmObserved - unk13000
         # Get for each of the clients the extrapolation to the peerstore
         extrapolatedClientList = {}
         for k in clientsCnt:
-            extrapolatedClientList[k] = round((noPrysmPort*clientsCnt[k])/nonPrysmObserved, 2)
+            if k == 'Unknown':
+                extrapolatedClientList[k] = round((noPrysmPort*(clientsCnt[k]-unk13000))/nonPrysmObserved, 2)
+            else:
+                extrapolatedClientList[k] = round((noPrysmPort*clientsCnt[k])/nonPrysmObserved, 2)
         
         print(extrapolatedClientList)
 
@@ -954,7 +981,7 @@ def main():
         auxxarray, auxyarray = getDataFromPanda(rumorMetricsPanda, None, "Country", countriesList, 'counter') 
         print("Number of different Countries hosting Eth2 clients:", len(auxxarray))
         # Remove the Countries with less than X peers
-        countryLimit = 10
+        countryLimit = 60
         xarray = []
         yarray = []
         for idx, item in enumerate(auxyarray):
