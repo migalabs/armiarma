@@ -30,7 +30,7 @@ type PeerConnectRandomCmd struct {
 
 func (c *PeerConnectRandomCmd) Default() {
 	c.Timeout = 15 * time.Second
-	c.Rescan = 1 * time.Minute
+	c.Rescan = 10 * time.Minute
 	c.MaxRetries = 5
 	c.FilterPort = -1
 }

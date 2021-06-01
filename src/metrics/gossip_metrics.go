@@ -187,7 +187,7 @@ func (c *GossipMetrics) FillMetrics(ep track.ExtendedPeerstore) {
 				peerMetrics.Pubkey = peerData.Pubkey
 			}
 
-			if len(peerMetrics.Addrs) == 0 || peerMetrics.Addrs == "/ip4/127.0.0.1/" {
+			if len(peerMetrics.Addrs) == 0 || peerMetrics.Addrs == "/ip4/127.0.0.1/0000" || peerMetrics.Addrs == "/ip4/127.0.0.1/9000" {
 				address := GetFullAddress(peerData.Addrs)
 				//fmt.Println("Addrs empty", peerMetrics.Addrs, "Adding Addrs:", address)
 				peerMetrics.Addrs = address
