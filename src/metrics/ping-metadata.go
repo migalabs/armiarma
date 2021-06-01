@@ -2,7 +2,6 @@ package metrics
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -16,9 +15,6 @@ import (
 var timeout time.Duration = 5 * time.Second
 
 func PollPeerMetadata(p peer.ID, base *base.Base, peerMetadataState *metadata.PeerMetadataState, store track.ExtendedPeerstore, gm *GossipMetrics) {
-	start := time.Now()
-	fmt.Println(start, "- Requesting Metadata to peer:", p)
-
 	// apply timeout to each poll target in this round
 	reqCtx, _ := context.WithTimeout(context.Background(), timeout)
 
@@ -37,10 +33,8 @@ func PollPeerMetadata(p peer.ID, base *base.Base, peerMetadataState *metadata.Pe
 		}
 		if err := pingCmd.Run(reqCtx); err != nil {
 			gm.AddMetadataEvent(p, false)
-			fmt.Println("failed to poll peer", p)
 		} else {
 			gm.AddMetadataEvent(p, true)
-			fmt.Println("successfully poll peer", p)
 		}
 	}(p)
 }

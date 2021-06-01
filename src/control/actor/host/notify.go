@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/libp2p/go-libp2p-core/network"
 	ma "github.com/multiformats/go-multiaddr"
@@ -57,8 +56,6 @@ func (c *HostNotifyCmd) connectedF(net network.Network, conn network.Conn) {
 	_ = c.GossipMetrics.AddNewPeer(conn.RemotePeer())
 	c.GossipMetrics.AddConnectionEvent(conn.RemotePeer(), "Connection")
 	// request metadata as soon as we connect to a peer
-	t := time.Now()
-	fmt.Println("Connection time", t)
 	metrics.PollPeerMetadata(conn.RemotePeer(), c.Base, c.PeerMetadataState, c.Store, c.GossipMetrics)
 
 	// End of metric traces to track the connections and disconnections
