@@ -149,7 +149,6 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host) {
 					}
 				}
 				tgap = time.Since(t)
-				fmt.Println(attempts, "next peer,", tgap)
 
 			}
 
