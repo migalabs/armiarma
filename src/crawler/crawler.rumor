@@ -50,6 +50,8 @@ armiarma: include dv5.rumor
 
 armiarma: include export_metrics.rumor
 
+#sleep 30s
+
 #armiarma: include connectall.rumor
 armiarma: include random-connect.rumor
 

@@ -12,7 +12,8 @@ import numpy as np
 def mainexecution():
     projectsFolder = sys.argv[1]
     outFolder = sys.argv[2]
-
+    print("reading folder:", projectsFolder)
+    print("output folder:", outFolder)
     outJson = outFolder + '/' + 'client-distribution.json'
     # So far, the generated panda will just contain the client count
     p = {'date': [], 'Lighthouse': [], 'Teku': [], 'Nimbus': [], 'Prysm': [], 'Lodestar': [], 'Unknown': []}
@@ -29,6 +30,7 @@ def mainexecution():
             if os.path.exists(f):
                 # Load the readed values from the json into the panda
                 poblatePandaCustomMetrics(p, j, f)
+                print(f)
         break
 
     # Export the Concatenated json to the given folder

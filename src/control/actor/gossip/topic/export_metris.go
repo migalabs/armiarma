@@ -164,6 +164,25 @@ func FilCustomMetrics(gm *metrics.GossipMetrics, ps track.ExtendedPeerstore, cm 
 	cm.PeerStore.ConnectionSucceed.Lodestar = lod
 	cm.PeerStore.ConnectionSucceed.Unknown = unk
 
+	// fill the json with client distribution from those peers we got the metadata request from
+	mtlig := mdf.AnalyzeClientTypeIfMetadataRequested("Lighthouse")
+	mttek := mdf.AnalyzeClientTypeIfMetadataRequested("Teku")
+	mtnim := mdf.AnalyzeClientTypeIfMetadataRequested("Nimbus")
+	mtpry := mdf.AnalyzeClientTypeIfMetadataRequested("Prysm")
+	mtlod := mdf.AnalyzeClientTypeIfMetadataRequested("Lodestar")
+	mtunk := mdf.AnalyzeClientTypeIfMetadataRequested("Unknown")
+
+	tot := mtlig.Total + mttek.Total + mtnim.Total + mtpry.Total + mtlod.Total + mtunk.Total
+
+	// fill the CustomMetrics with the readed information
+	cm.PeerStore.MetadataRequested.SetTotal(tot)
+	cm.PeerStore.MetadataRequested.Lighthouse = mtlig
+	cm.PeerStore.MetadataRequested.Teku = mttek
+	cm.PeerStore.MetadataRequested.Nimbus = mtnim
+	cm.PeerStore.MetadataRequested.Prysm = mtpry
+	cm.PeerStore.MetadataRequested.Lodestar = mtlod
+	cm.PeerStore.MetadataRequested.Unknown = mtunk
+
 	return nil
 }
 

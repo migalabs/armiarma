@@ -31,7 +31,7 @@ type PeerConnectRandomCmd struct {
 func (c *PeerConnectRandomCmd) Default() {
 	c.Timeout = 15 * time.Second
 	c.Rescan = 10 * time.Minute
-	c.MaxRetries = 5
+	c.MaxRetries = 3
 	c.FilterPort = -1
 }
 
@@ -103,11 +103,12 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host) {
 				p := randomPeer(peerList)
 				// loop until we arrive to a peer that we didn't connect before
 				_ = c.GossipMetrics.AddNewPeer(p)
-				val, _ := peerCache[p]
-				if val {
+				val, ok := peerCache[p]
+				if ok {
+					if len(peerCache) == peerstoreLen {
+						break // Temporary commented
+					}
 					continue
-				} else if len(peerCache) == peerstoreLen {
-					break // Temporary commented
 				}
 				// add peer to the peerCache for this round
 				peerCache[p] = true
@@ -148,6 +149,8 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host) {
 					}
 				}
 				tgap = time.Since(t)
+				fmt.Println(attempts, "next peer,", tgap)
+
 			}
 
 			fmt.Println("Restarting the peering")

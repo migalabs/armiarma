@@ -788,10 +788,13 @@ def main():
         barColor = GetColorGridFromArray(yarray)
         
         print()
+        """
         for idx,item in enumerate(xarray):
             print(item, ',', yarray[idx])
         
         print()
+        """
+
 
         plotHorizontalBarsFromArrays(xarray, yarray, pdf, opts={                                            
             'figSize': (12,7),                                                          
@@ -829,10 +832,10 @@ def main():
                 indexToDrop.append(index)
             else:
                 counter += 1
-                print(index, row['Client'])
+                #print(index, row['Client'])
 
         auxMetricsPanda.drop(indexToDrop, axis=0, inplace=True)
-        print(auxMetricsPanda)
+        #print(auxMetricsPanda)
         print("\nOrg. Metrics:", len(rumorMetricsPanda), "Should have:", counter, "Filtered:", len(auxMetricsPanda), "\n")
 
         clientCounter = []

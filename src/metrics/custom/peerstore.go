@@ -1,26 +1,26 @@
 package custom
 
-import ()
-
 type PeerStore struct {
-	Total int
-	Port13000 int
-	Port9000 int
-	PortDiff int
+	Total                 int
+	Port13000             int
+	Port9000              int
+	PortDiff              int
 	NoAttemptedConnection int
-	ConnectionFailed ConnectionFailed
-	ConnectionSucceed ConnectionSucceed
+	ConnectionFailed      ConnectionFailed
+	ConnectionSucceed     ConnectionSucceed
+	MetadataRequested     MetadataRequested
 }
 
 func NewPeerStore() PeerStore {
-	ps := PeerStore {
-		Total: 0,
-		Port13000: 0,
-		Port9000: 0,
-		PortDiff: 0,
+	ps := PeerStore{
+		Total:                 0,
+		Port13000:             0,
+		Port9000:              0,
+		PortDiff:              0,
 		NoAttemptedConnection: 0,
-		ConnectionFailed: NewConnectionFailed(),
-		ConnectionSucceed: NewConnectionSucceed(),
+		ConnectionFailed:      NewConnectionFailed(),
+		ConnectionSucceed:     NewConnectionSucceed(),
+		MetadataRequested:     NewMetadataRequesed(),
 	}
 	return ps
 }
@@ -44,4 +44,3 @@ func (ps *PeerStore) SetPortDiff(t int) {
 func (ps *PeerStore) SetNotAttempted(t int) {
 	ps.NoAttemptedConnection = t
 }
-

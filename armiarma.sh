@@ -285,7 +285,7 @@ LaunchGeneralResults(){
     # Run the Analyzer
     echo "  Launching General Overview Analyzer"
     echo ""
-    python3 ./src/analyzer/total-overview-analysis.py ./examples ./general-results
+    python3 ./src/analyzer/total-overview-analysis.py "$1" ./general-results
     echo "results available in \$ARMIARMA/results"
     echo ""
     # Deactivate the VENV
@@ -384,7 +384,7 @@ while getopts ":hcpfdo" option; do
 
         o)  # Generate the general overview of the previously generated projects
 
-            LaunchGeneralResults
+            LaunchGeneralResults "$2"
 
             echo "Overview Analyzer Finished!"
             echo ""

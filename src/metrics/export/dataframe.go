@@ -162,7 +162,7 @@ func GetMetricsDuplicate(original sync.Map) sync.Map {
 func (df MetricsDataFrame) AnalyzeClientType(clientname string) custom.Client {
 	client := custom.NewClient()
 	clicnt := 0
-	versions := make(map[string]int, 0)
+	versions := make(map[string]int)
 
 	// iterate through the peer metrics with reading the client List
 	for idx, item := range df.ClientTypes {
@@ -172,6 +172,42 @@ func (df MetricsDataFrame) AnalyzeClientType(clientname string) custom.Client {
 			ver := df.ClientVersions.GetByIndex(idx)
 			//x := versions[ver]
 			versions[ver] += 1
+		}
+	}
+	// after reading the entire metrics we can generate the custom.Client struct
+	client.SetTotal(clicnt)
+	v := make([]string, 0, len(versions))
+	for val := range versions {
+		v = append(v, val)
+	}
+	sort.Strings(v)
+	for i, j := 0, len(v)-1; i < j; i, j = i+1, j-1 {
+		v[i], v[j] = v[j], v[i]
+	}
+	for _, item := range v {
+		client.AddVersion(item, versions[item])
+	}
+	return client
+}
+
+// Function that iterates through the peers keeping track of the client type, and versions if the peer was requested the metadata
+func (df MetricsDataFrame) AnalyzeClientTypeIfMetadataRequested(clientname string) custom.Client {
+	client := custom.NewClient()
+	clicnt := 0
+	versions := make(map[string]int)
+
+	// iterate through the peer metrics with reading the client List
+	for idx, item := range df.ClientTypes {
+		if item == clientname { // peer with the same client type as the one we are searching for and metadata was requested
+			// check if the metadata was requested from the peer
+			i := df.RequestedMetadata.GetByIndex(idx)
+			if i {
+				clicnt += 1
+				// add the version to the map or increase the actual counter
+				ver := df.ClientVersions.GetByIndex(idx)
+				//x := versions[ver]
+				versions[ver] += 1
+			}
 		}
 	}
 	// after reading the entire metrics we can generate the custom.Client struct
