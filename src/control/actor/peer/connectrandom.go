@@ -103,7 +103,7 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host) {
 				p := randomPeer(peerList)
 				// loop until we arrive to a peer that we didn't connect before
 				_ = c.GossipMetrics.AddNewPeer(p)
-				val, ok := peerCache[p]
+				_, ok := peerCache[p]
 				if ok {
 					if len(peerCache) == peerstoreLen {
 						break // Temporary commented
