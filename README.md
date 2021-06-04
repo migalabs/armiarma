@@ -1,4 +1,4 @@
-# armiarma
+# Armiarma
 Armiarma is a Eth2 network Analyzer based on the [Rumor](https://github.com/protolambda/rumor) client debugger. The current version of Armiarma is based on the latest update on Rumor on its [commit](https://github.com/protolambda/rumor/commit/d42e0da5729ca887e26f43e8cf4f290a61dbdc26).
 
 ### Requisites
