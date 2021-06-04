@@ -57,7 +57,7 @@ def plotFromPandas(panda, pdf, opts):
     
     # Check is there is Value on top of the charts
     if opts['barValues'] is not None:
-        for ind, value in enumerate(yarray):
+        for ind, value in enumerate(opts['barValues']):
             plt.text(ind, value, str(value), fontsize=opts['textSize'], horizontalalignment='center')
 
     # Check id the grid has been set
@@ -81,7 +81,7 @@ def plotStackBarsFromArrays(xarray, yarray, pdf, opts):
 
     fig, ax = plt.subplots(figsize = opts['figSize'])
 
-    colors = ['mediumseagreen', 'indianred', 'goldenrod','cornflowerblue']
+    colors = ['mediumseagreen', 'springgreen', 'indianred', 'goldenrod', 'cornflowerblue']
     legends=[]
     auxI = 0
     bottom = [0,0] # done by hand
@@ -526,14 +526,12 @@ def main():
     # End of plotting variables
     csvFile = sys.argv[1]
     peerstoreFile = sys.argv[2]
-    extraMetrics = sys.argv[3]
-    outputFigsFolder = sys.argv[4]
+    outputFigsFolder = sys.argv[3]
 
     pdfFile = outputFigsFolder + "/MetricsSummary.pdf"
     
     peerstorePanda = getPandaFromPeerstoreJson(peerstoreFile)
     rumorMetricsPanda = pd.read_csv(csvFile)
-    extraPeerData = pd.read_csv(extraMetrics)
 
 
     # ---------- PLOT SECUENCE -----------
@@ -553,7 +551,7 @@ def main():
     cnt9000 = 0
     cntOthers = 0
     noAddrs = 0
-    
+
     peerstoreLen = len(peerstore)
     metricsLen = len(rumorMetricsPanda)
     print()
@@ -569,10 +567,25 @@ def main():
         except:
             noAddrs = noAddrs + 1
 
+    # Unknown Peers with 13000 port
+    unk13000 = 0
+    tcp13000 = 0
+    cunk1300 = 0
+    for index, row in rumorMetricsPanda.iterrows():
+
+        if '/13000' in str(row['Address']):
+            tcp13000 = tcp13000 +1
+            if row['Client'] == 'Unknown':
+                unk13000 = unk13000 +1
+                if row['Connected'] == True:
+                    cunk1300 = cunk1300 +1
+    print(tcp13000, unk13000, cunk1300)
+
     print('Number of clients with the TPC port at 13000:', cnt13000)
     print('Number of clients with the TPC port at 9000: ', cnt9000)
     print('Number of clients with other TCP ports:      ', cntOthers)
     print('Number of clients without address:           ', noAddrs)
+    print('Number of Unknown clients with 13000 TCP port:', unk13000)
     summ = cnt13000 + cnt9000 + cntOthers + noAddrs
     noPrysmPort = cnt9000 + cntOthers + noAddrs
     if summ != peerstoreLen:
@@ -694,11 +707,15 @@ def main():
         nonAttempted = 0
         succeed = 0
         failed = 0
+        connected = 0
 
-        print("extra metrics len:", len(extraPeerData))
-        for index, row in extraPeerData.iterrows():
+        print("extra metrics len:", len(rumorMetricsPanda))
+        for index, row in rumorMetricsPanda.iterrows():
             if row['Attempted'] == False:
-                nonAttempted = nonAttempted + 1
+                if row['Connected'] == True:
+                    connected = connected + 1
+                else:
+                    nonAttempted = nonAttempted + 1
             else:
                 if row['Succeed'] == False:
                     failed = failed + 1
@@ -708,59 +725,26 @@ def main():
         print("Not tried from the last peerstore copy:",nonAttempted)
         print("Tried and succeed:", succeed)
         print("Tried and failed", failed)
-        nonAttempted = nonAttempted + (peerstoreLen - (len(extraPeerData)))
+        print("Incoming connections:", connected)
+        nonAttempted = nonAttempted + (peerstoreLen - (len(rumorMetricsPanda)))
         print("Total Not tried from the entrire peerstore", nonAttempted)
 
         # get length of the peerstore
         peerstoreSize = getLengthOfPanda(peerstorePanda)
         peerMetricsSize = getLengthOfPanda(rumorMetricsPanda)
 
-        print("Attempted and succeed", succeed, "| On the metrics", peerMetricsSize)
+        print("Peers in metrics", peerMetricsSize, "| On the peerstore", peerstoreSize)
+        if peerMetricsSize != peerstoreSize:
+            print("----> WARN: Peers in Peerstore and peers on the metrics don't match")
 
-        if succeed < peerMetricsSize:
-            print("- Dismatch on the extra metrics and metrics -")
-            for idx, row in rumorMetricsPanda.iterrows():
-                index = extraPeerData.index[extraPeerData['Peer Id'] == row['Peer Id']]
-                extraPeerData.loc[index, 'Attempted'] = True
-                extraPeerData.loc[index, 'Succeed'] = True
-                extraPeerData.loc[index, 'Error'] = "None"
-            # plot the metrics gathered on the extra-metrics
-            nonAttempted = 0
-            succeed = 0
-            failed = 0
-            print("\n -- Updating extra-results -- \n")
-            print("extra metrics len:", len(extraPeerData))
-            for index, row in extraPeerData.iterrows():
-                if row['Attempted'] == False:
-                    nonAttempted = nonAttempted + 1
-                else:
-                    if row['Succeed'] == False:
-                        failed = failed + 1
-                    else:
-                        succeed = succeed + 1
-            
-            print("Not tried from the last peerstore copy:",nonAttempted)
-            print("Tried and succeed:", succeed)
-            print("Tried and failed", failed)
-            nonAttempted = nonAttempted + (peerstoreLen - (len(extraPeerData)))
-            print("Total Not tried from the entrire peerstore", nonAttempted)
-
-
-        print("Attempted and succeed", succeed, "| On the metrics", peerMetricsSize)
-        if succeed != peerMetricsSize:
-            print("----> WARN: Random connected peers and peers on the metrics don't match")
-        
         ## -- website code --
         print("\n")
         print("Results from crawler run on [month] running for [crawling time].\n<br>Total amount of peers on the peerstore:", peerstoreLen,".\n<br>Number of clients with the TPC port at 13000 (Prysm?):", cnt13000,".\n<br>Percentage of 'Prysm' peers from the peerstore (based on the TCP port):", round((cnt13000*100)/peerstoreLen,2),"%.\n<br>We manage to connect with", succeed,"peers from the peerstore.\n<br>This would be the distribution.")
         print("\n")
-        
-        
-        
-        
-        xarray = [[0, succeed], [0, failed], [0, nonAttempted], [peerstoreLen, 0]]
+      
+        xarray = [[0, succeed], [0, connected], [0, failed], [0, nonAttempted], [peerstoreLen, 0]]
         yarray = ['Peerstore', 'Peering Results']
-        labels = ['connected', 'failed', 'not attempted', 'peerstore']
+        labels = ['connected', 'incoming', 'failed', 'not tried', 'peerstore']
         barColor = ['tab:blue', 'tab:green']
 
 
@@ -793,18 +777,24 @@ def main():
 
         ## Classify the non connected peers by error
 
-        errorList = getItemsFromColumn(extraPeerData, 'Error')
-        errorList.remove('None')
-        auxxarray, auxyarray = getDataFromPanda(extraPeerData, None, "Error", errorList, 'counter') 
+        errorList = getItemsFromColumn(rumorMetricsPanda, 'Error')
+        try:
+            errorList.remove('None')
+        except:
+            pass
+        auxxarray, auxyarray = getDataFromPanda(rumorMetricsPanda, None, "Error", errorList, 'counter') 
         xarray, yarray = sortArrayMaxtoMin(auxxarray, auxyarray)
         # Get Color Grid
         barColor = GetColorGridFromArray(yarray)
         
         print()
+        """
         for idx,item in enumerate(xarray):
             print(item, ',', yarray[idx])
         
         print()
+        """
+
 
         plotHorizontalBarsFromArrays(xarray, yarray, pdf, opts={                                            
             'figSize': (12,7),                                                          
@@ -833,12 +823,27 @@ def main():
             'tickRotation': 0,
             'show': False})  
 
+        # Subgenerate a panda only with the peers that we did exchange metadata before
+        indexToDrop = []
+        counter = 0
+        auxMetricsPanda = rumorMetricsPanda.copy()  
+        for index, row in auxMetricsPanda.iterrows():
+            if row['Request Metadata'] == False: # If we didn't exchange metadata with them, remove them from the panda copy
+                indexToDrop.append(index)
+            else:
+                counter += 1
+                #print(index, row['Client'])
+
+        auxMetricsPanda.drop(indexToDrop, axis=0, inplace=True)
+        #print(auxMetricsPanda)
+        print("\nOrg. Metrics:", len(rumorMetricsPanda), "Should have:", counter, "Filtered:", len(auxMetricsPanda), "\n")
+
         clientCounter = []
         types         = []
         typesCounter  = []
 
         for idx, item in enumerate(clientList):
-            tcnt, tp, tpc = getTypesPerName(rumorMetricsPanda, item, 'Client', 'Version')
+            tcnt, tp, tpc = getTypesPerName(auxMetricsPanda, item, 'Client', 'Version')
             clientCounter.append(tcnt)
             types.append(tp)
             typesCounter.append(tpc)
@@ -846,6 +851,10 @@ def main():
         xarray = types
         yarray = typesCounter
         namesarray = clientList
+
+        print(clientCounter)
+        print(types)
+        print(typesCounter)
 
         plotDoublePieFromArray(yarray, pdf, opts={                                   
             'figsize': figSize,                                                      
@@ -895,10 +904,14 @@ def main():
         # Delete Prysm from the extrapoling
         del clientsCnt['Prysm']
         print(clientsCnt)
+        # Get number of unknown peers that has the 13000 port 
+        print('Number of unknown with 13000 port', unk13000)
         # Get total of non prysm peers
         nonPrysmObserved = 0
         for k in clientsCnt:
             nonPrysmObserved = nonPrysmObserved + clientsCnt[k]
+        # Remove Unknown with 13000 port from nonPrysmObserved
+        nonPrysmObserved = nonPrysmObserved
         # Get for each of the clients the extrapolation to the peerstore
         extrapolatedClientList = {}
         for k in clientsCnt:
@@ -950,7 +963,7 @@ def main():
         auxxarray, auxyarray = getDataFromPanda(rumorMetricsPanda, None, "Country", countriesList, 'counter') 
         print("Number of different Countries hosting Eth2 clients:", len(auxxarray))
         # Remove the Countries with less than X peers
-        countryLimit = 10
+        countryLimit = 60
         xarray = []
         yarray = []
         for idx, item in enumerate(auxyarray):

@@ -2,13 +2,14 @@ package sh
 
 import (
 	"context"
+	"os"
+	"time"
+
 	"github.com/protolambda/rumor/control"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"mvdan.cc/sh/v3/interp"
 	"mvdan.cc/sh/v3/syntax"
-	"os"
-	"time"
 )
 
 func FileCmd() *cobra.Command {

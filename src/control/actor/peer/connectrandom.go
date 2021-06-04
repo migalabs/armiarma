@@ -2,6 +2,7 @@ package peer
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 	"time"
 
@@ -29,8 +30,8 @@ type PeerConnectRandomCmd struct {
 
 func (c *PeerConnectRandomCmd) Default() {
 	c.Timeout = 15 * time.Second
-	c.Rescan = 1 * time.Minute
-	c.MaxRetries = 5
+	c.Rescan = 10 * time.Minute
+	c.MaxRetries = 3
 	c.FilterPort = -1
 }
 
@@ -44,7 +45,7 @@ func (c *PeerConnectRandomCmd) Run(ctx context.Context, args ...string) error {
 	if err != nil {
 		return err
 	}
-
+	fmt.Println("Peerstore Rescan Every:", c.Rescan)
 	bgCtx, bgCancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 	go func() {
@@ -55,6 +56,7 @@ func (c *PeerConnectRandomCmd) Run(ctx context.Context, args ...string) error {
 	c.Control.RegisterStop(func(ctx context.Context) error {
 		bgCancel()
 		c.Log.Infof("Stopped auto-connecting")
+		fmt.Println("Stop Autoconnected")
 		<-done
 		return nil
 	})
@@ -78,83 +80,90 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host) {
 	defer close(quit)
 	// set up the loop where every given time we will stop it to refresh the peerstore
 	go func() {
+		loopCount := 0
+		peerCache := make(map[peer.ID]bool)
 		for quit != nil {
-			reset := make(chan struct{})
-			go func() {
+			if loopCount >= 10 {
+				fmt.Println("Reseting cache")
 				// generate a "cache of peers in this raw"
-				peerCache := make(map[peer.ID]bool)
-				// make the first copy of the peerstore
-				p := h.Peerstore()
-				peerList := p.Peers()
-				c.Log.Infof("the peerstore has been re-scanned")
-				peerstoreLen := len(peerList)
-				c.Log.Infof("len peerlist: %s", peerstoreLen)
-				// loop to attempt connetions for the given time
-				for reset != nil {
-					p := randomPeer(peerList)
-					// loop until we arrive to a peer that we didn't connect before
-					exists := c.GossipMetrics.ExtraMetrics.AddNewPeer(p)
-					if exists == true {
-						connected := c.GossipMetrics.ExtraMetrics.CheckIdConnected(p)
-						if connected == true {
-							continue
-						} else if len(peerCache) == peerstoreLen {
-							return // Temporary commented
-						} else { // if we didn't crawl all the peers in the peerstore, don't loose time trying to reconnect failed peers in the past
-							continue
-						}
+				peerCache = make(map[peer.ID]bool)
+				loopCount = 0
+			}
+			// make the first copy of the peerstore
+			p := h.Peerstore()
+			peerList := p.Peers()
+			c.Log.Infof("the peerstore has been re-scanned")
+			peerstoreLen := len(peerList)
+			c.Log.Infof("len peerlist: %s", peerstoreLen)
+			fmt.Println("Peerstore Re-Scanned with", peerstoreLen, "peers")
+			t := time.Now()
+			// loop to attempt connetions for the given time
+			tgap := time.Since(t)
+			for tgap < c.Rescan {
+				p := randomPeer(peerList)
+				// loop until we arrive to a peer that we didn't connect before
+				_ = c.GossipMetrics.AddNewPeer(p)
+				_, ok := peerCache[p]
+				if ok {
+					if len(peerCache) == peerstoreLen {
+						break // Temporary commented
 					}
-					// add peer to the peerCache for this round
-					peerCache[p] = true
-					// Set the correct address format to connect the peers
-					// libp2p complains if we put multi-addresses that include the peer ID into the Addrs list.
-					addrs := c.Store.Addrs(p)
-					addrInfo := peer.AddrInfo{
-						ID:    p,
-						Addrs: make([]ma.Multiaddr, 0, len(addrs)),
-					}
-					for _, m := range addrs {
-						transport, _ := peer.SplitAddr(m)
-						if transport == nil {
-							continue
-						}
-						addrInfo.Addrs = append(addrInfo.Addrs, transport)
-					}
-					ctx, _ := context.WithTimeout(ctx, c.Timeout)
-					c.Log.Warnf("addrs %s attempting connection to peer", addrInfo.Addrs)
-					// try to connect the peer
-					attempts := 0
-					for attempts <= c.MaxRetries {
-						if err := h.Connect(ctx, addrInfo); err != nil {
-							// the connetion failed
-							attempts += 1
-							c.GossipMetrics.ExtraMetrics.AddNewAttempt(p, false, err.Error())
-							c.Log.WithError(err).Warnf("attempts %d failed connection attempt", attempts)
-						} else { // connection successfuly made
-							c.Log.Infof("peer_id %s successful connection made", p)
-							c.GossipMetrics.ExtraMetrics.AddNewAttempt(p, true, "None")
-							// break the loop
-							break
-						}
-						if attempts > c.MaxRetries {
-							c.Log.Warnf("attempts %d failed connection attempt, reached maximum, no retry", attempts)
-						}
-					}
-					// if the reset flag is active, kill the go-routine
-					if reset == nil {
-						c.Log.Infof("Channel reset has been closed")
-					}
-
+					continue
 				}
-			}()
-			time.Sleep(c.Rescan)
-			close(reset)
+				// add peer to the peerCache for this round
+				peerCache[p] = true
+				// Set the correct address format to connect the peers
+				// libp2p complains if we put multi-addresses that include the peer ID into the Addrs list.
+				addrs := c.Store.Addrs(p)
+				addrInfo := peer.AddrInfo{
+					ID:    p,
+					Addrs: make([]ma.Multiaddr, 0, len(addrs)),
+				}
+				for _, m := range addrs {
+					transport, _ := peer.SplitAddr(m)
+					if transport == nil {
+						continue
+					}
+					addrInfo.Addrs = append(addrInfo.Addrs, transport)
+				}
+				ctx, _ := context.WithTimeout(ctx, c.Timeout)
+				c.Log.Warnf("addrs %s attempting connection to peer", addrInfo.Addrs)
+				// try to connect the peer
+				attempts := 0
+				for attempts <= c.MaxRetries {
+					if err := h.Connect(ctx, addrInfo); err != nil {
+						// the connetion failed
+						attempts += 1
+						c.GossipMetrics.AddNewConnectionAttempt(p, false, err.Error())
+						c.Log.WithError(err).Warnf("attempts %d failed connection attempt", attempts)
+						continue
+					} else { // connection successfuly made
+						c.Log.Infof("peer_id %s successful connection made", p)
+						c.GossipMetrics.AddNewConnectionAttempt(p, true, "None")
+						// break the loop
+						break
+					}
+					if attempts > c.MaxRetries {
+						c.Log.Warnf("attempts %d failed connection attempt, reached maximum, no retry", attempts)
+						break
+					}
+				}
+				tgap = time.Since(t)
+
+			}
+
+			fmt.Println("Restarting the peering")
+			fmt.Println("Peer attempted from the last reset:", len(peerCache))
 
 			// Check if we have received any quit signal
 			if quit == nil {
 				c.Log.Infof("Channel Quit has been closed")
+				fmt.Println("Quit has been closed")
+				break
 			}
+			loopCount += 1
 		}
 		c.Log.Infof("Go routine to randomly connect has been canceled")
+		fmt.Println("Go routine to randomly connect has been canceled")
 	}()
 }

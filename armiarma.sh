@@ -173,7 +173,7 @@ LaunchCrawler(){
         echo ""
 
         # Finaly launch Rumor form the Network File (showing the logs on terminal mode)
-        ../../src/bin/armiarma file launcher.rumor --formatter="terminal" --level="error"
+        sh -c 'echo "PID of the crawler: $$"; echo ""; exec ../../src/bin/armiarma file launcher.rumor --formatter="terminal" --level="error"'
         # Check if the compilation has been successful
         exec_error="$?"
         if [[ "$exec_error" -ne "0" ]]
@@ -240,9 +240,8 @@ LaunchAnalyzer(){
     echo ""
 
     # Set the Paths for the gossip-metrics.json peerstore.json and output
-    csv="${folderPath}/examples/${aux}/metrics/metrics.csv"
-    peerstore="${folderPath}/examples/${aux}/metrics/peerstore.json"
-    extrametrics="${folderPath}/examples/${aux}/metrics/extra-metrics.csv"
+    csv="${folderPath}/examples/${aux}/metrics.csv"
+    peerstore="${folderPath}/examples/${aux}/peerstore.json"
     plots="${folderPath}/examples/${aux}/plots"
 
 
@@ -255,7 +254,7 @@ LaunchAnalyzer(){
     # Run the Analyzer
     echo "  Launching analyzer"
     echo ""
-    python3 ./src/analyzer/armiarma-analyzer.py "$csv" "$peerstore" "$extrametrics" "$plots"
+    python3 ./src/analyzer/armiarma-analyzer.py "$csv" "$peerstore" "$plots"
     
     # Deactivate the VENV
     deactivate
@@ -286,7 +285,7 @@ LaunchGeneralResults(){
     # Run the Analyzer
     echo "  Launching General Overview Analyzer"
     echo ""
-    python3 ./src/analyzer/total-overview-analysis.py ./examples ./general-results
+    python3 ./src/analyzer/total-overview-analysis.py "$1" ./general-results
     echo "results available in \$ARMIARMA/results"
     echo ""
     # Deactivate the VENV
@@ -300,6 +299,8 @@ LaunchGeneralResults(){
 
 # 0. Get the options
 go version
+pid="$!"
+echo "PID: $pid"
 
 # Generate the examples folder
 if [[ -d ./examples ]]; then
@@ -383,7 +384,7 @@ while getopts ":hcpfdo" option; do
 
         o)  # Generate the general overview of the previously generated projects
 
-            LaunchGeneralResults
+            LaunchGeneralResults "$2"
 
             echo "Overview Analyzer Finished!"
             echo ""

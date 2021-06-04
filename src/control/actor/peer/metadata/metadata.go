@@ -3,6 +3,7 @@ package metadata
 import (
 	"context"
 	"errors"
+
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/protolambda/ask"
 	"github.com/protolambda/rumor/control/actor/base"

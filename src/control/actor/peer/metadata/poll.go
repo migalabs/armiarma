@@ -2,13 +2,14 @@ package metadata
 
 import (
 	"context"
+	"sync"
+	"time"
+
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/protolambda/rumor/control/actor/base"
 	"github.com/protolambda/rumor/control/actor/flags"
 	"github.com/protolambda/rumor/p2p/rpc/reqresp"
 	"github.com/protolambda/rumor/p2p/track"
-	"sync"
-	"time"
 )
 
 type PeerMetadataPollCmd struct {

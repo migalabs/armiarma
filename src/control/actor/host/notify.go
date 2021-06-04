@@ -8,13 +8,17 @@ import (
 	"github.com/libp2p/go-libp2p-core/network"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/protolambda/rumor/control/actor/base"
+	"github.com/protolambda/rumor/control/actor/peer/metadata"
 	"github.com/protolambda/rumor/metrics"
+	"github.com/protolambda/rumor/p2p/track"
 	"github.com/sirupsen/logrus"
 )
 
 type HostNotifyCmd struct {
 	*base.Base
 	*metrics.GossipMetrics
+	*metadata.PeerMetadataState
+	Store track.ExtendedPeerstore
 }
 
 func (c *HostNotifyCmd) Help() string {
@@ -49,8 +53,10 @@ func (c *HostNotifyCmd) listenCloseF(net network.Network, addr ma.Multiaddr) {
 }
 
 func (c *HostNotifyCmd) connectedF(net network.Network, conn network.Conn) {
-	c.GossipMetrics.AddNewPeer(conn.RemotePeer())
+	_ = c.GossipMetrics.AddNewPeer(conn.RemotePeer())
 	c.GossipMetrics.AddConnectionEvent(conn.RemotePeer(), "Connection")
+	// request metadata as soon as we connect to a peer
+	metrics.PollPeerMetadata(conn.RemotePeer(), c.Base, c.PeerMetadataState, c.Store, c.GossipMetrics)
 
 	// End of metric traces to track the connections and disconnections
 	c.Log.WithFields(logrus.Fields{
