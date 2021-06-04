@@ -4,10 +4,13 @@
 
 import os, sys
 import json
+import time
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+from datetime import datetime
 
+inittime = 0
 
 def mainexecution():
     projectsFolder = sys.argv[1]
@@ -20,7 +23,7 @@ def mainexecution():
     clientDist = {'date': [], 'Lighthouse': [], 'Teku': [], 'Nimbus': [], 'Prysm': [], 'Lodestar': [], 'Unknown': []}
     stimationDist = {'date': [], 'Lighthouse': [], 'Teku': [], 'Nimbus': [], 'Prysm': [], 'Lodestar': [], 'Unknown': []}
     # Concatenation of the Json values
-    j = []
+
     print(projectsFolder)
     for root, dirs, _ in os.walk(projectsFolder):
         print(dirs)
@@ -105,15 +108,13 @@ def poblatePandaObservedClients(clientDist, jsonFile, customFile):
     cfValues = json.load(cf)
     cf.close()
 
-
-    # Aux Variables
-    tcp13000 = 0
+    global inittime
 
     crwlig = 0
     crwtek = 0
     crwnim = 0
-    crwlod = 0
     crwpry = 0
+    crwlod = 0
     crwunk = 0
     cnt = 0
     for k in jsonValues:
@@ -121,39 +122,64 @@ def poblatePandaObservedClients(clientDist, jsonFile, customFile):
         if 'MetadataRequest' in peer:
             if peer['MetadataRequest'] == True:
                 cnt = cnt + 1
-                if 'Light' in peer['ClientType']:
+                if 'lig' in peer['ClientType'].lower():
                     crwlig = crwlig + 1
-                elif 'Teku' in peer['ClientType']:
+                elif 'teku' in peer['ClientType'].lower():
                     crwtek = crwtek + 1
-                elif 'Nimbus' in peer['ClientType']:
+                elif 'nimbus' in peer['ClientType'].lower():
                     crwnim = crwnim + 1
-                elif 'Prysm' in peer['ClientType']:
+                elif 'prysm' in peer['ClientType'].lower():
                     crwpry = crwpry + 1
-                elif 'Lod' in peer['ClientType']:
+                elif 'js-libp2p' in peer['ClientType'].lower():
                     crwlod = crwlod + 1
-                elif 'Unk' in peer['ClientType']:
+                elif 'unk' in peer['ClientType'].lower():
+                    crwunk = crwunk + 1
+                else:
                     crwunk = crwunk + 1
         else:
             return
     
-    total = crwlig + crwtek + crwtek + crwpry + crwlod + crwunk
     print("total in metrics:", len(jsonValues))
     print("total requested:", cnt)
-    print("total of client sum:", total)
 
-    if total == 0:
+    if cnt == 0:
         print(jsonValues)
         return
 
-    lig = round((crwlig*100)/total, 2)
-    tek = round((crwtek*100)/total, 2)
-    nim = round((crwnim*100)/total, 2)
-    pry = round((crwpry*100)/total, 2)
-    lod = round((crwlod*100)/total, 2)
-    unk = round((crwunk*100)/total, 2)
+    lig = round((crwlig*100)/cnt, 3)
+    tek = round((crwtek*100)/cnt, 3)
+    nim = round((crwnim*100)/cnt, 3)
+    pry = round((crwpry*100)/cnt, 3)
+    lod = round((crwlod*100)/cnt, 3)
+    unk = round((crwunk*100)/cnt, 3)
 
-    cday = str(cfValues['StopTime']['Year']) + '/' + str(cfValues['StopTime']['Month']) + '/' + str(cfValues['StopTime']['Day']) + '-' + str(cfValues['StopTime']['Hour'])
-    clientDist['date'].append(cday)
+    if cfValues['StopTime']['Month'] < 10:
+	    month = "0" + str(cfValues['StopTime']['Month'])
+    else: 
+	    month = str(cfValues['StopTime']['Month'])
+
+    if cfValues['StopTime']['Day'] < 10:
+        day = "0" + str(cfValues['StopTime']['Day'])
+    else: 
+	    day = str(cfValues['StopTime']['Day'])
+
+    if cfValues['StopTime']['Hour'] < 10:
+	    hour = "0" + str(cfValues['StopTime']['Hour'])
+    else: 
+	    hour = str(cfValues['StopTime']['Hour'])
+	
+    if cfValues['StopTime']['Minute'] < 10:
+	    minutes = "0" + str(cfValues['StopTime']['Minute'])
+    else: 
+	    minutes = str(cfValues['StopTime']['Minute'])
+
+
+    cday = str(cfValues['StopTime']['Year']) + '/' + month + '/' + day + '-' + hour + '-' +  minutes
+    s = time.mktime(datetime.strptime(cday, "%Y/%m/%d-%H-%M").timetuple())
+    if inittime == 0:
+        inittime = s
+    h = (s -inittime)/(60*60) # to get it in Hours
+    clientDist['date'].append(h)
     clientDist['Lighthouse'].append(lig)
     clientDist['Teku'].append(tek)
     clientDist['Nimbus'].append(nim)
@@ -171,6 +197,8 @@ def poblatePandaStimatedClients(stimatedDist, jsonFile, customFile):
     cfValues = json.load(cf)
     cf.close()
 
+    global inittime
+
     # Aux Variables
     tcp13000 = 0
 
@@ -185,15 +213,15 @@ def poblatePandaStimatedClients(stimatedDist, jsonFile, customFile):
         if 'MetadataRequest' in peer:
             if peer['MetadataRequest'] == True:
                 cnt = cnt + 1
-                if 'Light' in peer['ClientType']:
+                if 'lig' in peer['ClientType'].lower():
                     crwlig = crwlig + 1
-                elif 'Teku' in peer['ClientType']:
+                elif 'teku' in peer['ClientType'].lower():
                     crwtek = crwtek + 1
-                elif 'Nimbus' in peer['ClientType']:
+                elif 'nimbus' in peer['ClientType'].lower():
                     crwnim = crwnim + 1
-                elif 'Lod' in peer['ClientType']:
+                elif 'js-libp2p' in peer['ClientType'].lower():
                     crwlod = crwlod + 1
-                elif 'Unk' in peer['ClientType']:
+                elif 'unk' in peer['ClientType'].lower():
                     crwunk = crwunk + 1
             if '/13000' in peer['Addrs']:
                 tcp13000 = tcp13000 + 1
@@ -225,8 +253,32 @@ def poblatePandaStimatedClients(stimatedDist, jsonFile, customFile):
     lod = round((estimlod*100)/total, 2)
     unk = round((estimunk*100)/total, 2)
 
-    cday = str(cfValues['StopTime']['Year']) + '/' + str(cfValues['StopTime']['Month']) + '/' + str(cfValues['StopTime']['Day']) + '-' + str(cfValues['StopTime']['Hour'])
-    stimatedDist['date'].append(cday)
+    if cfValues['StopTime']['Month'] < 10:
+	    month = "0" + str(cfValues['StopTime']['Month'])
+    else: 
+	    month = str(cfValues['StopTime']['Month'])
+
+    if cfValues['StopTime']['Day'] < 10:
+        day = "0" + str(cfValues['StopTime']['Day'])
+    else: 
+	    day = str(cfValues['StopTime']['Day'])
+
+    if cfValues['StopTime']['Hour'] < 10:
+	    hour = "0" + str(cfValues['StopTime']['Hour'])
+    else: 
+	    hour = str(cfValues['StopTime']['Hour'])
+	
+    if cfValues['StopTime']['Minute'] < 10:
+	    minutes = "0" + str(cfValues['StopTime']['Minute'])
+    else: 
+	    minutes = str(cfValues['StopTime']['Minute'])
+
+    cday = str(cfValues['StopTime']['Year']) + '/' + month + '/' + day + '-' + hour + '-' +  minutes
+    s = time.mktime(datetime.strptime(cday, "%Y/%m/%d-%H-%M").timetuple())
+    if inittime == 0:
+        inittime = s
+    h = (s -inittime)/(60*60) # to get it in Hours
+    stimatedDist['date'].append(h)
     stimatedDist['Lighthouse'].append(lig)
     stimatedDist['Teku'].append(tek)
     stimatedDist['Nimbus'].append(nim)
