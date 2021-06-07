@@ -5,14 +5,17 @@ go 1.14
 replace github.com/libp2p/go-libp2p-pubsub v0.3.3 => github.com/cortze/go-libp2p-pubsub v0.3.4-0.20210318120057-ca6e67cdec42
 
 require (
+	github.com/adejoux/grafanaclient v0.2.0
 	github.com/anmitsu/go-shlex v0.0.0-20200514113438-38f4b401e2be // indirect
 	github.com/aristanetworks/goarista v0.0.0-20200805130819-fd197cf57d96 // indirect
 	github.com/btcsuite/btcd v0.21.0-beta
+	github.com/christophberger/grada v0.0.0-20171107123403-5b073dc6bb99
 	github.com/chzyer/logex v1.1.10 // indirect
 	github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e
 	github.com/chzyer/test v0.0.0-20180213035817-a1ea475d72b1 // indirect
 	github.com/cortze/go-eth2-beacon-nodes v0.0.0-20210226135425-ab05ba562a6f
 	github.com/davidlazar/go-crypto v0.0.0-20200604182044-b73af7476f6c // indirect
+	github.com/eminetto/clean-architecture-go v0.0.0-20200312132632-3195811c74a3
 	github.com/ethereum/go-ethereum v1.10.1
 	github.com/gliderlabs/ssh v0.3.0
 	github.com/golang/snappy v0.0.3-0.20201103224600-674baa8c7fc3
@@ -55,6 +58,7 @@ require (
 	github.com/multiformats/go-multiaddr-net v0.1.5
 	github.com/multiformats/go-multistream v0.1.2
 	github.com/olekukonko/tablewriter v0.0.2-0.20190409134802-7e037d187b0c
+	github.com/prometheus/client_golang v1.5.0
 	github.com/protolambda/ask v0.0.5
 	github.com/protolambda/zrnt v0.13.2
 	github.com/protolambda/ztyp v0.1.2

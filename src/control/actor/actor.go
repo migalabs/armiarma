@@ -18,6 +18,7 @@ import (
 	"github.com/protolambda/rumor/control/actor/blocks"
 	"github.com/protolambda/rumor/control/actor/chain"
 	visualizer "github.com/protolambda/rumor/control/actor/chainvisualizer"
+	"github.com/protolambda/rumor/control/actor/prometheus"
 	"github.com/protolambda/rumor/control/actor/dv5"
 	"github.com/protolambda/rumor/control/actor/enr"
 	"github.com/protolambda/rumor/control/actor/gossip"
@@ -242,6 +243,8 @@ func (c *ActorCmd) Cmd(route string) (cmd interface{}, err error) {
 			VisualizerState: &c.VisualizerState,
 			BlockDBState:    &c.BlocksState,
 			StateDBState:    &c.StatesState}
+	case "prometheus":
+		cmd = &prometheus.PrometheusCmd{Base: b,GossipMetrics: &c.GossipMetrics}
 	case "blocks":
 		cmd = &blocks.BlocksCmd{Base: b, DBs: c.GlobalBlocksDBs, DBState: &c.BlocksState}
 	case "states":
@@ -267,7 +270,7 @@ func (c *ActorCmd) Cmd(route string) (cmd interface{}, err error) {
 	return cmd, nil
 }
 
-var topRoutes = []string{"host", "enr", "peer", "peerstore", "dv5", "gossip",
+var topRoutes = []string{"host", "enr", "peer", "peerstore", "dv5", "gossip", "prometheus",
 	"rpc", "blocks", "states", "gossip-import", "chain", "chain-visualizer", "sleep", "tool"}
 var topRoutesMap = map[string]struct{}{}
 
