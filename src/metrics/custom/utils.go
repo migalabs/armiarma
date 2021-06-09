@@ -26,14 +26,17 @@ func GetPeersWithPorts(h host.Host, ep track.ExtendedPeerstore) (int, int, int) 
 	peerList := h.Peerstore().Peers()
 	for _, peerId := range peerList {
 		peerData := ep.GetAllData(peerId)
-		for _, address := range peerData.Addrs {
-			if strings.Contains(address, "/13000/") {
+		if len(peerData.Addrs) > 0 {
+			address := peerData.Addrs[0]
+			if strings.Contains(address, "/13000") {
 				x += 1
-			} else if strings.Contains(address, "/9000/") {
+			} else if strings.Contains(address, "/9000") {
 				y += 1
 			} else {
 				z += 1
 			}
+		} else {
+			z += 1
 		}
 	}
 	return x, y, z

@@ -107,7 +107,7 @@ def plotStackBarsFromArrays(xarray, yarray, pdf, opts):
                 else:
                     plt.text(ind, value , str(value), fontsize=opts['textSize'], horizontalalignment='center')
     
-    ax.legend(handles=legends, loc='upper center', bbox_to_anchor=(0.5, -0.05), fancybox=True, shadow=True, ncol=4)    
+    ax.legend(handles=legends, loc='upper center', bbox_to_anchor=(0.5, -0.05), fancybox=True, shadow=True, ncol=5)    
 
     # Title
     plt.title(opts['title'], fontsize = opts['titleSize'])
@@ -558,9 +558,9 @@ def main():
     print('Total amount of peers on the peerstore:',peerstoreLen)
     for peer in peerstore:
         try:
-            if '/13000/' in peerstore[peer]["addrs"][0]:
+            if '/13000' in peerstore[peer]["addrs"][0]:
                 cnt13000 = cnt13000 +1
-            elif '/9000/' in peerstore[peer]["addrs"][0]:
+            elif '/9000' in peerstore[peer]["addrs"][0]:
                 cnt9000 = cnt9000 +1
             else: 
                 cntOthers = cntOthers + 1
@@ -905,7 +905,11 @@ def main():
         del clientsCnt['Prysm']
         print(clientsCnt)
         # Get number of unknown peers that has the 13000 port 
-        print('Number of unknown with 13000 port', unk13000)
+
+        print('Number of Peers', peerMetricsSize)
+        print('Number in Peerstore', peerstoreLen)
+        print('Number of peer with 13000 port', cnt13000)
+        print('No prysm port:', noPrysmPort, "real:", (peerstoreLen -cnt13000) )
         # Get total of non prysm peers
         nonPrysmObserved = 0
         for k in clientsCnt:

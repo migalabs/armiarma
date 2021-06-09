@@ -1,2 +1,2 @@
 # Apply the random connection strategy to see if all the peers are really unreachable
-peer connect-random --max-retries=5 --rescan=1m --timeout=15s
+peer connect-random --max-retries=3 --rescan=7m --timeout=10s
