@@ -48,7 +48,7 @@ func (c *PrometheusStartCmd) Run(ctx context.Context, args ...string) error {
 	// generate the endpoint where the metrics will be offered for prometheus
 	path := "/" + c.EndpointUrl
 	port := ":" + c.ExposePort
-	fmt.Println("Exporting prometheus metrics at:", path, port)
+	fmt.Println("Exposing prometheus metrics at:", path, port)
 	http.Handle(path, promhttp.Handler())
 
 	// Register the metrics in the prometheus exporter

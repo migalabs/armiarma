@@ -1,7 +1,6 @@
 package custom
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/libp2p/go-libp2p-core/host"
@@ -34,18 +33,11 @@ func GetPeersWithPorts(h host.Host, ep track.ExtendedPeerstore) (int, int, int) 
 			} else if strings.Contains(address, "/9000") {
 				y += 1
 			} else {
-				fmt.Println(address)
 				z += 1
 			}
 		} else {
-			fmt.Println("No address")
 			z += 1
 		}
 	}
-	fmt.Println("Total peers in peerstore:", len(peerList))
-	fmt.Println("Total peers with 13000:", x)
-	fmt.Println("Total peers with 9000:", y)
-	fmt.Println("Total peers with other:", z)
-	fmt.Println("Sum:", x+y+z)
 	return x, y, z
 }
