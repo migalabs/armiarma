@@ -22,7 +22,8 @@ def mainexecution():
     # So far, the generated panda will just contain the client count
     clientDist = {'date': [], 'Lighthouse': [], 'Teku': [], 'Nimbus': [], 'Prysm': [], 'Lodestar': [], 'Unknown': []}
     stimationDist = {'date': [], 'Lighthouse': [], 'Teku': [], 'Nimbus': [], 'Prysm': [], 'Lodestar': [], 'Unknown': []}
-    # Concatenation of the Json values
+    # Concatenation of the Json Values
+    j = []
 
     print(projectsFolder)
     for root, dirs, _ in os.walk(projectsFolder):
@@ -33,10 +34,11 @@ def mainexecution():
             fold = os.path.join(root, d)
             f = fold + '/gossip-metrics.json' 
             cf = fold + '/custom-metrics.json'
+            ps = fold + '/peerstore.json'
             if os.path.exists(f):
                 # Load the readed values from the json into the panda
                 poblatePandaObservedClients(clientDist, f, cf)
-                poblatePandaStimatedClients(stimationDist, f, cf)
+                poblatePandaStimatedClients(stimationDist, f, j, cf, ps)
                 print(f)
         break
 
@@ -50,6 +52,10 @@ def mainexecution():
     sf = sf.sort_values(by="date")
     print(sf)
 
+    # Export the Concatenated json to the given folder
+    with open(outJson, 'w', encoding='utf-8') as f:
+        json.dump(j, f, ensure_ascii=False, indent=4)
+
     outputFigsFolder = outFolder + '/' + 'plots'
     clientList = ['Lighthouse', 'Teku', 'Nimbus', 'Prysm', 'Lodestar', 'Unknown']
     figSize = (10,6)
@@ -59,8 +65,7 @@ def mainexecution():
     # Plot the images
     plotStackedChart(df, opts={                                   
             'figSize': figSize,                                                      
-            'figTitle': 'Client-Distribution.png',  
-            'figtitle': 'client-distribution.png',                                 
+            'figTitle': 'client-distribution.png',                               
             'outputPath': outputFigsFolder,                                        
             'align': 'center',
             'grid': 'y',    
@@ -80,8 +85,27 @@ def mainexecution():
     # Plot the images
     plotStackedChart(sf, opts={                                   
             'figSize': figSize,                                                      
-            'figTitle': 'Client estimation distribution',  
-            'figtitle': 'client-estimation-distribution.png',                                 
+            'figTitle': 'client-estimation-distribution.png',                                 
+            'outputPath': outputFigsFolder,                                        
+            'align': 'center',
+            'grid': 'y',    
+            'textSize': textSize,                                                  
+            'title': "Evolution of the estimated client distribution",           
+            'ylabel': 'Client concentration (%)',                                                         
+            'xlabel': None, 
+            'yticks': np.arange(0, 110, 10),
+            'legendLabels': clientList,                    
+            'titleSize': titleSize,                                                        
+            'labelSize': labelSize,                                                        
+            'lengendPosition': 1,                                                   
+            'legendSize': labelSize,                                                     
+            'tickRotation': 90,                                                     
+            'show': True})
+    
+     # Plot the images
+    plotStackedChart(sf, opts={                                   
+            'figSize': figSize,                                                      
+            'figTitle': 'Client-Distribution.png',                                 
             'outputPath': outputFigsFolder,                                        
             'align': 'center',
             'grid': 'y',    
@@ -173,13 +197,16 @@ def poblatePandaObservedClients(clientDist, jsonFile, customFile):
     else: 
 	    minutes = str(cfValues['StopTime']['Minute'])
 
-
+    """
     cday = str(cfValues['StopTime']['Year']) + '/' + month + '/' + day + '-' + hour + '-' +  minutes
     s = time.mktime(datetime.strptime(cday, "%Y/%m/%d-%H-%M").timetuple())
     if inittime == 0:
         inittime = s
     h = (s -inittime)/(60*60) # to get it in Hours
     clientDist['date'].append(h)
+    """
+    cday = str(cfValues['StopTime']['Year']) + '/' + month + '/' + day
+    clientDist['date'].append(cday)
     clientDist['Lighthouse'].append(lig)
     clientDist['Teku'].append(tek)
     clientDist['Nimbus'].append(nim)
@@ -187,7 +214,7 @@ def poblatePandaObservedClients(clientDist, jsonFile, customFile):
     clientDist['Lodestar'].append(lod)
     clientDist['Unknown'].append(unk)
 
-def poblatePandaStimatedClients(stimatedDist, jsonFile, customFile):
+def poblatePandaStimatedClients(stimatedDist, jsonFile, j, customFile, peerstore):
     # Read the Json
     jsf = open(jsonFile)
     jsonValues = json.load(jsf)
@@ -197,11 +224,18 @@ def poblatePandaStimatedClients(stimatedDist, jsonFile, customFile):
     cfValues = json.load(cf)
     cf.close()
 
+    ps = open(peerstore)
+    psValues = json.load(ps)
+    ps.close()
+
+    j.append(cfValues)
+
     global inittime
 
     # Aux Variables
     tcp13000 = 0
-
+    total = 0 
+    
     crwlig = 0
     crwtek = 0
     crwnim = 0
@@ -223,12 +257,25 @@ def poblatePandaStimatedClients(stimatedDist, jsonFile, customFile):
                     crwlod = crwlod + 1
                 elif 'unk' in peer['ClientType'].lower():
                     crwunk = crwunk + 1
+            """
             if '/13000' in peer['Addrs']:
                 tcp13000 = tcp13000 + 1
+            """
         else:
             return
 
-    total = len(jsonValues)
+    # iterate through the peerstore
+    for k in psValues:
+        peer = psValues[k]
+        total = total + 1
+        try:
+            if '/13000' in peer['addrs'][0]:
+                tcp13000 = tcp13000 + 1 
+        except:
+            pass
+        
+
+    #total = len(jsonValues)
     print("total in metrics:", len(jsonValues))
     print("total tcp 13000:", tcp13000)
 
@@ -273,12 +320,16 @@ def poblatePandaStimatedClients(stimatedDist, jsonFile, customFile):
     else: 
 	    minutes = str(cfValues['StopTime']['Minute'])
 
+    """
     cday = str(cfValues['StopTime']['Year']) + '/' + month + '/' + day + '-' + hour + '-' +  minutes
     s = time.mktime(datetime.strptime(cday, "%Y/%m/%d-%H-%M").timetuple())
     if inittime == 0:
         inittime = s
     h = (s -inittime)/(60*60) # to get it in Hours
     stimatedDist['date'].append(h)
+    """
+    cday = str(cfValues['StopTime']['Year']) + '/' + month + '/' + day
+    stimatedDist['date'].append(cday)
     stimatedDist['Lighthouse'].append(lig)
     stimatedDist['Teku'].append(tek)
     stimatedDist['Nimbus'].append(nim)

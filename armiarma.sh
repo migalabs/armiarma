@@ -32,6 +32,7 @@ Help()
     echo "                  of the obtained"
     echo "                  *Parameters for -f [network] [project-name] [time](minutes)"
     echo "          -o      Run the general analysis over the entire projects' folder."
+    echo "                  *Parameters for -o [folder-path]"
     echo ""
     echo "      Parameters:"
     echo "          [network]       The ETH2 network where the crawler will be running"
@@ -285,7 +286,7 @@ LaunchGeneralResults(){
     # Run the Analyzer
     echo "  Launching General Overview Analyzer"
     echo ""
-    python3 ./src/analyzer/total-overview-analysis.py "$1" ./general-results
+    python3 ./src/analyzer/crawler-progresion.py "$1" ./general-results
     echo "results available in \$ARMIARMA/results"
     echo ""
     # Deactivate the VENV

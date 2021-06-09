@@ -1,2 +1,2 @@
 # Rumor script that enables the metrics sharing for prometheus
-prometheus start --expose-port="9080" --endpoint-url="metrics"
+prometheus start --expose-port="9080" --endpoint-url="metrics" --refresh-interval=15s

@@ -11,4 +11,4 @@ else
 fi
 
 
-gossip topic export-metrics --metrics-folder-path="$metricsFolder" --export-period=1h --backup-period=15m
+gossip topic export-metrics --metrics-folder-path="$metricsFolder" --export-period=12h --backup-period=30m

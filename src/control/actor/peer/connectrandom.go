@@ -106,6 +106,7 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host) {
 				_, ok := peerCache[p]
 				if ok {
 					if len(peerCache) == peerstoreLen {
+						loopCount += 1
 						break // Temporary commented
 					}
 					continue
