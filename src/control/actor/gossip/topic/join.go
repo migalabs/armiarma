@@ -11,6 +11,7 @@ import (
 
 type TopicJoinCmd struct {
 	*base.Base
+	GossipMetrics *metrics.GossipMetrics
 	GossipState   *metrics.GossipState
 	Eth2TopicName string `ask:"--eth-topic" help:"The name of the eth2 topics"`
 	ForkDigest    string `ask:"--fork-version" help:"The fork digest value of the network we want to join to (Default Mainnet)"`
@@ -42,6 +43,8 @@ func (c *TopicJoinCmd) Run(ctx context.Context, args ...string) error {
 		}
 		c.GossipState.Topics.Store(topicName, top)
 		c.Log.Infof("joined topic %s", topicName)
+		// create a not channel in the c.GossipMetrics / buffering the channel to don't block the channel
+		c.GossipMetrics.AddNotChannel(topicName)
 		// if Validation Filter has been disabled, remove the Validator for the Topic
 		// TODO: Maybe in the future is more interesting to have this flag for each of the
 		//		 topics that we have joined (to reduce the bandwith or certain experimental tests)

@@ -49,7 +49,7 @@ func (c *PeerConnectRandomCmd) Run(ctx context.Context, args ...string) error {
 	bgCtx, bgCancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 	go func() {
-		c.run(bgCtx, h)
+		c.run(bgCtx, h, c.Store)
 		close(done)
 	}()
 
@@ -73,7 +73,7 @@ func randomPeer(peerList peer.IDSlice) peer.ID {
 // every 3-4 minutes generate a local new copy of the peers in the peerstore.
 // It randomly selects one of the attempting to connect with it, recording the
 // results of the attempts. If the peer was already connected, just dropt it
-func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host) {
+func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host, store track.ExtendedPeerstore) {
 	c.Log.Info("started randomly peering")
 	quit := make(chan struct{})
 	// Set the defer function to cancel the go routine
@@ -89,9 +89,12 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host) {
 				peerCache = make(map[peer.ID]bool)
 				loopCount = 0
 			}
-			// make the first copy of the peerstore
-			p := h.Peerstore()
-			peerList := p.Peers()
+			// make the first copy of the peers from the Host
+			//p := h.Peerstore()
+			//peerList := p.Peers()
+
+			// Make the first copy of the peers from the peerstore
+			peerList := store.Peers()
 			c.Log.Infof("the peerstore has been re-scanned")
 			peerstoreLen := len(peerList)
 			c.Log.Infof("len peerlist: %s", peerstoreLen)

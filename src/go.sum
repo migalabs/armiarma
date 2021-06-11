@@ -137,6 +137,7 @@ github.com/cortze/go-eth2-beacon-nodes v0.0.0-20210226135425-ab05ba562a6f h1:CQ6
 github.com/cortze/go-eth2-beacon-nodes v0.0.0-20210226135425-ab05ba562a6f/go.mod h1:KmcDlKQ/dPqdY1BOavmidXH/NB5YzQCtl6+1+jx0RsI=
 github.com/cortze/go-libp2p-pubsub v0.3.4-0.20210318120057-ca6e67cdec42 h1:G+G5CV2FyPMyJv0lbuOe1t9SWASmccoZM/accLN64kM=
 github.com/cortze/go-libp2p-pubsub v0.3.4-0.20210318120057-ca6e67cdec42/go.mod h1:eFwnGe90Z2wqjsZe2Jgx6HEAZo1Ul5S7zxGPhvjRCn4=
+github.com/cortze/rumor v0.2.3 h1:SNqmKO6TJVEkZK5L3f7QerE9F5fNchI0/o61g4h9QaI=
 github.com/cpuguy83/go-md2man v1.0.10/go.mod h1:SmD6nW6nTyfqj6ABTjUi3V3JVMnlJmwcJI5acqYI6dE=
 github.com/cpuguy83/go-md2man/v2 v2.0.0-20190314233015-f79a8a8ca69d/go.mod h1:maD7wRr/U5Z6m/iR4s+kqSMx2CaBsrgA7czyZG/E6dU=
 github.com/cpuguy83/go-md2man/v2 v2.0.0/go.mod h1:maD7wRr/U5Z6m/iR4s+kqSMx2CaBsrgA7czyZG/E6dU=

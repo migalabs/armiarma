@@ -25,11 +25,13 @@ type GossipMetrics struct {
 	GossipMetrics   sync.Map
 	MessageDatabase *database.MessageDatabase
 	StartTime       int64 // milliseconds
+	MsgNotChannels  map[string](chan bool)
 }
 
 func NewGossipMetrics() GossipMetrics {
 	gm := GossipMetrics{
-		StartTime: utils.GetTimeMiliseconds(),
+		StartTime:      utils.GetTimeMiliseconds(),
+		MsgNotChannels: make(map[string](chan bool)),
 	}
 	return gm
 }
@@ -158,6 +160,11 @@ func (c *GossipMetrics) ResetDynamicMetrics() {
 		return true
 	})
 	fmt.Println("Finished Reseting Dynamic Metrics")
+}
+
+// Function that adds a notification channel to the message gossip topic
+func (c *GossipMetrics) AddNotChannel(topicName string) {
+	c.MsgNotChannels[topicName] = make(chan bool, 100)
 }
 
 // Function that iterates through the received peers and fills the missing information
@@ -358,13 +365,12 @@ func (c *GossipMetrics) AddNewPeer(peerId peer.ID) bool {
 
 // Add a connection Event to the given peer
 func (c *GossipMetrics) AddConnectionEvent(peerId peer.ID, connectionType string) {
-	newConnection := utils.ConnectionEvents{
-		ConnectionType: connectionType,
-		TimeMili:       utils.GetTimeMiliseconds(),
-	}
-
 	pMetrics, ok := c.GossipMetrics.Load(peerId)
 	if ok {
+		newConnection := utils.ConnectionEvents{
+			ConnectionType: connectionType,
+			TimeMili:       utils.GetTimeMiliseconds(),
+		}
 		peerMetrics := pMetrics.(utils.PeerMetrics)
 		peerMetrics.ConnectionEvents = append(peerMetrics.ConnectionEvents, newConnection)
 		if connectionType == "Connection" {
@@ -396,7 +402,6 @@ func (c *GossipMetrics) AddMetadataEvent(peerId peer.ID, success bool) {
 // Function that Manages the metrics updates for the incoming messages
 func (c *GossipMetrics) IncomingMessageManager(peerId peer.ID, topicName string) error {
 	pMetrics, _ := c.GossipMetrics.Load(peerId)
-	//fmt.Println("the loaded", pMetrics)
 	peerMetrics := pMetrics.(utils.PeerMetrics)
 	messageMetrics, err := GetMessageMetrics(&peerMetrics, topicName)
 	if err != nil {
