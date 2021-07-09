@@ -48,10 +48,14 @@ def plotFromPandas(panda, pdf, opts):
         plt.xlabel(opts['xlabel'], fontsize=opts['labelSize'])
 
     # Ticks LABELS
-    if opts['xticks'] is not None:
-        plt.xticks(range(len(panda)), opts['xticks'], rotation=opts['tickRotation'], fontsize=opts['xticksSize'])
-    else: 
+    if opts['xticks'] == 'Default':
+        plt.xticks(range(len(panda)), rotation=opts['tickRotation'], fontsize=opts['xticksSize']) 
+    elif opts['xticks'] is not None:
+        plt.xticks(np.arange(0, len(panda), opts['xticks']), rotation=opts['tickRotation'], fontsize=opts['xticksSize'])
+    else:
         ax.get_xaxis().set_ticks([])
+
+
     plt.yticks(fontsize=opts['yticksSize'])
     plt.ylim(opts['yLowLimit'], opts['yUpperLimit'])
     
@@ -86,16 +90,19 @@ def plotStackBarsFromArrays(xarray, yarray, pdf, opts):
     auxI = 0
     bottom = [0,0] # done by hand
     for subarray in xarray:
-        legends.append(ax.barh(yarray, subarray, left=bottom, label=opts['labels'][auxI], color=colors[auxI]))
+        legends.append(ax.barh(yarray, subarray, left=bottom, label=opts['labels'][auxI], color=colors[auxI])) #
         auxI = auxI + 1
         for i in range(0,2):
             bottom[i] = bottom[i] + subarray[i]
 
     # labels
+
     if opts['ylabel'] is not None:     
-        plt.ylabel(opts['ylabel'], fontsize=opts['labelSize'])
+        pass
+        #plt.ylabel(opts['ylabel'], fontsize=opts['labelSize'])
     if opts['xlabel'] is not None:
         plt.xlabel(opts['xlabel'], fontsize=opts['labelSize'])
+
 
     # Check is there is Value on top of the charts
     if opts['barValues'] is not None:
@@ -107,7 +114,14 @@ def plotStackBarsFromArrays(xarray, yarray, pdf, opts):
                 else:
                     plt.text(ind, value , str(value), fontsize=opts['textSize'], horizontalalignment='center')
     
-    ax.legend(handles=legends, loc='upper center', bbox_to_anchor=(0.5, -0.05), fancybox=True, shadow=True, ncol=5)    
+    # Ticks LABELS
+    if opts['xticksSize'] is not None:
+        plt.xticks(fontsize=opts['xticksSize'])
+    # Ticks LABELS
+    if opts['yticksSize'] is not None:
+        plt.xticks(fontsize=opts['yticksSize'])
+
+    ax.legend(handles=legends, loc='upper center', bbox_to_anchor=(0.5, -0.05), fancybox=True, shadow=True, ncol=5,  prop={'size': opts['legendSize']})    
 
     # Title
     plt.title(opts['title'], fontsize = opts['titleSize'])
@@ -139,8 +153,10 @@ def plotBarsFromArrays(xarray, yarray, pdf, opts):
     if opts['xticks'] is not None:
         plt.xticks(range(len(xarray)), opts['xticks'], rotation=opts['tickRotation'], fontsize=opts['xticksSize'])
     else:
-        plt.xticks(range(len(xarray)), {},)
+        plt.xticks(range(len(xarray)), {}, rotation=opts['tickRotation'], fontsize=opts['xticksSize'])
         #plt.xticks(range(len(xarray)))
+
+    
 
     plt.margins(x=0)
     plt.yticks(fontsize=opts['yticksSize'])
@@ -188,6 +204,12 @@ def plotHorizontalBarsFromArrays(xarray, yarray, pdf, opts):
         plt.yticks(range(len(xarray)), {},)
         #plt.xticks(range(len(xarray)))
 
+    if opts['xticksSize'] is not None:
+        plt.xticks(fontsize=opts['xticksSize'])
+    # Ticks LABELS
+    if opts['yticksSize'] is not None:
+        plt.xticks(fontsize=opts['yticksSize'])
+
     plt.margins(x=0)
     plt.yticks(fontsize=opts['yticksSize'])
     plt.ylim(opts['yLowLimit'], opts['yUpperLimit'])
@@ -198,7 +220,7 @@ def plotHorizontalBarsFromArrays(xarray, yarray, pdf, opts):
     
     #  loc='upper center'
 
-    plt.legend(barh, xarray, loc='upper center', ncol=len(xarray), fancybox=True, title=opts['legendTitle'], title_fontsize=opts['legendSize'] )
+    plt.legend(barh, xarray, loc='upper center', ncol=len(xarray), fancybox=True, title=opts['legendTitle'], title_fontsize=opts['legendSize'], prop={'size': opts['legendSize']})
     #plt.legend(handles=legends, bbox_to_anchor=(0.5, -0.05), fancybox=True, shadow=True, ncol=len(xarray))
 
     # Title
@@ -547,6 +569,12 @@ def main():
     ff = open(peerstoreFile)
     peerstore = json.load(ff)
 
+    # TEMP CODE
+    # Remove the outlier of the metrics/peerstore
+    row = rumorMetricsPanda.loc[rumorMetricsPanda['Connected Time'].idxmax()]
+    rumorMetricsPanda = rumorMetricsPanda.drop([10261,1116,10427,4810,762,8658,4429], axis=0)
+    # END TEMP CODE
+
     cnt13000 = 0
     cnt9000 = 0
     cntOthers = 0
@@ -601,8 +629,9 @@ def main():
     messagePercentageArray = []
 
     for index, row in rumorMetricsPanda.iterrows():
-        totalMessageCounter = totalMessageCounter + row['Total Messages']
-        messageCounterArray.append(row['Total Messages'])
+        if row['Connected'] == True:
+            totalMessageCounter = totalMessageCounter + row['Total Messages']
+            messageCounterArray.append(row['Total Messages'])
 
     for msgCount in messageCounterArray:
         percent = msgCount/totalMessageCounter
@@ -718,7 +747,10 @@ def main():
                     nonAttempted = nonAttempted + 1
             else:
                 if row['Succeed'] == False:
-                    failed = failed + 1
+                    if row['Connected'] == True:
+                        connected = connected + 1
+                    else:
+                        failed = failed + 1
                 else:
                     succeed = succeed + 1
         
@@ -748,7 +780,7 @@ def main():
         barColor = ['tab:blue', 'tab:green']
 
 
-        plotStackBarsFromArrays(xarray, yarray, pdf, opts={                                   
+        plotStackBarsFromArrays(xarray, ['TOT','ConStat'], pdf, opts={                                   
             'figSize': figSize,                                                      
             'figTitle': 'PeerstoreVsConnectedPeers.png', 
             'pdf': pdfFile,                                
@@ -757,21 +789,21 @@ def main():
             'barValues': True,
             'logy': False,
             'barColor': barColor,
-            'textSize': textSize,
+            'textSize': textSize+2,
             'yLowLimit': 0,                                                         
             'yUpperLimit': None,                                                    
-            'title': "Number of Peers Connected from the entire Peerstore", 
+            'title': "Connection Status From Crawled Peers", 
             'labels': labels,              
             'xlabel': None,                                                         
             'ylabel': 'Number of Peers',                                      
             'xticks': None,
             'hGrids': False,                        
-            'titleSize': titleSize,                                                        
-            'labelSize': labelSize,                                                        
+            'titleSize': titleSize+2,                                                        
+            'labelSize': labelSize+2,                                                        
             'lengendPosition': 1,                                                   
-            'legendSize': labelSize,                                                       
-            'xticksSize': ticksSize,                                                       
-            'yticksSize': ticksSize,                                                       
+            'legendSize': labelSize-6,                                                       
+            'xticksSize': ticksSize-4,                                                       
+            'yticksSize': ticksSize-4,                                                       
             'tickRotation': 0,                                                     
             'show': False})
 
@@ -788,13 +820,12 @@ def main():
         barColor = GetColorGridFromArray(yarray)
         
         print()
-        """
+        
         for idx,item in enumerate(xarray):
             print(item, ',', yarray[idx])
         
         print()
-        """
-
+    
 
         plotHorizontalBarsFromArrays(xarray, yarray, pdf, opts={                                            
             'figSize': (12,7),                                                          
@@ -813,13 +844,13 @@ def main():
             'ylabel': None,                                                
             'yticks': None, 
             'vGrids': True,                                                           
-            'titleSize': titleSize+2,                                                        
-            'labelSize': labelSize+2,                                                        
+            'titleSize': titleSize+6,                                                        
+            'labelSize': labelSize,                                                        
             'legendPosition': 1,
-            'legendTitle': 'Recorded errors',                                                   
-            'legendSize': labelSize-4,                                                       
-            'xticksSize': ticksSize,                                                       
-            'yticksSize': ticksSize+2,                                                            
+            'legendTitle': None,                                                   
+            'legendSize': labelSize-5,                                                       
+            'xticksSize': ticksSize-2,                                                       
+            'yticksSize': ticksSize,                                        
             'tickRotation': 0,
             'show': False})  
 
@@ -967,7 +998,7 @@ def main():
         auxxarray, auxyarray = getDataFromPanda(rumorMetricsPanda, None, "Country", countriesList, 'counter') 
         print("Number of different Countries hosting Eth2 clients:", len(auxxarray))
         # Remove the Countries with less than X peers
-        countryLimit = 60
+        countryLimit = 100
         xarray = []
         yarray = []
         for idx, item in enumerate(auxyarray):
@@ -979,6 +1010,12 @@ def main():
         # Get Color Grid
         barColor = GetColorGridFromArray(yarray)
 
+        print()
+        print('Total countries:', len(auxxarray))
+        print('Countries lists and counters')
+        print(xarray)
+        print(yarray)
+        print()
 
         plotBarsFromArrays(xarray, yarray, pdf, opts={                                            
             'figSize': (12,7),                                                          
@@ -1008,6 +1045,16 @@ def main():
 
         # get the average of connections per client
         xarray, yarray = getDataFromPanda(rumorMetricsPanda, "Connections", "Client", clientList, 'avg') 
+
+        conn = 0
+        tot = 0
+        for _, row in rumorMetricsPanda.iterrows():
+            if row['Client'] == 'Lodestar':
+                tot += 1
+                conn += row['Connections']
+
+        print(conn, tot, 'lodestar conn average:', conn / tot)
+
 
         plotBarsFromArrays(xarray, yarray, pdf, opts={                                            
             'figSize': figSize,                                                          
@@ -1066,6 +1113,11 @@ def main():
 
         # get the average of ConnectedTime per client
         xarray, yarray = getDataFromPanda(rumorMetricsPanda, "Connected Time", "Client", clientList, 'avg') 
+        print()
+        print("Average of connected time per client")
+        print(xarray)
+        print(yarray)
+        print()
 
         plotBarsFromArrays(xarray, yarray, pdf, opts={                                            
             'figSize': figSize,                                                          
@@ -1536,7 +1588,7 @@ def main():
             'title': "Total of Time Connected with each Peer",                  
             'xlabel': "Peers Connected",                                                         
             'ylabel': 'Time (in Minutes)',                                      
-            'xticks': None,     
+            'xticks': 4000,     
             'lw': 3,                                                  
             'titleSize': titleSize+4,                                                        
             'labelSize': labelSize+4,                                                        
@@ -1549,7 +1601,7 @@ def main():
 
         barColor = 'black'
 
-        #print("Peer with highest RTT", rumorMetricsPanda.loc[rumorMetricsPanda['Latency'].idxmax()])
+        print("Peer with highest RTT", rumorMetricsPanda.loc[rumorMetricsPanda['Latency'].idxmax()])
 
         plotFromPandas(rumorMetricsPanda, pdf, opts={                                   
             'figSize': figSize,                                                      
@@ -1563,7 +1615,7 @@ def main():
             'xmetrics': ['Latency'],                                                      
             'barValues': None,   
             'barColor': barColor,                                               
-            'yLowLimit': 0,                                                         
+            'yLowLimit': None,                                                         
             'yUpperLimit': None,
             'grid': 'y',                                                    
             'title': "RTT with each Peer",                  
@@ -1598,7 +1650,7 @@ def main():
             xarray.append(item)
             yarray.append(sortedDict[item])
 
-        #print(rumorMetricsPanda.loc[rumorMetricsPanda['Beacon Blocks'].idxmax()])
+        print(rumorMetricsPanda.loc[rumorMetricsPanda['Connected Time'].idxmax()])
 
         plotColumn(rumorMetricsPanda, pdf, opts={
             'figSize': figSize, 
@@ -1645,8 +1697,8 @@ def main():
         auxPanda = rumorMetricsPanda.sort_values(by='Beacon Blocks', ascending=True)
         cont = 0
 
-        #auxrow = rumorMetricsPanda.loc[rumorMetricsPanda['Total Messages'].idxmax()]
-        #print(auxrow)
+        auxrow = rumorMetricsPanda.loc[rumorMetricsPanda['Total Messages'].idxmax()]
+        print(auxrow)
         
         
         plotColumn(rumorMetricsPanda, pdf, opts={

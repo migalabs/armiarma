@@ -134,7 +134,7 @@ func FilCustomMetrics(gm *metrics.GossipMetrics, ps track.ExtendedPeerstore, cm 
 	// Filter peers on peerstore by port
 	x, y, z := custom.GetPeersWithPorts(h, ps)
 	// Generate the MetricsDataFrame of the Current Metrics
-	mdf := export.NewMetricsDataFrame(gm.GossipMetrics)
+	mdf := export.NewMetricsDataFrame(&gm.GossipMetrics)
 	lig := mdf.AnalyzeClientType("Lighthouse")
 	tek := mdf.AnalyzeClientType("Teku")
 	nim := mdf.AnalyzeClientType("Nimbus")

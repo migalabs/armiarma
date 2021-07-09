@@ -87,6 +87,8 @@ func (c *TopicLogCmd) Run(ctx context.Context, args ...string) error {
 								"seq_no":    hex.EncodeToString(msg.Seqno),
 							}).Infof("new message on %s", topicName)
 							c.GossipMetrics.IncomingMessageManager(msg.ReceivedFrom, topicName)
+							// Add notification on the notification channel
+							c.GossipMetrics.MsgNotChannels[topicName] <- true
 							// Deserialize the message depending on the topic name
 							// generate a new ReceivedMessage on the Temp Database
 							// check if the topic has a db asiciated

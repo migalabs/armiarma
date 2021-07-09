@@ -26,6 +26,15 @@ type PeerMetrics struct {
 	MetadataSucceed bool // If the peer has been successfully requested its metadata
 
 	ConnectionEvents []ConnectionEvents
+
+	TotConnections    int64
+	LastConn          int64 //(timestamp in seconds of the last exported time (backup for when we are loading the peermetrics)
+	TotDisconnections int64
+	LastDisconn       int64 //(timestamp in seconds of the last exported time (backup for when we are loading the peermetrics)
+	TotConnTime       int64
+	ConnFlag          bool  // Flag that points if the peer was connected (for re-loading purposes)
+	LastExport        int64 //(timestamp in seconds of the last exported time (backup for when we are loading the peermetrics)
+
 	// Counters for the different topics
 	BeaconBlock          MessageMetrics
 	BeaconAggregateProof MessageMetrics
@@ -56,7 +65,15 @@ func NewPeerMetrics(peerId peer.ID) PeerMetrics {
 		MetadataRequest: false,
 		MetadataSucceed: false,
 
-		ConnectionEvents: make([]ConnectionEvents, 0),
+		ConnectionEvents:  make([]ConnectionEvents, 0),
+		TotConnections:    0,
+		LastConn:          0,
+		TotDisconnections: 0,
+		LastDisconn:       0,
+		TotConnTime:       0,
+		ConnFlag:          false,
+		LastExport:        0,
+
 		// Counters for the different topics
 		BeaconBlock:          NewMessageMetrics(),
 		BeaconAggregateProof: NewMessageMetrics(),
