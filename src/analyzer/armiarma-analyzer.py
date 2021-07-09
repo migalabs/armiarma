@@ -607,7 +607,6 @@ def main():
                 unk13000 = unk13000 +1
                 if row['Connected'] == True:
                     cunk1300 = cunk1300 +1
-    print(tcp13000, unk13000, cunk1300)
 
     print('Number of clients with the TPC port at 13000:', cnt13000)
     print('Number of clients with the TPC port at 9000: ', cnt9000)
@@ -771,7 +770,7 @@ def main():
 
         ## -- website code --
         print("\n")
-        print("Results from crawler run on [month] running for [crawling time].\n<br>Total amount of peers on the peerstore:", peerstoreLen,".\n<br>Number of clients with the TPC port at 13000 (Prysm?):", cnt13000,".\n<br>Percentage of 'Prysm' peers from the peerstore (based on the TCP port):", round((cnt13000*100)/peerstoreLen,2),"%.\n<br>We manage to connect with", succeed,"peers from the peerstore.\n<br>This would be the distribution.")
+        #print("Results from crawler run on [month] running for [crawling time].\n<br>Total amount of peers on the peerstore:", peerstoreLen,".\n<br>Number of clients with the TPC port at 13000 (Prysm?):", cnt13000,".\n<br>Percentage of 'Prysm' peers from the peerstore (based on the TCP port):", round((cnt13000*100)/peerstoreLen,2),"%.\n<br>We manage to connect with", succeed,"peers from the peerstore.\n<br>This would be the distribution.")
         print("\n")
       
         xarray = [[0, succeed], [0, connected], [0, failed], [0, nonAttempted], [peerstoreLen, 0]]
@@ -867,7 +866,7 @@ def main():
 
         auxMetricsPanda.drop(indexToDrop, axis=0, inplace=True)
         #print(auxMetricsPanda)
-        print("\nOrg. Metrics:", len(rumorMetricsPanda), "Should have:", counter, "Filtered:", len(auxMetricsPanda), "\n")
+        #print("\nOrg. Metrics:", len(rumorMetricsPanda), "Should have:", counter, "Filtered:", len(auxMetricsPanda), "\n")
 
         clientCounter = []
         types         = []
@@ -881,11 +880,6 @@ def main():
 
         xarray = types
         yarray = typesCounter
-        namesarray = clientList
-
-        print(clientCounter)
-        print(types)
-        print(typesCounter)
 
         plotDoublePieFromArray(yarray, pdf, opts={                                   
             'figsize': figSize,                                                      
@@ -1010,12 +1004,14 @@ def main():
         # Get Color Grid
         barColor = GetColorGridFromArray(yarray)
 
+        """
         print()
         print('Total countries:', len(auxxarray))
         print('Countries lists and counters')
         print(xarray)
         print(yarray)
         print()
+        """
 
         plotBarsFromArrays(xarray, yarray, pdf, opts={                                            
             'figSize': (12,7),                                                          
@@ -1113,11 +1109,13 @@ def main():
 
         # get the average of ConnectedTime per client
         xarray, yarray = getDataFromPanda(rumorMetricsPanda, "Connected Time", "Client", clientList, 'avg') 
+        """
         print()
         print("Average of connected time per client")
         print(xarray)
         print(yarray)
         print()
+        """
 
         plotBarsFromArrays(xarray, yarray, pdf, opts={                                            
             'figSize': figSize,                                                          
@@ -1601,7 +1599,7 @@ def main():
 
         barColor = 'black'
 
-        print("Peer with highest RTT", rumorMetricsPanda.loc[rumorMetricsPanda['Latency'].idxmax()])
+        #print("Peer with highest RTT", rumorMetricsPanda.loc[rumorMetricsPanda['Latency'].idxmax()])
 
         plotFromPandas(rumorMetricsPanda, pdf, opts={                                   
             'figSize': figSize,                                                      
@@ -1650,7 +1648,7 @@ def main():
             xarray.append(item)
             yarray.append(sortedDict[item])
 
-        print(rumorMetricsPanda.loc[rumorMetricsPanda['Connected Time'].idxmax()])
+        #print(rumorMetricsPanda.loc[rumorMetricsPanda['Connected Time'].idxmax()])
 
         plotColumn(rumorMetricsPanda, pdf, opts={
             'figSize': figSize, 
@@ -1694,12 +1692,12 @@ def main():
 
         barColor = 'black'
 
+        """
         auxPanda = rumorMetricsPanda.sort_values(by='Beacon Blocks', ascending=True)
         cont = 0
-
         auxrow = rumorMetricsPanda.loc[rumorMetricsPanda['Total Messages'].idxmax()]
         print(auxrow)
-        
+        """
         
         plotColumn(rumorMetricsPanda, pdf, opts={
             'figSize': figSize, 
