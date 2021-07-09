@@ -41,6 +41,7 @@ type MetricsDataFrame struct {
 	Connections    ConnectionList
 	Disconnections DisconnectionList
 	ConnectedTimes ConnectedTimeList
+	// New Lastconn, Lastdiscon, LastExport are missing (not really important so far)
 
 	RBeaconBlocks       RBeaconBlockList
 	RBeaconAggregations RBeaconAggregationList
@@ -56,14 +57,15 @@ type MetricsDataFrame struct {
 }
 
 // Generate New DataFrame out of the GossipMetrics sync.Map copy
-func NewMetricsDataFrame(metricsCopy sync.Map) *MetricsDataFrame {
+func NewMetricsDataFrame(gm *sync.Map) *MetricsDataFrame {
 	// Initialize the DataFrame with the expoting time
+	expTime := utils.GetTimeMiliseconds()
 	mdf := &MetricsDataFrame{
 		Len:        0,
-		ExportTime: utils.GetTimeMiliseconds(),
+		ExportTime: expTime,
 	}
 	// Generate the loop over each peer of the Metrics
-	metricsCopy.Range(func(k, val interface{}) bool {
+	gm.Range(func(k, val interface{}) bool {
 		var v utils.PeerMetrics
 		v = val.(utils.PeerMetrics)
 		mdf.PeerIds.AddItem(v.PeerId)
@@ -89,7 +91,7 @@ func NewMetricsDataFrame(metricsCopy sync.Map) *MetricsDataFrame {
 		mdf.RequestedMetadata.AddItem(v.MetadataRequest)
 		mdf.SuccessMetadata.AddItem(v.MetadataSucceed)
 		// Analyze the connections from the events
-		connections, disconnections, connTime := AnalyzeConnectionEvents(v.ConnectionEvents, mdf.ExportTime)
+		connections, disconnections, connTime := utils.AnalyzeConnDisconnTime(&v, expTime)
 		mdf.Connections.AddItem(connections)
 		mdf.Disconnections.AddItem(disconnections)
 		mdf.ConnectedTimes.AddItem(connTime)

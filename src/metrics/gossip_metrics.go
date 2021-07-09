@@ -86,6 +86,12 @@ func (c *GossipMetrics) ImportMetrics(importFolder string) (error, bool) {
 			json.Unmarshal(byteValue, &tempMap)
 			// iterate to add the metrics from the json to the the GossipMetrics
 			for k, v := range tempMap {
+				if v.ConnFlag {
+					v.TotDisconnections += 1
+					v.LastDisconn = v.LastExport
+					v.TotConnTime += (v.LastExport - v.LastConn)
+					v.ConnFlag = false
+				}
 				c.GossipMetrics.Store(k, v)
 			}
 			return nil, true
@@ -109,11 +115,17 @@ type GossipState struct {
 
 // Function that Wraps/Marshals the content of the sync.Map to be exported as a json
 func (c *GossipMetrics) MarshalMetrics() ([]byte, error) {
+	exportTime := utils.GetTimeMiliseconds()
 	tmpMap := make(map[string]utils.PeerMetrics)
 	c.GossipMetrics.Range(func(k, v interface{}) bool {
-		tmpMap[k.(peer.ID).String()] = v.(utils.PeerMetrics)
+		pm := v.(utils.PeerMetrics)
+		if pm.ConnFlag {
+			pm.LastExport = exportTime
+		}
+		tmpMap[k.(peer.ID).String()] = pm
 		return true
 	})
+
 	return json.Marshal(tmpMap)
 }
 
@@ -237,6 +249,14 @@ func (c *GossipMetrics) FillMetrics(ep track.ExtendedPeerstore) {
 
 // Function that Exports the entire Metrics to a .json file (lets see if in the future we can add websockets or other implementations)
 func (c *GossipMetrics) ExportMetrics(filePath string, peerstorePath string, csvPath string, ep track.ExtendedPeerstore) error {
+	// Generate the MetricsDataFrame of the Current Metrics
+	// Export the metrics to the given CSV file
+	mdf := export.NewMetricsDataFrame(&c.GossipMetrics)
+	err := mdf.ExportToCSV(csvPath)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return err
+	}
 	metrics, err := c.MarshalMetrics()
 	if err != nil {
 		fmt.Println("Error Marshalling the metrics")
@@ -254,14 +274,6 @@ func (c *GossipMetrics) ExportMetrics(filePath string, peerstorePath string, csv
 	err = ioutil.WriteFile(peerstorePath, peerstore, 0644)
 	if err != nil {
 		fmt.Println("Error opening file: ", peerstorePath)
-		return err
-	}
-	// Generate the MetricsDataFrame of the Current Metrics
-	// Export the metrics to the given CSV file
-	mdf := export.NewMetricsDataFrame(c.GossipMetrics)
-	err = mdf.ExportToCSV(csvPath)
-	if err != nil {
-		fmt.Println("Error:", err)
 		return err
 	}
 	return nil
@@ -367,14 +379,25 @@ func (c *GossipMetrics) AddNewPeer(peerId peer.ID) bool {
 func (c *GossipMetrics) AddConnectionEvent(peerId peer.ID, connectionType string) {
 	pMetrics, ok := c.GossipMetrics.Load(peerId)
 	if ok {
+		currTime := utils.GetTimeMiliseconds()
 		newConnection := utils.ConnectionEvents{
 			ConnectionType: connectionType,
-			TimeMili:       utils.GetTimeMiliseconds(),
+			TimeMili:       currTime,
 		}
 		peerMetrics := pMetrics.(utils.PeerMetrics)
 		peerMetrics.ConnectionEvents = append(peerMetrics.ConnectionEvents, newConnection)
 		if connectionType == "Connection" {
 			peerMetrics.Connected = true
+			// add the connections
+			peerMetrics.TotConnections += 1
+			peerMetrics.LastConn = currTime // Current time in SECs
+			peerMetrics.ConnFlag = true
+		} else {
+			// add the disconnections and sum the time
+			peerMetrics.TotDisconnections += 1
+			peerMetrics.LastDisconn = currTime // Current time in SECs
+			peerMetrics.TotConnTime += peerMetrics.LastDisconn - peerMetrics.LastConn
+			peerMetrics.ConnFlag = false
 		}
 		c.GossipMetrics.Store(peerId, peerMetrics)
 	} else {

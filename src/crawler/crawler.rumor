@@ -45,6 +45,9 @@ armiarma: include dv5.rumor
 
 armiarma: include export_metrics.rumor
 
+# Give time for the metrics exporter to load all the previous metrics
+armiarma: sleep 4s
+
 armiarma: include random-connect.rumor
 
 armiarma: include prometheus.rumor

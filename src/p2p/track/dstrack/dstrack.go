@@ -6,6 +6,9 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
+	"sync"
+
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	ds "github.com/ipfs/go-datastore"
 	ic "github.com/libp2p/go-libp2p-core/crypto"
@@ -17,8 +20,6 @@ import (
 	"github.com/protolambda/rumor/p2p/track"
 	"github.com/protolambda/rumor/p2p/track/dstee"
 	"github.com/protolambda/zrnt/eth2/beacon"
-	"io"
-	"sync"
 )
 
 var eth2Base = ds.NewKey("/peers/eth2")
@@ -175,7 +176,18 @@ func (ep *dsExtendedPeerstore) Close() error {
 
 func (ep *dsExtendedPeerstore) GetAllData(id peer.ID) *track.PeerAllData {
 	pub := ep.PubKey(id)
-	secpKey := (pub).(*ic.Secp256k1PublicKey)
+	secpKey, ok := (pub).(*ic.Secp256k1PublicKey)
+	if !ok {
+		auxRsaKey := (pub).(*ic.RsaPublicKey)
+		k, _ := auxRsaKey.Bytes()
+		auxSecpKey, err := ic.UnmarshalSecp256k1PublicKey(k)
+		if err != nil {
+			fmt.Println("error converting RAS pub key into Secp256 pubkey. Error: ", err)
+		}
+		secpKey = auxSecpKey.(*ic.Secp256k1PublicKey)
+		fmt.Printf("Peer with ID: %s  had a rsaKey \n", id.String())
+
+	}
 	keyBytes, err := secpKey.Raw()
 	pubStr := ""
 	if err == nil {

@@ -28,6 +28,18 @@ var (
 	},
 		[]string{"client"},
 	)
+	geoDistribution = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "crawler",
+		Name:      "gographical_distribution",
+		Help:      "Number of peers from each of the crawled countries",
+	},
+		[]string{"country"},
+	)
+	totPeers = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: "crawler",
+		Name:      "total_crawled_peers",
+		Help:      "The number of discovered peers with the crawler",
+	})
 	connectedPeers = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: "crawler",
 		Name:      "connected_peers",
@@ -75,6 +87,8 @@ func (c *PrometheusStartCmd) Run(ctx context.Context, args ...string) error {
 	prometheus.MustRegister(connectedPeers)
 	prometheus.MustRegister(receivedTotalMessages)
 	prometheus.MustRegister(receivedMessages)
+	prometheus.MustRegister(totPeers)
+	prometheus.MustRegister(geoDistribution)
 	// launch the collector go routine
 	stopping := make(chan struct{})
 
@@ -120,6 +134,7 @@ func (c *PrometheusStartCmd) Run(ctx context.Context, args ...string) error {
 			var unk float64 = 0
 
 			var conPeers float64 = 0
+			var totdisc float64 = 0
 
 			// read the connected peers from the
 			h, hostErr := c.Host()
@@ -128,8 +143,10 @@ func (c *PrometheusStartCmd) Run(ctx context.Context, args ...string) error {
 			}
 			peers := h.Network().Peers()
 			conPeers = float64(len(peers))
+			geoDist := make(map[string]float64)
 			// iterate through the client types in the metrics
 			c.GossipMetrics.GossipMetrics.Range(func(k interface{}, v interface{}) bool {
+				totdisc += 1
 				p := v.(utils.PeerMetrics)
 				if p.MetadataRequest {
 					if strings.Contains(strings.ToLower(p.ClientType), "lighthouse") {
@@ -148,6 +165,12 @@ func (c *PrometheusStartCmd) Run(ctx context.Context, args ...string) error {
 						unk += 1
 					}
 				}
+				_, ok := geoDist[p.Country]
+				if ok {
+					geoDist[p.Country] += 1
+				} else {
+					geoDist[p.Country] = 1
+				}
 				return true
 			})
 			// get the message counter
@@ -165,10 +188,15 @@ func (c *PrometheusStartCmd) Run(ctx context.Context, args ...string) error {
 			clientDistribution.WithLabelValues("prysm").Set(pry)
 			clientDistribution.WithLabelValues("lodestar").Set(lod)
 			clientDistribution.WithLabelValues("unknown").Set(unk)
+			// Country distribution
+			for k, v := range geoDist {
+				geoDistribution.WithLabelValues(k).Set(v)
+			}
 			connectedPeers.Set(conPeers)
 			receivedMessages.WithLabelValues("beacon_blocks").Set(bb)
 			receivedMessages.WithLabelValues("beacon_aggregate_and_proof").Set(ba)
 			receivedTotalMessages.Set(tot)
+			totPeers.Set(totdisc)
 			// reset the counters for the message statistics
 			resetChan <- true
 
