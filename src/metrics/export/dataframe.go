@@ -23,6 +23,7 @@ type MetricsDataFrame struct {
 	Addresses      AddressList
 	Ips            IpList
 	Countries      CountryList
+	CountryCodes   CountryCodeList
 	Cities         CityList
 	Latencies      LatencyList
 
@@ -79,6 +80,7 @@ func NewMetricsDataFrame(gm *sync.Map) *MetricsDataFrame {
 		mdf.Addresses.AddItem(v.Addrs)
 		mdf.Ips.AddItem(v.Ip)
 		mdf.Countries.AddItem(v.Country)
+		mdf.CountryCodes.AddItem(v.CountryCode)
 		mdf.Cities.AddItem(v.City)
 		mdf.Latencies.AddItem(v.Latency) // in milliseconds
 		// Add connection status to the CSV
@@ -120,7 +122,7 @@ func (mdf MetricsDataFrame) ExportToCSV(filePath string) error {
 	}
 	defer csvFile.Close()
 	// First raw of the file will be the Titles of the columns
-	_, err = csvFile.WriteString("Peer Id,Node Id,User Agent,Client,Version,Pubkey,Address,Ip,Country,City,Request Metadata,Success Metadata,Attempted,Succeed,Connected,Attempts,Error,Latency,Connections,Disconnections,Connected Time,Beacon Blocks,Beacon Aggregations,Voluntary Exits,Proposer Slashings,Attester Slashings,Total Messages\n")
+	_, err = csvFile.WriteString("Peer Id,Node Id,User Agent,Client,Version,Pubkey,Address,Ip,Country,CountryCode,City,Request Metadata,Success Metadata,Attempted,Succeed,Connected,Attempts,Error,Latency,Connections,Disconnections,Connected Time,Beacon Blocks,Beacon Aggregations,Voluntary Exits,Proposer Slashings,Attester Slashings,Total Messages\n")
 	if err != nil {
 		return fmt.Errorf("Error while Writing the Titles on the csv")
 	}
@@ -132,7 +134,7 @@ func (mdf MetricsDataFrame) ExportToCSV(filePath string) error {
 		conTime := fmt.Sprintf("%.3f", mdf.ConnectedTimes.GetByIndex(idx))
 		csvRow = mdf.PeerIds.GetByIndex(idx).String() + "," + mdf.NodeIds.GetByIndex(idx) + "," + mdf.UserAgent.GetByIndex(idx) + "," + mdf.ClientTypes.GetByIndex(idx) + "," +
 			mdf.ClientVersions.GetByIndex(idx) + "," + mdf.PubKeys.GetByIndex(idx) + "," + mdf.Addresses.GetByIndex(idx) + "," + mdf.Ips.GetByIndex(idx) + "," +
-			mdf.Countries.GetByIndex(idx) + "," + mdf.Cities.GetByIndex(idx) + "," + strconv.FormatBool(mdf.RequestedMetadata.GetByIndex(idx)) + "," + strconv.FormatBool(mdf.SuccessMetadata.GetByIndex(idx)) + "," + strconv.FormatBool(mdf.Attempted.GetByIndex(idx)) + "," +
+			mdf.Countries.GetByIndex(idx) + "," + mdf.CountryCodes.GetByIndex(idx) + "," + mdf.Cities.GetByIndex(idx) + "," + strconv.FormatBool(mdf.RequestedMetadata.GetByIndex(idx)) + "," + strconv.FormatBool(mdf.SuccessMetadata.GetByIndex(idx)) + "," + strconv.FormatBool(mdf.Attempted.GetByIndex(idx)) + "," +
 			strconv.FormatBool(mdf.Succeed.GetByIndex(idx)) + "," + strconv.FormatBool(mdf.Connected.GetByIndex(idx)) + "," + strconv.Itoa(mdf.Attempts.GetByIndex(idx)) + "," + mdf.Errors.GetByIndex(idx) + "," + lat + "," + strconv.Itoa(int(mdf.Connections.GetByIndex(idx))) + "," +
 			strconv.Itoa(int(mdf.Disconnections.GetByIndex(idx))) + "," + conTime + "," + strconv.Itoa(int(mdf.RBeaconBlocks.GetByIndex(idx))) + "," + strconv.Itoa(int(mdf.RBeaconAggregations.GetByIndex(idx))) + "," +
 			strconv.Itoa(int(mdf.RVoluntaryExits.GetByIndex(idx))) + "," + strconv.Itoa(int(mdf.RProposerSlashings.GetByIndex(idx))) + "," + strconv.Itoa(int(mdf.RAttesterSlashings.GetByIndex(idx))) + "," +

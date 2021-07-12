@@ -217,10 +217,11 @@ func (c *GossipMetrics) FillMetrics(ep track.ExtendedPeerstore) {
 					//fmt.Println("No Addrs on the PeerMetrics to request the Location")
 				} else {
 					//fmt.Println("Requesting the Location based on the addrs:", peerMetrics.Addrs)
-					ip, country, city := getIpAndLocationFromAddrs(peerMetrics.Addrs)
+					ip, country, cc, city := getIpAndLocationFromAddrs(peerMetrics.Addrs)
 					requestCounter = requestCounter + 1
 					peerMetrics.Ip = ip
 					peerMetrics.Country = country
+					peerMetrics.CountryCode = cc
 					peerMetrics.City = city
 				}
 			}
@@ -298,7 +299,7 @@ type IpApiMessage struct {
 }
 
 // get IP, location country and City from the multiaddress of the peer on the peerstore
-func getIpAndLocationFromAddrs(multiAddrs string) (ip string, country string, city string) {
+func getIpAndLocationFromAddrs(multiAddrs string) (ip string, country string, countryCode string, city string) {
 	ip = strings.TrimPrefix(multiAddrs, "/ip4/")
 	ipSlices := strings.Split(ip, "/")
 	ip = ipSlices[0]
@@ -307,8 +308,9 @@ func getIpAndLocationFromAddrs(multiAddrs string) (ip string, country string, ci
 	if err != nil {
 		fmt.Println(err)
 		country = "Unknown"
+		countryCode = "--"
 		city = "Unknown"
-		return ip, country, city
+		return ip, country, countryCode, city
 	}
 
 	attemptsLeft, _ := strconv.Atoi(resp.Header["X-Rl"][0])
@@ -320,8 +322,9 @@ func getIpAndLocationFromAddrs(multiAddrs string) (ip string, country string, ci
 		if err != nil {
 			fmt.Println(err)
 			country = "Unknown"
+			countryCode = "--"
 			city = "Unknown"
-			return ip, country, city
+			return ip, country, countryCode, city
 		}
 	}
 
@@ -341,22 +344,25 @@ func getIpAndLocationFromAddrs(multiAddrs string) (ip string, country string, ci
 			}
 		*/
 		country = "Unknown"
+		countryCode = "--"
 		city = "Unknown"
-		return ip, country, city
+		return ip, country, countryCode, city
 	}
 
 	country = ipApiResp.Country
+	countryCode = ipApiResp.CountryCode
 	city = ipApiResp.City
 
 	// check if country and city are correctly imported
 	if len(country) == 0 || len(city) == 0 {
 		country = "Unknown"
+		countryCode = "--"
 		city = "Unknown"
-		return ip, country, city
+		return ip, country, countryCode, city
 	}
 
 	// return the received values from the received message
-	return ip, country, city
+	return ip, country, countryCode, city
 
 }
 

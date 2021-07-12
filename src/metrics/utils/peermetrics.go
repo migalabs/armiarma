@@ -6,15 +6,16 @@ import (
 
 // Base Struct for the topic name and the received messages on the different topics
 type PeerMetrics struct {
-	PeerId     peer.ID
-	NodeId     string
-	ClientType string
-	Pubkey     string
-	Addrs      string
-	Ip         string
-	Country    string
-	City       string
-	Latency    float64
+	PeerId      peer.ID
+	NodeId      string
+	ClientType  string
+	Pubkey      string
+	Addrs       string
+	Ip          string
+	Country     string
+	CountryCode string
+	City        string
+	Latency     float64
 
 	Attempted bool   // If the peer has been attempted to stablish a connection
 	Succeed   bool   // If the connection attempt has been successful
@@ -46,15 +47,16 @@ type PeerMetrics struct {
 
 func NewPeerMetrics(peerId peer.ID) PeerMetrics {
 	pm := PeerMetrics{
-		PeerId:     peerId,
-		NodeId:     "",
-		ClientType: "Unknown",
-		Pubkey:     "",
-		Addrs:      "/ip4/127.0.0.1/0000",
-		Ip:         "127.0.0.1",
-		Country:    "Unknown",
-		City:       "Unknown",
-		Latency:    0,
+		PeerId:      peerId,
+		NodeId:      "",
+		ClientType:  "Unknown",
+		Pubkey:      "",
+		Addrs:       "/ip4/127.0.0.1/0000",
+		Ip:          "127.0.0.1",
+		Country:     "Unknown",
+		CountryCode: "--",
+		City:        "Unknown",
+		Latency:     0,
 
 		Attempted: false,
 		Succeed:   false,

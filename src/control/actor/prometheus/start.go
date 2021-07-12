@@ -30,7 +30,7 @@ var (
 	)
 	geoDistribution = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "crawler",
-		Name:      "gographical_distribution",
+		Name:      "geographical_distribution",
 		Help:      "Number of peers from each of the crawled countries",
 	},
 		[]string{"country"},
@@ -165,11 +165,11 @@ func (c *PrometheusStartCmd) Run(ctx context.Context, args ...string) error {
 						unk += 1
 					}
 				}
-				_, ok := geoDist[p.Country]
+				_, ok := geoDist[p.CountryCode]
 				if ok {
-					geoDist[p.Country] += 1
+					geoDist[p.CountryCode] += 1
 				} else {
-					geoDist[p.Country] = 1
+					geoDist[p.CountryCode] = 1
 				}
 				return true
 			})
