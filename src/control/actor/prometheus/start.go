@@ -57,7 +57,20 @@ var (
 	},
 		[]string{"topic"},
 	)
-	// GossipSub Topics
+	rttDistribution = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "crawler",
+		Name:      "observed_rtt_distribution",
+		Help:      "RTT in Secs observed by the tool",
+	},
+		[]string{"secs"},
+	)
+	tctDistribution = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "crawler",
+		Name:      "observed_total_connected_time_distribution",
+		Help:      "Total connected time in mintues to tool by peered nodes",
+	},
+		[]string{"mins"},
+	)
 )
 
 type PrometheusStartCmd struct {
@@ -89,6 +102,8 @@ func (c *PrometheusStartCmd) Run(ctx context.Context, args ...string) error {
 	prometheus.MustRegister(receivedMessages)
 	prometheus.MustRegister(totPeers)
 	prometheus.MustRegister(geoDistribution)
+	prometheus.MustRegister(rttDistribution)
+	prometheus.MustRegister(tctDistribution)
 	// launch the collector go routine
 	stopping := make(chan struct{})
 
@@ -144,6 +159,8 @@ func (c *PrometheusStartCmd) Run(ctx context.Context, args ...string) error {
 			peers := h.Network().Peers()
 			conPeers = float64(len(peers))
 			geoDist := make(map[string]float64)
+			rttDist := make(map[string]float64)
+			tctDist := make(map[string]float64)
 			// iterate through the client types in the metrics
 			c.GossipMetrics.GossipMetrics.Range(func(k interface{}, v interface{}) bool {
 				totdisc += 1
@@ -165,11 +182,29 @@ func (c *PrometheusStartCmd) Run(ctx context.Context, args ...string) error {
 						unk += 1
 					}
 				}
+				// Generate the Country Code distribution
 				_, ok := geoDist[p.CountryCode]
 				if ok {
 					geoDist[p.CountryCode] += 1
 				} else {
 					geoDist[p.CountryCode] = 1
+				}
+				// Generate the Latency distribution
+				rtt := fmt.Sprintf("%.1f", float64(p.Latency))
+				_, ok = rttDist[rtt]
+				if ok {
+					rttDist[rtt] += 1
+				} else {
+					rttDist[rtt] = 1
+				}
+				// Generate Total connected Time Distribution
+				tc := float64(p.TotConnTime) / 60000
+				tct := fmt.Sprintf("%.1f", float64(tc))
+				_, ok = tctDist[tct]
+				if ok {
+					tctDist[tct] += 1
+				} else {
+					tctDist[tct] = 1
 				}
 				return true
 			})
@@ -191,6 +226,18 @@ func (c *PrometheusStartCmd) Run(ctx context.Context, args ...string) error {
 			// Country distribution
 			for k, v := range geoDist {
 				geoDistribution.WithLabelValues(k).Set(v)
+			}
+			// RTT distribution
+			for k, v := range rttDist {
+				if k != "0.0" {
+					rttDistribution.WithLabelValues(k).Set(v)
+				}
+			}
+			// Total connected time
+			for k, v := range tctDist {
+				if k != "0.0" {
+					tctDistribution.WithLabelValues(k).Set(v)
+				}
 			}
 			connectedPeers.Set(conPeers)
 			receivedMessages.WithLabelValues("beacon_blocks").Set(bb)
