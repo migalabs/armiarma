@@ -48,12 +48,12 @@ var (
 	receivedTotalMessages = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: "crawler",
 		Name:      "total_received_messages_psec",
-		Help:      "The number of messages received in the last second",
+		Help:      "The number of messages received in the last minute",
 	})
 	receivedMessages = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "crawler",
 		Name:      "received_messages_psec",
-		Help:      "Number of messages received per second on each topic",
+		Help:      "Number of messages received per minute on each topic",
 	},
 		[]string{"topic"},
 	)
@@ -208,11 +208,11 @@ func (c *PrometheusStartCmd) Run(ctx context.Context, args ...string) error {
 				}
 				return true
 			})
-			// get the message counter
-			secs := c.RefreshInterval.Seconds()
-			bb := float64(beacBlock) / secs
+			// get the message counter (remove /secs) since we are measuring minute ranges
+			//secs := c.RefreshInterval.Seconds()
+			bb := float64(beacBlock)
 			//fmt.Println("Beacon_blocks", beacBlock, "m/ps", bb)
-			ba := float64(beacAttestation) / secs
+			ba := float64(beacAttestation)
 			//fmt.Println("Beacon_Attestation", beacAttestation, "m/ps", ba)
 			tot := float64(totalMsg)
 
