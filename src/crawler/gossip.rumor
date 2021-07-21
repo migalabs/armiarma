@@ -10,7 +10,7 @@
 # attester_slashing
 
 # Set the Seen filter to False, get notified of each of the msgs seen on the network
-gossip start --seen-filter="false"
+gossip start --seen-filter="true"
 
 echo "Fork-Version readed from config file: $gossip_fork"
 
