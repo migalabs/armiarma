@@ -198,8 +198,10 @@ func (c *PrometheusStartCmd) Run(ctx context.Context, args ...string) error {
 					rttDist[rtt] = 1
 				}
 				// Generate Total connected Time Distribution
-				tc := float64(p.TotConnTime) / 60000
-				tct := fmt.Sprintf("%.1f", float64(tc))
+				tc := p.TotConnTime / 60000
+				// Round up to multiples of 5
+				tc = (tc + 4) / 5 * 5
+				tct := fmt.Sprintf("%d", tc)
 				_, ok = tctDist[tct]
 				if ok {
 					tctDist[tct] += 1
