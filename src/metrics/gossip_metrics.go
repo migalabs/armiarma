@@ -12,6 +12,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+	log "github.com/sirupsen/logrus"
+	"google.golang.org/grpc"
+	pb "github.com/protolambda/rumor/proto"
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/protolambda/rumor/metrics/export"
@@ -26,12 +29,26 @@ type GossipMetrics struct {
 	MessageDatabase *database.MessageDatabase
 	StartTime       int64 // milliseconds
 	MsgNotChannels  map[string](chan bool)
+	AggregatorClient pb.AggregatorClient
 }
 
 func NewGossipMetrics() GossipMetrics {
+	// TODO: Just a proof of concept. This has to be moved
+	// to a more appropriate place
+	// TODO Handle if dial doesnt work, time out
+
+	// TODO: Hardcoded, set as input flag
+	serverEndpoint := "localhost:5000"
+	conn, err := grpc.Dial(serverEndpoint, grpc.WithInsecure(), grpc.WithBlock())
+	if err != nil {
+		log.Fatalf("did not connect: %v", err)
+	}
+	client := pb.NewAggregatorClient(conn)
+
 	gm := GossipMetrics{
 		StartTime:      utils.GetTimeMiliseconds(),
 		MsgNotChannels: make(map[string](chan bool)),
+		AggregatorClient: client,
 	}
 	return gm
 }
@@ -414,6 +431,28 @@ func (c *GossipMetrics) AddMetadataEvent(peerId peer.ID, success bool) {
 		peerMetrics.MetadataRequest = true
 		if success {
 			peerMetrics.MetadataSucceed = true
+			fmt.Println("peerMetrics.PeerId", peerMetrics.PeerId)
+			fmt.Println("peerMetrics.NodeId", peerMetrics.NodeId)
+			fmt.Println("peerMetrics.ClientType", peerMetrics.ClientType)
+			fmt.Println("peerMetrics.Pubkey", peerMetrics.Pubkey)
+			fmt.Println("peerMetrics.Addrs", peerMetrics.Addrs)
+			fmt.Println("peerMetrics.Ip", peerMetrics.Ip)
+			fmt.Println("peerMetrics.Country", peerMetrics.Country)
+
+			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		  defer cancel()
+
+			r, err := c.AggregatorClient.NewPeerMetadata(ctx, &pb.NewPeerMetadataRequest{
+				CrawlerId: "crawler_1",
+				PeerId: peerMetrics.PeerId.String(),
+				NodeId: peerMetrics.NodeId,
+				ClientType: peerMetrics.ClientType,
+				// etc
+			})
+			if err != nil {
+				log.Fatalf("error reporting peer metadata to server: %v", err)
+			}
+			log.Printf("Response: %s", r)
 		}
 		c.GossipMetrics.Store(peerId, peerMetrics)
 	} else {

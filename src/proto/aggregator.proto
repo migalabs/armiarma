@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+option go_package = "github.com/migalabs/armiarma/aggregator";
+option java_multiple_files = true;
+option java_package = "io.grpc.examples.aggregator";
+option java_outer_classname = "AggregatorProto";
+
+package aggregator;
+
+service Aggregator {
+  rpc NewPeerMetadata (NewPeerMetadataRequest) returns (NewPeerMetadataReply) {}
+}
+
+message NewPeerMetadataRequest {
+  string crawler_id = 1;
+  string peer_id = 2;
+  string node_id = 3;
+  string client_type = 4;
+  string pub_key = 5;
+  string address = 6;
+  string country = 7;
+  string city = 8;
+  string latency = 9;
+  // TODO: inbound/outbound
+}
+
+message NewPeerMetadataReply {
+  string dummy = 1;
+}

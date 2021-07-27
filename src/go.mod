@@ -18,6 +18,8 @@ require (
 	github.com/eminetto/clean-architecture-go v0.0.0-20200312132632-3195811c74a3
 	github.com/ethereum/go-ethereum v1.10.1
 	github.com/gliderlabs/ssh v0.3.0
+	github.com/gogo/protobuf v1.3.2 // indirect
+	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/golang/snappy v0.0.3-0.20201103224600-674baa8c7fc3
 	github.com/google/gopacket v1.1.18 // indirect
 	github.com/gorilla/websocket v1.4.2
@@ -66,9 +68,13 @@ require (
 	github.com/spf13/cobra v1.1.1
 	github.com/ugorji/go v1.1.4 // indirect
 	golang.org/x/crypto v0.0.0-20210317152858-513c2a44f670 // indirect
-	golang.org/x/sync v0.0.0-20200625203802-6e8e738ad208 // indirect
-	golang.org/x/sys v0.0.0-20210317225723-c4fcb01b228e // indirect
-	golang.org/x/text v0.3.3 // indirect
+	golang.org/x/net v0.0.0-20210716203947-853a461950ff
+	golang.org/x/sys v0.0.0-20210630005230-0f9fa26af87c // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
+	google.golang.org/genproto v0.0.0-20210726143408-b02e89920bf0 // indirect
+	google.golang.org/grpc v1.39.0
+	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.1.0 // indirect
+	google.golang.org/grpc/examples v0.0.0-20210723173718-1ddab338690a
+	google.golang.org/protobuf v1.27.1
 	mvdan.cc/sh/v3 v3.1.2
 )
