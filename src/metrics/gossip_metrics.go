@@ -12,12 +12,13 @@ import (
 	"strings"
 	"sync"
 	"time"
-	log "github.com/sirupsen/logrus"
-	"google.golang.org/grpc"
+
+	"github.com/libp2p/go-libp2p-core/host"
 	pb "github.com/protolambda/rumor/proto"
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/protolambda/rumor/metrics/export"
+	server "github.com/protolambda/rumor/metrics/export/serverexporter"
 	"github.com/protolambda/rumor/metrics/utils"
 	pgossip "github.com/protolambda/rumor/p2p/gossip"
 	"github.com/protolambda/rumor/p2p/gossip/database"
@@ -29,7 +30,7 @@ type GossipMetrics struct {
 	MessageDatabase *database.MessageDatabase
 	StartTime       int64 // milliseconds
 	MsgNotChannels  map[string](chan bool)
-	AggregatorClient pb.AggregatorClient
+	ArmiarmaServer  *server.ServerEndpoint
 }
 
 func NewGossipMetrics() GossipMetrics {
@@ -37,18 +38,10 @@ func NewGossipMetrics() GossipMetrics {
 	// to a more appropriate place
 	// TODO Handle if dial doesnt work, time out
 
-	// TODO: Hardcoded, set as input flag
-	serverEndpoint := "localhost:5000"
-	conn, err := grpc.Dial(serverEndpoint, grpc.WithInsecure(), grpc.WithBlock())
-	if err != nil {
-		log.Fatalf("did not connect: %v", err)
-	}
-	client := pb.NewAggregatorClient(conn)
-
 	gm := GossipMetrics{
 		StartTime:      utils.GetTimeMiliseconds(),
 		MsgNotChannels: make(map[string](chan bool)),
-		AggregatorClient: client,
+		ArmiarmaServer: nil,
 	}
 	return gm
 }
@@ -197,11 +190,24 @@ func (c *GossipMetrics) AddNotChannel(topicName string) {
 }
 
 // Function that iterates through the received peers and fills the missing information
-func (c *GossipMetrics) FillMetrics(ep track.ExtendedPeerstore) {
+func (c *GossipMetrics) FillMetrics(ep track.ExtendedPeerstore, h host.Host) {
 	// to prevent the Filler from crashing (the url-service only accepts 45req/s)
 	requestCounter := 0
+	hostID := h.ID()
 	// Loop over the Peers on the GossipMetrics
 	c.GossipMetrics.Range(func(key interface{}, value interface{}) bool {
+		newMetaFlag := false
+		msg := &pb.NewPeerMetadataRequest{
+			CrawlerId:  hostID.String(),
+			PeerId:     key.(peer.ID).String(),
+			NodeId:     "",
+			ClientType: "",
+			PubKey:     "",
+			Address:    "",
+			Country:    "",
+			City:       "",
+			Latency:    "",
+		}
 		// Read the info that we have from him
 		p, ok := c.GossipMetrics.Load(key)
 		if ok {
@@ -211,24 +217,28 @@ func (c *GossipMetrics) FillMetrics(ep track.ExtendedPeerstore) {
 			if len(peerMetrics.NodeId) == 0 {
 				//fmt.Println("NodeID empty", peerMetrics.NodeId, "Adding NodeId:", peerData.NodeID.String())
 				peerMetrics.NodeId = peerData.NodeID.String()
+				newMetaFlag = true
+				msg.NodeId = peerData.NodeID.String()
 			}
-
 			if len(peerMetrics.ClientType) == 0 || peerMetrics.ClientType == "Unknown" {
 				//fmt.Println("ClientType empty", peerMetrics.ClientType, "Adding ClientType:", peerData.UserAgent)
 				peerMetrics.ClientType = peerData.UserAgent
+				newMetaFlag = true
+				msg.ClientType = peerData.UserAgent
 			}
-
 			if len(peerMetrics.Pubkey) == 0 {
 				//fmt.Println("Pubkey empty", peerMetrics.Pubkey, "Adding Pubkey:", peerData.Pubkey)
 				peerMetrics.Pubkey = peerData.Pubkey
+				newMetaFlag = true
+				msg.PubKey = peerData.Pubkey
 			}
-
 			if len(peerMetrics.Addrs) == 0 || peerMetrics.Addrs == "/ip4/127.0.0.1/0000" || peerMetrics.Addrs == "/ip4/127.0.0.1/9000" {
 				address := GetFullAddress(peerData.Addrs)
 				//fmt.Println("Addrs empty", peerMetrics.Addrs, "Adding Addrs:", address)
 				peerMetrics.Addrs = address
+				newMetaFlag = true
+				msg.Address = address
 			}
-
 			if len(peerMetrics.Country) == 0 || peerMetrics.Country == "Unknown" {
 				if len(peerMetrics.Addrs) == 0 {
 					//fmt.Println("No Addrs on the PeerMetrics to request the Location")
@@ -239,24 +249,30 @@ func (c *GossipMetrics) FillMetrics(ep track.ExtendedPeerstore) {
 					peerMetrics.Ip = ip
 					peerMetrics.Country = country
 					peerMetrics.City = city
+					newMetaFlag = true
+					msg.Country = country
+					msg.City = city
 				}
 			}
-
 			// Since we want to have the latest Latency, we update it only when it is different from 0
 			// latency in seconds
 			if peerData.Latency != 0 {
 				peerMetrics.Latency = float64(peerData.Latency/time.Millisecond) / 1000
+				newMetaFlag = true
+				msg.Latency = fmt.Sprintf("%f", float64(peerData.Latency/time.Millisecond)/1000)
 			}
 
+			// Check if there is new metadata to report to the Armiarma Server
+			if newMetaFlag {
+				fmt.Println("New Msg to send")
+				// add the metadata fields to the msg
+				// msg.MetadataRequest = peerData.MetadataRequest
+				// msg.MetadataSucceed = peerData.MetadataSucced
+				// notify of new message to send
+				c.ArmiarmaServer.NewPeerMetadata <- msg
+			}
 			// After check that all the info is ready, save the item back into the Sync.Map
 			c.GossipMetrics.Store(key, peerMetrics)
-
-			/*
-				if requestCounter >= 40 { // Reminder 45 req/s
-					time.Sleep(70 * time.Second)
-					requestCounter = 0
-				}
-			*/
 		}
 		// Keep with the loop on the Range function
 		return true
@@ -341,7 +357,6 @@ func getIpAndLocationFromAddrs(multiAddrs string) (ip string, country string, ci
 			return ip, country, city
 		}
 	}
-
 	defer resp.Body.Close()
 	bodyBytes, _ := ioutil.ReadAll(resp.Body)
 
@@ -351,12 +366,6 @@ func getIpAndLocationFromAddrs(multiAddrs string) (ip string, country string, ci
 
 	// Check if the status of the request has been succesful
 	if ipApiResp.Status != "success" {
-		/*
-			fmt.Println("Error with the received response status,", ipApiResp.Status)
-			if ipApiResp.Query == ip {
-				fmt.Println("The given IP of the peer is private")
-			}
-		*/
 		country = "Unknown"
 		city = "Unknown"
 		return ip, country, city
@@ -431,28 +440,6 @@ func (c *GossipMetrics) AddMetadataEvent(peerId peer.ID, success bool) {
 		peerMetrics.MetadataRequest = true
 		if success {
 			peerMetrics.MetadataSucceed = true
-			fmt.Println("peerMetrics.PeerId", peerMetrics.PeerId)
-			fmt.Println("peerMetrics.NodeId", peerMetrics.NodeId)
-			fmt.Println("peerMetrics.ClientType", peerMetrics.ClientType)
-			fmt.Println("peerMetrics.Pubkey", peerMetrics.Pubkey)
-			fmt.Println("peerMetrics.Addrs", peerMetrics.Addrs)
-			fmt.Println("peerMetrics.Ip", peerMetrics.Ip)
-			fmt.Println("peerMetrics.Country", peerMetrics.Country)
-
-			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-		  defer cancel()
-
-			r, err := c.AggregatorClient.NewPeerMetadata(ctx, &pb.NewPeerMetadataRequest{
-				CrawlerId: "crawler_1",
-				PeerId: peerMetrics.PeerId.String(),
-				NodeId: peerMetrics.NodeId,
-				ClientType: peerMetrics.ClientType,
-				// etc
-			})
-			if err != nil {
-				log.Fatalf("error reporting peer metadata to server: %v", err)
-			}
-			log.Printf("Response: %s", r)
 		}
 		c.GossipMetrics.Store(peerId, peerMetrics)
 	} else {

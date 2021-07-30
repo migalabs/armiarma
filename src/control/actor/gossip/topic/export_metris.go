@@ -15,6 +15,7 @@ import (
 	"github.com/protolambda/rumor/metrics"
 	"github.com/protolambda/rumor/metrics/custom"
 	"github.com/protolambda/rumor/metrics/export"
+	server "github.com/protolambda/rumor/metrics/export/serverexporter"
 	"github.com/protolambda/rumor/p2p/track"
 )
 
@@ -26,6 +27,9 @@ type TopicExportMetricsCmd struct {
 	ExportPeriod      time.Duration `ask:"--export-period" help:"Requets the frecuency in witch the Metrics will be exported to the files"`
 	BackupPeriod      time.Duration `ask:"--backup-period" help:"Requets the frecuency in witch the Backup of the Metrics will be exported"`
 	MetricsFolderPath string        `ask:"--metrics-folder-path" help:"The path of the folder where to export the metrics."`
+	// Armiarma Server Metrics exporter
+	ArmiarmaServIP    string `ask:"--armiarma-server-ip" help:"IP address of the Armiarma Server where to export the metrics"`
+	ArmiarmaServPort  string `ask:"--armiarma-server-port" help:"Port address of the Armiarma Server where to export the metrics"`
 	RawFilePath       string
 	PeerstorePath     string
 	CsvPath           string
@@ -62,6 +66,9 @@ func (c *TopicExportMetricsCmd) Run(ctx context.Context, args ...string) error {
 	}
 	c.Log.Infof("Exporting Every %d , with a backup every %d", c.ExportPeriod, c.BackupPeriod)
 	fmt.Println("Exporting Every ", c.ExportPeriod, " with a backup every", c.BackupPeriod)
+	// Initialize the export of the metrics to the armiarma server
+	c.GossipMetrics.ArmiarmaServer = server.NewServerExport(c.ArmiarmaServIP, c.ArmiarmaServPort)
+	c.GossipMetrics.ArmiarmaServer.Start()
 	stopping := false
 	go func() {
 		t := time.Now()
@@ -71,6 +78,7 @@ func (c *TopicExportMetricsCmd) Run(ctx context.Context, args ...string) error {
 		// loop to export the metrics every Backup and Period time
 		for {
 			if stopping {
+				c.GossipMetrics.ArmiarmaServer.Stop()
 				_ = c.GossipMetrics.ExportMetrics(c.RawFilePath, c.PeerstorePath, c.CsvPath, c.Store)
 				c.Log.Infof("Metrics Export Stopped")
 				h, _ := c.Host()
@@ -229,7 +237,8 @@ func (c *TopicExportMetricsCmd) UpdateFilesAndFolders(t time.Time) {
 func (c *TopicExportMetricsCmd) ExportSecuence(start time.Time, cm *custom.CustomMetrics) {
 	// Export The metrics
 	fmt.Println("exporting metrics")
-	c.GossipMetrics.FillMetrics(c.Store)
+	h, _ := c.Host()
+	c.GossipMetrics.FillMetrics(c.Store, h)
 	err := c.GossipMetrics.ExportMetrics(c.RawFilePath, c.PeerstorePath, c.CsvPath, c.Store)
 	if err != nil {
 		c.Log.Infof("Problems exporting the Metrics to the given file path")
@@ -239,7 +248,6 @@ func (c *TopicExportMetricsCmd) ExportSecuence(start time.Time, cm *custom.Custo
 		c.Log.Infof(log)
 	}
 	// Export the Custom metrics
-	h, _ := c.Host()
 	// Exporting the CustomMetrics for last time (still don't know which is the best place where to put this call)
 	err = FilCustomMetrics(c.GossipMetrics, c.Store, cm, h)
 	if err != nil {

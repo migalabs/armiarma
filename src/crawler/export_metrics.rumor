@@ -11,4 +11,4 @@ else
 fi
 
 
-gossip topic export-metrics --metrics-folder-path="$metricsFolder" --export-period=10m --backup-period=1m
+gossip topic export-metrics --metrics-folder-path="$metricsFolder" --export-period=10m --backup-period=1m --armiarma-server-ip="localhost" --armiarma-server-port="5000"
