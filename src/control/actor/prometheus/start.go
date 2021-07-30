@@ -11,12 +11,14 @@ import (
 
 	"github.com/protolambda/rumor/control/actor/base"
 	"github.com/protolambda/rumor/metrics"
-	"github.com/protolambda/rumor/metrics/utils"
+	//"github.com/protolambda/rumor/metrics/utils"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	pgossip "github.com/protolambda/rumor/p2p/gossip"
 )
+
+// TODO move this to the common module
 
 // List of metrics that we are going to export
 var (
@@ -147,19 +149,19 @@ func (c *PrometheusStartCmd) Run(ctx context.Context, args ...string) error {
 			// iterate through the client types in the metrics
 			c.GossipMetrics.GossipMetrics.Range(func(k interface{}, v interface{}) bool {
 				totdisc += 1
-				p := v.(utils.PeerMetrics)
+				p := v.(metrics.PeerMetrics)
 				if p.MetadataRequest {
-					if strings.Contains(strings.ToLower(p.ClientType), "lighthouse") {
+					if strings.Contains(strings.ToLower(p.GetClientType()), "lighthouse") {
 						lig += 1
-					} else if strings.Contains(strings.ToLower(p.ClientType), "teku") {
+					} else if strings.Contains(strings.ToLower(p.GetClientType()), "teku") {
 						tek += 1
-					} else if strings.Contains(strings.ToLower(p.ClientType), "nimbus") {
+					} else if strings.Contains(strings.ToLower(p.GetClientType()), "nimbus") {
 						nim += 1
-					} else if strings.Contains(strings.ToLower(p.ClientType), "prysm") {
+					} else if strings.Contains(strings.ToLower(p.GetClientType()), "prysm") {
 						pry += 1
-					} else if strings.Contains(strings.ToLower(p.ClientType), "js-libp2p") {
+					} else if strings.Contains(strings.ToLower(p.GetClientType()), "js-libp2p") {
 						lod += 1
-					} else if strings.Contains(strings.ToLower(p.ClientType), "unknown") {
+					} else if strings.Contains(strings.ToLower(p.GetClientType()), "unknown") {
 						unk += 1
 					} else {
 						unk += 1

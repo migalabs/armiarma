@@ -14,7 +14,6 @@ import (
 	"github.com/protolambda/rumor/control/actor/base"
 	"github.com/protolambda/rumor/metrics"
 	"github.com/protolambda/rumor/metrics/custom"
-	"github.com/protolambda/rumor/metrics/export"
 	"github.com/protolambda/rumor/p2p/track"
 )
 
@@ -134,13 +133,25 @@ func FilCustomMetrics(gm *metrics.GossipMetrics, ps track.ExtendedPeerstore, cm 
 	// Filter peers on peerstore by port
 	x, y, z := custom.GetPeersWithPorts(h, ps)
 	// Generate the MetricsDataFrame of the Current Metrics
-	mdf := export.NewMetricsDataFrame(&gm.GossipMetrics)
+	//mdf := export.NewMetricsDataFrame(&gm.GossipMetrics)
+
+	//_ = mdf
+	/*
 	lig := mdf.AnalyzeClientType("Lighthouse")
 	tek := mdf.AnalyzeClientType("Teku")
 	nim := mdf.AnalyzeClientType("Nimbus")
 	pry := mdf.AnalyzeClientType("Prysm")
 	lod := mdf.AnalyzeClientType("Lodestar")
-	unk := mdf.AnalyzeClientType("Unknown")
+	unk := mdf.AnalyzeClientType("Unknown")*/
+
+	lig := custom.NewClient()
+	tek := custom.NewClient()
+	nim := custom.NewClient()
+	pry := custom.NewClient()
+  lod := custom.NewClient()
+	unk := custom.NewClient()
+
+
 
 	// read client versions from Metrics
 	cm.PeerStore.SetTotal(peerstoreLen)
@@ -165,12 +176,23 @@ func FilCustomMetrics(gm *metrics.GossipMetrics, ps track.ExtendedPeerstore, cm 
 	cm.PeerStore.ConnectionSucceed.Unknown = unk
 
 	// fill the json with client distribution from those peers we got the metadata request from
+	/*
 	mtlig := mdf.AnalyzeClientTypeIfMetadataRequested("Lighthouse")
 	mttek := mdf.AnalyzeClientTypeIfMetadataRequested("Teku")
 	mtnim := mdf.AnalyzeClientTypeIfMetadataRequested("Nimbus")
 	mtpry := mdf.AnalyzeClientTypeIfMetadataRequested("Prysm")
 	mtlod := mdf.AnalyzeClientTypeIfMetadataRequested("Lodestar")
 	mtunk := mdf.AnalyzeClientTypeIfMetadataRequested("Unknown")
+	*/
+
+	mtlig := custom.NewClient()
+	mttek := custom.NewClient()
+	mtnim := custom.NewClient()
+	mtpry := custom.NewClient()
+	mtlod := custom.NewClient()
+	mtunk := custom.NewClient()
+
+
 
 	tot := mtlig.Total + mttek.Total + mtnim.Total + mtpry.Total + mtlod.Total + mtunk.Total
 

@@ -14,6 +14,8 @@ import (
 
 var timeout time.Duration = 5 * time.Second
 
+// TODO: Move this out of metrics?
+
 func PollPeerMetadata(p peer.ID, base *base.Base, peerMetadataState *metadata.PeerMetadataState, store track.ExtendedPeerstore, gm *GossipMetrics) {
 	// apply timeout to each poll target in this round
 	reqCtx, _ := context.WithTimeout(context.Background(), timeout)

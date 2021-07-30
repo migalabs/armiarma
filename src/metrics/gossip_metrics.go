@@ -3,18 +3,15 @@ package metrics
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
+	"github.com/pkg/errors"
 	"io/ioutil"
-	"net/http"
 	"os"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/protolambda/rumor/metrics/export"
 	"github.com/protolambda/rumor/metrics/utils"
 	pgossip "github.com/protolambda/rumor/p2p/gossip"
 	"github.com/protolambda/rumor/p2p/gossip/database"
@@ -30,7 +27,7 @@ type GossipMetrics struct {
 
 func NewGossipMetrics() GossipMetrics {
 	gm := GossipMetrics{
-		StartTime:      utils.GetTimeMiliseconds(),
+		StartTime:      GetTimeMiliseconds(),
 		MsgNotChannels: make(map[string](chan bool)),
 	}
 	return gm
@@ -82,7 +79,7 @@ func (c *GossipMetrics) ImportMetrics(importFolder string) (error, bool) {
 			if err != nil {
 				return err, true
 			}
-			tempMap := make(map[peer.ID]utils.PeerMetrics)
+			tempMap := make(map[peer.ID]PeerMetrics)
 			json.Unmarshal(byteValue, &tempMap)
 			// iterate to add the metrics from the json to the the GossipMetrics
 			for k, v := range tempMap {
@@ -115,10 +112,10 @@ type GossipState struct {
 
 // Function that Wraps/Marshals the content of the sync.Map to be exported as a json
 func (c *GossipMetrics) MarshalMetrics() ([]byte, error) {
-	exportTime := utils.GetTimeMiliseconds()
-	tmpMap := make(map[string]utils.PeerMetrics)
+	exportTime := GetTimeMiliseconds()
+	tmpMap := make(map[string]PeerMetrics)
 	c.GossipMetrics.Range(func(k, v interface{}) bool {
-		pm := v.(utils.PeerMetrics)
+		pm := v.(PeerMetrics)
 		if pm.ConnFlag {
 			pm.LastExport = exportTime
 		}
@@ -166,7 +163,7 @@ func (c *GossipMetrics) ResetDynamicMetrics() {
 	fmt.Println("Reseting Dynamic Metrics in Peer")
 	// Iterate throught the peers in the metrics, restarting connection events and messages
 	c.GossipMetrics.Range(func(key interface{}, value interface{}) bool {
-		p := value.(utils.PeerMetrics)
+		p := value.(PeerMetrics)
 		p.ResetDynamicMetrics()
 		c.GossipMetrics.Store(key, p)
 		return true
@@ -188,7 +185,7 @@ func (c *GossipMetrics) FillMetrics(ep track.ExtendedPeerstore) {
 		// Read the info that we have from him
 		p, ok := c.GossipMetrics.Load(key)
 		if ok {
-			peerMetrics := p.(utils.PeerMetrics)
+			peerMetrics := p.(PeerMetrics)
 			peerData := ep.GetAllData(peerMetrics.PeerId)
 			//fmt.Println("Filling Metrics of Peer:", peerMetrics.PeerId.String())
 			if len(peerMetrics.NodeId) == 0 {
@@ -196,9 +193,10 @@ func (c *GossipMetrics) FillMetrics(ep track.ExtendedPeerstore) {
 				peerMetrics.NodeId = peerData.NodeID.String()
 			}
 
-			if len(peerMetrics.ClientType) == 0 || peerMetrics.ClientType == "Unknown" {
+ 			// TODO: Why does it matter that is "" or "Unknown". What is the difference.
+			if len(peerMetrics.UserAgent) == 0 || peerMetrics.UserAgent == "Unknown" {
 				//fmt.Println("ClientType empty", peerMetrics.ClientType, "Adding ClientType:", peerData.UserAgent)
-				peerMetrics.ClientType = peerData.UserAgent
+				peerMetrics.UserAgent = peerData.UserAgent
 			}
 
 			if len(peerMetrics.Pubkey) == 0 {
@@ -217,7 +215,7 @@ func (c *GossipMetrics) FillMetrics(ep track.ExtendedPeerstore) {
 					//fmt.Println("No Addrs on the PeerMetrics to request the Location")
 				} else {
 					//fmt.Println("Requesting the Location based on the addrs:", peerMetrics.Addrs)
-					ip, country, city := getIpAndLocationFromAddrs(peerMetrics.Addrs)
+					ip, country, city := utils.GetIpAndLocationFromAddrs(peerMetrics.Addrs)
 					requestCounter = requestCounter + 1
 					peerMetrics.Ip = ip
 					peerMetrics.Country = country
@@ -251,12 +249,13 @@ func (c *GossipMetrics) FillMetrics(ep track.ExtendedPeerstore) {
 func (c *GossipMetrics) ExportMetrics(filePath string, peerstorePath string, csvPath string, ep track.ExtendedPeerstore) error {
 	// Generate the MetricsDataFrame of the Current Metrics
 	// Export the metrics to the given CSV file
-	mdf := export.NewMetricsDataFrame(&c.GossipMetrics)
-	err := mdf.ExportToCSV(csvPath)
+	fmt.Println("---- exporting metrics")
+	err := c.ExportToCSV(csvPath)
 	if err != nil {
 		fmt.Println("Error:", err)
 		return err
 	}
+
 	metrics, err := c.MarshalMetrics()
 	if err != nil {
 		fmt.Println("Error Marshalling the metrics")
@@ -279,85 +278,31 @@ func (c *GossipMetrics) ExportMetrics(filePath string, peerstorePath string, csv
 	return nil
 }
 
-// IP-API message structure
-type IpApiMessage struct {
-	Query       string `json:"query"`
-	Status      string `json:"status"`
-	Country     string `json:"country"`
-	CountryCode string `json:"countryCode"`
-	Region      string `json:"region"`
-	RegionName  string `json:"regionName"`
-	City        string `json:"city"`
-	Zip         string `json:"zip"`
-	Lat         string `json:"lat"`
-	Lon         string `json:"lon"`
-	Timezone    string `json:"timezone"`
-	Isp         string `json:"isp"`
-	Org         string `json:"org"`
-	As          string `json:"as"`
-}
-
-// get IP, location country and City from the multiaddress of the peer on the peerstore
-func getIpAndLocationFromAddrs(multiAddrs string) (ip string, country string, city string) {
-	ip = strings.TrimPrefix(multiAddrs, "/ip4/")
-	ipSlices := strings.Split(ip, "/")
-	ip = ipSlices[0]
-	url := "http://ip-api.com/json/" + ip
-	resp, err := http.Get(url)
+func (c *GossipMetrics) ExportToCSV(filePath string) error {
+	csvFile, err := os.Create(filePath)
 	if err != nil {
-		fmt.Println(err)
-		country = "Unknown"
-		city = "Unknown"
-		return ip, country, city
+		return errors.Wrap(err, "Error Opening the file")
+	}
+	defer csvFile.Close()
+
+	// First raw of the file will be the Titles of the columns
+	_, err = csvFile.WriteString("Peer Id,Node Id,User Agent,Client,Version,Pubkey,Address,Ip,Country,City,Request Metadata,Success Metadata,Attempted,Succeed,Connected,Attempts,Error,Latency,Connections,Disconnections,Connected Time,Beacon Blocks,Beacon Aggregations,Voluntary Exits,Proposer Slashings,Attester Slashings,Total Messages\n")
+	if err != nil {
+		errors.Wrap(err, "Error while Writing the Titles on the csv")
 	}
 
-	attemptsLeft, _ := strconv.Atoi(resp.Header["X-Rl"][0])
-	timeLeft, _ := strconv.Atoi(resp.Header["X-Ttl"][0])
+	err = nil
+	c.GossipMetrics.Range(func(k, val interface{}) bool {
+		v := val.(PeerMetrics)
+		_, err = csvFile.WriteString(v.ToCsvLine())
+		return true
+	})
 
-	if attemptsLeft == 0 { // We have exceeded the limit of requests 45req/min
-		time.Sleep(time.Duration(timeLeft) * time.Second)
-		resp, err = http.Get(url)
-		if err != nil {
-			fmt.Println(err)
-			country = "Unknown"
-			city = "Unknown"
-			return ip, country, city
-		}
+	if err != nil {
+		return errors.Wrap(err, "could not export peer metrics")
 	}
 
-	defer resp.Body.Close()
-	bodyBytes, _ := ioutil.ReadAll(resp.Body)
-
-	// Convert response body to Todo struct
-	var ipApiResp IpApiMessage
-	json.Unmarshal(bodyBytes, &ipApiResp)
-
-	// Check if the status of the request has been succesful
-	if ipApiResp.Status != "success" {
-		/*
-			fmt.Println("Error with the received response status,", ipApiResp.Status)
-			if ipApiResp.Query == ip {
-				fmt.Println("The given IP of the peer is private")
-			}
-		*/
-		country = "Unknown"
-		city = "Unknown"
-		return ip, country, city
-	}
-
-	country = ipApiResp.Country
-	city = ipApiResp.City
-
-	// check if country and city are correctly imported
-	if len(country) == 0 || len(city) == 0 {
-		country = "Unknown"
-		city = "Unknown"
-		return ip, country, city
-	}
-
-	// return the received values from the received message
-	return ip, country, city
-
+	return nil
 }
 
 // Add new peer with all the information from the peerstore to the metrics db
@@ -366,7 +311,7 @@ func (c *GossipMetrics) AddNewPeer(peerId peer.ID) bool {
 	_, ok := c.GossipMetrics.Load(peerId)
 	if !ok {
 		// We will just add the info that we have (the peerId)
-		peerMetrics := utils.NewPeerMetrics(peerId)
+		peerMetrics := NewPeerMetrics(peerId)
 		// Include it to the Peer DB
 		c.GossipMetrics.Store(peerId, peerMetrics)
 		// return that wasn't already on the peerstore
@@ -379,12 +324,12 @@ func (c *GossipMetrics) AddNewPeer(peerId peer.ID) bool {
 func (c *GossipMetrics) AddConnectionEvent(peerId peer.ID, connectionType string) {
 	pMetrics, ok := c.GossipMetrics.Load(peerId)
 	if ok {
-		currTime := utils.GetTimeMiliseconds()
-		newConnection := utils.ConnectionEvents{
+		currTime := GetTimeMiliseconds()
+		newConnection := ConnectionEvents{
 			ConnectionType: connectionType,
 			TimeMili:       currTime,
 		}
-		peerMetrics := pMetrics.(utils.PeerMetrics)
+		peerMetrics := pMetrics.(PeerMetrics)
 		peerMetrics.ConnectionEvents = append(peerMetrics.ConnectionEvents, newConnection)
 		if connectionType == "Connection" {
 			peerMetrics.Connected = true
@@ -410,7 +355,7 @@ func (c *GossipMetrics) AddConnectionEvent(peerId peer.ID, connectionType string
 func (c *GossipMetrics) AddMetadataEvent(peerId peer.ID, success bool) {
 	pMetrics, ok := c.GossipMetrics.Load(peerId)
 	if ok {
-		peerMetrics := pMetrics.(utils.PeerMetrics)
+		peerMetrics := pMetrics.(PeerMetrics)
 		peerMetrics.MetadataRequest = true
 		if success {
 			peerMetrics.MetadataSucceed = true
@@ -425,7 +370,7 @@ func (c *GossipMetrics) AddMetadataEvent(peerId peer.ID, success bool) {
 // Function that Manages the metrics updates for the incoming messages
 func (c *GossipMetrics) IncomingMessageManager(peerId peer.ID, topicName string) error {
 	pMetrics, _ := c.GossipMetrics.Load(peerId)
-	peerMetrics := pMetrics.(utils.PeerMetrics)
+	peerMetrics := pMetrics.(PeerMetrics)
 	messageMetrics, err := GetMessageMetrics(&peerMetrics, topicName)
 	if err != nil {
 		return errors.New("Topic Name no supported")
@@ -443,7 +388,7 @@ func (c *GossipMetrics) IncomingMessageManager(peerId peer.ID, topicName string)
 	return nil
 }
 
-func GetMessageMetrics(c *utils.PeerMetrics, topicName string) (mesMetr *utils.MessageMetrics, err error) {
+func GetMessageMetrics(c *PeerMetrics, topicName string) (mesMetr *MessageMetrics, err error) {
 	// All this could be inside a different function
 	switch topicName {
 	case pgossip.BeaconBlock:

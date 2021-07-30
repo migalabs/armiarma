@@ -11,6 +11,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+// TODO Merge the prometheus metrics that are somewhere else here
+
 
 clientDistribution = prometheus.NewHistogramVec(prometheus.HistogramOpts {
 		Name: "crawler_observed_client_distribution",

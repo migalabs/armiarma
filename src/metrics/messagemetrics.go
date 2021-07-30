@@ -1,17 +1,17 @@
-package utils
+package metrics
 
 import "fmt"
 
 // Information regarding the messages received on the beacon_lock topic
 type MessageMetrics struct {
-	Cnt              int64
+	Cnt              uint64
 	FirstMessageTime int64
 	LastMessageTime  int64
 }
 
 func NewMessageMetrics() MessageMetrics {
 	mm := MessageMetrics{
-		Cnt:              0,
+		Cnt:              uint64(0),
 		FirstMessageTime: 0,
 		LastMessageTime:  0,
 	}
@@ -19,7 +19,7 @@ func NewMessageMetrics() MessageMetrics {
 }
 
 // Increments the counter of the topic
-func (c *MessageMetrics) IncrementCnt() int64 {
+func (c *MessageMetrics) IncrementCnt() uint64 {
 	c.Cnt++
 	return c.Cnt
 }

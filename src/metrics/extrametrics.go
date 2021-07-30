@@ -6,7 +6,6 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/protolambda/rumor/metrics/utils"
 )
 
 // AddNewAttempts adds the resuts of a new attempt over an existing peer
@@ -17,7 +16,7 @@ func (gm *GossipMetrics) AddNewConnectionAttempt(id peer.ID, succeed bool, err s
 		return fmt.Errorf("Not peer found with that ID %s", id.String())
 	}
 	// Update the counter and connection status
-	p := v.(utils.PeerMetrics)
+	p := v.(PeerMetrics)
 
 	if !p.Attempted {
 		p.Attempted = true
@@ -46,7 +45,7 @@ func (gm *GossipMetrics) AddNewConnection(id peer.ID) error {
 		return fmt.Errorf("Not peer found with that ID %s", id.String())
 	}
 	// Update the counter and connection status
-	p := v.(utils.PeerMetrics)
+	p := v.(PeerMetrics)
 
 	p.Connected = true
 
@@ -63,7 +62,7 @@ func (gm *GossipMetrics) CheckIfConnected(id peer.ID) bool {
 		return false
 	}
 	// Check if the peer was connected
-	p := v.(utils.PeerMetrics)
+	p := v.(PeerMetrics)
 	if p.Succeed {
 		return true
 	} else {
@@ -80,7 +79,7 @@ func (gm *GossipMetrics) GetConnectionMetrics(h host.Host) (int, int, int) {
 	notattempted := 0
 	// Read from the recorded ExtraMetrics the status of each peer connections
 	gm.GossipMetrics.Range(func(key interface{}, value interface{}) bool {
-		p := value.(utils.PeerMetrics)
+		p := value.(PeerMetrics)
 		totalrecorded += 1
 		// Catalog each of the peers for the experienced status
 		if p.Attempted {
@@ -113,7 +112,7 @@ func (gm *GossipMetrics) GetErrorCounter(h host.Host) (int, int, int, int, int) 
 	uncertain := 0
 	// Read from the recorded ExtraMetrics the status of each peer connections
 	gm.GossipMetrics.Range(func(key interface{}, value interface{}) bool {
-		p := value.(utils.PeerMetrics)
+		p := value.(PeerMetrics)
 		// Catalog each of the peers for the experienced status
 		if p.Attempted && !p.Succeed { // atempted and failed should have generated an error
 			erro := p.Error
