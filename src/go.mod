@@ -65,6 +65,7 @@ require (
 	github.com/protolambda/ztyp v0.1.2
 	github.com/sirupsen/logrus v1.6.0
 	github.com/spf13/cobra v1.1.1
+	github.com/stretchr/testify v1.7.0
 	github.com/ugorji/go v1.1.4 // indirect
 	golang.org/x/crypto v0.0.0-20210317152858-513c2a44f670 // indirect
 	golang.org/x/sync v0.0.0-20200625203802-6e8e738ad208 // indirect

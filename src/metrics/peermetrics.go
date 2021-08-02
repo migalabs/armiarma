@@ -53,9 +53,9 @@ func NewPeerMetrics(peerId peer.ID) PeerMetrics {
 		// TODO Check. What is the difference between Unknown and "" empty.
 		PeerId:     peerId,
 		NodeId:     "",
-		UserAgent: "Unknown",
+		UserAgent: "Unknown", // TODO: why no just using ""
 		Pubkey:     "",
-		Addrs:      "/ip4/127.0.0.1/0000",
+		Addrs:      "/ip4/127.0.0.1/0000", // TODO: why not just using ""
 		Ip:         "127.0.0.1",
 		Country:    "Unknown",
 		City:       "Unknown",

@@ -125,13 +125,13 @@ func (c *TopicExportMetricsCmd) Run(ctx context.Context, args ...string) error {
 // fulfil the info from the Custom Metrics
 func FilCustomMetrics(gm *metrics.GossipMetrics, ps track.ExtendedPeerstore, cm *custom.CustomMetrics, h host.Host) error {
 	// Get total peers in peerstore
-	peerstoreLen := custom.TotalPeers(h)
+	//peerstoreLen := custom.TotalPeers(h)
 	// get the connection status for each of the peers in the extra-metrics
-	succeed, failed, notattempted := gm.GetConnectionMetrics(h)
+	//succeed, failed, notattempted := gm.GetConnectionMetrics(h)
 	// Analyze the reported error by the connection attempts
-	resetbypeer, timeout, dialtoself, dialbackoff, uncertain := gm.GetErrorCounter(h)
+	//resetbypeer, timeout, dialtoself, dialbackoff, uncertain := gm.GetErrorCounter(h)
 	// Filter peers on peerstore by port
-	x, y, z := custom.GetPeersWithPorts(h, ps)
+	//x, y, z := custom.GetPeersWithPorts(h, ps)
 	// Generate the MetricsDataFrame of the Current Metrics
 	//mdf := export.NewMetricsDataFrame(&gm.GossipMetrics)
 
@@ -143,17 +143,18 @@ func FilCustomMetrics(gm *metrics.GossipMetrics, ps track.ExtendedPeerstore, cm 
 	pry := mdf.AnalyzeClientType("Prysm")
 	lod := mdf.AnalyzeClientType("Lodestar")
 	unk := mdf.AnalyzeClientType("Unknown")*/
-
+/*
 	lig := custom.NewClient()
 	tek := custom.NewClient()
 	nim := custom.NewClient()
 	pry := custom.NewClient()
   lod := custom.NewClient()
 	unk := custom.NewClient()
-
+*/
 
 
 	// read client versions from Metrics
+	/*
 	cm.PeerStore.SetTotal(peerstoreLen)
 	cm.PeerStore.SetPort13000(x)
 	cm.PeerStore.SetPort9000(y)
@@ -164,16 +165,17 @@ func FilCustomMetrics(gm *metrics.GossipMetrics, ps track.ExtendedPeerstore, cm 
 	cm.PeerStore.ConnectionFailed.SetTimeOut(timeout)
 	cm.PeerStore.ConnectionFailed.SetDialToSelf(dialtoself)
 	cm.PeerStore.ConnectionFailed.SetDialBackOff(dialbackoff)
-	cm.PeerStore.ConnectionFailed.SetUncertain(uncertain)
+	cm.PeerStore.ConnectionFailed.SetUncertain(uncertain)*/
 
 	// fill the CustomMetrics with the readed information
+	/*
 	cm.PeerStore.ConnectionSucceed.SetTotal(succeed)
 	cm.PeerStore.ConnectionSucceed.Lighthouse = lig
 	cm.PeerStore.ConnectionSucceed.Teku = tek
 	cm.PeerStore.ConnectionSucceed.Nimbus = nim
 	cm.PeerStore.ConnectionSucceed.Prysm = pry
 	cm.PeerStore.ConnectionSucceed.Lodestar = lod
-	cm.PeerStore.ConnectionSucceed.Unknown = unk
+	cm.PeerStore.ConnectionSucceed.Unknown = unk*/
 
 	// fill the json with client distribution from those peers we got the metadata request from
 	/*
@@ -184,7 +186,7 @@ func FilCustomMetrics(gm *metrics.GossipMetrics, ps track.ExtendedPeerstore, cm 
 	mtlod := mdf.AnalyzeClientTypeIfMetadataRequested("Lodestar")
 	mtunk := mdf.AnalyzeClientTypeIfMetadataRequested("Unknown")
 	*/
-
+/*
 	mtlig := custom.NewClient()
 	mttek := custom.NewClient()
 	mtnim := custom.NewClient()
@@ -204,6 +206,7 @@ func FilCustomMetrics(gm *metrics.GossipMetrics, ps track.ExtendedPeerstore, cm 
 	cm.PeerStore.MetadataRequested.Prysm = mtpry
 	cm.PeerStore.MetadataRequested.Lodestar = mtlod
 	cm.PeerStore.MetadataRequested.Unknown = mtunk
+	*/
 
 	return nil
 }

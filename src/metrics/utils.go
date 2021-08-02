@@ -3,46 +3,45 @@ package metrics
 import (
 	"strings"
 	//"github.com/protolambda/rumor/metrics/utils"
-	"github.com/protolambda/rumor/metrics/custom"
 )
 
 // Client utils
 // Main function that will analyze the client type and verion out of the Peer UserAgent
 // return the Client Type and it's verison (if determined)
-func FilterClientType(fullName string) (string, string) {
+func FilterClientType(userAgent string) (string, string) {
 	var client string
 	var version string
 	// get the UserAgent in lowercases
-	fullName = strings.ToLower(fullName)
+	userAgent = strings.ToLower(userAgent)
 	// check the client type
-	if strings.Contains(fullName, "lighthouse") { // the client is from Lighthouse
+	if strings.Contains(userAgent, "lighthouse") { // the client is from Lighthouse
 		// Lighthouse UserAgent Example: "Lighthouse/v1.0.3-65dcdc3/x86_64-linux"
 		client = "Lighthouse"
 		// Extract version
-		s := strings.Split(fullName, "/")
+		s := strings.Split(userAgent, "/")
 		aux := strings.Split(s[1], "-")
 		version = aux[0]
-	} else if strings.Contains(fullName, "prysm") { // the client is from Prysm
+	} else if strings.Contains(userAgent, "prysm") { // the client is from Prysm
 		// Prysm UserAgent Example: "Prysm/v1.1.0/9b367b36fc12ecf565ad649209aa2b5bba8c7797"
 		client = "Prysm"
 		// Extract version
-		s := strings.Split(fullName, "/")
+		s := strings.Split(userAgent, "/")
 		version = s[1]
-	} else if strings.Contains(fullName, "teku") { // the client is from Prysm
+	} else if strings.Contains(userAgent, "teku") { // the client is from Prysm
 		// Prysm UserAgent Example: "Prysm/v1.1.0/9b367b36fc12ecf565ad649209aa2b5bba8c7797"
 		client = "Teku"
 		// Extract version
-		s := strings.Split(fullName, "/")
+		s := strings.Split(userAgent, "/")
 		aux := strings.Split(s[2], "+")
 		version = aux[0]
-	} else if strings.Contains(fullName, "nimbus") {
+	} else if strings.Contains(userAgent, "nimbus") {
 		client = "Nimbus"
 		version = "Unknown"
-	} else if strings.Contains(fullName, "js-libp2p") {
+	} else if strings.Contains(userAgent, "js-libp2p") {
 		client = "Lodestar"
-		s := strings.Split(fullName, "/")
+		s := strings.Split(userAgent, "/")
 		version = s[1]
-	} else if strings.Contains(fullName, "unknown") {
+	} else if strings.Contains(userAgent, "unknown") {
 		client = "Unknown"
 		version = "Unknown"
 	} else {
@@ -53,8 +52,8 @@ func FilterClientType(fullName string) (string, string) {
 }
 
 // Function that iterates through the peers keeping track of the client type, and versions
-func AnalyzeClientType(gm *GossipMetrics, clientname string) custom.Client {
-	client := custom.NewClient()
+func AnalyzeClientType(gm *GossipMetrics, clientname string) Clients {
+	clients := NewClients()
 	/*
 
 	clicnt := 0
@@ -103,7 +102,7 @@ func AnalyzeClientType(gm *GossipMetrics, clientname string) custom.Client {
 	for _, item := range v {
 		client.AddVersion(item, versions[item])
 	}*/
-	return client
+	return clients
 }
 
 // Function that iterates through the peers keeping track of the client type, and versions if the peer was requested the metadata
