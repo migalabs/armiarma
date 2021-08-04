@@ -71,6 +71,13 @@ var (
 	},
 		[]string{"mins"},
 	)
+	ipDistribution = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "crawler",
+		Name:      "observed_ip_distribution",
+		Help:      "The number of nodes per IP address",
+	},
+		[]string{"ip"},
+	)
 )
 
 type PrometheusStartCmd struct {
@@ -104,6 +111,7 @@ func (c *PrometheusStartCmd) Run(ctx context.Context, args ...string) error {
 	prometheus.MustRegister(geoDistribution)
 	prometheus.MustRegister(rttDistribution)
 	prometheus.MustRegister(tctDistribution)
+	prometheus.MustRegister(ipDistribution)
 	// launch the collector go routine
 	stopping := make(chan struct{})
 
@@ -161,6 +169,7 @@ func (c *PrometheusStartCmd) Run(ctx context.Context, args ...string) error {
 			geoDist := make(map[string]float64)
 			rttDist := make(map[string]float64)
 			tctDist := make(map[string]float64)
+			ipDist 	:= make(map[string]float64)
 			// iterate through the client types in the metrics
 			c.GossipMetrics.GossipMetrics.Range(func(k interface{}, v interface{}) bool {
 				totdisc += 1
@@ -188,6 +197,13 @@ func (c *PrometheusStartCmd) Run(ctx context.Context, args ...string) error {
 					geoDist[p.CountryCode] += 1
 				} else {
 					geoDist[p.CountryCode] = 1
+				}
+				// Generate the IP Address distribution
+				_, ok = ipDist[p.Ip]
+				if ok {
+					ipDist[p.Ip] += 1
+				} else {
+					ipDist[p.Ip] = 1
 				}
 				// Generate the Latency distribution
 				rtt := fmt.Sprintf("%.1f", float64(p.Latency))
@@ -228,6 +244,10 @@ func (c *PrometheusStartCmd) Run(ctx context.Context, args ...string) error {
 			// Country distribution
 			for k, v := range geoDist {
 				geoDistribution.WithLabelValues(k).Set(v)
+			}
+			// IP distribution
+			for k, v := range ipDist {
+				ipDistribution.WithLabelValues(k).Set(v)
 			}
 			// RTT distribution
 			for k, v := range rttDist {
