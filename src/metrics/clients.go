@@ -1,53 +1,52 @@
 package metrics
 
-import (
-	//"strconv"
-)
-
 type Version struct {
 	Version string
-	Count   int //needed?
-}
-
-type Client struct {
-	ClientName string
-	Versions   []Version
-	Count      int //needed?
+	Count   int
 }
 
 type Clients struct {
-	Clients []Client
+	Clients map[string][]Version
 }
 
 func NewClients() Clients {
-	clients := Clients {
-		Clients: make([]Client, 0),
+	clients := Clients{
+		Clients: make(map[string][]Version, 0),
 	}
 	return clients
 }
 
 func (c *Clients) AddClientVersion(clientName, clientVersion string) {
-	for _, cl := range c.Clients {
-		if clientName == cl.ClientName {
-			for _, vr := range cl.Versions {
-				if clientVersion == vr.Version {
-					vr.Count++
-				} else {
-					newVersion := Version{Version: clientVersion, Count: 1}
-					cl.Versions = append(cl.Versions, newVersion)
-				}
+	if versions, ok := c.Clients[clientName]; ok {
+		versionFound := false
+		for i, v := range versions {
+			if v.Version == clientVersion {
+				c.Clients[clientName][i].Count++
+				versionFound = true
 			}
-		} else {
-			newVersion := Version{
-				Version: clientVersion,
-				Count: 1}
-			newClient := Client{
-				ClientName: clientName,
-				Versions: make([]Version, 1),
-				Count: 1,
-			}
-			newClient.Versions[0] = newVersion
-			c.Clients = append(c.Clients, newClient)
 		}
+		if !versionFound {
+			c.Clients[clientName] = append(c.Clients[clientName],
+				Version{Version: clientVersion, Count: 1})
+		}
+	} else {
+		c.Clients[clientName] = make([]Version, 1)
+		c.Clients[clientName][0] = Version{Version: clientVersion, Count: 1}
 	}
+}
+
+func (c *Clients) GetClientNames() []string {
+	clientNames := make([]string, 0)
+	for k := range c.Clients {
+		clientNames = append(clientNames, k)
+	}
+	return clientNames
+}
+
+func (c *Clients) GetPeersOfClient(clientName string) int {
+	total := 0
+	for _, v := range c.Clients[clientName] {
+		total += v.Count
+	}
+	return total
 }

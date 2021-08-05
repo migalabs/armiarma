@@ -19,3 +19,4 @@ website-summary/*
 
 # ignore the venv
 src/analyzer/venv
+data/*

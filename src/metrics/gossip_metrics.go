@@ -16,6 +16,7 @@ import (
 	pgossip "github.com/protolambda/rumor/p2p/gossip"
 	"github.com/protolambda/rumor/p2p/gossip/database"
 	"github.com/protolambda/rumor/p2p/track"
+	"github.com/libp2p/go-libp2p-core/host"
 )
 
 type GossipMetrics struct {
@@ -31,6 +32,22 @@ func NewGossipMetrics() GossipMetrics {
 		MsgNotChannels: make(map[string](chan bool)),
 	}
 	return gm
+}
+
+// TODO: quick copy paste
+func GetTimeMiliseconds() int64 {
+	now := time.Now()
+	//secs := now.Unix()
+	nanos := now.UnixNano()
+	millis := nanos / 1000000
+
+	return millis
+}
+
+// Connection event model
+type ConnectionEvents struct {
+	ConnectionType string
+	TimeMili       int64
 }
 
 // Exists reports whether the named file or directory exists.
@@ -79,7 +96,7 @@ func (c *GossipMetrics) ImportMetrics(importFolder string) (error, bool) {
 			if err != nil {
 				return err, true
 			}
-			tempMap := make(map[peer.ID]PeerMetrics)
+			tempMap := make(map[peer.ID]Peer)
 			json.Unmarshal(byteValue, &tempMap)
 			// iterate to add the metrics from the json to the the GossipMetrics
 			for k, v := range tempMap {
@@ -113,9 +130,9 @@ type GossipState struct {
 // Function that Wraps/Marshals the content of the sync.Map to be exported as a json
 func (c *GossipMetrics) MarshalMetrics() ([]byte, error) {
 	exportTime := GetTimeMiliseconds()
-	tmpMap := make(map[string]PeerMetrics)
+	tmpMap := make(map[string]Peer)
 	c.GossipMetrics.Range(func(k, v interface{}) bool {
-		pm := v.(PeerMetrics)
+		pm := v.(Peer)
 		if pm.ConnFlag {
 			pm.LastExport = exportTime
 		}
@@ -163,7 +180,7 @@ func (c *GossipMetrics) ResetDynamicMetrics() {
 	fmt.Println("Reseting Dynamic Metrics in Peer")
 	// Iterate throught the peers in the metrics, restarting connection events and messages
 	c.GossipMetrics.Range(func(key interface{}, value interface{}) bool {
-		p := value.(PeerMetrics)
+		p := value.(Peer)
 		p.ResetDynamicMetrics()
 		c.GossipMetrics.Store(key, p)
 		return true
@@ -176,6 +193,8 @@ func (c *GossipMetrics) AddNotChannel(topicName string) {
 	c.MsgNotChannels[topicName] = make(chan bool, 100)
 }
 
+// TODO: This module shouldnt know about rumor at all. So ExtendedPeerstore
+// should be replaced
 // Function that iterates through the received peers and fills the missing information
 func (c *GossipMetrics) FillMetrics(ep track.ExtendedPeerstore) {
 	// to prevent the Filler from crashing (the url-service only accepts 45req/s)
@@ -185,52 +204,45 @@ func (c *GossipMetrics) FillMetrics(ep track.ExtendedPeerstore) {
 		// Read the info that we have from him
 		p, ok := c.GossipMetrics.Load(key)
 		if ok {
-			peerMetrics := p.(PeerMetrics)
-			peerData := ep.GetAllData(peerMetrics.PeerId)
-			//fmt.Println("Filling Metrics of Peer:", peerMetrics.PeerId.String())
-			if len(peerMetrics.NodeId) == 0 {
-				//fmt.Println("NodeID empty", peerMetrics.NodeId, "Adding NodeId:", peerData.NodeID.String())
-				peerMetrics.NodeId = peerData.NodeID.String()
+			Peer := p.(Peer)
+			peerData := ep.GetAllData(Peer.PeerId)
+			if len(Peer.NodeId) == 0 {
+				Peer.NodeId = peerData.NodeID.String()
 			}
 
- 			// TODO: Why does it matter that is "" or "Unknown". What is the difference.
-			if len(peerMetrics.UserAgent) == 0 || peerMetrics.UserAgent == "Unknown" {
-				//fmt.Println("ClientType empty", peerMetrics.ClientType, "Adding ClientType:", peerData.UserAgent)
-				peerMetrics.UserAgent = peerData.UserAgent
+			if len(Peer.UserAgent) == 0 {
+				Peer.UserAgent = peerData.UserAgent
 			}
 
-			if len(peerMetrics.Pubkey) == 0 {
-				//fmt.Println("Pubkey empty", peerMetrics.Pubkey, "Adding Pubkey:", peerData.Pubkey)
-				peerMetrics.Pubkey = peerData.Pubkey
+			if len(Peer.Pubkey) == 0 {
+				Peer.Pubkey = peerData.Pubkey
 			}
 
-			if len(peerMetrics.Addrs) == 0 || peerMetrics.Addrs == "/ip4/127.0.0.1/0000" || peerMetrics.Addrs == "/ip4/127.0.0.1/9000" {
+			if len(Peer.Addrs) == 0 {
 				address := GetFullAddress(peerData.Addrs)
-				//fmt.Println("Addrs empty", peerMetrics.Addrs, "Adding Addrs:", address)
-				peerMetrics.Addrs = address
+				Peer.Addrs = address
 			}
-
-			if len(peerMetrics.Country) == 0 || peerMetrics.Country == "Unknown" {
-				if len(peerMetrics.Addrs) == 0 {
-					//fmt.Println("No Addrs on the PeerMetrics to request the Location")
+			if len(Peer.Country) == 0 {
+				if len(Peer.Addrs) == 0 {
+					//fmt.Println("No Addrs on the Peer to request the Location")
 				} else {
-					//fmt.Println("Requesting the Location based on the addrs:", peerMetrics.Addrs)
-					ip, country, city := utils.GetIpAndLocationFromAddrs(peerMetrics.Addrs)
+					//fmt.Println("Requesting the Location based on the addrs:", Peer.Addrs)
+					ip, country, city := utils.GetIpAndLocationFromAddrs(Peer.Addrs)
 					requestCounter = requestCounter + 1
-					peerMetrics.Ip = ip
-					peerMetrics.Country = country
-					peerMetrics.City = city
+					Peer.Ip = ip
+					Peer.Country = country
+					Peer.City = city
 				}
 			}
 
 			// Since we want to have the latest Latency, we update it only when it is different from 0
 			// latency in seconds
 			if peerData.Latency != 0 {
-				peerMetrics.Latency = float64(peerData.Latency/time.Millisecond) / 1000
+				Peer.Latency = float64(peerData.Latency/time.Millisecond) / 1000
 			}
 
 			// After check that all the info is ready, save the item back into the Sync.Map
-			c.GossipMetrics.Store(key, peerMetrics)
+			c.GossipMetrics.Store(key, Peer)
 
 			/*
 				if requestCounter >= 40 { // Reminder 45 req/s
@@ -293,7 +305,7 @@ func (c *GossipMetrics) ExportToCSV(filePath string) error {
 
 	err = nil
 	c.GossipMetrics.Range(func(k, val interface{}) bool {
-		v := val.(PeerMetrics)
+		v := val.(Peer)
 		_, err = csvFile.WriteString(v.ToCsvLine())
 		return true
 	})
@@ -310,10 +322,11 @@ func (c *GossipMetrics) ExportToCSV(filePath string) error {
 func (c *GossipMetrics) AddNewPeer(peerId peer.ID) bool {
 	_, ok := c.GossipMetrics.Load(peerId)
 	if !ok {
+		fmt.Println("new peer was added")
 		// We will just add the info that we have (the peerId)
-		peerMetrics := NewPeerMetrics(peerId)
+		Peer := NewPeer(peerId)
 		// Include it to the Peer DB
-		c.GossipMetrics.Store(peerId, peerMetrics)
+		c.GossipMetrics.Store(peerId, Peer)
 		// return that wasn't already on the peerstore
 		return false
 	}
@@ -329,22 +342,22 @@ func (c *GossipMetrics) AddConnectionEvent(peerId peer.ID, connectionType string
 			ConnectionType: connectionType,
 			TimeMili:       currTime,
 		}
-		peerMetrics := pMetrics.(PeerMetrics)
-		peerMetrics.ConnectionEvents = append(peerMetrics.ConnectionEvents, newConnection)
+		Peer := pMetrics.(Peer)
+		Peer.ConnectionEvents = append(Peer.ConnectionEvents, newConnection)
 		if connectionType == "Connection" {
-			peerMetrics.Connected = true
+			Peer.Connected = true
 			// add the connections
-			peerMetrics.TotConnections += 1
-			peerMetrics.LastConn = currTime // Current time in SECs
-			peerMetrics.ConnFlag = true
+			Peer.TotConnections += 1
+			Peer.LastConn = currTime // Current time in SECs
+			Peer.ConnFlag = true
 		} else {
 			// add the disconnections and sum the time
-			peerMetrics.TotDisconnections += 1
-			peerMetrics.LastDisconn = currTime // Current time in SECs
-			peerMetrics.TotConnTime += peerMetrics.LastDisconn - peerMetrics.LastConn
-			peerMetrics.ConnFlag = false
+			Peer.TotDisconnections += 1
+			Peer.LastDisconn = currTime // Current time in SECs
+			Peer.TotConnTime += Peer.LastDisconn - Peer.LastConn
+			Peer.ConnFlag = false
 		}
-		c.GossipMetrics.Store(peerId, peerMetrics)
+		c.GossipMetrics.Store(peerId, Peer)
 	} else {
 		// Might be possible to add
 		fmt.Println("Counld't add Event, Peer is not in the list")
@@ -355,12 +368,12 @@ func (c *GossipMetrics) AddConnectionEvent(peerId peer.ID, connectionType string
 func (c *GossipMetrics) AddMetadataEvent(peerId peer.ID, success bool) {
 	pMetrics, ok := c.GossipMetrics.Load(peerId)
 	if ok {
-		peerMetrics := pMetrics.(PeerMetrics)
-		peerMetrics.MetadataRequest = true
+		Peer := pMetrics.(Peer)
+		Peer.MetadataRequest = true
 		if success {
-			peerMetrics.MetadataSucceed = true
+			Peer.MetadataSucceed = true
 		}
-		c.GossipMetrics.Store(peerId, peerMetrics)
+		c.GossipMetrics.Store(peerId, Peer)
 	} else {
 		// Might be possible to add
 		fmt.Println("Counld't add Event, Peer is not in the list")
@@ -370,8 +383,8 @@ func (c *GossipMetrics) AddMetadataEvent(peerId peer.ID, success bool) {
 // Function that Manages the metrics updates for the incoming messages
 func (c *GossipMetrics) IncomingMessageManager(peerId peer.ID, topicName string) error {
 	pMetrics, _ := c.GossipMetrics.Load(peerId)
-	peerMetrics := pMetrics.(PeerMetrics)
-	messageMetrics, err := GetMessageMetrics(&peerMetrics, topicName)
+	Peer := pMetrics.(Peer)
+	messageMetrics, err := GetMessageMetrics(&Peer, topicName)
 	if err != nil {
 		return errors.New("Topic Name no supported")
 	}
@@ -383,12 +396,159 @@ func (c *GossipMetrics) IncomingMessageManager(peerId peer.ID, topicName string)
 	messageMetrics.StampTime("last")
 
 	// Store back the Loaded/Modified Variable
-	c.GossipMetrics.Store(peerId, peerMetrics)
+	c.GossipMetrics.Store(peerId, Peer)
 
 	return nil
 }
 
-func GetMessageMetrics(c *PeerMetrics, topicName string) (mesMetr *MessageMetrics, err error) {
+// AddNewAttempts adds the resuts of a new attempt over an existing peer
+// increasing the attempt counter and the respective fields
+func (gm *GossipMetrics) AddNewConnectionAttempt(id peer.ID, succeed bool, err string) error {
+	v, ok := gm.GossipMetrics.Load(id)
+	if !ok { // the peer was already in the sync.Map return true
+		return fmt.Errorf("Not peer found with that ID %s", id.String())
+	}
+	// Update the counter and connection status
+	p := v.(Peer)
+
+	if !p.Attempted {
+		p.Attempted = true
+		//fmt.Println("Original ", err)
+		// MIGHT be nice to try if we can change the uncertain errors for the dial backoff
+		if err != "" || err != "dial backoff" {
+			p.Error = FilterError(err)
+		}
+	}
+	if succeed {
+		p.Succeed = succeed
+		p.Error = "None"
+	}
+	p.Attempts += 1
+
+	// Store the new struct in the sync.Map
+	gm.GossipMetrics.Store(id, p)
+	return nil
+}
+
+// AddNewAttempts adds the resuts of a new attempt over an existing peer
+// increasing the attempt counter and the respective fields
+func (gm *GossipMetrics) AddNewConnection(id peer.ID) error {
+	v, ok := gm.GossipMetrics.Load(id)
+	if !ok { // the peer was already in the sync.Map return true
+		return fmt.Errorf("Not peer found with that ID %s", id.String())
+	}
+	// Update the counter and connection status
+	p := v.(Peer)
+
+	p.Connected = true
+
+	// Store the new struct in the sync.Map
+	gm.GossipMetrics.Store(id, p)
+	return nil
+}
+
+// CheckIdConnected check if the given peer was already connected
+// returning true if it was connected before or false if wasn't
+func (gm *GossipMetrics) CheckIfConnected(id peer.ID) bool {
+	v, ok := gm.GossipMetrics.Load(id)
+	if !ok { // the peer was already in the sync.Map we didn't connect the peer -> false
+		return false
+	}
+	// Check if the peer was connected
+	p := v.(Peer)
+	if p.Succeed {
+		return true
+	} else {
+		return false
+	}
+}
+
+// GetConnectionsMetrics returns the analysis over the peers found in the
+// ExtraMetrics. Return Values = (0)->succeed | (1)->failed | (2)->notattempted
+func (gm *GossipMetrics) GetConnectionMetrics(h host.Host) (int, int, int) {
+	totalrecorded := 0
+	succeed := 0
+	failed := 0
+	notattempted := 0
+	// Read from the recorded ExtraMetrics the status of each peer connections
+	gm.GossipMetrics.Range(func(key interface{}, value interface{}) bool {
+		p := value.(Peer)
+		totalrecorded += 1
+		// Catalog each of the peers for the experienced status
+		if p.Attempted {
+			if p.Succeed {
+				succeed += 1
+			} else {
+				failed += 1
+			}
+		} else {
+			notattempted += 1
+		}
+		return true
+	})
+	// get the len of the peerstore to complete the number of notattempted peers
+	peerList := h.Peerstore().Peers()
+	peerstoreLen := len(peerList)
+	notattempted = notattempted + (peerstoreLen - totalrecorded)
+	// MAYBE -> include here the error reader?
+	return succeed, failed, notattempted
+}
+
+// GetConnectionsMetrics returns the analysis over the peers found in the ExtraMetrics.
+// Return Values = (0)->resetbypeer | (1)->timeout | (2)->dialtoself | (3)->dialbackoff | (4)->uncertain
+func (gm *GossipMetrics) GetErrorCounter(h host.Host) (int, int, int, int, int) {
+	totalfailed := 0
+	dialbackoff := 0
+	timeout := 0
+	resetbypeer := 0
+	dialtoself := 0
+	uncertain := 0
+	// Read from the recorded ExtraMetrics the status of each peer connections
+	gm.GossipMetrics.Range(func(key interface{}, value interface{}) bool {
+		p := value.(Peer)
+		// Catalog each of the peers for the experienced status
+		if p.Attempted && !p.Succeed { // atempted and failed should have generated an error
+			erro := p.Error
+			totalfailed += 1
+			switch erro {
+			case "Connection reset by peer":
+				resetbypeer += 1
+			case "i/o timeout":
+				timeout += 1
+			case "dial to self attempted":
+				dialtoself += 1
+			case "dial backoff":
+				dialbackoff += 1
+			case "Uncertain":
+				uncertain += 1
+			default:
+				fmt.Println("The recorded error type doesn't match any of the error on the list", erro)
+			}
+		}
+		return true
+	})
+	return resetbypeer, timeout, dialtoself, dialbackoff, uncertain
+}
+
+// funtion that formats the error into a Pretty understandable (standard) way
+// also important to cohesionate the extra-metrics output csv
+func FilterError(err string) string {
+	errorPretty := "Uncertain"
+	// filter the error type
+	if strings.Contains(err, "connection reset by peer") {
+		errorPretty = "Connection reset by peer"
+	} else if strings.Contains(err, "i/o timeout") {
+		errorPretty = "i/o timeout"
+	} else if strings.Contains(err, "dial to self attempted") {
+		errorPretty = "dial to self attempted"
+	} else if strings.Contains(err, "dial backoff") {
+		errorPretty = "dial backoff"
+	}
+
+	return errorPretty
+}
+
+func GetMessageMetrics(c *Peer, topicName string) (mesMetr *MessageMetrics, err error) {
 	// All this could be inside a different function
 	switch topicName {
 	case pgossip.BeaconBlock:

@@ -3,86 +3,39 @@ package prometheus
 import (
 	"fmt"
 	"time"
-
-	//"time"
 	"context"
 	"net/http"
-	"strings"
 
-	"github.com/protolambda/rumor/control/actor/base"
 	"github.com/protolambda/rumor/metrics"
-	//"github.com/protolambda/rumor/metrics/utils"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	pgossip "github.com/protolambda/rumor/p2p/gossip"
+	log "github.com/sirupsen/logrus"
 )
 
-// TODO move this to the common module
-
-// List of metrics that we are going to export
-var (
-	// Metrics
-	clientDistribution = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace: "crawler",
-		Name:      "observed_client_distribution",
-		Help:      "Number of peers from each of the clients observed",
-	},
-		[]string{"client"},
-	)
-	geoDistribution = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace: "crawler",
-		Name:      "gographical_distribution",
-		Help:      "Number of peers from each of the crawled countries",
-	},
-		[]string{"country"},
-	)
-	totPeers = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: "crawler",
-		Name:      "total_crawled_peers",
-		Help:      "The number of discovered peers with the crawler",
-	})
-	connectedPeers = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: "crawler",
-		Name:      "connected_peers",
-		Help:      "The number of connected peers with the crawler",
-	})
-	receivedTotalMessages = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: "crawler",
-		Name:      "total_received_messages_psec",
-		Help:      "The number of messages received in the last second",
-	})
-	receivedMessages = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace: "crawler",
-		Name:      "received_messages_psec",
-		Help:      "Number of messages received per second on each topic",
-	},
-		[]string{"topic"},
-	)
-	// GossipSub Topics
-)
-
-type PrometheusStartCmd struct {
-	*base.Base
+type PrometheusRunner struct {
 	GossipMetrics *metrics.GossipMetrics
 
-	ExposePort      string        `ask:"--expose-port" help:"port that will be used to offer the metrics to prometheus"`
-	EndpointUrl     string        `ask:"--endpoint-url" help:"url path where the metrics will be offered"`
-	RefreshInterval time.Duration `ask:"--refresh-interval" help:"Time duration between metrics updates"`
+	ExposePort      string
+	EndpointUrl     string
+	RefreshInterval time.Duration
 }
 
-func (c *PrometheusStartCmd) Default() {
-	c.ExposePort = "9080"
-	c.EndpointUrl = "metrics"
-	c.RefreshInterval = 10 * time.Second
+func NewPrometheusRunner(gm *metrics.GossipMetrics) PrometheusRunner {
+	return PrometheusRunner {
+		GossipMetrics: gm,
+		ExposePort: "9080",
+		EndpointUrl: "metrics",
+		RefreshInterval: 10 * time.Second,
+	}
 }
 
-func (c *PrometheusStartCmd) Run(ctx context.Context, args ...string) error {
-	// generate the endpoint where the metrics will be offered for prometheus
-	path := "/" + c.EndpointUrl
-	port := ":" + c.ExposePort
-	fmt.Println("Exposing prometheus metrics at:", path, port)
-	http.Handle(path, promhttp.Handler())
+func (c *PrometheusRunner) Run(ctx context.Context) error {
+	go func() {
+		log.Info("Exposing prometheus metrics at: ", c.ExposePort)
+		http.Handle("/metrics", promhttp.Handler())
+		http.ListenAndServe(fmt.Sprintf(":%d", c.ExposePort), nil)
+	}()
 
 	// Register the metrics in the prometheus exporter
 	prometheus.MustRegister(clientDistribution)
@@ -91,16 +44,50 @@ func (c *PrometheusStartCmd) Run(ctx context.Context, args ...string) error {
 	prometheus.MustRegister(receivedMessages)
 	prometheus.MustRegister(totPeers)
 	prometheus.MustRegister(geoDistribution)
+
+	go func() {
+		for {
+
+			// TODO: Use the Gossip Metrics to populate the metrics
+			c.GossipMetrics.GossipMetrics.Range(func(k, val interface{}) bool {
+				v := val.(metrics.Peer)
+				log.Info(v.ToCsvLine())
+				return true
+			})
+
+			/* TODO: All the data to populate the metrics is here in GossipMetrics
+			clientDistribution.WithLabelValues("xxx").Set(lig)
+			clientDistribution.WithLabelValues("yyy").Set(tek)
+			clientDistribution.WithLabelValues("nimbus").Set(nim)
+			connectedPeers.Set(conPeers)
+			receivedTotalMessages.Set(tot)
+			receivedMessages.WithLabelValues("beacon_blocks").Set(bb)
+			receivedMessages.WithLabelValues("beacon_aggregate_and_proof").Set(ba)
+
+			*/
+
+			//totPeers.Set(totdisc)
+
+			/*
+			for k, v := range geoDist {
+				geoDistribution.WithLabelValues(k).Set(v)
+			}*/
+
+			time.Sleep(c.RefreshInterval)
+		}
+	}()
+
 	// launch the collector go routine
-	stopping := make(chan struct{})
+	//stopping := make(chan struct{})
 
 	// generate reset channel
-	resetChan := make(chan bool, 2)
+	//resetChan := make(chan bool, 2)
 	// message counters
-	beacBlock := 0
-	beacAttestation := 0
-	totalMsg := 0
+	//beacBlock := 0
+	//beacAttestation := 0
+	//totalMsg := 0
 	// go routine to keep track of the received messages
+	/*
 	go func() {
 		for {
 			select {
@@ -121,10 +108,20 @@ func (c *PrometheusStartCmd) Run(ctx context.Context, args ...string) error {
 			}
 		}
 		fmt.Println("End Message tracker")
+	}()*/
+/*
+	go func() {
+		for {
+			fmt.Println("TODO: exporting metrics to prometheus")
+			fmt.Println("hej", c.GossipMetrics.GossipMetrics)
+			fmt.Println("addres gosmet", &c.GossipMetrics)
+			time.Sleep(c.RefreshInterval)
+		}
 	}()
-
-	t := time.Now()
+*/
+	//t := time.Now()
 	// go routine to export the metrics to prometheus
+	/*
 	go func() {
 		for {
 			// variable definitions
@@ -149,7 +146,7 @@ func (c *PrometheusStartCmd) Run(ctx context.Context, args ...string) error {
 			// iterate through the client types in the metrics
 			c.GossipMetrics.GossipMetrics.Range(func(k interface{}, v interface{}) bool {
 				totdisc += 1
-				p := v.(metrics.PeerMetrics)
+				p := v.(metrics.Peer)
 				if p.MetadataRequest {
 					if strings.Contains(strings.ToLower(p.GetClientType()), "lighthouse") {
 						lig += 1
@@ -212,25 +209,7 @@ func (c *PrometheusStartCmd) Run(ctx context.Context, args ...string) error {
 				return
 			}
 		}
-	}()
+	}()*/
 
-	err := http.ListenAndServe(port, nil)
-	if err != nil {
-		fmt.Println("Error while generating m")
-	}
-
-	c.Control.RegisterStop(func(ctx context.Context) error {
-		// stop the message reading go routine
-		close(stopping)
-
-		c.Log.Infof("Stoped Prometheus Metrics Exporter")
-		return nil
-	})
 	return nil
 }
-
-func (c *PrometheusStartCmd) Help() string {
-	return "Start the service to offer the Metrics with prometheus"
-}
-
-// Necesary Code to export/offer the metrics to prometheus

@@ -29,10 +29,10 @@ func (c *HostNotifyCmd) HelpLong() string {
 	return `
 Args: <event-types>...
 
-Network event notifications. 
-Valid event types: 
+Network event notifications.
+Valid event types:
  - listen (listen_open listen_close)
- - connection (connection_open connection_close) 
+ - connection (connection_open connection_close)
  - stream (stream_open stream_close)
  - all
 

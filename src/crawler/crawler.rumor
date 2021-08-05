@@ -3,14 +3,14 @@ p2p_port=9020
 
 # TODO: -Priv-key loader/checker needs to be implemented
 
-privkeyfile="${metricsFolder}/priv_key" 
+privkeyfile="${metricsFolder}/priv_key"
 
 if [[ -f $privkeyfile ]]
-then 
+then
     echo "Privkey Existed from before:"
     pk=$(cat "$privkeyfile" | sed 's/^.//;s/.$//')
 	priv_key="$pk"
-else 
+else
     echo "No Privkey found, generating a new one"
     armiarma: enr gen-key
     priv_key=$__key
@@ -50,8 +50,6 @@ armiarma: sleep 4s
 
 armiarma: include random-connect.rumor
 
-armiarma: include prometheus.rumor
-
 error="$?"
 if [[ "$error" -ne "0" ]]
 then
@@ -66,15 +64,15 @@ echo "$timeRange minutes"
 # Check if a given execution time has been given
 if [[ -z "$timeRange" ]]
 then
-	echo "No time has been assigned" 
+	echo "No time has been assigned"
 	# Generate and endless loop to keep the Rumor script alive
 	while :
 	do
-		echo "Press [CTRL+C] to stop.." 
+		echo "Press [CTRL+C] to stop.."
 		sleep 15s
 	done
 else
-	echo "Running the crawler for $timeRange minutes" 
+	echo "Running the crawler for $timeRange minutes"
 	sleep "${timeRange}m"
 	exit 0
 fi

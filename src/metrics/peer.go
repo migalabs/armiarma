@@ -2,14 +2,14 @@ package metrics
 
 import (
 	"github.com/libp2p/go-libp2p-core/peer"
-	//"github.com/protolambda/rumor/metrics/export"
+	"github.com/protolambda/rumor/metrics/utils"
 	"strconv"
 	"fmt"
 )
 
 // Base Struct for the topic name and the received messages on the different topics
 // TODO: In the future we might reuse the Rumor struct and add the missing fields
-type PeerMetrics struct {
+type Peer struct {
 	PeerId     peer.ID
 	NodeId     string
 	UserAgent  string
@@ -32,12 +32,12 @@ type PeerMetrics struct {
 	ConnectionEvents []ConnectionEvents
 
 	TotConnections    int64
-	LastConn          int64 //(timestamp in seconds of the last exported time (backup for when we are loading the peermetrics)
+	LastConn          int64 //(timestamp in seconds of the last exported time (backup for when we are loading the Peer)
 	TotDisconnections int64
-	LastDisconn       int64 //(timestamp in seconds of the last exported time (backup for when we are loading the peermetrics)
+	LastDisconn       int64 //(timestamp in seconds of the last exported time (backup for when we are loading the Peer)
 	TotConnTime       int64
 	ConnFlag          bool  // Flag that points if the peer was connected (for re-loading purposes)
-	LastExport        int64 //(timestamp in seconds of the last exported time (backup for when we are loading the peermetrics)
+	LastExport        int64 //(timestamp in seconds of the last exported time (backup for when we are loading the Peer)
 
 	// Counters for the different topics
 	BeaconBlock          MessageMetrics
@@ -48,17 +48,17 @@ type PeerMetrics struct {
 	// Variables related to the SubNets (only needed for when Shards will be implemented)
 }
 
-func NewPeerMetrics(peerId peer.ID) PeerMetrics {
-	pm := PeerMetrics{
+func NewPeer(peerId peer.ID) Peer {
+	pm := Peer{
 		// TODO Check. What is the difference between Unknown and "" empty.
 		PeerId:     peerId,
 		NodeId:     "",
-		UserAgent: "Unknown", // TODO: why no just using ""
+		UserAgent:  "",
 		Pubkey:     "",
-		Addrs:      "/ip4/127.0.0.1/0000", // TODO: why not just using ""
-		Ip:         "127.0.0.1",
-		Country:    "Unknown",
-		City:       "Unknown",
+		Addrs:      "",
+		Ip:         "",
+		Country:    "",
+		City:       "",
 		Latency:    0,
 
 		Attempted: false,
@@ -89,7 +89,7 @@ func NewPeerMetrics(peerId peer.ID) PeerMetrics {
 	return pm
 }
 
-func (pm *PeerMetrics) ResetDynamicMetrics() {
+func (pm *Peer) ResetDynamicMetrics() {
 	pm.Attempts = 0
 	pm.ConnectionEvents = make([]ConnectionEvents, 0)
 	pm.BeaconBlock = NewMessageMetrics()
@@ -99,7 +99,7 @@ func (pm *PeerMetrics) ResetDynamicMetrics() {
 	pm.AttesterSlashing = NewMessageMetrics()
 }
 
-func (pm *PeerMetrics) GetAllMessagesCount() uint64 {
+func (pm *Peer) GetAllMessagesCount() uint64 {
 	return (pm.BeaconBlock.Cnt +
 		pm.BeaconAggregateProof.Cnt +
 		pm.VoluntaryExit.Cnt +
@@ -107,7 +107,21 @@ func (pm *PeerMetrics) GetAllMessagesCount() uint64 {
 		pm.ProposerSlashing.Cnt)
 }
 
-func (pm *PeerMetrics) ToCsvLine() string {
+// TODO: quick copy paste
+// filter the received Connection/Disconnection events generating a counter and the connected time
+func AnalyzeConnDisconnTime(pm *Peer, currentTime int64) (int64, int64, float64) {
+	var connTime int64
+	// Use the counters in the PeerMetrics to check if the peer is still connected
+	if pm.ConnFlag {
+		connTime = pm.TotConnTime + (currentTime - pm.LastConn)
+	} else {
+		connTime = pm.TotConnTime
+	}
+	pm.LastExport = currentTime
+	return pm.TotConnections, pm.TotDisconnections, float64(connTime) / 60000 // return the connection time in minutes ( / 60)
+}
+
+func (pm *Peer) ToCsvLine() string {
 	// TODO: Perhaps move the following three lines somewhere else
 	expTime := GetTimeMiliseconds()
 	connections, disconnections, connTime := AnalyzeConnDisconnTime(pm, expTime)
@@ -144,27 +158,27 @@ func (pm *PeerMetrics) ToCsvLine() string {
 
 }
 
-func (pm *PeerMetrics) LogPeerMetrics() {
+func (pm *Peer) LogPeer() {
 	// TODO
 }
 
-func (pm *PeerMetrics) GetClientType() string {
+func (pm *Peer) GetClientType() string {
 
 	// TODO: Rethink, just reusing this by now
-	client, _ := FilterClientType(pm.UserAgent)
+	client, _ := utils.FilterClientType(pm.UserAgent)
 
 	return client
 
 }
 
-func (pm *PeerMetrics) GetClientVersion() string {
+func (pm *Peer) GetClientVersion() string {
 	// TODO: Rethink, just reusing this by now
-	_, version := FilterClientType(pm.UserAgent)
+	_, version := utils.FilterClientType(pm.UserAgent)
 	return version
 
 }
 
-func (pm *PeerMetrics) GetClientOS() string {
+func (pm *Peer) GetClientOS() string {
 	return "TODO"
 
 }

@@ -6,17 +6,29 @@ import (
 	"fmt"
 )
 
-
 func Test_Clients(t *testing.T) {
-	fmt.Println("hj there")
-	require.Equal(t, 1, 1)
-	fmt.Println("hj there")
-
 	clients := NewClients()
 
-	clients.AddClientVersion("cl1", "ver1")
-	clients.AddClientVersion("cl1", "ver2")
-	clients.AddClientVersion("cl1", "ver2")
+	clients.AddClientVersion("prysm", "v1.0.0")
+	clients.AddClientVersion("prysm", "v1.0.0")
+	clients.AddClientVersion("prysm", "v1.0.0")
+	clients.AddClientVersion("prysm", "v1.0.0")
+	clients.AddClientVersion("prysm", "v1.0.1")
+	clients.AddClientVersion("prysm", "v1.0.1")
+	clients.AddClientVersion("prysm", "v1.0.0")
+	clients.AddClientVersion("lighthouse", "v1.0.0")
+	clients.AddClientVersion("lighthouse", "v1.0.0")
+	clients.AddClientVersion("lighthouse", "v1.0.0")
+	clients.AddClientVersion("lighthouse", "v2.0.0")
+	clients.AddClientVersion("lighthouse", "v2.0.0")
+	clients.AddClientVersion("lighthouse", "v1.0.0")
+	clients.AddClientVersion("lighthouse", "v2.0.0")
+	clients.AddClientVersion("lighthouse", "v3.0.0")
 
-	fmt.Println("asd", clients.Clients)
+  require.Equal(t, clients.GetPeersOfClient("prysm"), 7)
+	require.Equal(t, clients.GetPeersOfClient("lighthouse"), 8)
+	require.Equal(t, len(clients.GetClientNames()), 2)
+
+	require.Equal(t, len(clients.Clients["prysm"]), 2)
+	require.Equal(t, len(clients.Clients["lighthouse"]), 3)
 }

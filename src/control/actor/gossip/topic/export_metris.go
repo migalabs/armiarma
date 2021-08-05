@@ -10,12 +10,15 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/host"
+	//"github.com/libp2p/go-libp2p-core/host"
 	"github.com/protolambda/rumor/control/actor/base"
 	"github.com/protolambda/rumor/metrics"
-	"github.com/protolambda/rumor/metrics/custom"
 	"github.com/protolambda/rumor/p2p/track"
+	"github.com/protolambda/rumor/metrics/prometheus"
+	log "github.com/sirupsen/logrus"
 )
+
+// TODO: This will be shared by both armiarma-client and server, so move to /metrics
 
 type TopicExportMetricsCmd struct {
 	*base.Base
@@ -33,7 +36,7 @@ type TopicExportMetricsCmd struct {
 
 func (c *TopicExportMetricsCmd) Defaul() {
 	c.ExportPeriod = 24 * time.Hour
-	c.BackupPeriod = 30 * time.Minute
+	c.BackupPeriod = 10 * time.Second
 	c.RawFilePath = "gossip-metrics.json"
 	c.CustomMetricsPath = "custom-metrics.json"
 	c.PeerstorePath = "peerstore.json"
@@ -48,8 +51,17 @@ func (c *TopicExportMetricsCmd) Run(ctx context.Context, args ...string) error {
 	if c.GossipState.GsNode == nil {
 		return NoGossipErr
 	}
+
+	// TODO: Placing this here as a quick solution. Dont know where to access PeerMetrics
+	log.Info("Starting prometheus")
+	prometheusRunner := prometheus.NewPrometheusRunner(c.GossipMetrics)
+	err := prometheusRunner.Run(context.Background())
+	if err != nil {
+		fmt.Println("TODO Error starting prometheus")
+	}
+
 	// Generate the custom Metrics to export in Json at end of execution
-	customMetrics := custom.NewCustomMetrics()
+	//customMetrics := custom.NewCustomMetrics()
 	c.Log.Info("Checking for existing Metrics on Project ...")
 	// Check if Previous GossipMetrics were generated
 	err, fileExists := c.GossipMetrics.ImportMetrics(c.MetricsFolderPath)
@@ -72,8 +84,9 @@ func (c *TopicExportMetricsCmd) Run(ctx context.Context, args ...string) error {
 			if stopping {
 				_ = c.GossipMetrics.ExportMetrics(c.RawFilePath, c.PeerstorePath, c.CsvPath, c.Store)
 				c.Log.Infof("Metrics Export Stopped")
-				h, _ := c.Host()
+				//h, _ := c.Host()
 				// Exporting the CustomMetrics for last time (still don't know which is the best place where to put this call)
+				/*
 				err := FilCustomMetrics(c.GossipMetrics, c.Store, &customMetrics, h)
 				if err != nil {
 					fmt.Println(err)
@@ -84,13 +97,18 @@ func (c *TopicExportMetricsCmd) Run(ctx context.Context, args ...string) error {
 				if err != nil {
 					fmt.Println(err)
 					return
-				}
+				}*/
 				return
 			}
 
 			start := time.Now()
 			c.Log.Infof("Backup Export of the Metrics")
-			c.ExportSecuence(t, &customMetrics)
+			//c.ExportSecuence(t, &customMetrics)
+			c.GossipMetrics.FillMetrics(c.Store)
+			err := c.GossipMetrics.ExportMetrics(c.RawFilePath, c.PeerstorePath, c.CsvPath, c.Store)
+			if err != nil {
+				fmt.Println("ERROR TODO:")
+			}
 
 			// Check Backup period to wait for next round
 			exportStepDuration := time.Since(start)
@@ -106,7 +124,7 @@ func (c *TopicExportMetricsCmd) Run(ctx context.Context, args ...string) error {
 				c.Log.Infof("Exporting Metrics changing to Folder")
 				t = time.Now()
 				c.UpdateFilesAndFolders(t)
-				c.ExportSecuence(t, &customMetrics)
+				//c.ExportSecuence(t, &customMetrics)
 				c.GossipMetrics.ResetDynamicMetrics()
 				// Force Memmory Free from the Garbage Collector
 				debug.FreeOSMemory()
@@ -123,7 +141,8 @@ func (c *TopicExportMetricsCmd) Run(ctx context.Context, args ...string) error {
 }
 
 // fulfil the info from the Custom Metrics
-func FilCustomMetrics(gm *metrics.GossipMetrics, ps track.ExtendedPeerstore, cm *custom.CustomMetrics, h host.Host) error {
+
+//func FilCustomMetrics(gm *metrics.GossipMetrics, ps track.ExtendedPeerstore, cm *custom.CustomMetrics, h host.Host) error {
 	// Get total peers in peerstore
 	//peerstoreLen := custom.TotalPeers(h)
 	// get the connection status for each of the peers in the extra-metrics
@@ -208,8 +227,8 @@ func FilCustomMetrics(gm *metrics.GossipMetrics, ps track.ExtendedPeerstore, cm 
 	cm.PeerStore.MetadataRequested.Unknown = mtunk
 	*/
 
-	return nil
-}
+//	return nil
+//}
 
 func (c *TopicExportMetricsCmd) UpdateFilesAndFolders(t time.Time) {
 	year := strconv.Itoa(t.Year())
@@ -251,6 +270,7 @@ func (c *TopicExportMetricsCmd) UpdateFilesAndFolders(t time.Time) {
 	}
 }
 
+/*
 func (c *TopicExportMetricsCmd) ExportSecuence(start time.Time, cm *custom.CustomMetrics) {
 	// Export The metrics
 	fmt.Println("exporting metrics")
@@ -275,7 +295,7 @@ func (c *TopicExportMetricsCmd) ExportSecuence(start time.Time, cm *custom.Custo
 	if err != nil {
 		c.Log.Warn(err)
 	}
-}
+}*/
 
 // Function that writes in a file the folder name of the last checkpoint generated in the project
 // DOUBT: Write path relative or absolute? dunno
