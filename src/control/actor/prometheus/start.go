@@ -12,6 +12,7 @@ import (
 	"github.com/protolambda/rumor/control/actor/base"
 	"github.com/protolambda/rumor/metrics"
 	"github.com/protolambda/rumor/metrics/utils"
+	"github.com/protolambda/rumor/metrics/export"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -27,6 +28,13 @@ var (
 		Help:      "Number of peers from each of the clients observed",
 	},
 		[]string{"client"},
+	)
+	clientVersionistribution = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "crawler",
+		Name: "observed_client_version_distribution",
+		Help: "Number of peers from each of the clients versions observed",
+	},
+		[]string{"client_version"},
 	)
 	geoDistribution = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "crawler",
@@ -104,6 +112,7 @@ func (c *PrometheusStartCmd) Run(ctx context.Context, args ...string) error {
 
 	// Register the metrics in the prometheus exporter
 	prometheus.MustRegister(clientDistribution)
+	prometheus.MustRegister(clientVersionistribution)
 	prometheus.MustRegister(connectedPeers)
 	prometheus.MustRegister(receivedTotalMessages)
 	prometheus.MustRegister(receivedMessages)
@@ -166,6 +175,7 @@ func (c *PrometheusStartCmd) Run(ctx context.Context, args ...string) error {
 			}
 			peers := h.Network().Peers()
 			conPeers = float64(len(peers))
+			clientVerDist := make(map[string]float64)
 			geoDist := make(map[string]float64)
 			rttDist := make(map[string]float64)
 			tctDist := make(map[string]float64)
@@ -191,8 +201,17 @@ func (c *PrometheusStartCmd) Run(ctx context.Context, args ...string) error {
 						unk += 1
 					}
 				}
+				// Client Version Distribution
+				client, version := export.FilterClientType(p.ClientType)
+				clientVer := fmt.Sprintf("%v_%v",client,version)
+				_, ok := clientVerDist[clientVer]
+				if ok {
+					clientVerDist[clientVer] += 1
+				} else {
+					clientVerDist[clientVer] = 1
+				}
 				// Generate the Country Code distribution
-				_, ok := geoDist[p.CountryCode]
+				_, ok = geoDist[p.CountryCode]
 				if ok {
 					geoDist[p.CountryCode] += 1
 				} else {
@@ -241,6 +260,10 @@ func (c *PrometheusStartCmd) Run(ctx context.Context, args ...string) error {
 			clientDistribution.WithLabelValues("prysm").Set(pry)
 			clientDistribution.WithLabelValues("lodestar").Set(lod)
 			clientDistribution.WithLabelValues("unknown").Set(unk)
+			// Client Version distribution
+			for k, v := range clientVerDist{
+				clientVersionistribution.WithLabelValues(k).Set(v)
+			}
 			// Country distribution
 			for k, v := range geoDist {
 				geoDistribution.WithLabelValues(k).Set(v)
