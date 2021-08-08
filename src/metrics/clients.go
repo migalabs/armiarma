@@ -43,7 +43,7 @@ func (c *Clients) GetClientNames() []string {
 	return clientNames
 }
 
-func (c *Clients) GetPeersOfClient(clientName string) int {
+func (c *Clients) GetCountOfClient(clientName string) int {
 	total := 0
 	for _, v := range c.Clients[clientName] {
 		total += v.Count

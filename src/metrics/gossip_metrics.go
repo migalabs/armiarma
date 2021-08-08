@@ -212,6 +212,10 @@ func (c *GossipMetrics) FillMetrics(ep track.ExtendedPeerstore) {
 
 			if len(Peer.UserAgent) == 0 {
 				Peer.UserAgent = peerData.UserAgent
+				client, version := utils.FilterClientType(Peer.UserAgent)
+				// OperatingSystem TODO:
+				Peer.ClientName = client
+				Peer.ClientVersion = version
 			}
 
 			if len(Peer.Pubkey) == 0 {
@@ -322,7 +326,6 @@ func (c *GossipMetrics) ExportToCSV(filePath string) error {
 func (c *GossipMetrics) AddNewPeer(peerId peer.ID) bool {
 	_, ok := c.GossipMetrics.Load(peerId)
 	if !ok {
-		fmt.Println("new peer was added")
 		// We will just add the info that we have (the peerId)
 		Peer := NewPeer(peerId)
 		// Include it to the Peer DB

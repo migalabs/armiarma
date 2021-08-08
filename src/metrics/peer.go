@@ -2,7 +2,6 @@ package metrics
 
 import (
 	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/protolambda/rumor/metrics/utils"
 	"strconv"
 	"fmt"
 )
@@ -13,6 +12,9 @@ type Peer struct {
 	PeerId     peer.ID
 	NodeId     string
 	UserAgent  string
+	ClientName string
+	ClientOS   string //TODO:
+	ClientVersion    string
 	Pubkey     string
 	Addrs      string
 	Ip         string
@@ -129,8 +131,8 @@ func (pm *Peer) ToCsvLine() string {
 	csvRow := pm.PeerId.String() + "," +
 		pm.NodeId + "," +
 		pm.UserAgent + "," +
-		pm.GetClientType() + "," +
-		pm.GetClientVersion() + "," +
+		pm.ClientName + "," +
+		pm.ClientVersion + "," +
 		pm.Pubkey + "," +
 		pm.Addrs + "," +
 		pm.Ip + "," +
@@ -160,25 +162,4 @@ func (pm *Peer) ToCsvLine() string {
 
 func (pm *Peer) LogPeer() {
 	// TODO
-}
-
-func (pm *Peer) GetClientType() string {
-
-	// TODO: Rethink, just reusing this by now
-	client, _ := utils.FilterClientType(pm.UserAgent)
-
-	return client
-
-}
-
-func (pm *Peer) GetClientVersion() string {
-	// TODO: Rethink, just reusing this by now
-	_, version := utils.FilterClientType(pm.UserAgent)
-	return version
-
-}
-
-func (pm *Peer) GetClientOS() string {
-	return "TODO"
-
 }

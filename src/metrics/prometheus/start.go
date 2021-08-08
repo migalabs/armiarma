@@ -45,13 +45,32 @@ func (c *PrometheusRunner) Run(ctx context.Context) error {
 	prometheus.MustRegister(totPeers)
 	prometheus.MustRegister(geoDistribution)
 
+	log.Info("debug, done registering")
+
 	go func() {
 		for {
 
+			clients := metrics.NewClients()
+
 			// TODO: Use the Gossip Metrics to populate the metrics
 			c.GossipMetrics.GossipMetrics.Range(func(k, val interface{}) bool {
-				v := val.(metrics.Peer)
-				log.Info(v.ToCsvLine())
+				peerData := val.(metrics.Peer)
+				//log.Info(v.ToCsvLine())
+
+				// TODO: Rethink this criteria
+				if (peerData.ClientName != "Unknown" && peerData.ClientName != "") {
+					clients.AddClientVersion(peerData.ClientName, peerData.ClientVersion)
+				}
+
+				for _, clientName := range clients.GetClientNames() {
+					count := clients.GetCountOfClient(clientName)
+					log.Info("found clients: ", clientName, " ", count)
+					clientDistribution.WithLabelValues(clientName).Set(float64(count))
+				}
+
+				log.Info(clients)
+
+
 				return true
 			})
 
