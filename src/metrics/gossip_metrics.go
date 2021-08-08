@@ -265,7 +265,6 @@ func (c *GossipMetrics) FillMetrics(ep track.ExtendedPeerstore) {
 func (c *GossipMetrics) ExportMetrics(filePath string, peerstorePath string, csvPath string, ep track.ExtendedPeerstore) error {
 	// Generate the MetricsDataFrame of the Current Metrics
 	// Export the metrics to the given CSV file
-	fmt.Println("---- exporting metrics")
 	err := c.ExportToCSV(csvPath)
 	if err != nil {
 		fmt.Println("Error:", err)

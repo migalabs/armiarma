@@ -13,8 +13,8 @@ import (
 	//"github.com/libp2p/go-libp2p-core/host"
 	"github.com/protolambda/rumor/control/actor/base"
 	"github.com/protolambda/rumor/metrics"
-	"github.com/protolambda/rumor/p2p/track"
 	"github.com/protolambda/rumor/metrics/prometheus"
+	"github.com/protolambda/rumor/p2p/track"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -52,12 +52,11 @@ func (c *TopicExportMetricsCmd) Run(ctx context.Context, args ...string) error {
 		return NoGossipErr
 	}
 
-	// TODO: Placing this here as a quick solution. Dont know where to access PeerMetrics
-	log.Info("Starting prometheus")
+	// TODO: Placing this here as a quick solution.
 	prometheusRunner := prometheus.NewPrometheusRunner(c.GossipMetrics)
 	err := prometheusRunner.Run(context.Background())
 	if err != nil {
-		fmt.Println("TODO Error starting prometheus")
+		log.Fatal("TODO Error starting prometheus")
 	}
 
 	// Generate the custom Metrics to export in Json at end of execution
@@ -87,17 +86,17 @@ func (c *TopicExportMetricsCmd) Run(ctx context.Context, args ...string) error {
 				//h, _ := c.Host()
 				// Exporting the CustomMetrics for last time (still don't know which is the best place where to put this call)
 				/*
-				err := FilCustomMetrics(c.GossipMetrics, c.Store, &customMetrics, h)
-				if err != nil {
-					fmt.Println(err)
-					return
-				}
-				// export the CustomMetrics into a json
-				err = customMetrics.ExportJson(c.CustomMetricsPath)
-				if err != nil {
-					fmt.Println(err)
-					return
-				}*/
+					err := FilCustomMetrics(c.GossipMetrics, c.Store, &customMetrics, h)
+					if err != nil {
+						fmt.Println(err)
+						return
+					}
+					// export the CustomMetrics into a json
+					err = customMetrics.ExportJson(c.CustomMetricsPath)
+					if err != nil {
+						fmt.Println(err)
+						return
+					}*/
 				return
 			}
 
@@ -143,19 +142,19 @@ func (c *TopicExportMetricsCmd) Run(ctx context.Context, args ...string) error {
 // fulfil the info from the Custom Metrics
 
 //func FilCustomMetrics(gm *metrics.GossipMetrics, ps track.ExtendedPeerstore, cm *custom.CustomMetrics, h host.Host) error {
-	// Get total peers in peerstore
-	//peerstoreLen := custom.TotalPeers(h)
-	// get the connection status for each of the peers in the extra-metrics
-	//succeed, failed, notattempted := gm.GetConnectionMetrics(h)
-	// Analyze the reported error by the connection attempts
-	//resetbypeer, timeout, dialtoself, dialbackoff, uncertain := gm.GetErrorCounter(h)
-	// Filter peers on peerstore by port
-	//x, y, z := custom.GetPeersWithPorts(h, ps)
-	// Generate the MetricsDataFrame of the Current Metrics
-	//mdf := export.NewMetricsDataFrame(&gm.GossipMetrics)
+// Get total peers in peerstore
+//peerstoreLen := custom.TotalPeers(h)
+// get the connection status for each of the peers in the extra-metrics
+//succeed, failed, notattempted := gm.GetConnectionMetrics(h)
+// Analyze the reported error by the connection attempts
+//resetbypeer, timeout, dialtoself, dialbackoff, uncertain := gm.GetErrorCounter(h)
+// Filter peers on peerstore by port
+//x, y, z := custom.GetPeersWithPorts(h, ps)
+// Generate the MetricsDataFrame of the Current Metrics
+//mdf := export.NewMetricsDataFrame(&gm.GossipMetrics)
 
-	//_ = mdf
-	/*
+//_ = mdf
+/*
 	lig := mdf.AnalyzeClientType("Lighthouse")
 	tek := mdf.AnalyzeClientType("Teku")
 	nim := mdf.AnalyzeClientType("Nimbus")
@@ -171,9 +170,8 @@ func (c *TopicExportMetricsCmd) Run(ctx context.Context, args ...string) error {
 	unk := custom.NewClient()
 */
 
-
-	// read client versions from Metrics
-	/*
+// read client versions from Metrics
+/*
 	cm.PeerStore.SetTotal(peerstoreLen)
 	cm.PeerStore.SetPort13000(x)
 	cm.PeerStore.SetPort9000(y)
@@ -186,8 +184,8 @@ func (c *TopicExportMetricsCmd) Run(ctx context.Context, args ...string) error {
 	cm.PeerStore.ConnectionFailed.SetDialBackOff(dialbackoff)
 	cm.PeerStore.ConnectionFailed.SetUncertain(uncertain)*/
 
-	// fill the CustomMetrics with the readed information
-	/*
+// fill the CustomMetrics with the readed information
+/*
 	cm.PeerStore.ConnectionSucceed.SetTotal(succeed)
 	cm.PeerStore.ConnectionSucceed.Lighthouse = lig
 	cm.PeerStore.ConnectionSucceed.Teku = tek
@@ -196,15 +194,15 @@ func (c *TopicExportMetricsCmd) Run(ctx context.Context, args ...string) error {
 	cm.PeerStore.ConnectionSucceed.Lodestar = lod
 	cm.PeerStore.ConnectionSucceed.Unknown = unk*/
 
-	// fill the json with client distribution from those peers we got the metadata request from
-	/*
+// fill the json with client distribution from those peers we got the metadata request from
+/*
 	mtlig := mdf.AnalyzeClientTypeIfMetadataRequested("Lighthouse")
 	mttek := mdf.AnalyzeClientTypeIfMetadataRequested("Teku")
 	mtnim := mdf.AnalyzeClientTypeIfMetadataRequested("Nimbus")
 	mtpry := mdf.AnalyzeClientTypeIfMetadataRequested("Prysm")
 	mtlod := mdf.AnalyzeClientTypeIfMetadataRequested("Lodestar")
 	mtunk := mdf.AnalyzeClientTypeIfMetadataRequested("Unknown")
-	*/
+*/
 /*
 	mtlig := custom.NewClient()
 	mttek := custom.NewClient()
@@ -225,7 +223,7 @@ func (c *TopicExportMetricsCmd) Run(ctx context.Context, args ...string) error {
 	cm.PeerStore.MetadataRequested.Prysm = mtpry
 	cm.PeerStore.MetadataRequested.Lodestar = mtlod
 	cm.PeerStore.MetadataRequested.Unknown = mtunk
-	*/
+*/
 
 //	return nil
 //}
