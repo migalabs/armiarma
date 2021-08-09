@@ -12,7 +12,7 @@ import (
 type TopicCmd struct {
 	*base.Base
 	GossipState   *metrics.GossipState
-	GossipMetrics *metrics.GossipMetrics
+	PeerStore *metrics.PeerStore
 	Store         track.ExtendedPeerstore
 }
 
@@ -26,17 +26,17 @@ func (c *TopicCmd) Cmd(route string) (cmd interface{}, err error) {
 	case "events":
 		cmd = &TopicEventsCmd{Base: c.Base, GossipState: c.GossipState, Store: c.Store}
 	case "join":
-		cmd = &TopicJoinCmd{Base: c.Base, GossipState: c.GossipState, GossipMetrics: c.GossipMetrics}
+		cmd = &TopicJoinCmd{Base: c.Base, GossipState: c.GossipState, PeerStore: c.PeerStore}
 	case "list-peers":
 		cmd = &TopicListPeersCmd{Base: c.Base, GossipState: c.GossipState}
 	case "leave":
 		cmd = &TopicLeaveCmd{Base: c.Base, GossipState: c.GossipState}
 	case "log":
-		cmd = &TopicLogCmd{Base: c.Base, GossipState: c.GossipState, GossipMetrics: c.GossipMetrics}
+		cmd = &TopicLogCmd{Base: c.Base, GossipState: c.GossipState, PeerStore: c.PeerStore}
 	case "publish":
 		cmd = &TopicPublishCmd{Base: c.Base, GossipState: c.GossipState}
 	case "export-metrics":
-		cmd = &TopicExportMetricsCmd{Base: c.Base, GossipState: c.GossipState, Store: c.Store, GossipMetrics: c.GossipMetrics}
+		cmd = &TopicExportMetricsCmd{Base: c.Base, GossipState: c.GossipState, Store: c.Store, PeerStore: c.PeerStore}
 	default:
 		return nil, ask.UnrecognizedErr
 	}

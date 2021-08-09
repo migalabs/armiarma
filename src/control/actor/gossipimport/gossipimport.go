@@ -23,7 +23,7 @@ import (
 type GossipImportCmd struct {
 	*base.Base
 
-	GossipMetrics   *metrics.GossipMetrics
+	PeerStore   *metrics.PeerStore
 	VisualizerState *visualizer.VisualizerState
 	*pstatus.PeerStatusState
 
@@ -57,7 +57,7 @@ func (c *GossipImportCmd) Default() {
 func (c *GossipImportCmd) Run(ctx context.Context, args ...string) error {
 
 	// Check if the Message DB has been initialized
-	if c.GossipMetrics.MessageDatabase != nil {
+	if c.PeerStore.MessageDatabase != nil {
 		// change directory to the Project folder (maybe it will solve the error of Path)
 		err := os.Chdir(c.ProjectPath)
 		if err != nil {
@@ -66,15 +66,15 @@ func (c *GossipImportCmd) Run(ctx context.Context, args ...string) error {
 		}
 		// Generate the DBIDs for the block and state DB
 		// If there is a notification channel, we generate a DB for the Blocks and for the States
-		blockDB, err := c.BlocksDB.Create(c.BName, c.DBPath, c.GossipMetrics.MessageDatabase.Spec)
+		blockDB, err := c.BlocksDB.Create(c.BName, c.DBPath, c.PeerStore.MessageDatabase.Spec)
 		if err != nil {
 			c.Log.WithError(err).Error("Error creating BlockDB.")
 			return err
 		}
 		c.BlockDBState.CurrentDB = c.BName
 		// Currently StatesDB doesn't accept any kind of disk datbase
-		//        stateDB, err := c.StatesDB.Create(c.SName, "", c.GossipMetrics.MessageDatabase.Spec)
-		_, err = c.StatesDB.Create(c.SName, "", c.GossipMetrics.MessageDatabase.Spec)
+		//        stateDB, err := c.StatesDB.Create(c.SName, "", c.PeerStore.MessageDatabase.Spec)
+		_, err = c.StatesDB.Create(c.SName, "", c.PeerStore.MessageDatabase.Spec)
 		if err != nil {
 			return err
 		}
@@ -87,7 +87,7 @@ func (c *GossipImportCmd) Run(ctx context.Context, args ...string) error {
 			c.Log.Infof("Gossip Import has been launched. Beacon Blocks and Beacons States will be imported from the Gossip Messages on: %s", c.DBPath)
 			for {
 				select {
-				case newBlock := <-c.GossipMetrics.MessageDatabase.BlockNotChan:
+				case newBlock := <-c.PeerStore.MessageDatabase.BlockNotChan:
 					// Check if the incoming New Block is an empty
 					if newBlock != nil {
 						c.Log.WithError(err).Warn("Error Reading the message from the notification channel - empty struct ")
@@ -102,7 +102,7 @@ func (c *GossipImportCmd) Run(ctx context.Context, args ...string) error {
 							continue
 						}
 						// Store the BeaconBlock to the DB, (Maybe the Store thingy might be implemented)
-						blockWRoot := bdb.WithRoot(c.GossipMetrics.MessageDatabase.Spec, newBlock)
+						blockWRoot := bdb.WithRoot(c.PeerStore.MessageDatabase.Spec, newBlock)
 						// we dont mind if the block already exists
 						_, err = blockDB.Store(ctx, blockWRoot)
 						if err != nil {
@@ -140,10 +140,10 @@ func (c *GossipImportCmd) Run(ctx context.Context, args ...string) error {
 							//								continue
 							//							}
 							// generate a new hot entry to create a chain
-							hotEntry, err := GenerateNewHotEntry(bStateView, c.GossipMetrics.MessageDatabase.Spec)
+							hotEntry, err := GenerateNewHotEntry(bStateView, c.PeerStore.MessageDatabase.Spec)
 							_ = currentChain
 							fmt.Println("Creating New Chain")
-							_, err = c.Chains.Create(c.CName, hotEntry, c.GossipMetrics.MessageDatabase.Spec)
+							_, err = c.Chains.Create(c.CName, hotEntry, c.PeerStore.MessageDatabase.Spec)
 							if err != nil {
 								c.Log.WithError(err).Warn("Error Creating a new chain")
 								continue

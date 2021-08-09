@@ -1,4 +1,4 @@
-package metrics
+package host
 
 import (
 	"context"
@@ -10,13 +10,12 @@ import (
 	"github.com/protolambda/rumor/control/actor/peer/metadata"
 	"github.com/protolambda/rumor/p2p/rpc/reqresp"
 	"github.com/protolambda/rumor/p2p/track"
+	"github.com/protolambda/rumor/metrics"
 )
 
 var timeout time.Duration = 5 * time.Second
 
-// TODO: Move this out of metrics?
-
-func PollPeerMetadata(p peer.ID, base *base.Base, peerMetadataState *metadata.PeerMetadataState, store track.ExtendedPeerstore, gm *GossipMetrics) {
+func PollPeerMetadata(p peer.ID, base *base.Base, peerMetadataState *metadata.PeerMetadataState, store track.ExtendedPeerstore, gm *metrics.PeerStore) {
 	// apply timeout to each poll target in this round
 	reqCtx, _ := context.WithTimeout(context.Background(), timeout)
 

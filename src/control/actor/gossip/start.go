@@ -12,7 +12,7 @@ import (
 type GossipStartCmd struct {
 	*base.Base
 	*metrics.GossipState
-	*metrics.GossipMetrics
+	*metrics.PeerStore
 
 	SeenFilter bool `ask:"--seen-filter" help:"Enable or Disable the Received Message Validation (Default: True)"`
 }

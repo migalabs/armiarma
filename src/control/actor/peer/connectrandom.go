@@ -18,7 +18,7 @@ import (
 type PeerConnectRandomCmd struct {
 	*base.Base
 	Store         track.ExtendedPeerstore
-	GossipMetrics *metrics.GossipMetrics
+	PeerStore *metrics.PeerStore
 	Timeout       time.Duration `ask:"--timeout" help:"connection timeout, 0 to disable"`
 	Rescan        time.Duration `ask:"--rescan" help:"rescan the peerscore for new peers to connect with this given interval"`
 	MaxRetries    int           `ask:"--max-retries" help:"how many connection attempts until the peer is banned"`
@@ -105,7 +105,7 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host, store track
 			for tgap < c.Rescan {
 				p := randomPeer(peerList)
 				// loop until we arrive to a peer that we didn't connect before
-				_ = c.GossipMetrics.AddNewPeer(p)
+				_ = c.PeerStore.AddNewPeer(p)
 				_, ok := peerCache[p]
 				if ok {
 					if len(peerCache) == peerstoreLen {
@@ -138,12 +138,12 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host, store track
 					if err := h.Connect(ctx, addrInfo); err != nil {
 						// the connetion failed
 						attempts += 1
-						c.GossipMetrics.AddNewConnectionAttempt(p, false, err.Error())
+						c.PeerStore.AddNewConnectionAttempt(p, false, err.Error())
 						c.Log.WithError(err).Warnf("attempts %d failed connection attempt", attempts)
 						continue
 					} else { // connection successfuly made
 						c.Log.Infof("peer_id %s successful connection made", p)
-						c.GossipMetrics.AddNewConnectionAttempt(p, true, "None")
+						c.PeerStore.AddNewConnectionAttempt(p, true, "None")
 						// break the loop
 						break
 					}

@@ -22,7 +22,7 @@ import (
 
 type TopicExportMetricsCmd struct {
 	*base.Base
-	GossipMetrics     *metrics.GossipMetrics
+	PeerStore     *metrics.PeerStore
 	GossipState       *metrics.GossipState
 	Store             track.ExtendedPeerstore
 	ExportPeriod      time.Duration `ask:"--export-period" help:"Requets the frecuency in witch the Metrics will be exported to the files"`
@@ -53,7 +53,7 @@ func (c *TopicExportMetricsCmd) Run(ctx context.Context, args ...string) error {
 	}
 
 	// TODO: Placing this here as a quick solution.
-	prometheusRunner := prometheus.NewPrometheusRunner(c.GossipMetrics)
+	prometheusRunner := prometheus.NewPrometheusRunner(c.PeerStore)
 	err := prometheusRunner.Run(context.Background())
 	if err != nil {
 		log.Fatal("TODO Error starting prometheus")
@@ -62,8 +62,8 @@ func (c *TopicExportMetricsCmd) Run(ctx context.Context, args ...string) error {
 	// Generate the custom Metrics to export in Json at end of execution
 	//customMetrics := custom.NewCustomMetrics()
 	c.Log.Info("Checking for existing Metrics on Project ...")
-	// Check if Previous GossipMetrics were generated
-	err, fileExists := c.GossipMetrics.ImportMetrics(c.MetricsFolderPath)
+	// Check if Previous PeerStore were generated
+	err, fileExists := c.PeerStore.ImportMetrics(c.MetricsFolderPath)
 	if fileExists && err != nil {
 		c.Log.Error("Error Importing the metrics from the previous file", err)
 	}
@@ -81,12 +81,12 @@ func (c *TopicExportMetricsCmd) Run(ctx context.Context, args ...string) error {
 		// loop to export the metrics every Backup and Period time
 		for {
 			if stopping {
-				_ = c.GossipMetrics.ExportMetrics(c.RawFilePath, c.PeerstorePath, c.CsvPath, c.Store)
+				_ = c.PeerStore.ExportMetrics(c.RawFilePath, c.PeerstorePath, c.CsvPath, c.Store)
 				c.Log.Infof("Metrics Export Stopped")
 				//h, _ := c.Host()
 				// Exporting the CustomMetrics for last time (still don't know which is the best place where to put this call)
 				/*
-					err := FilCustomMetrics(c.GossipMetrics, c.Store, &customMetrics, h)
+					err := FilCustomMetrics(c.PeerStore, c.Store, &customMetrics, h)
 					if err != nil {
 						fmt.Println(err)
 						return
@@ -103,8 +103,8 @@ func (c *TopicExportMetricsCmd) Run(ctx context.Context, args ...string) error {
 			start := time.Now()
 			c.Log.Infof("Backup Export of the Metrics")
 			//c.ExportSecuence(t, &customMetrics)
-			c.GossipMetrics.FillMetrics(c.Store)
-			err := c.GossipMetrics.ExportMetrics(c.RawFilePath, c.PeerstorePath, c.CsvPath, c.Store)
+			c.PeerStore.FillMetrics(c.Store)
+			err := c.PeerStore.ExportMetrics(c.RawFilePath, c.PeerstorePath, c.CsvPath, c.Store)
 			if err != nil {
 				fmt.Println("ERROR TODO:")
 			}
@@ -124,7 +124,7 @@ func (c *TopicExportMetricsCmd) Run(ctx context.Context, args ...string) error {
 				t = time.Now()
 				c.UpdateFilesAndFolders(t)
 				//c.ExportSecuence(t, &customMetrics)
-				c.GossipMetrics.ResetDynamicMetrics()
+				c.PeerStore.ResetDynamicMetrics()
 				// Force Memmory Free from the Garbage Collector
 				debug.FreeOSMemory()
 			}
@@ -141,7 +141,7 @@ func (c *TopicExportMetricsCmd) Run(ctx context.Context, args ...string) error {
 
 // fulfil the info from the Custom Metrics
 
-//func FilCustomMetrics(gm *metrics.GossipMetrics, ps track.ExtendedPeerstore, cm *custom.CustomMetrics, h host.Host) error {
+//func FilCustomMetrics(gm *metrics.PeerStore, ps track.ExtendedPeerstore, cm *custom.CustomMetrics, h host.Host) error {
 // Get total peers in peerstore
 //peerstoreLen := custom.TotalPeers(h)
 // get the connection status for each of the peers in the extra-metrics
@@ -151,7 +151,7 @@ func (c *TopicExportMetricsCmd) Run(ctx context.Context, args ...string) error {
 // Filter peers on peerstore by port
 //x, y, z := custom.GetPeersWithPorts(h, ps)
 // Generate the MetricsDataFrame of the Current Metrics
-//mdf := export.NewMetricsDataFrame(&gm.GossipMetrics)
+//mdf := export.NewMetricsDataFrame(&gm.PeerStore)
 
 //_ = mdf
 /*
@@ -272,8 +272,8 @@ func (c *TopicExportMetricsCmd) UpdateFilesAndFolders(t time.Time) {
 func (c *TopicExportMetricsCmd) ExportSecuence(start time.Time, cm *custom.CustomMetrics) {
 	// Export The metrics
 	fmt.Println("exporting metrics")
-	c.GossipMetrics.FillMetrics(c.Store)
-	err := c.GossipMetrics.ExportMetrics(c.RawFilePath, c.PeerstorePath, c.CsvPath, c.Store)
+	c.PeerStore.FillMetrics(c.Store)
+	err := c.PeerStore.ExportMetrics(c.RawFilePath, c.PeerstorePath, c.CsvPath, c.Store)
 	if err != nil {
 		c.Log.Infof("Problems exporting the Metrics to the given file path")
 	} else {
@@ -284,7 +284,7 @@ func (c *TopicExportMetricsCmd) ExportSecuence(start time.Time, cm *custom.Custo
 	// Export the Custom metrics
 	h, _ := c.Host()
 	// Exporting the CustomMetrics for last time (still don't know which is the best place where to put this call)
-	err = FilCustomMetrics(c.GossipMetrics, c.Store, cm, h)
+	err = FilCustomMetrics(c.PeerStore, c.Store, cm, h)
 	if err != nil {
 		c.Log.Warn(err)
 	}

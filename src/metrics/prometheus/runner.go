@@ -15,16 +15,16 @@ import (
 )
 
 type PrometheusRunner struct {
-	GossipMetrics *metrics.GossipMetrics
+	PeerStore *metrics.PeerStore
 
 	ExposePort      string
 	EndpointUrl     string
 	RefreshInterval time.Duration
 }
 
-func NewPrometheusRunner(gm *metrics.GossipMetrics) PrometheusRunner {
+func NewPrometheusRunner(gm *metrics.PeerStore) PrometheusRunner {
 	return PrometheusRunner {
-		GossipMetrics: gm,
+		PeerStore: gm,
 		ExposePort: "9080",
 		EndpointUrl: "metrics",
 		RefreshInterval: 10 * time.Second,
@@ -51,7 +51,7 @@ func (c *PrometheusRunner) Run(ctx context.Context) error {
 			nOfDiscoveredPeers := 0
 			geoDist := make(map[string]float64)
 
-			c.GossipMetrics.GossipMetrics.Range(func(k, val interface{}) bool {
+			c.PeerStore.PeerStore.Range(func(k, val interface{}) bool {
 				peerData := val.(metrics.Peer)
 
 				// TODO: Rethink this criteria

@@ -16,7 +16,7 @@ import (
 
 type HostNotifyCmd struct {
 	*base.Base
-	*metrics.GossipMetrics
+	*metrics.PeerStore
 	*metadata.PeerMetadataState
 	Store track.ExtendedPeerstore
 }
@@ -53,10 +53,10 @@ func (c *HostNotifyCmd) listenCloseF(net network.Network, addr ma.Multiaddr) {
 }
 
 func (c *HostNotifyCmd) connectedF(net network.Network, conn network.Conn) {
-	_ = c.GossipMetrics.AddNewPeer(conn.RemotePeer())
-	c.GossipMetrics.AddConnectionEvent(conn.RemotePeer(), "Connection")
+	_ = c.PeerStore.AddNewPeer(conn.RemotePeer())
+	c.PeerStore.AddConnectionEvent(conn.RemotePeer(), "Connection")
 	// request metadata as soon as we connect to a peer
-	metrics.PollPeerMetadata(conn.RemotePeer(), c.Base, c.PeerMetadataState, c.Store, c.GossipMetrics)
+	PollPeerMetadata(conn.RemotePeer(), c.Base, c.PeerMetadataState, c.Store, c.PeerStore)
 
 	// End of metric traces to track the connections and disconnections
 	c.Log.WithFields(logrus.Fields{
@@ -66,7 +66,7 @@ func (c *HostNotifyCmd) connectedF(net network.Network, conn network.Conn) {
 }
 
 func (c *HostNotifyCmd) disconnectedF(net network.Network, conn network.Conn) {
-	c.GossipMetrics.AddConnectionEvent(conn.RemotePeer(), "Disconnection")
+	c.PeerStore.AddConnectionEvent(conn.RemotePeer(), "Disconnection")
 	// End of metric traces to track the connections and disconnections
 	c.Log.WithFields(logrus.Fields{
 		"event": "connection_close", "peer": conn.RemotePeer().String(),

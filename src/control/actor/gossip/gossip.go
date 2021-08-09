@@ -13,7 +13,7 @@ import (
 type GossipCmd struct {
 	*base.Base
 	*metrics.GossipState
-	*metrics.GossipMetrics
+	*metrics.PeerStore
 	Store track.ExtendedPeerstore
 }
 
@@ -24,11 +24,11 @@ func (c *GossipCmd) Cmd(route string) (cmd interface{}, err error) {
 	case "list":
 		cmd = &GossipListCmd{Base: c.Base, GossipState: c.GossipState}
 	case "message-db":
-		cmd = &GossipMessageDBCmd{Base: c.Base, GossipState: c.GossipState, GossipMetrics: c.GossipMetrics}
+		cmd = &GossipMessageDBCmd{Base: c.Base, GossipState: c.GossipState, PeerStore: c.PeerStore}
 	case "blacklist":
 		cmd = &GossipBlacklistCmd{Base: c.Base, GossipState: c.GossipState}
 	case "topic":
-		cmd = &topic.TopicCmd{Base: c.Base, GossipState: c.GossipState, GossipMetrics: c.GossipMetrics, Store: c.Store}
+		cmd = &topic.TopicCmd{Base: c.Base, GossipState: c.GossipState, PeerStore: c.PeerStore, Store: c.Store}
 	default:
 		return nil, ask.UnrecognizedErr
 	}

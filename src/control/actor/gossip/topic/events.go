@@ -15,7 +15,7 @@ import (
 type TopicEventsCmd struct {
 	*base.Base
 	GossipState   *metrics.GossipState
-	GossipMetrics *metrics.GossipMetrics
+	PeerStore *metrics.PeerStore
 	Store         track.ExtendedPeerstore
 	//TopicName string `ask:"<topic>" help:"The name of the topic to track events of"`
 	Eth2TopicName string `ask:"--eth-topic" help:"The name of the eth2 topics"`

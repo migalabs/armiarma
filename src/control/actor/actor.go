@@ -66,7 +66,7 @@ type Actor struct {
 	Dv5State dv5.Dv5State
 
 	GossipState     metrics.GossipState
-	GossipMetrics   metrics.GossipMetrics
+	PeerStore   metrics.PeerStore
 	VisualizerState visualizer.VisualizerState
 
 	RPCState rpc.RPCState
@@ -96,7 +96,7 @@ func NewActor(id ActorID, globals *GlobalActorData) *Actor {
 		ActorCtx:         ctxAll,
 		actorCancel:      cancelAll,
 		CurrentPeerstore: track.NewDynamicPeerstore(),
-		GossipMetrics:    metrics.NewGossipMetrics(),
+		PeerStore:    metrics.NewPeerStore(),
 		VisualizerState:  chainV,
 	}
 	return act
@@ -188,7 +188,7 @@ func (c *ActorCmd) Cmd(route string) (cmd interface{}, err error) {
 			GlobalPeerstores:  c.GlobalPeerstores,
 			CurrentPeerstore:  c.CurrentPeerstore,
 			PeerMetadataState: &c.PeerMetadataState,
-			GossipMetrics:     &c.GossipMetrics,
+			PeerStore:     &c.PeerStore,
 		}
 	case "enr":
 		cmd = &enr.EnrCmd{Base: b, Lazy: &c.LazyEnrState, PrivSettings: c, WithHostPriv: &c.HostState}
@@ -202,7 +202,7 @@ func (c *ActorCmd) Cmd(route string) (cmd interface{}, err error) {
 			PeerStatusState:   &c.PeerStatusState,
 			PeerMetadataState: &c.PeerMetadataState,
 			Store:             store,
-			GossipMetrics:     &c.GossipMetrics,
+			PeerStore:     &c.PeerStore,
 		}
 	case "peerstore":
 		cmd = &peerstore.PeerstoreCmd{
@@ -221,7 +221,7 @@ func (c *ActorCmd) Cmd(route string) (cmd interface{}, err error) {
 		if !store.Initialized() {
 			store = nil
 		}
-		cmd = &gossip.GossipCmd{Base: b, GossipState: &c.GossipState, GossipMetrics: &c.GossipMetrics, Store: store}
+		cmd = &gossip.GossipCmd{Base: b, GossipState: &c.GossipState, PeerStore: &c.PeerStore, Store: store}
 	case "rpc":
 		cmd = &rpc.RpcCmd{Base: b, RPCState: &c.RPCState}
 	case "gossip-import":
@@ -233,7 +233,7 @@ func (c *ActorCmd) Cmd(route string) (cmd interface{}, err error) {
 			StateDBState:    &c.StatesState,
 			Chains:          c.GlobalChains,
 			ChainState:      &c.ChainState,
-			GossipMetrics:   &c.GossipMetrics,
+			PeerStore:   &c.PeerStore,
 			PeerStatusState: &c.PeerStatusState,
 			VisualizerState: &c.VisualizerState}
 	case "chain-visualizer":
