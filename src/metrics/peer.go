@@ -1,7 +1,6 @@
 package metrics
 
 import (
-	"github.com/libp2p/go-libp2p-core/peer"
 	"strconv"
 	"fmt"
 )
@@ -9,7 +8,7 @@ import (
 // Base Struct for the topic name and the received messages on the different topics
 // TODO: In the future we might reuse the Rumor struct and add the missing fields
 type Peer struct {
-	PeerId     peer.ID
+	PeerId     string
 	NodeId     string
 	UserAgent  string
 	ClientName string
@@ -50,7 +49,7 @@ type Peer struct {
 	// Variables related to the SubNets (only needed for when Shards will be implemented)
 }
 
-func NewPeer(peerId peer.ID) Peer {
+func NewPeer(peerId string) Peer {
 	pm := Peer{
 		// TODO Check. What is the difference between Unknown and "" empty.
 		PeerId:     peerId,
@@ -128,7 +127,7 @@ func (pm *Peer) ToCsvLine() string {
 	expTime := GetTimeMiliseconds()
 	connections, disconnections, connTime := AnalyzeConnDisconnTime(pm, expTime)
 
-	csvRow := pm.PeerId.String() + "," +
+	csvRow := pm.PeerId + "," +
 		pm.NodeId + "," +
 		pm.UserAgent + "," +
 		pm.ClientName + "," +

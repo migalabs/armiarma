@@ -33,9 +33,9 @@ func PollPeerMetadata(p peer.ID, base *base.Base, peerMetadataState *metadata.Pe
 			PeerID:            flags.PeerIDFlag{PeerID: peerID},
 		}
 		if err := pingCmd.Run(reqCtx); err != nil {
-			gm.AddMetadataEvent(p, false)
+			gm.AddMetadataEvent(p.String(), false)
 		} else {
-			gm.AddMetadataEvent(p, true)
+			gm.AddMetadataEvent(p.String(), true)
 		}
 	}(p)
 }

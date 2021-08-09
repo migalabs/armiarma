@@ -53,8 +53,8 @@ func (c *HostNotifyCmd) listenCloseF(net network.Network, addr ma.Multiaddr) {
 }
 
 func (c *HostNotifyCmd) connectedF(net network.Network, conn network.Conn) {
-	_ = c.PeerStore.AddNewPeer(conn.RemotePeer())
-	c.PeerStore.AddConnectionEvent(conn.RemotePeer(), "Connection")
+	_ = c.PeerStore.AddNewPeer(conn.RemotePeer().String())
+	c.PeerStore.AddConnectionEvent(conn.RemotePeer().String(), "Connection")
 	// request metadata as soon as we connect to a peer
 	PollPeerMetadata(conn.RemotePeer(), c.Base, c.PeerMetadataState, c.Store, c.PeerStore)
 
@@ -66,7 +66,7 @@ func (c *HostNotifyCmd) connectedF(net network.Network, conn network.Conn) {
 }
 
 func (c *HostNotifyCmd) disconnectedF(net network.Network, conn network.Conn) {
-	c.PeerStore.AddConnectionEvent(conn.RemotePeer(), "Disconnection")
+	c.PeerStore.AddConnectionEvent(conn.RemotePeer().String(), "Disconnection")
 	// End of metric traces to track the connections and disconnections
 	c.Log.WithFields(logrus.Fields{
 		"event": "connection_close", "peer": conn.RemotePeer().String(),

@@ -12,12 +12,12 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/protolambda/rumor/metrics/utils"
+	//"github.com/protolambda/rumor/metrics/utils"
 	pgossip "github.com/protolambda/rumor/p2p/gossip"
 	"github.com/protolambda/rumor/p2p/gossip/database"
 	"github.com/protolambda/rumor/p2p/track"
 	"github.com/libp2p/go-libp2p-core/host"
-	log "github.com/sirupsen/logrus"
+	//log "github.com/sirupsen/logrus"
 )
 
 type PeerStore struct {
@@ -198,7 +198,7 @@ func (c *PeerStore) AddPeer(peer Peer) {
 	//p, ok := c.PeerStore.Load(key)
 	// After check that all the info is ready, save the item back into the Sync.Map
   //c.PeerStore.Store(key, Peer)
-	c.PeerStore.Store(peer.PeerId.String(), peer)
+	c.PeerStore.Store(peer.PeerId, peer)
 }
 
 // TODO: This module shouldnt know about rumor at all. So ExtendedPeerstore
@@ -206,6 +206,7 @@ func (c *PeerStore) AddPeer(peer Peer) {
 // Function that iterates through the received peers and fills the missing information
 func (c *PeerStore) FillMetrics(ep track.ExtendedPeerstore) {
 	// to prevent the Filler from crashing (the url-service only accepts 45req/s)
+	/*
 	requestCounter := 0
 	// Loop over the Peers on the PeerStore
 	c.PeerStore.Range(func(key interface{}, value interface{}) bool {
@@ -262,7 +263,7 @@ func (c *PeerStore) FillMetrics(ep track.ExtendedPeerstore) {
 		// Keep with the loop on the Range function
 		return true
 	})
-
+*/
 }
 
 // Function that Exports the entire Metrics to a .json file (lets see if in the future we can add websockets or other implementations)
@@ -326,7 +327,7 @@ func (c *PeerStore) ExportToCSV(filePath string) error {
 
 // Add new peer with all the information from the peerstore to the metrics db
 // returns: Alredy (Bool)
-func (c *PeerStore) AddNewPeer(peerId peer.ID) bool {
+func (c *PeerStore) AddNewPeer(peerId string) bool {
 	_, ok := c.PeerStore.Load(peerId)
 	if !ok {
 		// We will just add the info that we have (the peerId)
@@ -340,7 +341,7 @@ func (c *PeerStore) AddNewPeer(peerId peer.ID) bool {
 }
 
 // Add a connection Event to the given peer
-func (c *PeerStore) AddConnectionEvent(peerId peer.ID, connectionType string) {
+func (c *PeerStore) AddConnectionEvent(peerId string, connectionType string) {
 	pMetrics, ok := c.PeerStore.Load(peerId)
 	if ok {
 		currTime := GetTimeMiliseconds()
@@ -371,7 +372,7 @@ func (c *PeerStore) AddConnectionEvent(peerId peer.ID, connectionType string) {
 }
 
 // Add a connection Event to the given peer
-func (c *PeerStore) AddMetadataEvent(peerId peer.ID, success bool) {
+func (c *PeerStore) AddMetadataEvent(peerId string, success bool) {
 	pMetrics, ok := c.PeerStore.Load(peerId)
 	if ok {
 		Peer := pMetrics.(Peer)
@@ -387,7 +388,7 @@ func (c *PeerStore) AddMetadataEvent(peerId peer.ID, success bool) {
 }
 
 // Function that Manages the metrics updates for the incoming messages
-func (c *PeerStore) IncomingMessageManager(peerId peer.ID, topicName string) error {
+func (c *PeerStore) IncomingMessageManager(peerId string, topicName string) error {
 	pMetrics, _ := c.PeerStore.Load(peerId)
 	Peer := pMetrics.(Peer)
 	messageMetrics, err := GetMessageMetrics(&Peer, topicName)
@@ -421,7 +422,7 @@ func (gm *PeerStore) AddNewConnectionAttempt(id peer.ID, succeed bool, err strin
 		p.Attempted = true
 		//fmt.Println("Original ", err)
 		// MIGHT be nice to try if we can change the uncertain errors for the dial backoff
-		if err != "" || err != "dial backoff" {
+		if err != "dial backoff" {
 			p.Error = FilterError(err)
 		}
 	}

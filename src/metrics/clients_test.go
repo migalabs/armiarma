@@ -3,7 +3,6 @@ package metrics
 import (
 	"testing"
 	"github.com/stretchr/testify/require"
-	"fmt"
 )
 
 func Test_Clients(t *testing.T) {
