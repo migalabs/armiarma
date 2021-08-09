@@ -9,7 +9,7 @@ import (
 	"os"
 	"strings"
 	"sync"
-	"time"
+	"github.com/protolambda/rumor/metrics/utils"
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	//"github.com/protolambda/rumor/metrics/utils"
@@ -17,11 +17,12 @@ import (
 	"github.com/protolambda/rumor/p2p/gossip/database"
 	"github.com/protolambda/rumor/p2p/track"
 	"github.com/libp2p/go-libp2p-core/host"
-	//log "github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
 type PeerStore struct {
 	PeerStore   sync.Map
+	PeerCount   int
 	MessageDatabase *database.MessageDatabase
 	StartTime       int64 // milliseconds
 	MsgNotChannels  map[string](chan bool)
@@ -29,20 +30,10 @@ type PeerStore struct {
 
 func NewPeerStore() PeerStore {
 	gm := PeerStore{
-		StartTime:      GetTimeMiliseconds(),
+		StartTime:      utils.GetTimeMiliseconds(),
 		MsgNotChannels: make(map[string](chan bool)),
 	}
 	return gm
-}
-
-// TODO: quick copy paste
-func GetTimeMiliseconds() int64 {
-	now := time.Now()
-	//secs := now.Unix()
-	nanos := now.UnixNano()
-	millis := nanos / 1000000
-
-	return millis
 }
 
 // Connection event model
@@ -130,7 +121,8 @@ type GossipState struct {
 
 // Function that Wraps/Marshals the content of the sync.Map to be exported as a json
 func (c *PeerStore) MarshalMetrics() ([]byte, error) {
-	exportTime := GetTimeMiliseconds()
+	/*
+	exportTime := utils.GetTimeMiliseconds()
 	tmpMap := make(map[string]Peer)
 	c.PeerStore.Range(func(k, v interface{}) bool {
 		pm := v.(Peer)
@@ -142,6 +134,8 @@ func (c *PeerStore) MarshalMetrics() ([]byte, error) {
 	})
 
 	return json.Marshal(tmpMap)
+	*/
+	return nil, nil
 }
 
 // Function that Wraps/Marshals the content of the Entire Peerstore into a json
@@ -152,25 +146,6 @@ func (c *PeerStore) MarshalPeerStore(ep track.ExtendedPeerstore) ([]byte, error)
 		peerData[p.String()] = ep.GetAllData(p)
 	}
 	return json.Marshal(peerData)
-}
-
-// Get the Real Ip Address from the multi Address list
-// TODO: Implement the Private IP filter in a better way
-func GetFullAddress(multiAddrs []string) string {
-	var address string
-	if len(multiAddrs) > 0 {
-		for _, element := range multiAddrs {
-			if strings.Contains(element, "/ip4/192.168.") || strings.Contains(element, "/ip4/127.0.") || strings.Contains(element, "/ip6/") || strings.Contains(element, "/ip4/172.") || strings.Contains(element, "0.0.0.0") {
-				continue
-			} else {
-				address = element
-				break
-			}
-		}
-	} else {
-		address = "/ip4/127.0.0.1/tcp/9000"
-	}
-	return address
 }
 
 // Function that resets to 0 the connections/disconnections, and message counters
@@ -194,82 +169,141 @@ func (c *PeerStore) AddNotChannel(topicName string) {
 	c.MsgNotChannels[topicName] = make(chan bool, 100)
 }
 
+// Adds or updates peer
 func (c *PeerStore) AddPeer(peer Peer) {
-	//p, ok := c.PeerStore.Load(key)
-	// After check that all the info is ready, save the item back into the Sync.Map
-  //c.PeerStore.Store(key, Peer)
-	c.PeerStore.Store(peer.PeerId, peer)
+	oldData, loaded := c.PeerStore.LoadOrStore(peer.PeerId, peer)
+
+	// If already present
+	if loaded {
+		// TODO: We could also store the old data if there was a change. For example
+		// if a given client upgrated it version. Use oldData
+		// See: https://github.com/migalabs/armiarma/issues/17
+		// Currently just overwritting what was before
+		_ = oldData // TODO:
+		c.PeerStore.Store(peer.PeerId, peer)
+	}
+
+	c.PeerCount++
 }
 
-// TODO: This module shouldnt know about rumor at all. So ExtendedPeerstore
-// should be replaced
-// Function that iterates through the received peers and fills the missing information
-func (c *PeerStore) FillMetrics(ep track.ExtendedPeerstore) {
-	// to prevent the Filler from crashing (the url-service only accepts 45req/s)
-	/*
-	requestCounter := 0
-	// Loop over the Peers on the PeerStore
-	c.PeerStore.Range(func(key interface{}, value interface{}) bool {
-		// Read the info that we have from him
-		p, ok := c.PeerStore.Load(key)
-		if ok {
-			Peer := p.(Peer)
-			peerData := ep.GetAllData(Peer.PeerId)
-			if len(Peer.NodeId) == 0 {
-				Peer.NodeId = peerData.NodeID.String()
-			}
+func (c *PeerStore) GetPeerData(peerId string) (Peer, bool) {
+	peerData, ok := c.PeerStore.Load(peerId)
+	return peerData.(Peer), ok
+}
 
-			if len(Peer.UserAgent) == 0 {
-				Peer.UserAgent = peerData.UserAgent
-				client, version := utils.FilterClientType(Peer.UserAgent)
-				// OperatingSystem TODO:
-				Peer.ClientName = client
-				Peer.ClientVersion = version
-			}
+// Add new peer with all the information from the peerstore to the metrics db
+// returns: Alredy (Bool)
+func (c *PeerStore) AddNewPeer(peerId string) bool {
+	_, ok := c.PeerStore.Load(peerId)
+	if !ok {
+		// We will just add the info that we have (the peerId)
+		Peer := NewPeer(peerId)
+		// Include it to the Peer DB
+		c.PeerStore.Store(peerId, Peer)
+		// return that wasn't already on the peerstore
+		return false
+	}
+	return true
+}
 
-			if len(Peer.Pubkey) == 0 {
-				Peer.Pubkey = peerData.Pubkey
-			}
-
-			if len(Peer.Addrs) == 0 {
-				address := GetFullAddress(peerData.Addrs)
-				Peer.Addrs = address
-			}
-			if len(Peer.Country) == 0 {
-				if len(Peer.Addrs) == 0 {
-					//fmt.Println("No Addrs on the Peer to request the Location")
-				} else {
-					//fmt.Println("Requesting the Location based on the addrs:", Peer.Addrs)
-					ip, country, city, err := utils.GetIpAndLocationFromAddrs(Peer.Addrs)
-					if err != nil {
-						log.Error("error when fetching country/city from ip", err)
-					}
-					requestCounter = requestCounter + 1
-					Peer.Ip = ip
-					Peer.Country = country
-					Peer.City = city
-				}
-			}
-
-			// Since we want to have the latest Latency, we update it only when it is different from 0
-			// latency in seconds
-			if peerData.Latency != 0 {
-				Peer.Latency = float64(peerData.Latency/time.Millisecond) / 1000
-			}
-
-			// After check that all the info is ready, save the item back into the Sync.Map
-			c.PeerStore.Store(key, Peer)
+// Add a connection Event to the given peer
+func (c *PeerStore) AddConnectionEvent(peerId string, connectionType string) {
+	pMetrics, ok := c.PeerStore.Load(peerId)
+	if ok {
+		currTime := utils.GetTimeMiliseconds()
+		newConnection := ConnectionEvents{
+			ConnectionType: connectionType,
+			TimeMili:       currTime,
 		}
-		// Keep with the loop on the Range function
-		return true
-	})
-*/
+		Peer := pMetrics.(Peer)
+		Peer.ConnectionEvents = append(Peer.ConnectionEvents, newConnection)
+		if connectionType == "Connection" {
+			Peer.Connected = true
+			// add the connections
+			Peer.TotConnections += 1
+			Peer.LastConn = currTime // Current time in SECs
+			Peer.ConnFlag = true
+		} else {
+			// add the disconnections and sum the time
+			Peer.TotDisconnections += 1
+			Peer.LastDisconn = currTime // Current time in SECs
+			Peer.TotConnTime += Peer.LastDisconn - Peer.LastConn
+			Peer.ConnFlag = false
+		}
+		c.PeerStore.Store(peerId, Peer)
+	} else {
+		// Might be possible to add
+		fmt.Println("Counld't add Event, Peer is not in the list")
+	}
+}
+
+// Add a connection Event to the given peer
+func (c *PeerStore) AddMetadataEvent(peerId string, success bool) {
+	pMetrics, ok := c.PeerStore.Load(peerId)
+	if ok {
+		Peer := pMetrics.(Peer)
+		Peer.MetadataRequest = true
+		if success {
+			Peer.MetadataSucceed = true
+		}
+		c.PeerStore.Store(peerId, Peer)
+	} else {
+		// Might be possible to add
+		fmt.Println("Counld't add Event, Peer is not in the list")
+	}
+}
+
+// AddNewAttempts adds the resuts of a new attempt over an existing peer
+// increasing the attempt counter and the respective fields
+func (gm *PeerStore) AddNewConnectionAttempt(id peer.ID, succeed bool, err string) error {
+	v, ok := gm.PeerStore.Load(id)
+	if !ok { // the peer was already in the sync.Map return true
+		return fmt.Errorf("Not peer found with that ID %s", id.String())
+	}
+	// Update the counter and connection status
+	p := v.(Peer)
+
+	if !p.Attempted {
+		p.Attempted = true
+		//fmt.Println("Original ", err)
+		// MIGHT be nice to try if we can change the uncertain errors for the dial backoff
+		if err != "dial backoff" {
+			p.Error = FilterError(err)
+		}
+	}
+	if succeed {
+		p.Succeed = succeed
+		p.Error = "None"
+	}
+	p.Attempts += 1
+
+	// Store the new struct in the sync.Map
+	gm.PeerStore.Store(id, p)
+	return nil
+}
+
+// AddNewAttempts adds the resuts of a new attempt over an existing peer
+// increasing the attempt counter and the respective fields
+func (gm *PeerStore) AddNewConnection(id peer.ID) error {
+	v, ok := gm.PeerStore.Load(id)
+	if !ok { // the peer was already in the sync.Map return true
+		return fmt.Errorf("Not peer found with that ID %s", id.String())
+	}
+	// Update the counter and connection status
+	p := v.(Peer)
+
+	p.Connected = true
+
+	// Store the new struct in the sync.Map
+	gm.PeerStore.Store(id, p)
+	return nil
 }
 
 // Function that Exports the entire Metrics to a .json file (lets see if in the future we can add websockets or other implementations)
 func (c *PeerStore) ExportMetrics(filePath string, peerstorePath string, csvPath string, ep track.ExtendedPeerstore) error {
 	// Generate the MetricsDataFrame of the Current Metrics
 	// Export the metrics to the given CSV file
+	log.Info("Exporting the metrics")
 	err := c.ExportToCSV(csvPath)
 	if err != nil {
 		fmt.Println("Error:", err)
@@ -325,68 +359,6 @@ func (c *PeerStore) ExportToCSV(filePath string) error {
 	return nil
 }
 
-// Add new peer with all the information from the peerstore to the metrics db
-// returns: Alredy (Bool)
-func (c *PeerStore) AddNewPeer(peerId string) bool {
-	_, ok := c.PeerStore.Load(peerId)
-	if !ok {
-		// We will just add the info that we have (the peerId)
-		Peer := NewPeer(peerId)
-		// Include it to the Peer DB
-		c.PeerStore.Store(peerId, Peer)
-		// return that wasn't already on the peerstore
-		return false
-	}
-	return true
-}
-
-// Add a connection Event to the given peer
-func (c *PeerStore) AddConnectionEvent(peerId string, connectionType string) {
-	pMetrics, ok := c.PeerStore.Load(peerId)
-	if ok {
-		currTime := GetTimeMiliseconds()
-		newConnection := ConnectionEvents{
-			ConnectionType: connectionType,
-			TimeMili:       currTime,
-		}
-		Peer := pMetrics.(Peer)
-		Peer.ConnectionEvents = append(Peer.ConnectionEvents, newConnection)
-		if connectionType == "Connection" {
-			Peer.Connected = true
-			// add the connections
-			Peer.TotConnections += 1
-			Peer.LastConn = currTime // Current time in SECs
-			Peer.ConnFlag = true
-		} else {
-			// add the disconnections and sum the time
-			Peer.TotDisconnections += 1
-			Peer.LastDisconn = currTime // Current time in SECs
-			Peer.TotConnTime += Peer.LastDisconn - Peer.LastConn
-			Peer.ConnFlag = false
-		}
-		c.PeerStore.Store(peerId, Peer)
-	} else {
-		// Might be possible to add
-		fmt.Println("Counld't add Event, Peer is not in the list")
-	}
-}
-
-// Add a connection Event to the given peer
-func (c *PeerStore) AddMetadataEvent(peerId string, success bool) {
-	pMetrics, ok := c.PeerStore.Load(peerId)
-	if ok {
-		Peer := pMetrics.(Peer)
-		Peer.MetadataRequest = true
-		if success {
-			Peer.MetadataSucceed = true
-		}
-		c.PeerStore.Store(peerId, Peer)
-	} else {
-		// Might be possible to add
-		fmt.Println("Counld't add Event, Peer is not in the list")
-	}
-}
-
 // Function that Manages the metrics updates for the incoming messages
 func (c *PeerStore) IncomingMessageManager(peerId string, topicName string) error {
 	pMetrics, _ := c.PeerStore.Load(peerId)
@@ -405,52 +377,6 @@ func (c *PeerStore) IncomingMessageManager(peerId string, topicName string) erro
 	// Store back the Loaded/Modified Variable
 	c.PeerStore.Store(peerId, Peer)
 
-	return nil
-}
-
-// AddNewAttempts adds the resuts of a new attempt over an existing peer
-// increasing the attempt counter and the respective fields
-func (gm *PeerStore) AddNewConnectionAttempt(id peer.ID, succeed bool, err string) error {
-	v, ok := gm.PeerStore.Load(id)
-	if !ok { // the peer was already in the sync.Map return true
-		return fmt.Errorf("Not peer found with that ID %s", id.String())
-	}
-	// Update the counter and connection status
-	p := v.(Peer)
-
-	if !p.Attempted {
-		p.Attempted = true
-		//fmt.Println("Original ", err)
-		// MIGHT be nice to try if we can change the uncertain errors for the dial backoff
-		if err != "dial backoff" {
-			p.Error = FilterError(err)
-		}
-	}
-	if succeed {
-		p.Succeed = succeed
-		p.Error = "None"
-	}
-	p.Attempts += 1
-
-	// Store the new struct in the sync.Map
-	gm.PeerStore.Store(id, p)
-	return nil
-}
-
-// AddNewAttempts adds the resuts of a new attempt over an existing peer
-// increasing the attempt counter and the respective fields
-func (gm *PeerStore) AddNewConnection(id peer.ID) error {
-	v, ok := gm.PeerStore.Load(id)
-	if !ok { // the peer was already in the sync.Map return true
-		return fmt.Errorf("Not peer found with that ID %s", id.String())
-	}
-	// Update the counter and connection status
-	p := v.(Peer)
-
-	p.Connected = true
-
-	// Store the new struct in the sync.Map
-	gm.PeerStore.Store(id, p)
 	return nil
 }
 

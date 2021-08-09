@@ -14,6 +14,7 @@ import (
 	"github.com/protolambda/rumor/control/actor/base"
 	"github.com/protolambda/rumor/metrics"
 	"github.com/protolambda/rumor/metrics/prometheus"
+	"github.com/protolambda/rumor/metrics/utils"
 	"github.com/protolambda/rumor/p2p/track"
 	log "github.com/sirupsen/logrus"
 )
@@ -22,7 +23,7 @@ import (
 
 type TopicExportMetricsCmd struct {
 	*base.Base
-	PeerStore     *metrics.PeerStore
+	PeerStore         *metrics.PeerStore
 	GossipState       *metrics.GossipState
 	Store             track.ExtendedPeerstore
 	ExportPeriod      time.Duration `ask:"--export-period" help:"Requets the frecuency in witch the Metrics will be exported to the files"`
@@ -83,51 +84,26 @@ func (c *TopicExportMetricsCmd) Run(ctx context.Context, args ...string) error {
 			if stopping {
 				_ = c.PeerStore.ExportMetrics(c.RawFilePath, c.PeerstorePath, c.CsvPath, c.Store)
 				c.Log.Infof("Metrics Export Stopped")
-				//h, _ := c.Host()
-				// Exporting the CustomMetrics for last time (still don't know which is the best place where to put this call)
-				/*
-					err := FilCustomMetrics(c.PeerStore, c.Store, &customMetrics, h)
-					if err != nil {
-						fmt.Println(err)
-						return
-					}
-					// export the CustomMetrics into a json
-					err = customMetrics.ExportJson(c.CustomMetricsPath)
-					if err != nil {
-						fmt.Println(err)
-						return
-					}*/
 				return
 			}
 
-			start := time.Now()
-			c.Log.Infof("Backup Export of the Metrics")
-			//c.ExportSecuence(t, &customMetrics)
-			c.PeerStore.FillMetrics(c.Store)
+			log.Info("Backup Export of the Metrics")
+			for _, peerId := range c.Store.Peers() {
+				peerData := c.Store.GetAllData(peerId)
+				peer := fetchPeerExtraInfo(peerData)
+				c.PeerStore.AddPeer(peer)
+			}
 			err := c.PeerStore.ExportMetrics(c.RawFilePath, c.PeerstorePath, c.CsvPath, c.Store)
 			if err != nil {
 				fmt.Println("ERROR TODO:")
 			}
 
-			// Check Backup period to wait for next round
-			exportStepDuration := time.Since(start)
-			if exportStepDuration < c.BackupPeriod {
-				fmt.Println("Waiting to run new backup export")
-				wt := c.BackupPeriod - exportStepDuration
-				fmt.Println("Waiting time:", wt)
-				time.Sleep(wt)
-			}
-			// Check if the Export Period has been accomplished (generate new folder for the metrics)
-			tnow := time.Since(t)
-			if tnow >= c.ExportPeriod {
-				c.Log.Infof("Exporting Metrics changing to Folder")
-				t = time.Now()
-				c.UpdateFilesAndFolders(t)
-				//c.ExportSecuence(t, &customMetrics)
-				c.PeerStore.ResetDynamicMetrics()
-				// Force Memmory Free from the Garbage Collector
-				debug.FreeOSMemory()
-			}
+			c.UpdateFilesAndFolders(t)
+			c.PeerStore.ResetDynamicMetrics()
+			// Force Memmory Free from the Garbage Collector
+			debug.FreeOSMemory()
+
+			time.Sleep(c.BackupPeriod)
 		}
 	}()
 	c.Control.RegisterStop(func(ctx context.Context) error {
@@ -139,94 +115,34 @@ func (c *TopicExportMetricsCmd) Run(ctx context.Context, args ...string) error {
 	return nil
 }
 
-// fulfil the info from the Custom Metrics
+// Convert from rumor PeerAllData to our Peer. Note that
+// some external data is fetched and some fields are parsed
+func fetchPeerExtraInfo(peerData *track.PeerAllData) metrics.Peer {
+	client, version := utils.FilterClientType(peerData.UserAgent)
+	address := utils.GetFullAddress(peerData.Addrs)
 
-//func FilCustomMetrics(gm *metrics.PeerStore, ps track.ExtendedPeerstore, cm *custom.CustomMetrics, h host.Host) error {
-// Get total peers in peerstore
-//peerstoreLen := custom.TotalPeers(h)
-// get the connection status for each of the peers in the extra-metrics
-//succeed, failed, notattempted := gm.GetConnectionMetrics(h)
-// Analyze the reported error by the connection attempts
-//resetbypeer, timeout, dialtoself, dialbackoff, uncertain := gm.GetErrorCounter(h)
-// Filter peers on peerstore by port
-//x, y, z := custom.GetPeersWithPorts(h, ps)
-// Generate the MetricsDataFrame of the Current Metrics
-//mdf := export.NewMetricsDataFrame(&gm.PeerStore)
+	ip, country, city, err := utils.GetIpAndLocationFromAddrs(address)
+	if err != nil {
+		log.Error("error when fetching country/city from ip", err)
+	}
 
-//_ = mdf
-/*
-	lig := mdf.AnalyzeClientType("Lighthouse")
-	tek := mdf.AnalyzeClientType("Teku")
-	nim := mdf.AnalyzeClientType("Nimbus")
-	pry := mdf.AnalyzeClientType("Prysm")
-	lod := mdf.AnalyzeClientType("Lodestar")
-	unk := mdf.AnalyzeClientType("Unknown")*/
-/*
-	lig := custom.NewClient()
-	tek := custom.NewClient()
-	nim := custom.NewClient()
-	pry := custom.NewClient()
-  lod := custom.NewClient()
-	unk := custom.NewClient()
-*/
+	peer := metrics.Peer {
+		PeerId: peerData.PeerID.String(),
+		NodeId: peerData.NodeID.String(),
+		UserAgent: peerData.UserAgent,
+		ClientName: client,
+		ClientVersion: version,
+		ClientOS: "TODO",
+		Pubkey: peerData.Pubkey,
+		Addrs: address,
+		Ip: ip,
+		Country: country,
+		City: city,
+		Latency: float64(peerData.Latency/time.Millisecond) / 1000,
+	}
 
-// read client versions from Metrics
-/*
-	cm.PeerStore.SetTotal(peerstoreLen)
-	cm.PeerStore.SetPort13000(x)
-	cm.PeerStore.SetPort9000(y)
-	cm.PeerStore.SetPortDiff(z)
-	cm.PeerStore.SetNotAttempted(notattempted)
-	cm.PeerStore.ConnectionFailed.SetTotal(failed)
-	cm.PeerStore.ConnectionFailed.SetResetByPeer(resetbypeer)
-	cm.PeerStore.ConnectionFailed.SetTimeOut(timeout)
-	cm.PeerStore.ConnectionFailed.SetDialToSelf(dialtoself)
-	cm.PeerStore.ConnectionFailed.SetDialBackOff(dialbackoff)
-	cm.PeerStore.ConnectionFailed.SetUncertain(uncertain)*/
-
-// fill the CustomMetrics with the readed information
-/*
-	cm.PeerStore.ConnectionSucceed.SetTotal(succeed)
-	cm.PeerStore.ConnectionSucceed.Lighthouse = lig
-	cm.PeerStore.ConnectionSucceed.Teku = tek
-	cm.PeerStore.ConnectionSucceed.Nimbus = nim
-	cm.PeerStore.ConnectionSucceed.Prysm = pry
-	cm.PeerStore.ConnectionSucceed.Lodestar = lod
-	cm.PeerStore.ConnectionSucceed.Unknown = unk*/
-
-// fill the json with client distribution from those peers we got the metadata request from
-/*
-	mtlig := mdf.AnalyzeClientTypeIfMetadataRequested("Lighthouse")
-	mttek := mdf.AnalyzeClientTypeIfMetadataRequested("Teku")
-	mtnim := mdf.AnalyzeClientTypeIfMetadataRequested("Nimbus")
-	mtpry := mdf.AnalyzeClientTypeIfMetadataRequested("Prysm")
-	mtlod := mdf.AnalyzeClientTypeIfMetadataRequested("Lodestar")
-	mtunk := mdf.AnalyzeClientTypeIfMetadataRequested("Unknown")
-*/
-/*
-	mtlig := custom.NewClient()
-	mttek := custom.NewClient()
-	mtnim := custom.NewClient()
-	mtpry := custom.NewClient()
-	mtlod := custom.NewClient()
-	mtunk := custom.NewClient()
-
-
-
-	tot := mtlig.Total + mttek.Total + mtnim.Total + mtpry.Total + mtlod.Total + mtunk.Total
-
-	// fill the CustomMetrics with the readed information
-	cm.PeerStore.MetadataRequested.SetTotal(tot)
-	cm.PeerStore.MetadataRequested.Lighthouse = mtlig
-	cm.PeerStore.MetadataRequested.Teku = mttek
-	cm.PeerStore.MetadataRequested.Nimbus = mtnim
-	cm.PeerStore.MetadataRequested.Prysm = mtpry
-	cm.PeerStore.MetadataRequested.Lodestar = mtlod
-	cm.PeerStore.MetadataRequested.Unknown = mtunk
-*/
-
-//	return nil
-//}
+	return peer
+}
 
 func (c *TopicExportMetricsCmd) UpdateFilesAndFolders(t time.Time) {
 	year := strconv.Itoa(t.Year())
@@ -267,33 +183,6 @@ func (c *TopicExportMetricsCmd) UpdateFilesAndFolders(t time.Time) {
 		fmt.Println(err)
 	}
 }
-
-/*
-func (c *TopicExportMetricsCmd) ExportSecuence(start time.Time, cm *custom.CustomMetrics) {
-	// Export The metrics
-	fmt.Println("exporting metrics")
-	c.PeerStore.FillMetrics(c.Store)
-	err := c.PeerStore.ExportMetrics(c.RawFilePath, c.PeerstorePath, c.CsvPath, c.Store)
-	if err != nil {
-		c.Log.Infof("Problems exporting the Metrics to the given file path")
-	} else {
-		ed := time.Since(start)
-		log := "Metrics Exported, time to export:" + ed.String()
-		c.Log.Infof(log)
-	}
-	// Export the Custom metrics
-	h, _ := c.Host()
-	// Exporting the CustomMetrics for last time (still don't know which is the best place where to put this call)
-	err = FilCustomMetrics(c.PeerStore, c.Store, cm, h)
-	if err != nil {
-		c.Log.Warn(err)
-	}
-	// export the CustomMetrics into a json
-	err = cm.ExportJson(c.CustomMetricsPath)
-	if err != nil {
-		c.Log.Warn(err)
-	}
-}*/
 
 // Function that writes in a file the folder name of the last checkpoint generated in the project
 // DOUBT: Write path relative or absolute? dunno

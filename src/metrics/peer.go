@@ -3,6 +3,7 @@ package metrics
 import (
 	"strconv"
 	"fmt"
+	"github.com/protolambda/rumor/metrics/utils"
 )
 
 // Base Struct for the topic name and the received messages on the different topics
@@ -124,7 +125,7 @@ func AnalyzeConnDisconnTime(pm *Peer, currentTime int64) (int64, int64, float64)
 
 func (pm *Peer) ToCsvLine() string {
 	// TODO: Perhaps move the following three lines somewhere else
-	expTime := GetTimeMiliseconds()
+	expTime := utils.GetTimeMiliseconds()
 	connections, disconnections, connTime := AnalyzeConnDisconnTime(pm, expTime)
 
 	csvRow := pm.PeerId + "," +

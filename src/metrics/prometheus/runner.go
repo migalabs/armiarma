@@ -51,12 +51,15 @@ func (c *PrometheusRunner) Run(ctx context.Context) error {
 			nOfDiscoveredPeers := 0
 			geoDist := make(map[string]float64)
 
+			//log.Info("peerstore entero", c.PeerStore.PeerStore)
+
 			c.PeerStore.PeerStore.Range(func(k, val interface{}) bool {
 				peerData := val.(metrics.Peer)
 
 				// TODO: Rethink this criteria
 				if (peerData.ClientName != "Unknown" && peerData.ClientName != "") {
 					clients.AddClientVersion(peerData.ClientName, peerData.ClientVersion)
+
 				}
 
 				// TODO: Expose also the city
@@ -73,6 +76,8 @@ func (c *PrometheusRunner) Run(ctx context.Context) error {
 				//receivedMessages.WithLabelValues("beacon_blocks").Set(TODO)
 				//receivedMessages.WithLabelValues("beacon_aggregate_and_proof").Set(TODO)
 
+				//log.Info("peer in  metris IS", peerData)
+
 
 				nOfDiscoveredPeers++
 
@@ -82,6 +87,8 @@ func (c *PrometheusRunner) Run(ctx context.Context) error {
 			log.Info("Debug", clients)
 
 			totPeers.Set(float64(nOfDiscoveredPeers))
+
+			log.Info("discovered peers", nOfDiscoveredPeers)
 
 			for _, clientName := range clients.GetClientNames() {
 				count := clients.GetCountOfClient(clientName)

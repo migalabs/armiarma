@@ -1,6 +1,9 @@
 package metrics
 
-import "fmt"
+import (
+	"fmt"
+	"github.com/protolambda/rumor/metrics/utils"
+)
 
 // Information regarding the messages received on the beacon_lock topic
 type MessageMetrics struct {
@@ -26,7 +29,7 @@ func (c *MessageMetrics) IncrementCnt() uint64 {
 
 // Stamps linux_time(millis) on the FirstMessageTime/LastMessageTime from given args: time (int64), flag string("first"/"last")
 func (c *MessageMetrics) StampTime(flag string) {
-	unixMillis := GetTimeMiliseconds()
+	unixMillis := utils.GetTimeMiliseconds()
 
 	switch flag {
 	case "first":
