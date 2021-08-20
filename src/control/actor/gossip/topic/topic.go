@@ -36,7 +36,7 @@ func (c *TopicCmd) Cmd(route string) (cmd interface{}, err error) {
 	case "publish":
 		cmd = &TopicPublishCmd{Base: c.Base, GossipState: c.GossipState}
 	case "export-metrics":
-		cmd = &TopicExportMetricsCmd{Base: c.Base, GossipState: c.GossipState, Store: c.Store, PeerStore: c.PeerStore}
+		cmd = &TopicExportMetricsCmd{Base: c.Base, PeerStore: c.PeerStore}
 	default:
 		return nil, ask.UnrecognizedErr
 	}

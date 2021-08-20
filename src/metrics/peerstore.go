@@ -301,40 +301,9 @@ func (gm *PeerStore) AddNewConnection(id peer.ID) error {
 	return nil
 }
 
-// Function that Exports the entire Metrics to a .json file (lets see if in the future we can add websockets or other implementations)
-func (c *PeerStore) ExportMetrics(filePath string, peerstorePath string, csvPath string, ep track.ExtendedPeerstore) error {
-	// Generate the MetricsDataFrame of the Current Metrics
-	// Export the metrics to the given CSV file
-	log.Info("Exporting the metrics")
-	err := c.ExportToCSV(csvPath)
-	if err != nil {
-		fmt.Println("Error:", err)
-		return err
-	}
-
-	metrics, err := c.MarshalMetrics()
-	if err != nil {
-		fmt.Println("Error Marshalling the metrics")
-	}
-	peerstore, err := c.MarshalPeerStore(ep)
-	if err != nil {
-		fmt.Println("Error Marshalling the peerstore")
-	}
-
-	err = ioutil.WriteFile(filePath, metrics, 0644)
-	if err != nil {
-		fmt.Println("Error opening file: ", filePath)
-		return err
-	}
-	err = ioutil.WriteFile(peerstorePath, peerstore, 0644)
-	if err != nil {
-		fmt.Println("Error opening file: ", peerstorePath)
-		return err
-	}
-	return nil
-}
-
+// Exports to a csv, useful for debug
 func (c *PeerStore) ExportToCSV(filePath string) error {
+	log.Info("Exporting metrics to csv: ", filePath)
 	csvFile, err := os.Create(filePath)
 	if err != nil {
 		return errors.Wrap(err, "Error Opening the file")

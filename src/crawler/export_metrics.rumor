@@ -2,13 +2,4 @@
 
 echo "Exporting the metrics to the folder $metricsFolder"
 
-# Generate /metrics folder inside the example folder
-if [[ -d  "${metricsFolder}/metrics" ]]
-then
-    echo "${metricsFolder}/metrics folder already exist" 
-else
-    mkdir "${metricsFolder}/metrics"
-fi
-
-
-gossip topic export-metrics --metrics-folder-path="$metricsFolder" --export-period=10m --backup-period=1m
+gossip topic export-metrics
