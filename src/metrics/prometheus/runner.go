@@ -1,14 +1,14 @@
 package prometheus
 
 import (
-	"time"
 	"context"
-	"net/http"
 	"fmt"
+	"net/http"
+	"time"
 
-	"github.com/protolambda/rumor/metrics"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/protolambda/rumor/metrics"
 
 	//"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
@@ -23,15 +23,13 @@ type PrometheusRunner struct {
 }
 
 func NewPrometheusRunner(gm *metrics.PeerStore) PrometheusRunner {
-	return PrometheusRunner {
-		PeerStore: gm,
-		ExposePort: "9080",
-		EndpointUrl: "metrics",
+	return PrometheusRunner{
+		PeerStore:       gm,
+		ExposePort:      "9080",
+		EndpointUrl:     "metrics",
 		RefreshInterval: 10 * time.Second,
 	}
 }
-
-
 
 func (c *PrometheusRunner) Run(ctx context.Context) error {
 	http.Handle("/metrics", promhttp.Handler())
@@ -51,13 +49,11 @@ func (c *PrometheusRunner) Run(ctx context.Context) error {
 			nOfDiscoveredPeers := 0
 			geoDist := make(map[string]float64)
 
-			//log.Info("peerstore entero", c.PeerStore.PeerStore)
-
 			c.PeerStore.PeerStore.Range(func(k, val interface{}) bool {
 				peerData := val.(metrics.Peer)
 
 				// TODO: Rethink this criteria
-				if (peerData.ClientName != "Unknown" && peerData.ClientName != "") {
+				if peerData.ClientName != "Unknown" && peerData.ClientName != "" {
 					clients.AddClientVersion(peerData.ClientName, peerData.ClientVersion)
 
 				}
@@ -76,19 +72,12 @@ func (c *PrometheusRunner) Run(ctx context.Context) error {
 				//receivedMessages.WithLabelValues("beacon_blocks").Set(TODO)
 				//receivedMessages.WithLabelValues("beacon_aggregate_and_proof").Set(TODO)
 
-				//log.Info("peer in  metris IS", peerData)
-
-
 				nOfDiscoveredPeers++
 
 				return true
 			})
 
-			log.Info("Debug", clients)
-
 			totPeers.Set(float64(nOfDiscoveredPeers))
-
-			log.Info("discovered peers", nOfDiscoveredPeers)
 
 			for _, clientName := range clients.GetClientNames() {
 				count := clients.GetCountOfClient(clientName)
@@ -100,6 +89,14 @@ func (c *PrometheusRunner) Run(ctx context.Context) error {
 			for k, v := range geoDist {
 				geoDistribution.WithLabelValues(k).Set(v)
 			}
+
+			// TODO: Add numOfPeersWithMetadata
+
+			log.WithFields(log.Fields{
+				"ClientsDist":        clients,
+				"GeoDist":            geoDist,
+				"NOfDiscoveredPeers": nOfDiscoveredPeers,
+			}).Info("Metrics summary")
 
 			time.Sleep(c.RefreshInterval)
 		}

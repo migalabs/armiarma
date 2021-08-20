@@ -4,14 +4,17 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/libp2p/go-libp2p-core/network"
+	"github.com/protolambda/rumor/metrics/utils"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/protolambda/rumor/control/actor/base"
 	"github.com/protolambda/rumor/control/actor/peer/metadata"
 	"github.com/protolambda/rumor/metrics"
 	"github.com/protolambda/rumor/p2p/track"
 	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
 type HostNotifyCmd struct {
@@ -55,8 +58,17 @@ func (c *HostNotifyCmd) listenCloseF(net network.Network, addr ma.Multiaddr) {
 func (c *HostNotifyCmd) connectedF(net network.Network, conn network.Conn) {
 	_ = c.PeerStore.AddNewPeer(conn.RemotePeer().String())
 	c.PeerStore.AddConnectionEvent(conn.RemotePeer().String(), "Connection")
+	logrus.Info("connection detected: ", conn.RemotePeer().String())
+	
 	// request metadata as soon as we connect to a peer
-	PollPeerMetadata(conn.RemotePeer(), c.Base, c.PeerMetadataState, c.Store, c.PeerStore)
+	peerData, err := PollPeerMetadata(conn.RemotePeer(), c.Base, c.PeerMetadataState, c.Store, c.PeerStore)
+
+	if err == nil {
+		peer := fetchPeerExtraInfo(peerData)
+		c.PeerStore.AddPeer(peer)
+	} else {
+		log.Info("could not get metadata for peer: ", conn.RemotePeer().String(), " err: ", err)
+	}
 
 	// End of metric traces to track the connections and disconnections
 	c.Log.WithFields(logrus.Fields{
@@ -67,6 +79,7 @@ func (c *HostNotifyCmd) connectedF(net network.Network, conn network.Conn) {
 
 func (c *HostNotifyCmd) disconnectedF(net network.Network, conn network.Conn) {
 	c.PeerStore.AddConnectionEvent(conn.RemotePeer().String(), "Disconnection")
+	logrus.Info("disconnection detected", conn.RemotePeer().String())
 	// End of metric traces to track the connections and disconnections
 	c.Log.WithFields(logrus.Fields{
 		"event": "connection_close", "peer": conn.RemotePeer().String(),
@@ -153,4 +166,33 @@ func fmtDirection(d network.Direction) string {
 	default:
 		return "unknown"
 	}
+}
+
+// Convert from rumor PeerAllData to our Peer. Note that
+// some external data is fetched and some fields are parsed
+func fetchPeerExtraInfo(peerData *track.PeerAllData) metrics.Peer {
+	client, version := utils.FilterClientType(peerData.UserAgent)
+	address := utils.GetFullAddress(peerData.Addrs)
+
+	ip, country, city, err := utils.GetIpAndLocationFromAddrs(address)
+	if err != nil {
+		log.Error("error when fetching country/city from ip", err)
+	}
+
+	peer := metrics.Peer {
+		PeerId: peerData.PeerID.String(),
+		NodeId: peerData.NodeID.String(),
+		UserAgent: peerData.UserAgent,
+		ClientName: client,
+		ClientVersion: version,
+		ClientOS: "TODO",
+		Pubkey: peerData.Pubkey,
+		Addrs: address,
+		Ip: ip,
+		Country: country,
+		City: city,
+		Latency: float64(peerData.Latency/time.Millisecond) / 1000,
+	}
+
+	return peer
 }

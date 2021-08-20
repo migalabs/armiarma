@@ -14,12 +14,10 @@ import (
 	"github.com/protolambda/rumor/control/actor/base"
 	"github.com/protolambda/rumor/metrics"
 	"github.com/protolambda/rumor/metrics/prometheus"
-	"github.com/protolambda/rumor/metrics/utils"
+	//"github.com/protolambda/rumor/metrics/utils"
 	"github.com/protolambda/rumor/p2p/track"
 	log "github.com/sirupsen/logrus"
 )
-
-// TODO: This will be shared by both armiarma-client and server, so move to /metrics
 
 type TopicExportMetricsCmd struct {
 	*base.Base
@@ -37,7 +35,7 @@ type TopicExportMetricsCmd struct {
 
 func (c *TopicExportMetricsCmd) Defaul() {
 	c.ExportPeriod = 24 * time.Hour
-	c.BackupPeriod = 10 * time.Second
+	c.BackupPeriod = 5 * time.Second
 	c.RawFilePath = "gossip-metrics.json"
 	c.CustomMetricsPath = "custom-metrics.json"
 	c.PeerstorePath = "peerstore.json"
@@ -87,12 +85,6 @@ func (c *TopicExportMetricsCmd) Run(ctx context.Context, args ...string) error {
 				return
 			}
 
-			log.Info("Backup Export of the Metrics")
-			for _, peerId := range c.Store.Peers() {
-				peerData := c.Store.GetAllData(peerId)
-				peer := fetchPeerExtraInfo(peerData)
-				c.PeerStore.AddPeer(peer)
-			}
 			err := c.PeerStore.ExportMetrics(c.RawFilePath, c.PeerstorePath, c.CsvPath, c.Store)
 			if err != nil {
 				fmt.Println("ERROR TODO:")
@@ -113,35 +105,6 @@ func (c *TopicExportMetricsCmd) Run(ctx context.Context, args ...string) error {
 	})
 
 	return nil
-}
-
-// Convert from rumor PeerAllData to our Peer. Note that
-// some external data is fetched and some fields are parsed
-func fetchPeerExtraInfo(peerData *track.PeerAllData) metrics.Peer {
-	client, version := utils.FilterClientType(peerData.UserAgent)
-	address := utils.GetFullAddress(peerData.Addrs)
-
-	ip, country, city, err := utils.GetIpAndLocationFromAddrs(address)
-	if err != nil {
-		log.Error("error when fetching country/city from ip", err)
-	}
-
-	peer := metrics.Peer {
-		PeerId: peerData.PeerID.String(),
-		NodeId: peerData.NodeID.String(),
-		UserAgent: peerData.UserAgent,
-		ClientName: client,
-		ClientVersion: version,
-		ClientOS: "TODO",
-		Pubkey: peerData.Pubkey,
-		Addrs: address,
-		Ip: ip,
-		Country: country,
-		City: city,
-		Latency: float64(peerData.Latency/time.Millisecond) / 1000,
-	}
-
-	return peer
 }
 
 func (c *TopicExportMetricsCmd) UpdateFilesAndFolders(t time.Time) {

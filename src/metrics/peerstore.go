@@ -23,6 +23,7 @@ import (
 type PeerStore struct {
 	PeerStore   sync.Map
 	PeerCount   int
+	// TODO: Connected Peers? Directly populated by h.Network().Peers() for the client
 	MessageDatabase *database.MessageDatabase
 	StartTime       int64 // milliseconds
 	MsgNotChannels  map[string](chan bool)
@@ -193,6 +194,7 @@ func (c *PeerStore) GetPeerData(peerId string) (Peer, bool) {
 
 // Add new peer with all the information from the peerstore to the metrics db
 // returns: Alredy (Bool)
+// TODO: Join AddPeer and AddNewPeer?
 func (c *PeerStore) AddNewPeer(peerId string) bool {
 	_, ok := c.PeerStore.Load(peerId)
 	if !ok {
