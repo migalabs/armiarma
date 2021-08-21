@@ -5,24 +5,24 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/pkg/errors"
+	"github.com/protolambda/rumor/metrics/utils"
 	"io/ioutil"
 	"os"
 	"strings"
 	"sync"
-	"github.com/protolambda/rumor/metrics/utils"
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	//"github.com/protolambda/rumor/metrics/utils"
+	"github.com/libp2p/go-libp2p-core/host"
 	pgossip "github.com/protolambda/rumor/p2p/gossip"
 	"github.com/protolambda/rumor/p2p/gossip/database"
 	"github.com/protolambda/rumor/p2p/track"
-	"github.com/libp2p/go-libp2p-core/host"
 	log "github.com/sirupsen/logrus"
 )
 
 type PeerStore struct {
-	PeerStore   sync.Map
-	PeerCount   int
+	PeerStore sync.Map
+	PeerCount int
 	// TODO: Connected Peers? Directly populated by h.Network().Peers() for the client
 	MessageDatabase *database.MessageDatabase
 	StartTime       int64 // milliseconds
@@ -123,18 +123,18 @@ type GossipState struct {
 // Function that Wraps/Marshals the content of the sync.Map to be exported as a json
 func (c *PeerStore) MarshalMetrics() ([]byte, error) {
 	/*
-	exportTime := utils.GetTimeMiliseconds()
-	tmpMap := make(map[string]Peer)
-	c.PeerStore.Range(func(k, v interface{}) bool {
-		pm := v.(Peer)
-		if pm.ConnFlag {
-			pm.LastExport = exportTime
-		}
-		tmpMap[k.(peer.ID).String()] = pm
-		return true
-	})
+		exportTime := utils.GetTimeMiliseconds()
+		tmpMap := make(map[string]Peer)
+		c.PeerStore.Range(func(k, v interface{}) bool {
+			pm := v.(Peer)
+			if pm.ConnFlag {
+				pm.LastExport = exportTime
+			}
+			tmpMap[k.(peer.ID).String()] = pm
+			return true
+		})
 
-	return json.Marshal(tmpMap)
+		return json.Marshal(tmpMap)
 	*/
 	return nil, nil
 }

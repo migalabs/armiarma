@@ -1,18 +1,18 @@
 package metrics
 
 import (
-	"testing"
 	"github.com/stretchr/testify/require"
+	"testing"
 )
 
 func Test_PeerStore(t *testing.T) {
 	peerStore := NewPeerStore()
 	peerStore.AddPeer(Peer{
-		PeerId: "Peer1",
+		PeerId:     "Peer1",
 		ClientName: "Client1",
 	})
 	peerStore.AddPeer(Peer{
-		PeerId: "Peer2",
+		PeerId:     "Peer2",
 		ClientName: "Client2",
 	})
 
@@ -25,7 +25,7 @@ func Test_PeerStore(t *testing.T) {
 	require.Equal(t, p.ClientName, "Client2")
 
 	peerStore.AddPeer(Peer{
-		PeerId: "Peer1",
+		PeerId:     "Peer1",
 		ClientName: "Client3",
 	})
 

@@ -1,26 +1,26 @@
 package metrics
 
 import (
-	"strconv"
 	"fmt"
 	"github.com/protolambda/rumor/metrics/utils"
+	"strconv"
 )
 
 // Base Struct for the topic name and the received messages on the different topics
 // TODO: In the future we might reuse the Rumor struct and add the missing fields
 type Peer struct {
-	PeerId     string
-	NodeId     string
-	UserAgent  string
-	ClientName string
-	ClientOS   string //TODO:
-	ClientVersion    string
-	Pubkey     string
-	Addrs      string
-	Ip         string
-	Country    string
-	City       string
-	Latency    float64
+	PeerId        string
+	NodeId        string
+	UserAgent     string
+	ClientName    string
+	ClientOS      string //TODO:
+	ClientVersion string
+	Pubkey        string
+	Addrs         string
+	Ip            string
+	Country       string
+	City          string
+	Latency       float64
 
 	Attempted bool   // If the peer has been attempted to stablish a connection
 	Succeed   bool   // If the connection attempt has been successful
@@ -53,15 +53,15 @@ type Peer struct {
 func NewPeer(peerId string) Peer {
 	pm := Peer{
 		// TODO Check. What is the difference between Unknown and "" empty.
-		PeerId:     peerId,
-		NodeId:     "",
-		UserAgent:  "",
-		Pubkey:     "",
-		Addrs:      "",
-		Ip:         "",
-		Country:    "",
-		City:       "",
-		Latency:    0,
+		PeerId:    peerId,
+		NodeId:    "",
+		UserAgent: "",
+		Pubkey:    "",
+		Addrs:     "",
+		Ip:        "",
+		Country:   "",
+		City:      "",
+		Latency:   0,
 
 		Attempted: false,
 		Succeed:   false,
@@ -156,7 +156,7 @@ func (pm *Peer) ToCsvLine() string {
 		strconv.FormatUint(pm.AttesterSlashing.Cnt, 10) + "," +
 		strconv.FormatUint(pm.GetAllMessagesCount(), 10) + "\n"
 
-		return csvRow
+	return csvRow
 
 }
 

@@ -1,11 +1,11 @@
 package metrics
 
 import (
-	"testing"
 	"github.com/stretchr/testify/require"
+	"testing"
 )
 
 func Test_Peer(t *testing.T) {
-  // TODO
+	// TODO
 	require.Equal(t, 1, 1)
 }

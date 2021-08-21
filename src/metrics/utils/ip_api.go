@@ -1,13 +1,13 @@
 package utils
 
 import (
-  "strings"
-  "net/http"
-  "strconv"
-  "time"
-  "io/ioutil"
-  "encoding/json"
-  "github.com/pkg/errors"
+	"encoding/json"
+	"github.com/pkg/errors"
+	"io/ioutil"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
 )
 
 // IP-API message structure
@@ -59,7 +59,7 @@ func GetIpAndLocationFromAddrs(multiAddrs string) (ip string, country string, ci
 
 	// Check if the status of the request has been succesful
 	if ipApiResp.Status != "success" {
-    return ip, "", "", errors.Wrap(err, "could not get country and city from ip")
+		return ip, "", "", errors.Wrap(err, "could not get country and city from ip")
 	}
 
 	country = ipApiResp.Country
