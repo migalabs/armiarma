@@ -4,14 +4,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/pkg/errors"
-	"github.com/protolambda/rumor/metrics/utils"
 	"io/ioutil"
 	"os"
 	"strings"
 	"sync"
 
+	"github.com/pkg/errors"
+	"github.com/protolambda/rumor/metrics/utils"
+
+	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
+
 	//"github.com/protolambda/rumor/metrics/utils"
 	"github.com/libp2p/go-libp2p-core/host"
 	pgossip "github.com/protolambda/rumor/p2p/gossip"
@@ -32,6 +35,7 @@ type PeerStore struct {
 func NewPeerStore() PeerStore {
 	gm := PeerStore{
 		StartTime:      utils.GetTimeMiliseconds(),
+		PeerCount:      0,
 		MsgNotChannels: make(map[string](chan bool)),
 	}
 	return gm
