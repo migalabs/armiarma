@@ -105,7 +105,12 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host, store track
 			for tgap < c.Rescan {
 				p := randomPeer(peerList)
 				// loop until we arrive to a peer that we didn't connect before
-				_ = c.PeerStore.AddNewPeer(p.String())
+
+				// TODO: Add also IP taken from ENR of discovered peers
+				peerMetrics := metrics.Peer {
+					PeerId: p.String(),
+				}
+				c.PeerStore.AddPeer(peerMetrics)
 				_, ok := peerCache[p]
 				if ok {
 					if len(peerCache) == peerstoreLen {

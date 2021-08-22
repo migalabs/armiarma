@@ -56,19 +56,23 @@ func (c *HostNotifyCmd) listenCloseF(net network.Network, addr ma.Multiaddr) {
 }
 
 func (c *HostNotifyCmd) connectedF(net network.Network, conn network.Conn) {
-	_ = c.PeerStore.AddNewPeer(conn.RemotePeer().String())
-	c.PeerStore.AddConnectionEvent(conn.RemotePeer().String(), "Connection")
 	logrus.Info("connection detected: ", conn.RemotePeer().String())
-	
+
 	// request metadata as soon as we connect to a peer
 	peerData, err := PollPeerMetadata(conn.RemotePeer(), c.Base, c.PeerMetadataState, c.Store, c.PeerStore)
-
+	var peer metrics.Peer
 	if err == nil {
-		peer := fetchPeerExtraInfo(peerData)
-		c.PeerStore.AddPeer(peer)
+		peer = fetchPeerExtraInfo(peerData)
+		_ = peer
 	} else {
 		log.Info("could not get metadata for peer: ", conn.RemotePeer().String(), " err: ", err)
+		// TODO: Add also IP taken from ENR of discovered peers
+		peer = metrics.Peer {
+			PeerId: conn.RemotePeer().String(),
+		}
 	}
+	c.PeerStore.AddPeer(peer)
+	c.PeerStore.AddConnectionEvent(conn.RemotePeer().String(), "Connection")
 
 	// End of metric traces to track the connections and disconnections
 	c.Log.WithFields(logrus.Fields{

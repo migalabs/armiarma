@@ -192,22 +192,6 @@ func (c *PeerStore) GetPeerData(peerId string) (Peer, bool) {
 	return peerData.(Peer), ok
 }
 
-// Add new peer with all the information from the peerstore to the metrics db
-// returns: Alredy (Bool)
-// TODO: Join AddPeer and AddNewPeer?
-func (c *PeerStore) AddNewPeer(peerId string) bool {
-	_, ok := c.PeerStore.Load(peerId)
-	if !ok {
-		// We will just add the info that we have (the peerId)
-		Peer := NewPeer(peerId)
-		// Include it to the Peer DB
-		c.PeerStore.Store(peerId, Peer)
-		// return that wasn't already on the peerstore
-		return false
-	}
-	return true
-}
-
 // Add a connection Event to the given peer
 func (c *PeerStore) AddConnectionEvent(peerId string, connectionType string) {
 	pMetrics, ok := c.PeerStore.Load(peerId)
