@@ -110,7 +110,8 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host, store track
 				peerMetrics := metrics.Peer {
 					PeerId: p.String(),
 				}
-				c.PeerStore.AddPeer(peerMetrics)
+				_ = peerMetrics
+				//c.PeerStore.AddPeer(peerMetrics)
 				_, ok := peerCache[p]
 				if ok {
 					if len(peerCache) == peerstoreLen {

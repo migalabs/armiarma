@@ -7,6 +7,7 @@ import (
 	"github.com/protolambda/rumor/p2p/addrutil"
 	"github.com/protolambda/rumor/p2p/track"
 	"github.com/protolambda/zrnt/eth2/beacon"
+	"github.com/protolambda/rumor/metrics"
 	"github.com/sirupsen/logrus"
 	"time"
 )
@@ -18,6 +19,7 @@ type HandleENR struct {
 	FilterDigest beacon.ForkDigest `ask:"--filter-digest" help:"Only add peers with the given digest to the peerstore"`
 	TTL          time.Duration     `ask:"--ttl" help:"When adding the node, apply this TTL"`
 	Filtering    bool              `changed:"filter-digest"`
+	PeerStore *metrics.PeerStore
 }
 
 func (c *HandleENR) handle(log logrus.FieldLogger, res *enode.Node) error {
@@ -52,6 +54,14 @@ func (c *HandleENR) handle(log logrus.FieldLogger, res *enode.Node) error {
 			c.Store.SetAddr(peerID, addr, c.TTL)
 			log.WithFields(logrus.Fields{"id": res.ID().String()}).Infof("Updated ENR record")
 		}
+		// TODO: Add other information
+		// logrus.Info(peerID, res.IP(), res.ID(), " ", res.TCP(), " ", res.UDP())
+		// res.IP() res.ID() res.TCP() res.UDP()
+		peerMetrics := metrics.Peer {
+			PeerId: peerID.String(),
+			Ip: res.IP().String(),
+		}
+		c.PeerStore.AddPeer(peerMetrics)
 	}
 	return nil
 }

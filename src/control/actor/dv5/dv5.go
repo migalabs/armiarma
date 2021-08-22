@@ -7,6 +7,7 @@ import (
 	"github.com/protolambda/rumor/control/actor/base"
 	"github.com/protolambda/rumor/p2p/peering/dv5"
 	"github.com/protolambda/rumor/p2p/track"
+	"github.com/protolambda/rumor/metrics"
 )
 
 type Dv5State struct {
@@ -18,6 +19,7 @@ type Dv5Cmd struct {
 	*Dv5State
 
 	CurrentPeerstore track.DynamicPeerstore
+	PeerStore *metrics.PeerStore
 
 	dv5.Dv5Settings
 }
@@ -35,7 +37,7 @@ func (c *Dv5Cmd) Cmd(route string) (cmd interface{}, err error) {
 	case "lookup":
 		cmd = &Dv5LookupCmd{Base: c.Base, Dv5State: c.Dv5State}
 	case "random":
-		cmd = &Dv5RandomCmd{Base: c.Base, Dv5State: c.Dv5State, HandleENR: HandleENR{Store: c.CurrentPeerstore}}
+		cmd = &Dv5RandomCmd{Base: c.Base, Dv5State: c.Dv5State, HandleENR: HandleENR{Store: c.CurrentPeerstore, PeerStore: c.PeerStore}}
 	case "self":
 		cmd = &Dv5SelfCmd{Base: c.Base, Dv5State: c.Dv5State}
 	default:

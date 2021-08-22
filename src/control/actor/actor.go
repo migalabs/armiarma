@@ -215,7 +215,7 @@ func (c *ActorCmd) Cmd(route string) (cmd interface{}, err error) {
 		if settings == nil {
 			return nil, errors.New("Discv5 needs an ENR first. Use 'enr make'.")
 		}
-		cmd = &dv5.Dv5Cmd{Base: b, Dv5State: &c.Dv5State, Dv5Settings: settings, CurrentPeerstore: c.CurrentPeerstore}
+		cmd = &dv5.Dv5Cmd{Base: b, Dv5State: &c.Dv5State, Dv5Settings: settings, CurrentPeerstore: c.CurrentPeerstore, PeerStore: &c.PeerStore}
 	case "gossip":
 		store := c.CurrentPeerstore
 		if !store.Initialized() {

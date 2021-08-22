@@ -189,6 +189,9 @@ func (c *PeerStore) AddPeer(peer Peer) {
 
 func (c *PeerStore) GetPeerData(peerId string) (Peer, bool) {
 	peerData, ok := c.PeerStore.Load(peerId)
+	if !ok {
+		return Peer{}, ok
+	}
 	return peerData.(Peer), ok
 }
 
@@ -316,9 +319,11 @@ func (c *PeerStore) ExportToCSV(filePath string) error {
 
 // Function that Manages the metrics updates for the incoming messages
 func (c *PeerStore) IncomingMessageManager(peerId string, topicName string) error {
-	pMetrics, _ := c.PeerStore.Load(peerId)
-	Peer := pMetrics.(Peer)
-	messageMetrics, err := GetMessageMetrics(&Peer, topicName)
+	peerData, found := c.GetPeerData(peerId)
+	if !found {
+		return errors.New("could not find peer: " + peerId)
+	}
+	messageMetrics, err := GetMessageMetrics(&peerData, topicName)
 	if err != nil {
 		return errors.New("Topic Name no supported")
 	}
@@ -330,7 +335,7 @@ func (c *PeerStore) IncomingMessageManager(peerId string, topicName string) erro
 	messageMetrics.StampTime("last")
 
 	// Store back the Loaded/Modified Variable
-	c.PeerStore.Store(peerId, Peer)
+	c.PeerStore.Store(peerId, peerData)
 
 	return nil
 }
