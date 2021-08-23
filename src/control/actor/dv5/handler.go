@@ -54,7 +54,7 @@ func (c *HandleENR) handle(log logrus.FieldLogger, res *enode.Node) error {
 			c.Store.SetAddr(peerID, addr, c.TTL)
 			log.WithFields(logrus.Fields{"id": res.ID().String()}).Infof("Updated ENR record")
 		}
-		// TODO: Add other information
+		// TODO: Add other information (i.e. country)
 		// logrus.Info(peerID, res.IP(), res.ID(), " ", res.TCP(), " ", res.UDP())
 		// res.IP() res.ID() res.TCP() res.UDP()
 		peerMetrics := metrics.Peer {

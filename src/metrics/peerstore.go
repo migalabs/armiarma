@@ -2,28 +2,24 @@ package metrics
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"github.com/pkg/errors"
-	"github.com/protolambda/rumor/metrics/utils"
-	"io/ioutil"
 	"os"
 	"strings"
 	"sync"
+	"time"
 
+	"github.com/pkg/errors"
 	"github.com/libp2p/go-libp2p-core/peer"
-	//"github.com/protolambda/rumor/metrics/utils"
 	"github.com/libp2p/go-libp2p-core/host"
-	pgossip "github.com/protolambda/rumor/p2p/gossip"
+	"github.com/protolambda/rumor/metrics/utils"
 	"github.com/protolambda/rumor/p2p/gossip/database"
-	"github.com/protolambda/rumor/p2p/track"
+	pgossip "github.com/protolambda/rumor/p2p/gossip"
 	log "github.com/sirupsen/logrus"
 )
 
 type PeerStore struct {
 	PeerStore sync.Map
 	PeerCount int
-	// TODO: Connected Peers? Directly populated by h.Network().Peers() for the client
 	MessageDatabase *database.MessageDatabase
 	StartTime       int64 // milliseconds
 	MsgNotChannels  map[string](chan bool)
@@ -37,12 +33,6 @@ func NewPeerStore() PeerStore {
 	return gm
 }
 
-// Connection event model
-type ConnectionEvents struct {
-	ConnectionType string
-	TimeMili       int64
-}
-
 // Exists reports whether the named file or directory exists.
 func FileExists(name string) bool {
 	if _, err := os.Stat(name); err != nil {
@@ -53,62 +43,12 @@ func FileExists(name string) bool {
 	return true
 }
 
-type Checkpoint struct {
-	Checkpoint string `json:"checkpoint"`
-}
+func (c *PeerStore) ImportPeerStoreMetrics(importFolder string) error {
+	// TODO: Load to memory an existing csv
+	// Perhaps not needed since we are migrating to a database
+	// See: https://github.com/migalabs/armiarma/pull/18
 
-// Import an old PeerStore from given file
-// return: - return error if there was error while reading the file
-//         - return bool for existing file (true if there was a file to read, return false if there wasn't a file to read)
-func (c *PeerStore) ImportMetrics(importFolder string) (error, bool) {
-	// Check if there is any checkpoint file in the folder
-	cpFile := importFolder + "/metrics/checkpoint-folder.json"
-	if FileExists(cpFile) { // if exists, read it
-		// get the json of the file
-		fmt.Println("Importing Checkpoint Json:", cpFile)
-		cp, err := os.Open(cpFile)
-		if err != nil {
-			return err, true
-		}
-		cpBytes, err := ioutil.ReadAll(cp)
-		if err != nil {
-			return err, true
-		}
-		cpFolder := Checkpoint{}
-		json.Unmarshal(cpBytes, &cpFolder)
-		importFile := importFolder + "/metrics/" + cpFolder.Checkpoint + "/gossip-metrics.json"
-		// Check if file exist
-		if FileExists(importFile) { // if exists, read it
-			// get the json of the file
-			fmt.Println("Importing Gossip-Metrics Json:", importFile)
-			jsonFile, err := os.Open(importFile)
-			if err != nil {
-				return err, true
-			}
-			byteValue, err := ioutil.ReadAll(jsonFile)
-			if err != nil {
-				return err, true
-			}
-			tempMap := make(map[peer.ID]Peer)
-			json.Unmarshal(byteValue, &tempMap)
-			// iterate to add the metrics from the json to the the PeerStore
-			for k, v := range tempMap {
-				if v.ConnFlag {
-					v.TotDisconnections += 1
-					v.LastDisconn = v.LastExport
-					v.TotConnTime += (v.LastExport - v.LastConn)
-					v.ConnFlag = false
-				}
-				c.PeerStore.Store(k, v)
-			}
-			return nil, true
-		} else {
-			return nil, false
-		}
-	} else {
-		fmt.Println("NO previous Checkpoint")
-		return nil, false
-	}
+	return nil
 }
 
 type GossipState struct {
@@ -118,35 +58,6 @@ type GossipState struct {
 	Topics sync.Map
 	// Validation Filter Flag
 	SeenFilter bool
-}
-
-// Function that Wraps/Marshals the content of the sync.Map to be exported as a json
-func (c *PeerStore) MarshalMetrics() ([]byte, error) {
-	/*
-		exportTime := utils.GetTimeMiliseconds()
-		tmpMap := make(map[string]Peer)
-		c.PeerStore.Range(func(k, v interface{}) bool {
-			pm := v.(Peer)
-			if pm.ConnFlag {
-				pm.LastExport = exportTime
-			}
-			tmpMap[k.(peer.ID).String()] = pm
-			return true
-		})
-
-		return json.Marshal(tmpMap)
-	*/
-	return nil, nil
-}
-
-// Function that Wraps/Marshals the content of the Entire Peerstore into a json
-func (c *PeerStore) MarshalPeerStore(ep track.ExtendedPeerstore) ([]byte, error) {
-	peers := ep.Peers()
-	peerData := make(map[string]*track.PeerAllData)
-	for _, p := range peers {
-		peerData[p.String()] = ep.GetAllData(p)
-	}
-	return json.Marshal(peerData)
 }
 
 // Function that resets to 0 the connections/disconnections, and message counters
@@ -196,34 +107,29 @@ func (c *PeerStore) GetPeerData(peerId string) (Peer, bool) {
 }
 
 // Add a connection Event to the given peer
-func (c *PeerStore) AddConnectionEvent(peerId string, connectionType string) {
+func (c *PeerStore) AddConnectionEvent(peerId string, direction string) error {
 	pMetrics, ok := c.PeerStore.Load(peerId)
 	if ok {
-		currTime := utils.GetTimeMiliseconds()
-		newConnection := ConnectionEvents{
-			ConnectionType: connectionType,
-			TimeMili:       currTime,
-		}
-		Peer := pMetrics.(Peer)
-		Peer.ConnectionEvents = append(Peer.ConnectionEvents, newConnection)
-		if connectionType == "Connection" {
-			Peer.Connected = true
-			// add the connections
-			Peer.TotConnections += 1
-			Peer.LastConn = currTime // Current time in SECs
-			Peer.ConnFlag = true
-		} else {
-			// add the disconnections and sum the time
-			Peer.TotDisconnections += 1
-			Peer.LastDisconn = currTime // Current time in SECs
-			Peer.TotConnTime += Peer.LastDisconn - Peer.LastConn
-			Peer.ConnFlag = false
-		}
-		c.PeerStore.Store(peerId, Peer)
+		peer := pMetrics.(Peer)
+		peer.AddConnectionEvent(direction, time.Now())
+		c.PeerStore.Store(peerId, peer)
 	} else {
-		// Might be possible to add
-		fmt.Println("Counld't add Event, Peer is not in the list")
+		return errors.New("could not add event, peer is not in the list")
 	}
+	return nil
+}
+
+// Add a connection Event to the given peer
+func (c *PeerStore) AddDisconnectionEvent(peerId string) error {
+	pMetrics, ok := c.PeerStore.Load(peerId)
+	if ok {
+		peer := pMetrics.(Peer)
+		peer.AddDisconnectionEvent(time.Now())
+		c.PeerStore.Store(peerId, peer)
+	} else {
+		return errors.New("could not add event, peer is not in the list")
+	}
+	return nil
 }
 
 // Add a connection Event to the given peer
@@ -238,7 +144,7 @@ func (c *PeerStore) AddMetadataEvent(peerId string, success bool) {
 		c.PeerStore.Store(peerId, Peer)
 	} else {
 		// Might be possible to add
-		fmt.Println("Counld't add Event, Peer is not in the list")
+		fmt.Println("Counld't add Event, Peer is not in the list: ", peerId)
 	}
 }
 
@@ -265,23 +171,6 @@ func (gm *PeerStore) AddNewConnectionAttempt(id peer.ID, succeed bool, err strin
 		p.Error = "None"
 	}
 	p.Attempts += 1
-
-	// Store the new struct in the sync.Map
-	gm.PeerStore.Store(id, p)
-	return nil
-}
-
-// AddNewAttempts adds the resuts of a new attempt over an existing peer
-// increasing the attempt counter and the respective fields
-func (gm *PeerStore) AddNewConnection(id peer.ID) error {
-	v, ok := gm.PeerStore.Load(id)
-	if !ok { // the peer was already in the sync.Map return true
-		return fmt.Errorf("Not peer found with that ID %s", id.String())
-	}
-	// Update the counter and connection status
-	p := v.(Peer)
-
-	p.Connected = true
 
 	// Store the new struct in the sync.Map
 	gm.PeerStore.Store(id, p)

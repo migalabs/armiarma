@@ -51,7 +51,6 @@ func PollPeerMetadata(p peer.ID, base *base.Base, peerMetadataState *metadata.Pe
 			peerData := pingCmd.Store.GetAllData(peerId)
 			// TODO: Or another criteria for non empty metadata
 			if peerData.UserAgent != "" {
-				log.Info("Metadata not empty: ", p.String(), "UserAgent: ", peerData.UserAgent)
 				return peerData, nil
 			}
 		}

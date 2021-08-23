@@ -47,6 +47,7 @@ func (c *PrometheusRunner) Run(ctx context.Context) error {
 
 			// TODO: Use the Gossip Metrics to populate the metrics
 			nOfDiscoveredPeers := 0
+			nOfConnectedPeers := 0
 			geoDist := make(map[string]float64)
 
 			c.PeerStore.PeerStore.Range(func(k, val interface{}) bool {
@@ -55,7 +56,10 @@ func (c *PrometheusRunner) Run(ctx context.Context) error {
 				// TODO: Rethink this criteria
 				if peerData.ClientName != "Unknown" && peerData.ClientName != "" {
 					clients.AddClientVersion(peerData.ClientName, peerData.ClientVersion)
+				}
 
+				if peerData.IsConnected {
+					nOfConnectedPeers++
 				}
 
 				// TODO: Expose also the city
@@ -66,18 +70,17 @@ func (c *PrometheusRunner) Run(ctx context.Context) error {
 					geoDist[peerData.Country] = 1
 				}
 
-				//connectedPeers.Set(TODO)
-				//receivedTotalMessages.Set(TODO)
-
-				//receivedMessages.WithLabelValues("beacon_blocks").Set(TODO)
-				//receivedMessages.WithLabelValues("beacon_aggregate_and_proof").Set(TODO)
-
 				nOfDiscoveredPeers++
 
 				return true
 			})
 
 			totPeers.Set(float64(nOfDiscoveredPeers))
+			connectedPeers.Set(float64(nOfConnectedPeers))
+			//receivedTotalMessages.Set(TODO)
+
+			//receivedMessages.WithLabelValues("beacon_blocks").Set(TODO)
+			//receivedMessages.WithLabelValues("beacon_aggregate_and_proof").Set(TODO)
 
 			for _, clientName := range clients.GetClientNames() {
 				count := clients.GetCountOfClient(clientName)
@@ -90,12 +93,11 @@ func (c *PrometheusRunner) Run(ctx context.Context) error {
 				geoDistribution.WithLabelValues(k).Set(v)
 			}
 
-			// TODO: Add numOfPeersWithMetadata
-
 			log.WithFields(log.Fields{
 				"ClientsDist":        clients,
 				"GeoDist":            geoDist,
 				"NOfDiscoveredPeers": nOfDiscoveredPeers,
+				"NOfConnectedPeers":  nOfConnectedPeers,
 			}).Info("Metrics summary")
 
 			time.Sleep(c.RefreshInterval)

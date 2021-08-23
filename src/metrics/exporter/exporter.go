@@ -27,7 +27,6 @@ func (c *Exporter) Run(ctx context.Context) error {
 
 	go func() {
 		for {
-			log.Info("Exporting metrics from peerstore")
 			err := c.PeerStore.ExportToCSV(c.CsvFileName)
 			if err != nil {
 				log.Error("could not export peerstore to csv: ", err)

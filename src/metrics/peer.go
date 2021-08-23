@@ -2,8 +2,9 @@ package metrics
 
 import (
 	"fmt"
-	"github.com/protolambda/rumor/metrics/utils"
 	"strconv"
+	"time"
+	log "github.com/sirupsen/logrus"
 )
 
 // Base Struct for the topic name and the received messages on the different topics
@@ -21,25 +22,20 @@ type Peer struct {
 	Country       string
 	City          string
 	Latency       float64
+	// TODO: Store Enr
 
-	Attempted bool   // If the peer has been attempted to stablish a connection
-	Succeed   bool   // If the connection attempt has been successful
-	Connected bool   // If the peer was at any point connected by the crawler (keep count of incoming dials)
-	Attempts  int    // Number of attempts done
-	Error     string // Type of error that we detected
+	ConnectedDirection string
+	IsConnected        bool
+	Attempted          bool   // If the peer has been attempted to stablish a connection
+	Succeed            bool   // If the connection attempt has been successful
+	Attempts           uint64 // Number of attempts done
+	Error              string // Type of error that we detected
+	ConnectionTimes    []time.Time
+	DisconnectionTimes []time.Time
 
-	MetadataRequest bool // If the peer has been attempted to request its metadata
-	MetadataSucceed bool // If the peer has been successfully requested its metadata
-
-	ConnectionEvents []ConnectionEvents
-
-	TotConnections    int64
-	LastConn          int64 //(timestamp in seconds of the last exported time (backup for when we are loading the Peer)
-	TotDisconnections int64
-	LastDisconn       int64 //(timestamp in seconds of the last exported time (backup for when we are loading the Peer)
-	TotConnTime       int64
-	ConnFlag          bool  // Flag that points if the peer was connected (for re-loading purposes)
-	LastExport        int64 //(timestamp in seconds of the last exported time (backup for when we are loading the Peer)
+	MetadataRequest bool  // If the peer has been attempted to request its metadata
+	MetadataSucceed bool  // If the peer has been successfully requested its metadata
+	LastExport      int64 //(timestamp in seconds of the last exported time (backup for when we are loading the Peer)
 
 	// Counters for the different topics
 	BeaconBlock          MessageMetrics
@@ -65,21 +61,17 @@ func NewPeer(peerId string) Peer {
 
 		Attempted: false,
 		Succeed:   false,
-		Connected: false,
 		Attempts:  0,
 		Error:     "None",
 
-		MetadataRequest: false,
-		MetadataSucceed: false,
+		MetadataRequest:    false,
+		MetadataSucceed:    false,
+		IsConnected:        false,
+		ConnectedDirection: "",
+		LastExport:         0,
 
-		ConnectionEvents:  make([]ConnectionEvents, 0),
-		TotConnections:    0,
-		LastConn:          0,
-		TotDisconnections: 0,
-		LastDisconn:       0,
-		TotConnTime:       0,
-		ConnFlag:          false,
-		LastExport:        0,
+		ConnectionTimes:    make([]time.Time, 0),
+		DisconnectionTimes: make([]time.Time, 0),
 
 		// Counters for the different topics
 		BeaconBlock:          NewMessageMetrics(),
@@ -93,7 +85,6 @@ func NewPeer(peerId string) Peer {
 
 func (pm *Peer) ResetDynamicMetrics() {
 	pm.Attempts = 0
-	pm.ConnectionEvents = make([]ConnectionEvents, 0)
 	pm.BeaconBlock = NewMessageMetrics()
 	pm.BeaconAggregateProof = NewMessageMetrics()
 	pm.VoluntaryExit = NewMessageMetrics()
@@ -109,25 +100,36 @@ func (pm *Peer) GetAllMessagesCount() uint64 {
 		pm.ProposerSlashing.Cnt)
 }
 
-// TODO: quick copy paste
-// filter the received Connection/Disconnection events generating a counter and the connected time
-func AnalyzeConnDisconnTime(pm *Peer, currentTime int64) (int64, int64, float64) {
-	var connTime int64
-	// Use the counters in the PeerMetrics to check if the peer is still connected
-	if pm.ConnFlag {
-		connTime = pm.TotConnTime + (currentTime - pm.LastConn)
-	} else {
-		connTime = pm.TotConnTime
+// Register when a new connection was detected
+func (pm *Peer) AddConnectionEvent(direction string, time time.Time) {
+	pm.ConnectionTimes = append(pm.ConnectionTimes, time)
+	pm.IsConnected = true
+	pm.ConnectedDirection = direction
+}
+
+// Register when a disconnection was detected
+func (pm *Peer) AddDisconnectionEvent(time time.Time) {
+	pm.DisconnectionTimes = append(pm.DisconnectionTimes, time)
+	pm.IsConnected = false
+	pm.ConnectedDirection = ""
+}
+
+// Calculate the total connected time based on con/disc timestamps
+func (pm *Peer) GetConnectedTime() float64 {
+	var totalConnectedTime int64
+	for _, conTime := range pm.ConnectionTimes {
+		for _, discTime := range pm.DisconnectionTimes {
+			singleConnectionTime := discTime.Sub(conTime).Milliseconds()
+			if singleConnectionTime >= 0 {
+				totalConnectedTime += singleConnectionTime
+				break
+			}
+		}
 	}
-	pm.LastExport = currentTime
-	return pm.TotConnections, pm.TotDisconnections, float64(connTime) / 60000 // return the connection time in minutes ( / 60)
+	return float64(totalConnectedTime) / 60000
 }
 
 func (pm *Peer) ToCsvLine() string {
-	// TODO: Perhaps move the following three lines somewhere else
-	expTime := utils.GetTimeMiliseconds()
-	connections, disconnections, connTime := AnalyzeConnDisconnTime(pm, expTime)
-
 	csvRow := pm.PeerId + "," +
 		pm.NodeId + "," +
 		pm.UserAgent + "," +
@@ -142,13 +144,13 @@ func (pm *Peer) ToCsvLine() string {
 		strconv.FormatBool(pm.MetadataSucceed) + "," +
 		strconv.FormatBool(pm.Attempted) + "," +
 		strconv.FormatBool(pm.Succeed) + "," +
-		strconv.FormatBool(pm.Connected) + "," +
-		strconv.Itoa(pm.Attempts) + "," +
+		strconv.FormatBool(pm.IsConnected) + "," +
+		strconv.FormatUint(pm.Attempts, 10) + "," +
 		pm.Error + "," +
 		fmt.Sprint(pm.Latency) + "," +
-		strconv.FormatInt(connections, 10) + "," +
-		strconv.FormatInt(disconnections, 10) + "," +
-		fmt.Sprintf("%.3f", connTime) + "," +
+		fmt.Sprintf("%d", len(pm.ConnectionTimes)) + "," +
+		fmt.Sprintf("%d", len(pm.DisconnectionTimes)) + "," +
+		fmt.Sprintf("%.3f", pm.GetConnectedTime()) + "," +
 		strconv.FormatUint(pm.BeaconBlock.Cnt, 10) + "," +
 		strconv.FormatUint(pm.BeaconAggregateProof.Cnt, 10) + "," +
 		strconv.FormatUint(pm.VoluntaryExit.Cnt, 10) + "," +
@@ -157,9 +159,21 @@ func (pm *Peer) ToCsvLine() string {
 		strconv.FormatUint(pm.GetAllMessagesCount(), 10) + "\n"
 
 	return csvRow
-
 }
 
 func (pm *Peer) LogPeer() {
-	// TODO
+	log.WithFields(log.Fields{
+		"PeerId":        pm.PeerId,
+		"NodeId":        pm.NodeId,
+		"UserAgent":     pm.UserAgent,
+		"ClientName":    pm.ClientName,
+		"ClientOS":      pm.ClientOS,
+		"ClientVersion": pm.ClientVersion,
+		"Pubkey":        pm.Pubkey,
+		"Addrs":         pm.Addrs,
+		"Ip":            pm.Ip,
+		"Country":       pm.Country,
+		"City":          pm.City,
+		"Latency":       pm.Latency,
+	}).Info("Peer Info")
 }
