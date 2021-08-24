@@ -13,6 +13,7 @@ import (
 	"github.com/protolambda/rumor/metrics"
 	"github.com/protolambda/rumor/p2p/track"
 	"github.com/protolambda/zrnt/eth2/beacon"
+	log "github.com/sirupsen/logrus"
 )
 
 type PeerConnectRandomCmd struct {
@@ -141,16 +142,26 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host, store track
 				// try to connect the peer
 				attempts := 0
 				for attempts <= c.MaxRetries {
+					// TODO: Workaround to ensure the peer is already added.
+					// If the peer was already discovered it should be here, but
+					// apparently thats not the case
+					// TODO: Add IP, parse addrInfo.Addrs
+					c.PeerStore.AddPeer(metrics.Peer{PeerId:p.String()})
 					if err := h.Connect(ctx, addrInfo); err != nil {
 						// the connetion failed
 						attempts += 1
-						c.PeerStore.AddNewConnectionAttempt(p, false, err.Error())
+						err := c.PeerStore.AddNewConnectionAttempt(p.String(), false, err.Error())
+						if err != nil {
+							log.Error("could not add new connection attemp: ", err)
+						}
 						c.Log.WithError(err).Warnf("attempts %d failed connection attempt", attempts)
 						continue
 					} else { // connection successfuly made
 						c.Log.Infof("peer_id %s successful connection made", p)
-						c.PeerStore.AddNewConnectionAttempt(p, true, "None")
-						// break the loop
+						err := c.PeerStore.AddNewConnectionAttempt(p.String(), true, "None")
+						if err != nil {
+							log.Error("could not add new connection attemp: ", err)
+						}
 						break
 					}
 					if attempts > c.MaxRetries {

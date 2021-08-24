@@ -2,9 +2,12 @@ package metrics
 
 import (
 	"fmt"
+	"github.com/pkg/errors"
+	"github.com/protolambda/rumor/metrics/utils"
+	pgossip "github.com/protolambda/rumor/p2p/gossip"
+	log "github.com/sirupsen/logrus"
 	"strconv"
 	"time"
-	log "github.com/sirupsen/logrus"
 )
 
 // Base Struct for the topic name and the received messages on the different topics
@@ -29,7 +32,7 @@ type Peer struct {
 	Attempted          bool   // If the peer has been attempted to stablish a connection
 	Succeed            bool   // If the connection attempt has been successful
 	Attempts           uint64 // Number of attempts done
-	Error              string // Type of error that we detected
+	Error              string // Type of error that we detected. TODO: We are just storing the last one
 	ConnectionTimes    []time.Time
 	DisconnectionTimes []time.Time
 
@@ -93,11 +96,11 @@ func (pm *Peer) ResetDynamicMetrics() {
 }
 
 func (pm *Peer) GetAllMessagesCount() uint64 {
-	return (pm.BeaconBlock.Cnt +
-		pm.BeaconAggregateProof.Cnt +
-		pm.VoluntaryExit.Cnt +
-		pm.AttesterSlashing.Cnt +
-		pm.ProposerSlashing.Cnt)
+	return (pm.BeaconBlock.Count +
+		pm.BeaconAggregateProof.Count +
+		pm.VoluntaryExit.Count +
+		pm.AttesterSlashing.Count +
+		pm.ProposerSlashing.Count)
 }
 
 // Register when a new connection was detected
@@ -114,6 +117,21 @@ func (pm *Peer) AddDisconnectionEvent(time time.Time) {
 	pm.ConnectedDirection = ""
 }
 
+// Register when a connection attempt was made. Note that there is some
+// overlap with AddConnectionEvent
+func (pm *Peer) AddNewConnectionAttempt(succeed bool, err string) {
+	pm.Attempts += 1
+	if !pm.Attempted {
+		pm.Attempted = true
+	}
+	if succeed {
+		pm.Succeed = succeed
+		pm.Error = "None"
+	} else {
+		pm.Error = utils.FilterError(err)
+	}
+}
+
 // Calculate the total connected time based on con/disc timestamps
 func (pm *Peer) GetConnectedTime() float64 {
 	var totalConnectedTime int64
@@ -127,6 +145,24 @@ func (pm *Peer) GetConnectedTime() float64 {
 		}
 	}
 	return float64(totalConnectedTime) / 60000
+}
+
+func (pm *Peer) GetMessageMetrics(topicName string) (*MessageMetrics, error) {
+	// All this could be inside a different function
+	switch topicName {
+	case pgossip.BeaconBlock:
+		return &pm.BeaconBlock, nil
+	case pgossip.BeaconAggregateProof:
+		return &pm.BeaconAggregateProof, nil
+	case pgossip.VoluntaryExit:
+		return &pm.VoluntaryExit, nil
+	case pgossip.ProposerSlashing:
+		return &pm.ProposerSlashing, nil
+	case pgossip.AttesterSlashing:
+		return &pm.AttesterSlashing, nil
+	default:
+		return nil, errors.New("unknown topic name: " + topicName)
+	}
 }
 
 func (pm *Peer) ToCsvLine() string {
@@ -151,11 +187,11 @@ func (pm *Peer) ToCsvLine() string {
 		fmt.Sprintf("%d", len(pm.ConnectionTimes)) + "," +
 		fmt.Sprintf("%d", len(pm.DisconnectionTimes)) + "," +
 		fmt.Sprintf("%.3f", pm.GetConnectedTime()) + "," +
-		strconv.FormatUint(pm.BeaconBlock.Cnt, 10) + "," +
-		strconv.FormatUint(pm.BeaconAggregateProof.Cnt, 10) + "," +
-		strconv.FormatUint(pm.VoluntaryExit.Cnt, 10) + "," +
-		strconv.FormatUint(pm.ProposerSlashing.Cnt, 10) + "," +
-		strconv.FormatUint(pm.AttesterSlashing.Cnt, 10) + "," +
+		strconv.FormatUint(pm.BeaconBlock.Count, 10) + "," +
+		strconv.FormatUint(pm.BeaconAggregateProof.Count, 10) + "," +
+		strconv.FormatUint(pm.VoluntaryExit.Count, 10) + "," +
+		strconv.FormatUint(pm.ProposerSlashing.Count, 10) + "," +
+		strconv.FormatUint(pm.AttesterSlashing.Count, 10) + "," +
 		strconv.FormatUint(pm.GetAllMessagesCount(), 10) + "\n"
 
 	return csvRow

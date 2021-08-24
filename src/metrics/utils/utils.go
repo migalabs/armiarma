@@ -2,7 +2,6 @@ package utils
 
 import (
 	"strings"
-	"time"
 )
 
 // Client utils
@@ -51,6 +50,24 @@ func FilterClientType(userAgent string) (string, string) {
 	return client, version
 }
 
+// funtion that formats the error into a Pretty understandable (standard) way
+// also important to cohesionate the extra-metrics output csv
+func FilterError(err string) string {
+	errorPretty := "Uncertain"
+	// filter the error type
+	if strings.Contains(err, "connection reset by peer") {
+		errorPretty = "Connection reset by peer"
+	} else if strings.Contains(err, "i/o timeout") {
+		errorPretty = "i/o timeout"
+	} else if strings.Contains(err, "dial to self attempted") {
+		errorPretty = "dial to self attempted"
+	} else if strings.Contains(err, "dial backoff") {
+		errorPretty = "dial backoff"
+	}
+
+	return errorPretty
+}
+
 // Get the Real Ip Address from the multi Address list
 // TODO: Implement the Private IP filter in a better way
 func GetFullAddress(multiAddrs []string) string {
@@ -68,13 +85,4 @@ func GetFullAddress(multiAddrs []string) string {
 		address = "/ip4/127.0.0.1/tcp/9000"
 	}
 	return address
-}
-
-func GetTimeMiliseconds() int64 {
-	now := time.Now()
-	//secs := now.Unix()
-	nanos := now.UnixNano()
-	millis := nanos / 1000000
-
-	return millis
 }

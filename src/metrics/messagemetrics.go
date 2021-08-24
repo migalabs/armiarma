@@ -2,40 +2,39 @@ package metrics
 
 import (
 	"fmt"
-	"github.com/protolambda/rumor/metrics/utils"
+	"time"
 )
 
 // Information regarding the messages received on the beacon_lock topic
 type MessageMetrics struct {
-	Cnt              uint64
-	FirstMessageTime int64
-	LastMessageTime  int64
+	Count            uint64
+	FirstMessageTime time.Time
+	LastMessageTime  time.Time
 }
 
 func NewMessageMetrics() MessageMetrics {
 	mm := MessageMetrics{
-		Cnt:              uint64(0),
-		FirstMessageTime: 0,
-		LastMessageTime:  0,
+		Count:            uint64(0),
+		FirstMessageTime: time.Time{},
+		LastMessageTime:  time.Time{},
 	}
 	return mm
 }
 
 // Increments the counter of the topic
 func (c *MessageMetrics) IncrementCnt() uint64 {
-	c.Cnt++
-	return c.Cnt
+	c.Count++
+	return c.Count
 }
 
 // Stamps linux_time(millis) on the FirstMessageTime/LastMessageTime from given args: time (int64), flag string("first"/"last")
 func (c *MessageMetrics) StampTime(flag string) {
-	unixMillis := utils.GetTimeMiliseconds()
-
+	now := time.Now()
 	switch flag {
 	case "first":
-		c.FirstMessageTime = unixMillis
+		c.FirstMessageTime = now
 	case "last":
-		c.LastMessageTime = unixMillis
+		c.LastMessageTime = now
 	default:
 		fmt.Println("Metrics Package -> StampTime.flag wrongly parsed")
 	}

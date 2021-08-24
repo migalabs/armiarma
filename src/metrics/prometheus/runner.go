@@ -93,11 +93,14 @@ func (c *PrometheusRunner) Run(ctx context.Context) error {
 				geoDistribution.WithLabelValues(k).Set(v)
 			}
 
+			allLastErrors := c.PeerStore.GetErrorCounter()
+
 			log.WithFields(log.Fields{
 				"ClientsDist":        clients,
 				"GeoDist":            geoDist,
 				"NOfDiscoveredPeers": nOfDiscoveredPeers,
 				"NOfConnectedPeers":  nOfConnectedPeers,
+				"LastErrors":         allLastErrors,
 			}).Info("Metrics summary")
 
 			time.Sleep(c.RefreshInterval)
