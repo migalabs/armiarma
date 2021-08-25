@@ -68,84 +68,13 @@ func (c *PeerStore) AddNotChannel(topicName string) {
 }
 
 // Adds or updates peer
-func (c *PeerStore) AddPeer(peer Peer) {
-	oldData, loaded := c.PeerStore.LoadOrStore(peer.PeerId, peer)
-
-	// If already present
-	if loaded {
-		// TODO: We could also store the old data if there was a change. For example
-		// if a given client upgrated it version. Use oldData
-		// See: https://github.com/migalabs/armiarma/issues/17
-		// Currently just overwritting what was before
-		_ = oldData // TODO:
-		c.PeerStore.Store(peer.PeerId, peer)
-	}
-}
-
-// Add a connection Event to the given peer
-func (c *PeerStore) ConnectionEvent(peerId string, direction string) error {
-	pMetrics, ok := c.PeerStore.Load(peerId)
-	if ok {
-		peer := pMetrics.(Peer)
-		peer.ConnectionEvent(direction, time.Now())
-		c.PeerStore.Store(peerId, peer)
-		return nil
-	}
-	return errors.New("could not add event, peer is not in the list")
-}
-
-// Add a connection Event to the given peer
-func (c *PeerStore) DisconnectionEvent(peerId string) error {
-	pMetrics, ok := c.PeerStore.Load(peerId)
-	if ok {
-		peer := pMetrics.(Peer)
-		peer.DisconnectionEvent(time.Now())
-		c.PeerStore.Store(peerId, peer)
-		return nil
-	}
-	return errors.New("could not add connection event, peer is not in the list")
-}
-
-// Add a connection Event to the given peer
-func (c *PeerStore) MetadataEvent(peerId string, success bool) error {
-	pMetrics, ok := c.PeerStore.Load(peerId)
-	if ok {
-		Peer := pMetrics.(Peer)
-		Peer.MetadataRequest = true
-		if success {
-			Peer.MetadataSucceed = true
-		}
-		c.PeerStore.Store(peerId, Peer)
-		return nil
-	}
-	return errors.New("counld't add Event, Peer is not in the list: " + peerId)
-}
-
-// AddNewAttempts adds the resuts of a new attempt over an existing peer
-// increasing the attempt counter and the respective fields
-func (gm *PeerStore) ConnectionAttemptEvent(peerId string, succeed bool, err string) error {
-	pMetrics, ok := gm.PeerStore.Load(peerId)
-	if ok {
-		peer := pMetrics.(Peer)
-		peer.ConnectionAttemptEvent(succeed, err)
-		gm.PeerStore.Store(peerId, peer)
-		return nil
-	}
-	return errors.New("could not add connection attempt, peer is not in the list")
-}
-
-// Function that Manages the metrics updates for the incoming messages
-// TODO: Rename to AddNewMessageEvent or something like that
-func (c *PeerStore) MessageEvent(peerId string, topicName string) error {
-	pMetrics, ok := c.PeerStore.Load(peerId)
-	if ok {
-		peer := pMetrics.(Peer)
-		peer.MessageEvent(topicName, time.Now())
-		c.PeerStore.Store(peerId, peer)
-	} else {
-		return errors.New("could not add incomming message to topics list")
-	}
-	return nil
+func (c *PeerStore) StorePeer(peer Peer) {
+	// TODO: We could also store the old data if there was a change. For example
+	// if a given client upgrated it version. Use oldData
+	// See: https://github.com/migalabs/armiarma/issues/17
+	// Currently just overwritting what was before
+	//oldData, loaded := c.PeerStore.LoadOrStore(peer.PeerId, peer)
+	c.PeerStore.Store(peer.PeerId, peer)
 }
 
 // Get peer data
@@ -155,6 +84,66 @@ func (c *PeerStore) GetPeerData(peerId string) (Peer, error) {
 		return Peer{}, errors.New("could not find peer in peerstore: " + peerId)
 	}
 	return peerData.(Peer), nil
+}
+
+// Add a connection Event to the given peer
+func (c *PeerStore) ConnectionEvent(peerId string, direction string) error {
+	peer, err := c.GetPeerData(peerId)
+	if err != nil {
+		return errors.New("could not add connection event, peer is not in the list: " + peerId)
+	}
+	peer.ConnectionEvent(direction, time.Now())
+	c.StorePeer(peer)
+	return nil
+}
+
+// Add a connection Event to the given peer
+func (c *PeerStore) DisconnectionEvent(peerId string) error {
+	peer, err := c.GetPeerData(peerId)
+	if err != nil {
+		return errors.New("could not add disconnection event, peer is not in the list: " + peerId)
+	}
+	peer.DisconnectionEvent(time.Now())
+	c.StorePeer(peer)
+	return nil
+}
+
+// Add a connection Event to the given peer
+func (c *PeerStore) MetadataEvent(peerId string, success bool) error {
+	peer, err := c.GetPeerData(peerId)
+	if err != nil {
+		return errors.New("could not add metadata event, peer is not in the list: " + peerId)
+	}
+	peer.MetadataRequest = true
+	if success {
+		peer.MetadataSucceed = true
+	}
+	c.StorePeer(peer)
+	return nil
+}
+
+// AddNewAttempts adds the resuts of a new attempt over an existing peer
+// increasing the attempt counter and the respective fields
+func (c *PeerStore) ConnectionAttemptEvent(peerId string, succeed bool, conErr string) error {
+	peer, err := c.GetPeerData(peerId)
+	if err != nil {
+		return errors.New("could not add connection attempt, peer is not in the list: " + peerId)
+	}
+	peer.ConnectionAttemptEvent(succeed, conErr)
+	c.StorePeer(peer)
+	return nil
+}
+
+// Function that Manages the metrics updates for the incoming messages
+// TODO: Rename to AddNewMessageEvent or something like that
+func (c *PeerStore) MessageEvent(peerId string, topicName string) error {
+	peer, err := c.GetPeerData(peerId)
+	if err != nil {
+		return errors.New("could not add message event, peer is not in the list: " + peerId)
+	}
+	peer.MessageEvent(topicName, time.Now())
+	c.StorePeer(peer)
+	return nil
 }
 
 // Get a map with the errors we got when connecting and their amount

@@ -12,6 +12,7 @@ func Test_Peer(t *testing.T) {
 	require.Equal(t, 1, 1)
 }
 
+// TODO: Perhaps move to peerstore and test the whoe flow
 func Test_MessageEvent(t *testing.T) {
 	peer1 := NewPeer("peer1")
 

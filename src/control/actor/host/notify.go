@@ -60,13 +60,13 @@ func (c *HostNotifyCmd) connectedF(net network.Network, conn network.Conn) {
 
 	// add the peer
 	peer := metrics.NewPeer(conn.RemotePeer().String())
-	c.PeerStore.AddPeer(peer)
+	c.PeerStore.StorePeer(peer)
 
 	// try to request metadata for the peer
 	peerData, err := PollPeerMetadata(conn.RemotePeer(), c.Base, c.PeerMetadataState, c.Store, c.PeerStore)
 	if err == nil {
 		peer = fetchPeerExtraInfo(peerData)
-		c.PeerStore.AddPeer(peer)
+		c.PeerStore.StorePeer(peer)
 	}
 	c.PeerStore.ConnectionEvent(conn.RemotePeer().String(), fmtDirection(conn.Stat().Direction))
 
