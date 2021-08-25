@@ -108,11 +108,8 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host, store track
 				// loop until we arrive to a peer that we didn't connect before
 
 				// TODO: Add also IP taken from ENR of discovered peers
-				peerMetrics := metrics.Peer {
-					PeerId: p.String(),
-				}
-				_ = peerMetrics
-				//c.PeerStore.AddPeer(peerMetrics)
+				peerMetrics := metrics.NewPeer(p.String())
+				c.PeerStore.AddPeer(peerMetrics)
 				_, ok := peerCache[p]
 				if ok {
 					if len(peerCache) == peerstoreLen {
@@ -146,7 +143,7 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host, store track
 					// If the peer was already discovered it should be here, but
 					// apparently thats not the case
 					// TODO: Add IP, parse addrInfo.Addrs
-					c.PeerStore.AddPeer(metrics.Peer{PeerId:p.String()})
+					c.PeerStore.AddPeer(metrics.NewPeer(p.String()))
 					if err := h.Connect(ctx, addrInfo); err != nil {
 						// the connetion failed
 						attempts += 1

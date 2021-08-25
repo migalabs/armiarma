@@ -2,6 +2,7 @@ package utils
 
 import (
 	"strings"
+	pgossip "github.com/protolambda/rumor/p2p/gossip"
 )
 
 // Client utils
@@ -66,6 +67,23 @@ func FilterError(err string) string {
 	}
 
 	return errorPretty
+}
+
+func ShortToFullTopicName(topicName string) string {
+	switch topicName {
+	case "BeaconBlock":
+		return pgossip.BeaconBlock
+	case "BeaconAggregateProof":
+		return pgossip.BeaconAggregateProof
+	case "VoluntaryExit":
+		return pgossip.VoluntaryExit
+	case "ProposerSlashing":
+		return pgossip.ProposerSlashing
+	case "AttesterSlashing":
+		return pgossip.AttesterSlashing
+	default:
+		return ""
+	}
 }
 
 // Get the Real Ip Address from the multi Address list

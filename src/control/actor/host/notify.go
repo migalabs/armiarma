@@ -59,9 +59,7 @@ func (c *HostNotifyCmd) connectedF(net network.Network, conn network.Conn) {
 	logrus.Info("Connection detected: ", conn.RemotePeer().String())
 
 	// add the peer
-	peer := metrics.Peer {
-		PeerId: conn.RemotePeer().String(),
-	}
+	peer := metrics.NewPeer(conn.RemotePeer().String())
 	c.PeerStore.AddPeer(peer)
 
 	// try to request metadata for the peer
@@ -181,20 +179,18 @@ func fetchPeerExtraInfo(peerData *track.PeerAllData) metrics.Peer {
 		log.Error("error when fetching country/city from ip", err)
 	}
 
-	peer := metrics.Peer {
-		PeerId: peerData.PeerID.String(),
-		NodeId: peerData.NodeID.String(),
-		UserAgent: peerData.UserAgent,
-		ClientName: client,
-		ClientVersion: version,
-		ClientOS: "TODO",
-		Pubkey: peerData.Pubkey,
-		Addrs: address,
-		Ip: ip,
-		Country: country,
-		City: city,
-		Latency: float64(peerData.Latency/time.Millisecond) / 1000,
-	}
+	peer := metrics.NewPeer(peerData.PeerID.String())
+	peer.NodeId = peerData.NodeID.String()
+	peer.UserAgent = peerData.UserAgent
+	peer.ClientName = client
+	peer.ClientVersion = version
+	peer.ClientOS = "TODO"
+	peer.Pubkey = peerData.Pubkey
+	peer.Addrs = address
+	peer.Ip = ip
+	peer.Country = country
+	peer.City = city
+	peer.Latency = float64(peerData.Latency/time.Millisecond) / 1000
 
 	return peer
 }

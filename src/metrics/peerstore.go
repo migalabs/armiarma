@@ -143,22 +143,12 @@ func (gm *PeerStore) AddNewConnectionAttempt(peerId string, succeed bool, err st
 }
 
 // Function that Manages the metrics updates for the incoming messages
-func (c *PeerStore) IncomingMessageManager(peerId string, topicName string) error {
+// TODO: Rename to AddNewMessageEvent or something like that
+func (c *PeerStore) AddMessageEvent(peerId string, topicName string) error {
 	pMetrics, ok := c.PeerStore.Load(peerId)
 	if ok {
 		peer := pMetrics.(Peer)
-		messageMetrics, err := peer.GetMessageMetrics(topicName)
-		if err != nil {
-			return errors.Wrap(err, "could not not get message metrics struct")
-		}
-
-		if messageMetrics.Count == 0 {
-			messageMetrics.StampTime("first")
-		}
-
-		messageMetrics.IncrementCnt()
-		messageMetrics.StampTime("last")
-
+		peer.AddMessageEvent(topicName, time.Now())
 		c.PeerStore.Store(peerId, peer)
 	} else {
 		return errors.New("could not add incomming message to topics list")
@@ -200,8 +190,7 @@ func (gm *PeerStore) GetConnectionMetrics() (int, int, int) {
 }
 */
 
-// GetConnectionsMetrics returns the analysis over the peers found in the ExtraMetrics.
-// Return Values = (0)->resetbypeer | (1)->timeout | (2)->dialtoself | (3)->dialbackoff | (4)->uncertain
+// Get a map with the errors we got when connecting and their amount
 func (gm *PeerStore) GetErrorCounter() map[string]uint64 {
 	errorsAndAmount := make(map[string]uint64)
 	gm.PeerStore.Range(func(key interface{}, value interface{}) bool {

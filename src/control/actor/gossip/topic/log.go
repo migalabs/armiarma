@@ -86,7 +86,7 @@ func (c *TopicLogCmd) Run(ctx context.Context, args ...string) error {
 								"signature": hex.EncodeToString(msg.Signature),
 								"seq_no":    hex.EncodeToString(msg.Seqno),
 							}).Infof("new message on %s", topicName)
-							c.PeerStore.IncomingMessageManager(msg.ReceivedFrom.String(), topicName)
+							c.PeerStore.AddMessageEvent(msg.ReceivedFrom.String(), topicName)
 							// Add notification on the notification channel
 							c.PeerStore.MsgNotChannels[topicName] <- true
 							// Deserialize the message depending on the topic name

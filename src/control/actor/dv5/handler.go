@@ -57,10 +57,8 @@ func (c *HandleENR) handle(log logrus.FieldLogger, res *enode.Node) error {
 		// TODO: Add other information (i.e. country)
 		// logrus.Info(peerID, res.IP(), res.ID(), " ", res.TCP(), " ", res.UDP())
 		// res.IP() res.ID() res.TCP() res.UDP()
-		peerMetrics := metrics.Peer {
-			PeerId: peerID.String(),
-			Ip: res.IP().String(),
-		}
+		peerMetrics := metrics.NewPeer(peerID.String())
+		peerMetrics.Ip = res.IP().String()
 		c.PeerStore.AddPeer(peerMetrics)
 	}
 	return nil

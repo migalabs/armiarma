@@ -2,9 +2,8 @@ package metrics
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
+	//"github.com/pkg/errors"
 	"github.com/protolambda/rumor/metrics/utils"
-	pgossip "github.com/protolambda/rumor/p2p/gossip"
 	log "github.com/sirupsen/logrus"
 	"strconv"
 	"time"
@@ -41,12 +40,15 @@ type Peer struct {
 	LastExport      int64 //(timestamp in seconds of the last exported time (backup for when we are loading the Peer)
 
 	// Counters for the different topics
-	BeaconBlock          MessageMetrics
-	BeaconAggregateProof MessageMetrics
-	VoluntaryExit        MessageMetrics
-	ProposerSlashing     MessageMetrics
-	AttesterSlashing     MessageMetrics
+	MessageMetrics map[string]*MessageMetric
 	// Variables related to the SubNets (only needed for when Shards will be implemented)
+}
+
+// Information regarding the messages received on a given topic
+type MessageMetric struct {
+	Count            uint64
+	FirstMessageTime time.Time
+	LastMessageTime  time.Time
 }
 
 func NewPeer(peerId string) Peer {
@@ -77,30 +79,14 @@ func NewPeer(peerId string) Peer {
 		DisconnectionTimes: make([]time.Time, 0),
 
 		// Counters for the different topics
-		BeaconBlock:          NewMessageMetrics(),
-		BeaconAggregateProof: NewMessageMetrics(),
-		VoluntaryExit:        NewMessageMetrics(),
-		ProposerSlashing:     NewMessageMetrics(),
-		AttesterSlashing:     NewMessageMetrics(),
+		MessageMetrics: make(map[string]*MessageMetric),
 	}
 	return pm
 }
 
 func (pm *Peer) ResetDynamicMetrics() {
 	pm.Attempts = 0
-	pm.BeaconBlock = NewMessageMetrics()
-	pm.BeaconAggregateProof = NewMessageMetrics()
-	pm.VoluntaryExit = NewMessageMetrics()
-	pm.ProposerSlashing = NewMessageMetrics()
-	pm.AttesterSlashing = NewMessageMetrics()
-}
-
-func (pm *Peer) GetAllMessagesCount() uint64 {
-	return (pm.BeaconBlock.Count +
-		pm.BeaconAggregateProof.Count +
-		pm.VoluntaryExit.Count +
-		pm.AttesterSlashing.Count +
-		pm.ProposerSlashing.Count)
+	pm.MessageMetrics = make(map[string]*MessageMetric)
 }
 
 // Register when a new connection was detected
@@ -132,6 +118,17 @@ func (pm *Peer) AddNewConnectionAttempt(succeed bool, err string) {
 	}
 }
 
+// Count the messages we get per topis and its first/last timestamps
+func (pm *Peer) AddMessageEvent(topicName string, time time.Time) {
+	if pm.MessageMetrics[topicName] == nil {
+		pm.MessageMetrics[topicName] = &MessageMetric{}
+		pm.MessageMetrics[topicName].FirstMessageTime = time
+	} else {
+		pm.MessageMetrics[topicName].LastMessageTime = time
+	}
+	pm.MessageMetrics[topicName].Count++
+}
+
 // Calculate the total connected time based on con/disc timestamps
 func (pm *Peer) GetConnectedTime() float64 {
 	var totalConnectedTime int64
@@ -147,22 +144,23 @@ func (pm *Peer) GetConnectedTime() float64 {
 	return float64(totalConnectedTime) / 60000
 }
 
-func (pm *Peer) GetMessageMetrics(topicName string) (*MessageMetrics, error) {
-	// All this could be inside a different function
-	switch topicName {
-	case pgossip.BeaconBlock:
-		return &pm.BeaconBlock, nil
-	case pgossip.BeaconAggregateProof:
-		return &pm.BeaconAggregateProof, nil
-	case pgossip.VoluntaryExit:
-		return &pm.VoluntaryExit, nil
-	case pgossip.ProposerSlashing:
-		return &pm.ProposerSlashing, nil
-	case pgossip.AttesterSlashing:
-		return &pm.AttesterSlashing, nil
-	default:
-		return nil, errors.New("unknown topic name: " + topicName)
+// Get the number of messages that we got for a given topic. Note that
+// the topic name is the shortened name i.e. BeaconBlock
+func (pm *Peer) GetNumOfMsgFromTopic(shortTopic string) uint64 {
+	msgMetric := pm.MessageMetrics[utils.ShortToFullTopicName(shortTopic)]
+	if msgMetric != nil {
+		return msgMetric.Count
 	}
+	return uint64(0)
+}
+
+// Get total of message rx from that peer
+func (pm *Peer) GetAllMessagesCount() uint64 {
+	totalMessages := uint64(0)
+	for _, messageMetric := range pm.MessageMetrics {
+		totalMessages += messageMetric.Count
+	}
+	return totalMessages
 }
 
 func (pm *Peer) ToCsvLine() string {
@@ -187,11 +185,11 @@ func (pm *Peer) ToCsvLine() string {
 		fmt.Sprintf("%d", len(pm.ConnectionTimes)) + "," +
 		fmt.Sprintf("%d", len(pm.DisconnectionTimes)) + "," +
 		fmt.Sprintf("%.3f", pm.GetConnectedTime()) + "," +
-		strconv.FormatUint(pm.BeaconBlock.Count, 10) + "," +
-		strconv.FormatUint(pm.BeaconAggregateProof.Count, 10) + "," +
-		strconv.FormatUint(pm.VoluntaryExit.Count, 10) + "," +
-		strconv.FormatUint(pm.ProposerSlashing.Count, 10) + "," +
-		strconv.FormatUint(pm.AttesterSlashing.Count, 10) + "," +
+		strconv.FormatUint(pm.GetNumOfMsgFromTopic("BeaconBlock"), 10) + "," +
+		strconv.FormatUint(pm.GetNumOfMsgFromTopic("BeaconAggregateProof"), 10) + "," +
+		strconv.FormatUint(pm.GetNumOfMsgFromTopic("VoluntaryExit"), 10) + "," +
+		strconv.FormatUint(pm.GetNumOfMsgFromTopic("ProposerSlashing"), 10) + "," +
+		strconv.FormatUint(pm.GetNumOfMsgFromTopic("AttesterSlashing"), 10) + "," +
 		strconv.FormatUint(pm.GetAllMessagesCount(), 10) + "\n"
 
 	return csvRow
