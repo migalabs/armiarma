@@ -14,6 +14,7 @@ import (
 	"github.com/protolambda/rumor/metrics"
 	"github.com/protolambda/rumor/metrics/utils"
 	"github.com/protolambda/rumor/p2p/track"
+	"github.com/protolambda/zrnt/eth2/beacon"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
@@ -32,14 +33,12 @@ func (c *HostNotifyCmd) Help() string {
 func (c *HostNotifyCmd) HelpLong() string {
 	return `
 Args: <event-types>...
-
 Network event notifications.
 Valid event types:
  - listen (listen_open listen_close)
  - connection (connection_open connection_close)
  - stream (stream_open stream_close)
  - all
-
 Notification logs will have keys: "event" - one of the above detailed event types, e.g. listen_close.
 - "peer": peer ID
 - "direction": "inbound"/"outbound"/"unknown", for connections and streams
@@ -63,11 +62,30 @@ func (c *HostNotifyCmd) connectedF(net network.Network, conn network.Conn) {
 	}).Info("Peer: ", conn.RemotePeer().String())
 	// try to request metadata for the peer
 	peerData, err := PollPeerMetadata(conn.RemotePeer(), c.Base, c.PeerMetadataState, c.Store, c.PeerStore)
-	// double check that the peerData is not empty
+	// request BeaconStatus metadata as we connect to a peer
+	h, err := c.Host()
 	if err != nil {
-		logrus.WithFields(logrus.Fields{
-			"EVENT": "Metadata request NOK",
-		}).Info("Peer: ", conn.RemotePeer().String())
+		log.Error(err)
+	}
+	bState, err2 := nodemetadata.ReqBeaconStatus(context.Background(), h, conn.RemotePeer())
+	if err2 != nil {
+		log.Warn(err)
+	}
+	logrus.Info(&bState)
+	var peer metrics.Peer
+	// TODO: so far, If we didn't manage to exchange metadata, we asume that the peer didn't exchange Status neither
+	// 		  IMPORTANT: Metadata doen't include any kind of info related to the Host/Node
+	// 				     It just includes SeqNumber, Attnets
+	if err == nil {
+		peer = fetchPeerExtraInfo(peerData, bState)	
+		// temp
+		log.Info(peer)
+	} else {
+		log.Info("could not get metadata for peer: ", conn.RemotePeer().String(), " err: ", err)
+		// TODO: Add also IP taken from ENR of discovered peers
+		peer = metrics.Peer{
+			PeerId: conn.RemotePeer().String(),
+		}
 	}
 	ma := conn.RemoteMultiaddr().String()
 	fmt.Println("Multiaddress of the peer", ma)
@@ -185,15 +203,25 @@ func fmtDirection(d network.Direction) string {
 
 // Convert from rumor PeerAllData to our Peer. Note that
 // some external data is fetched and some fields are parsed
+<<<<<<< HEAD
 func fetchPeerExtraInfo(peerData *track.PeerAllData, addr string) (metrics.Peer, error) {
 	client, version := utils.FilterClientType(peerData.UserAgent)
 	// Obtaining the IP or MultiAddrs from the ENR increases the chances to get a Restringed IP
 	// therefore, this one can be obtained directly from the libp2p connection stream
 	ip := strings.Split(addr, "/")[2]
 	country, city, err := utils.GetLocationFromIp(ip)
+=======
+func fetchPeerExtraInfo(peerData *track.PeerAllData, bStatus beacon.Status) metrics.Peer {
+	client, version := utils.FilterClientType(peerData.UserAgent)
+	// TODO: temporary fix untill IP clear IP is adjusted to database
+	// 		 GetIpAndLocationFromAddrs should be deprecated to GetLocationFromIP
+	address := utils.GetFullAddress(peerData.Addrs)
+	ip, country, city, err := utils.GetIpAndLocationFromAddrs(address)
+>>>>>>> Add Beacon.Status to Peer + ReqBeaconStatus()
 	if err != nil {
 		return metrics.Peer{}, errors.Wrap(err, "could not get location from ip")
 	}
+<<<<<<< HEAD
 	peer := metrics.NewPeer(peerData.PeerID.String())
 	peer.NodeId = peerData.NodeID.String()
 	peer.UserAgent = peerData.UserAgent
@@ -208,4 +236,23 @@ func fetchPeerExtraInfo(peerData *track.PeerAllData, addr string) (metrics.Peer,
 	peer.Latency = float64(peerData.Latency/time.Millisecond) / 1000
 
 	return peer, nil
+=======
+
+	peer := metrics.Peer{
+		PeerId:        peerData.PeerID.String(),
+		NodeId:        peerData.NodeID.String(),
+		UserAgent:     peerData.UserAgent,
+		ClientName:    client,
+		ClientVersion: version,
+		ClientOS:      "TODO",
+		Pubkey:        peerData.Pubkey,
+		Addrs:         address,
+		Ip:            ip,
+		Country:       country,
+		City:          city,
+		Latency:       float64(peerData.Latency/time.Millisecond) / 1000,
+	}
+	peer.UpdateBeaconStatus(bStatus)
+	return peer
+>>>>>>> Add Beacon.Status to Peer + ReqBeaconStatus()
 }

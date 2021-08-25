@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/protolambda/rumor/metrics/utils"
+
+	"github.com/protolambda/zrnt/eth2/beacon"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -39,6 +41,9 @@ type Peer struct {
 	MetadataSucceed bool  // If the peer has been successfully requested its metadata
 	LastExport      int64 //(timestamp in seconds of the last exported time (backup for when we are loading the Peer)
 
+	// BeaconStatus
+	BeaconStatus beacon.Status
+
 	// Counters for the different topics
 	MessageMetrics map[string]*MessageMetric
 }
@@ -52,11 +57,33 @@ type MessageMetric struct {
 
 func NewPeer(peerId string) Peer {
 	pm := Peer{
-		PeerId:             peerId,
+
+		PeerId:    peerId,
+		NodeId:    "",
+		UserAgent: "",
+		Pubkey:    "",
+		Addrs:     "",
+		Ip:        "",
+		Country:   "",
+		City:      "",
+		Latency:   0,
+
+		Attempted:          false,
+		Succeed:            false,
+		IsConnected:        false,
+		Attempts:           0,
 		Error:              "None",
 		ConnectionTimes:    make([]time.Time, 0),
 		DisconnectionTimes: make([]time.Time, 0),
-		MessageMetrics:     make(map[string]*MessageMetric),
+
+		MetadataRequest: false,
+		MetadataSucceed: false,
+		BeaconStatus:    beacon.Status{},
+
+		LastExport: 0,
+
+		// Counters for the different topics
+		MessageMetrics: make(map[string]*MessageMetric),
 	}
 	return pm
 }
@@ -93,6 +120,15 @@ func (pm *Peer) ConnectionAttemptEvent(succeed bool, err string) {
 	} else {
 		pm.Error = utils.FilterError(err)
 	}
+}
+
+// Update beacon Status of the peer
+func (pm *Peer) UpdateBeaconStatus(bStatus beacon.Status) {
+	pm.BeaconStatus.ForkDigest = bStatus.ForkDigest
+	pm.BeaconStatus.FinalizedRoot = bStatus.FinalizedRoot
+	pm.BeaconStatus.FinalizedEpoch = bStatus.FinalizedEpoch
+	pm.BeaconStatus.HeadRoot = bStatus.HeadRoot
+	pm.BeaconStatus.HeadSlot = bStatus.HeadSlot
 }
 
 // Count the messages we get per topis and its first/last timestamps
