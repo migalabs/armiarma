@@ -82,14 +82,6 @@ func (c *PeerStore) AddPeer(peer Peer) {
 	}
 }
 
-func (c *PeerStore) GetPeerData(peerId string) (Peer, bool) {
-	peerData, ok := c.PeerStore.Load(peerId)
-	if !ok {
-		return Peer{}, ok
-	}
-	return peerData.(Peer), ok
-}
-
 // Add a connection Event to the given peer
 func (c *PeerStore) AddConnectionEvent(peerId string, direction string) error {
 	pMetrics, ok := c.PeerStore.Load(peerId)
@@ -189,6 +181,15 @@ func (gm *PeerStore) GetConnectionMetrics() (int, int, int) {
 	return succeed, failed, notattempted
 }
 */
+
+// Get peer data
+func (c *PeerStore) GetPeerData(peerId string) (Peer, error) {
+	peerData, ok := c.PeerStore.Load(peerId)
+	if !ok {
+		return Peer{}, errors.New("could not find peer in peerstore: " + peerId)
+	}
+	return peerData.(Peer), nil
+}
 
 // Get a map with the errors we got when connecting and their amount
 func (gm *PeerStore) GetErrorCounter() map[string]uint64 {

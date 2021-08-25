@@ -16,12 +16,12 @@ func Test_PeerStore(t *testing.T) {
 		ClientName: "Client2",
 	})
 
-	p, ok := peerStore.GetPeerData("Peer1")
-	require.Equal(t, ok, true)
+	p, err := peerStore.GetPeerData("Peer1")
+	require.NoError(t, err)
 	require.Equal(t, p.ClientName, "Client1")
 
-	p, ok = peerStore.GetPeerData("Peer2")
-	require.Equal(t, ok, true)
+	p, err = peerStore.GetPeerData("Peer2")
+	require.NoError(t, err)
 	require.Equal(t, p.ClientName, "Client2")
 
 	peerStore.AddPeer(Peer{
@@ -29,7 +29,7 @@ func Test_PeerStore(t *testing.T) {
 		ClientName: "Client3",
 	})
 
-	p, ok = peerStore.GetPeerData("Peer1")
-	require.Equal(t, ok, true)
+	p, err = peerStore.GetPeerData("Peer1")
+	require.NoError(t, err)
 	require.Equal(t, p.ClientName, "Client3")
 }

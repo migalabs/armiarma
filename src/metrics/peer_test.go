@@ -1,7 +1,7 @@
 package metrics
 
 import (
-	log "github.com/sirupsen/logrus"
+	//log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
@@ -30,7 +30,7 @@ func Test_AddMessageEvent(t *testing.T) {
 	require.Equal(t, peer1.MessageMetrics["topic2"].LastMessageTime, parseTime("2021-08-23T05:00:00.000Z", t))
 
 	// assert a total of 4 messages were recorded
-	require.Equal(t, peer1.GetAllMessagesCount(), 4)
+	require.Equal(t, peer1.GetAllMessagesCount(), uint64(4))
 }
 
 func Test_GetConnectedTime(t *testing.T) {

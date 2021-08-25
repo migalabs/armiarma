@@ -139,11 +139,6 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host, store track
 				// try to connect the peer
 				attempts := 0
 				for attempts <= c.MaxRetries {
-					// TODO: Workaround to ensure the peer is already added.
-					// If the peer was already discovered it should be here, but
-					// apparently thats not the case
-					// TODO: Add IP, parse addrInfo.Addrs
-					c.PeerStore.AddPeer(metrics.NewPeer(p.String()))
 					if err := h.Connect(ctx, addrInfo); err != nil {
 						// the connetion failed
 						attempts += 1

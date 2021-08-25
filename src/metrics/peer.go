@@ -122,10 +122,9 @@ func (pm *Peer) AddNewConnectionAttempt(succeed bool, err string) {
 func (pm *Peer) AddMessageEvent(topicName string, time time.Time) {
 	if pm.MessageMetrics[topicName] == nil {
 		pm.MessageMetrics[topicName] = &MessageMetric{}
-		pm.MessageMetrics[topicName].FirstMessageTime = time
-	} else {
-		pm.MessageMetrics[topicName].LastMessageTime = time
+		pm.MessageMetrics[topicName].FirstMessageTime = time	
 	}
+	pm.MessageMetrics[topicName].LastMessageTime = time
 	pm.MessageMetrics[topicName].Count++
 }
 
