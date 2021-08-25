@@ -142,7 +142,7 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host, store track
 					if err := h.Connect(ctx, addrInfo); err != nil {
 						// the connetion failed
 						attempts += 1
-						err := c.PeerStore.AddNewConnectionAttempt(p.String(), false, err.Error())
+						err := c.PeerStore.ConnectionAttemptEvent(p.String(), false, err.Error())
 						if err != nil {
 							log.Error("could not add new connection attemp: ", err)
 						}
@@ -150,7 +150,7 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host, store track
 						continue
 					} else { // connection successfuly made
 						c.Log.Infof("peer_id %s successful connection made", p)
-						err := c.PeerStore.AddNewConnectionAttempt(p.String(), true, "None")
+						err := c.PeerStore.ConnectionAttemptEvent(p.String(), true, "None")
 						if err != nil {
 							log.Error("could not add new connection attemp: ", err)
 						}

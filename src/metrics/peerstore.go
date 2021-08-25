@@ -83,11 +83,11 @@ func (c *PeerStore) AddPeer(peer Peer) {
 }
 
 // Add a connection Event to the given peer
-func (c *PeerStore) AddConnectionEvent(peerId string, direction string) error {
+func (c *PeerStore) ConnectionEvent(peerId string, direction string) error {
 	pMetrics, ok := c.PeerStore.Load(peerId)
 	if ok {
 		peer := pMetrics.(Peer)
-		peer.AddConnectionEvent(direction, time.Now())
+		peer.ConnectionEvent(direction, time.Now())
 		c.PeerStore.Store(peerId, peer)
 		return nil
 	}
@@ -95,11 +95,11 @@ func (c *PeerStore) AddConnectionEvent(peerId string, direction string) error {
 }
 
 // Add a connection Event to the given peer
-func (c *PeerStore) AddDisconnectionEvent(peerId string) error {
+func (c *PeerStore) DisconnectionEvent(peerId string) error {
 	pMetrics, ok := c.PeerStore.Load(peerId)
 	if ok {
 		peer := pMetrics.(Peer)
-		peer.AddDisconnectionEvent(time.Now())
+		peer.DisconnectionEvent(time.Now())
 		c.PeerStore.Store(peerId, peer)
 		return nil
 	}
@@ -107,7 +107,7 @@ func (c *PeerStore) AddDisconnectionEvent(peerId string) error {
 }
 
 // Add a connection Event to the given peer
-func (c *PeerStore) AddMetadataEvent(peerId string, success bool) error {
+func (c *PeerStore) MetadataEvent(peerId string, success bool) error {
 	pMetrics, ok := c.PeerStore.Load(peerId)
 	if ok {
 		Peer := pMetrics.(Peer)
@@ -123,11 +123,11 @@ func (c *PeerStore) AddMetadataEvent(peerId string, success bool) error {
 
 // AddNewAttempts adds the resuts of a new attempt over an existing peer
 // increasing the attempt counter and the respective fields
-func (gm *PeerStore) AddNewConnectionAttempt(peerId string, succeed bool, err string) error {
+func (gm *PeerStore) ConnectionAttemptEvent(peerId string, succeed bool, err string) error {
 	pMetrics, ok := gm.PeerStore.Load(peerId)
 	if ok {
 		peer := pMetrics.(Peer)
-		peer.AddNewConnectionAttempt(succeed, err)
+		peer.ConnectionAttemptEvent(succeed, err)
 		gm.PeerStore.Store(peerId, peer)
 		return nil
 	}
@@ -136,51 +136,17 @@ func (gm *PeerStore) AddNewConnectionAttempt(peerId string, succeed bool, err st
 
 // Function that Manages the metrics updates for the incoming messages
 // TODO: Rename to AddNewMessageEvent or something like that
-func (c *PeerStore) AddMessageEvent(peerId string, topicName string) error {
+func (c *PeerStore) MessageEvent(peerId string, topicName string) error {
 	pMetrics, ok := c.PeerStore.Load(peerId)
 	if ok {
 		peer := pMetrics.(Peer)
-		peer.AddMessageEvent(topicName, time.Now())
+		peer.MessageEvent(topicName, time.Now())
 		c.PeerStore.Store(peerId, peer)
 	} else {
 		return errors.New("could not add incomming message to topics list")
 	}
 	return nil
 }
-
-// GetConnectionsMetrics returns the analysis over the peers found in the
-// ExtraMetrics. Return Values = (0)->succeed | (1)->failed | (2)->notattempted
-
-/* TODO: Rethink this function
-func (gm *PeerStore) GetConnectionMetrics() (int, int, int) {
-	totalrecorded := 0
-	succeed := 0
-	failed := 0
-	notattempted := 0
-	// Read from the recorded ExtraMetrics the status of each peer connections
-	gm.PeerStore.Range(func(key interface{}, value interface{}) bool {
-		p := value.(Peer)
-		totalrecorded += 1
-		// Catalog each of the peers for the experienced status
-		if p.Attempted {
-			if p.Succeed {
-				succeed += 1
-			} else {
-				failed += 1
-			}
-		} else {
-			notattempted += 1
-		}
-		return true
-	})
-	// get the len of the peerstore to complete the number of notattempted peers
-	//peerList := h.Peerstore().Peers()
-	//peerstoreLen := len(peerList)
-	//notattempted = notattempted + (peerstoreLen - totalrecorded)
-	// MAYBE -> include here the error reader?
-	return succeed, failed, notattempted
-}
-*/
 
 // Get peer data
 func (c *PeerStore) GetPeerData(peerId string) (Peer, error) {

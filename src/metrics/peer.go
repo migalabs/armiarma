@@ -90,22 +90,22 @@ func (pm *Peer) ResetDynamicMetrics() {
 }
 
 // Register when a new connection was detected
-func (pm *Peer) AddConnectionEvent(direction string, time time.Time) {
+func (pm *Peer) ConnectionEvent(direction string, time time.Time) {
 	pm.ConnectionTimes = append(pm.ConnectionTimes, time)
 	pm.IsConnected = true
 	pm.ConnectedDirection = direction
 }
 
 // Register when a disconnection was detected
-func (pm *Peer) AddDisconnectionEvent(time time.Time) {
+func (pm *Peer) DisconnectionEvent(time time.Time) {
 	pm.DisconnectionTimes = append(pm.DisconnectionTimes, time)
 	pm.IsConnected = false
 	pm.ConnectedDirection = ""
 }
 
 // Register when a connection attempt was made. Note that there is some
-// overlap with AddConnectionEvent
-func (pm *Peer) AddNewConnectionAttempt(succeed bool, err string) {
+// overlap with ConnectionEvent
+func (pm *Peer) ConnectionAttemptEvent(succeed bool, err string) {
 	pm.Attempts += 1
 	if !pm.Attempted {
 		pm.Attempted = true
@@ -119,10 +119,10 @@ func (pm *Peer) AddNewConnectionAttempt(succeed bool, err string) {
 }
 
 // Count the messages we get per topis and its first/last timestamps
-func (pm *Peer) AddMessageEvent(topicName string, time time.Time) {
+func (pm *Peer) MessageEvent(topicName string, time time.Time) {
 	if pm.MessageMetrics[topicName] == nil {
 		pm.MessageMetrics[topicName] = &MessageMetric{}
-		pm.MessageMetrics[topicName].FirstMessageTime = time	
+		pm.MessageMetrics[topicName].FirstMessageTime = time
 	}
 	pm.MessageMetrics[topicName].LastMessageTime = time
 	pm.MessageMetrics[topicName].Count++

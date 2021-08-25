@@ -39,9 +39,9 @@ func PollPeerMetadata(p peer.ID, base *base.Base, peerMetadataState *metadata.Pe
 	// TODO: Rethink this
 	err := pingCmd.Run(reqCtx)
 	if err != nil {
-		gm.AddMetadataEvent(p.String(), false)
+		gm.MetadataEvent(p.String(), false)
 	} else {
-		gm.AddMetadataEvent(p.String(), true)
+		gm.MetadataEvent(p.String(), true)
 	}
 
 	// TODO Naive solution. Iterates the store looking if we got the metadata

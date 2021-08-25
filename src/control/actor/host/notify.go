@@ -68,7 +68,7 @@ func (c *HostNotifyCmd) connectedF(net network.Network, conn network.Conn) {
 		peer = fetchPeerExtraInfo(peerData)
 		c.PeerStore.AddPeer(peer)
 	}
-	c.PeerStore.AddConnectionEvent(conn.RemotePeer().String(), fmtDirection(conn.Stat().Direction))
+	c.PeerStore.ConnectionEvent(conn.RemotePeer().String(), fmtDirection(conn.Stat().Direction))
 
 	// End of metric traces to track the connections and disconnections
 	c.Log.WithFields(logrus.Fields{
@@ -79,7 +79,7 @@ func (c *HostNotifyCmd) connectedF(net network.Network, conn network.Conn) {
 
 func (c *HostNotifyCmd) disconnectedF(net network.Network, conn network.Conn) {
 	logrus.Info("Disconnection detected: ", conn.RemotePeer().String())
-	c.PeerStore.AddDisconnectionEvent(conn.RemotePeer().String())
+	c.PeerStore.DisconnectionEvent(conn.RemotePeer().String())
 	// End of metric traces to track the connections and disconnections
 	c.Log.WithFields(logrus.Fields{
 		"event": "connection_close", "peer": conn.RemotePeer().String(),
