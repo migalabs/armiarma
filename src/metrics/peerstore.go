@@ -13,7 +13,7 @@ import (
 )
 
 type PeerStore struct {
-	PeerStore       sync.Map
+	PeerStore       PeerStoreStorage
 	MessageDatabase *database.MessageDatabase // TODO: Discuss
 	StartTime       time.Time
 	MsgNotChannels  map[string](chan bool) // TODO: Unused?
@@ -29,11 +29,37 @@ type GossipState struct {
 	SeenFilter bool
 }
 
-func NewPeerStore() PeerStore {
+// New PeerStore creates an empty peerstore ready to accept new peers.
+// You can choose to store in either a Db or in Memory by passing a first
+// argument as "db" or "memory".
+// If you choose a Db, you should pass as a second argument the path of the db.
+// TODO: Pass these arguments from the cli ?
+func NewPeerStore(args ...string) PeerStore {
 	gm := PeerStore{
 		StartTime:      time.Now(),
 		MsgNotChannels: make(map[string](chan bool)),
 	}
+
+	switch args[0] {
+	case "db":
+		var path string
+		if len(args) < 2 {
+			path = "../../peerstore.db"
+		} else {
+			path = args[1]
+		}
+		db, err := OpenDB(path, "PeerStore", 0600, nil)
+		if err != nil {
+			log.Error(err)
+			db = nil
+		}
+		gm.PeerStore = &PeerStoreDb{db}
+
+	case "memory":
+		var m sync.Map
+		gm.PeerStore = &PeerStoreMemory{&m}
+	}
+
 	return gm
 }
 
@@ -53,10 +79,9 @@ func (c *PeerStore) ResetDynamicMetrics() {
 	log.Info("Reseting Dynamic Metrics in Peer")
 
 	// Iterate throught the peers in the metrics, restarting connection events and messages
-	c.PeerStore.Range(func(key interface{}, value interface{}) bool {
-		p := value.(Peer)
-		p.ResetDynamicMetrics()
-		c.PeerStore.Store(key, p)
+	c.PeerStore.Range(func(key string, value Peer) bool {
+		value.ResetDynamicMetrics()
+		c.PeerStore.Store(key, value)
 		return true
 	})
 	log.Info("Finished Reseting Dynamic Metrics")
@@ -83,7 +108,7 @@ func (c *PeerStore) GetPeerData(peerId string) (Peer, error) {
 	if !ok {
 		return Peer{}, errors.New("could not find peer in peerstore: " + peerId)
 	}
-	return peerData.(Peer), nil
+	return peerData, nil
 }
 
 // Add a connection Event to the given peer
@@ -149,8 +174,8 @@ func (c *PeerStore) MessageEvent(peerId string, topicName string) error {
 // Get a map with the errors we got when connecting and their amount
 func (gm *PeerStore) GetErrorCounter() map[string]uint64 {
 	errorsAndAmount := make(map[string]uint64)
-	gm.PeerStore.Range(func(key interface{}, value interface{}) bool {
-		peer := value.(Peer)
+	gm.PeerStore.Range(func(key string, value Peer) bool {
+		peer := value
 		errorsAndAmount[peer.Error]++
 		return true
 	})
@@ -174,9 +199,8 @@ func (c *PeerStore) ExportToCSV(filePath string) error {
 	}
 
 	err = nil
-	c.PeerStore.Range(func(k, val interface{}) bool {
-		v := val.(Peer)
-		_, err = csvFile.WriteString(v.ToCsvLine())
+	c.PeerStore.Range(func(key string, value Peer) bool {
+		_, err = csvFile.WriteString(value.ToCsvLine())
 		return true
 	})
 

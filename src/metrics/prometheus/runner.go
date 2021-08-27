@@ -50,8 +50,8 @@ func (c *PrometheusRunner) Run(ctx context.Context) error {
 			nOfConnectedPeers := 0
 			geoDist := make(map[string]float64)
 
-			c.PeerStore.PeerStore.Range(func(k, val interface{}) bool {
-				peerData := val.(metrics.Peer)
+			c.PeerStore.PeerStore.Range(func(k string, val metrics.Peer) bool {
+				peerData := val
 
 				// TODO: Rethink this criteria
 				if peerData.ClientName != "Unknown" && peerData.ClientName != "" {
