@@ -53,8 +53,7 @@ func (c *PrometheusRunner) Run(ctx context.Context) error {
 			c.PeerStore.PeerStore.Range(func(k, val interface{}) bool {
 				peerData := val.(metrics.Peer)
 
-				// TODO: Rethink this criteria
-				if peerData.ClientName != "Unknown" && peerData.ClientName != "" {
+				if peerData.ClientName != "" {
 					clients.AddClientVersion(peerData.ClientName, peerData.ClientVersion)
 				}
 

@@ -21,8 +21,9 @@ var timeout time.Duration = 5 * time.Second
 func PollPeerMetadata(p peer.ID, base *base.Base, peerMetadataState *metadata.PeerMetadataState, store track.ExtendedPeerstore, gm *metrics.PeerStore) (*track.PeerAllData, error) {
 	// apply timeout to each poll target in this round
 	reqCtx, _ := context.WithTimeout(context.Background(), timeout)
-
-	log.Info("Requesting metadata for peer: ", p.String())
+	log.WithFields(log.Fields{
+		"EVENT": "Metadata request",
+	}).Info("Peer: ", p.String())
 
 	pingCmd := &metadata.PeerMetadataPingCmd{
 		Base:              base,

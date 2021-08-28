@@ -5,50 +5,29 @@ import (
 	pgossip "github.com/protolambda/rumor/p2p/gossip"
 )
 
-// Client utils
-// Main function that will analyze the client type and verion out of the Peer UserAgent
-// return the Client Type and it's verison (if determined)
+// Gets the client and version for a given userAgent
 func FilterClientType(userAgent string) (string, string) {
-	var client string
-	var version string
-	// get the UserAgent in lowercases
+	// Examples:
+	// teku/teku/v21.8.2/linux-x86_64/corretto-java-16
+	// teku/teku/v21.7.0+9-g77b4b9e/linux-x86_64/-ubuntu-openjdk64bitservervm-java-11
+	// Prysm/v1.4.3/8bca66ac6408a03af52d65541f58384007ed50ef
+	// Prysm/v1.3.8-hotfix+6c0942/6c09424feb3141b96016bed817d7ade1cd75deb7
+	// Lighthouse/v1.5.1-b0ac346/x86_64-linux
 	userAgent = strings.ToLower(userAgent)
-	// check the client type
-	if strings.Contains(userAgent, "lighthouse") { // the client is from Lighthouse
-		// Lighthouse UserAgent Example: "Lighthouse/v1.0.3-65dcdc3/x86_64-linux"
-		client = "Lighthouse"
-		// Extract version
-		s := strings.Split(userAgent, "/")
-		aux := strings.Split(s[1], "-")
-		version = aux[0]
-	} else if strings.Contains(userAgent, "prysm") { // the client is from Prysm
-		// Prysm UserAgent Example: "Prysm/v1.1.0/9b367b36fc12ecf565ad649209aa2b5bba8c7797"
-		client = "Prysm"
-		// Extract version
-		s := strings.Split(userAgent, "/")
-		version = s[1]
-	} else if strings.Contains(userAgent, "teku") { // the client is from Prysm
-		// Prysm UserAgent Example: "Prysm/v1.1.0/9b367b36fc12ecf565ad649209aa2b5bba8c7797"
-		client = "Teku"
-		// Extract version
-		s := strings.Split(userAgent, "/")
-		aux := strings.Split(s[2], "+")
-		version = aux[0]
+	fields := strings.Split(userAgent, "/")
+	if strings.Contains(userAgent, "lighthouse") {
+		return "Lighthouse", strings.Split(fields[1], "-")[0]
+	} else if strings.Contains(userAgent, "prysm") {
+		return "Prysm", fields[1]
+	} else if strings.Contains(userAgent, "teku") {
+		return "Teku", strings.Split(fields[2], "+")[0]
 	} else if strings.Contains(userAgent, "nimbus") {
-		client = "Nimbus"
-		version = "Unknown"
+		return "Nimbus", "Unknown"
 	} else if strings.Contains(userAgent, "js-libp2p") {
-		client = "Lodestar"
-		s := strings.Split(userAgent, "/")
-		version = s[1]
-	} else if strings.Contains(userAgent, "unknown") {
-		client = "Unknown"
-		version = "Unknown"
+		return "Lodestar", fields[1]
 	} else {
-		client = "Unknown"
-		version = "Unknown"
+		return "Unknown", "Unknown"
 	}
-	return client, version
 }
 
 // funtion that formats the error into a Pretty understandable (standard) way
