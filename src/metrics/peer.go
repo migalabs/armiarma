@@ -9,8 +9,7 @@ import (
 	"time"
 )
 
-// Base Struct for the topic name and the received messages on the different topics
-// TODO: In the future we might reuse the Rumor struct and add the missing fields
+// Stores all the information related to a peer
 type Peer struct {
 	PeerId        string
 	NodeId        string
@@ -41,7 +40,6 @@ type Peer struct {
 
 	// Counters for the different topics
 	MessageMetrics map[string]*MessageMetric
-	// Variables related to the SubNets (only needed for when Shards will be implemented)
 }
 
 // Information regarding the messages received on a given topic
@@ -53,32 +51,10 @@ type MessageMetric struct {
 
 func NewPeer(peerId string) Peer {
 	pm := Peer{
-		// TODO Check. What is the difference between Unknown and "" empty.
 		PeerId:    peerId,
-		NodeId:    "",
-		UserAgent: "",
-		Pubkey:    "",
-		Addrs:     "",
-		Ip:        "",
-		Country:   "",
-		City:      "",
-		Latency:   0,
-
-		Attempted: false,
-		Succeed:   false,
-		Attempts:  0,
 		Error:     "None",
-
-		MetadataRequest:    false,
-		MetadataSucceed:    false,
-		IsConnected:        false,
-		ConnectedDirection: "",
-		LastExport:         0,
-
 		ConnectionTimes:    make([]time.Time, 0),
 		DisconnectionTimes: make([]time.Time, 0),
-
-		// Counters for the different topics
 		MessageMetrics: make(map[string]*MessageMetric),
 	}
 	return pm

@@ -27,7 +27,7 @@ func NewPrometheusRunner(gm *metrics.PeerStore) PrometheusRunner {
 		PeerStore:       gm,
 		ExposePort:      "9080",
 		EndpointUrl:     "metrics",
-		RefreshInterval: 10 * time.Second,
+		RefreshInterval: 30 * time.Second,
 	}
 }
 

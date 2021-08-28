@@ -1,25 +1,18 @@
 package metrics
 
 import (
-	"context"
 	"os"
 	"sync"
 	"time"
+	"context"
 
 	"github.com/pkg/errors"
-	pgossip "github.com/protolambda/rumor/p2p/gossip"
 	"github.com/protolambda/rumor/p2p/gossip/database"
 	log "github.com/sirupsen/logrus"
+	pgossip "github.com/protolambda/rumor/p2p/gossip"
 )
 
-type PeerStore struct {
-	PeerStore       sync.Map
-	MessageDatabase *database.MessageDatabase // TODO: Discuss
-	StartTime       time.Time
-	MsgNotChannels  map[string](chan bool) // TODO: Unused?
-}
-
-// TODO: Remove from here?
+// TODO: Move this out
 type GossipState struct {
 	GsNode  pgossip.GossipSub
 	CloseGS context.CancelFunc
@@ -27,6 +20,13 @@ type GossipState struct {
 	Topics sync.Map
 	// Validation Filter Flag
 	SeenFilter bool
+}
+
+type PeerStore struct {
+	PeerStore       sync.Map
+	MessageDatabase *database.MessageDatabase // TODO: Discuss
+	StartTime       time.Time
+	MsgNotChannels  map[string](chan bool) // TODO: Unused?
 }
 
 func NewPeerStore() PeerStore {

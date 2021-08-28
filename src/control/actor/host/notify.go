@@ -67,6 +67,9 @@ func (c *HostNotifyCmd) connectedF(net network.Network, conn network.Conn) {
 	if err == nil {
 		peer = fetchPeerExtraInfo(peerData)
 		c.PeerStore.StorePeer(peer)
+		logrus.Info("Rx metadata OK for peer: ", conn.RemotePeer().String())
+	} else {
+		logrus.Info("Rx metadata NOK for peer: ", conn.RemotePeer().String())
 	}
 	c.PeerStore.ConnectionEvent(conn.RemotePeer().String(), fmtDirection(conn.Stat().Direction))
 
