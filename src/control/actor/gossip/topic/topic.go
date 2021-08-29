@@ -7,11 +7,12 @@ import (
 	"github.com/protolambda/rumor/control/actor/base"
 	"github.com/protolambda/rumor/metrics"
 	"github.com/protolambda/rumor/p2p/track"
+	"github.com/protolambda/rumor/control/actor/gossipimport"
 )
 
 type TopicCmd struct {
 	*base.Base
-	GossipState   *metrics.GossipState
+	GossipState   *gossipimport.GossipState
 	PeerStore *metrics.PeerStore
 	Store         track.ExtendedPeerstore
 }

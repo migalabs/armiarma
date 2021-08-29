@@ -8,11 +8,12 @@ import (
 	"github.com/protolambda/rumor/metrics"
 	"github.com/protolambda/rumor/p2p/gossip/database"
 	"github.com/protolambda/zrnt/eth2/configs"
+	"github.com/protolambda/rumor/control/actor/gossipimport"
 )
 
 type GossipMessageDBCmd struct {
 	*base.Base
-	GossipState   *metrics.GossipState
+	GossipState   *gossipimport.GossipState
 	PeerStore *metrics.PeerStore
 
 	MessageLimit int `ask:"--temp-msg-limit" help:"The number of Messages that will be kept on the Temporary Database (Like a Cache of messages)"`

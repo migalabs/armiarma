@@ -18,12 +18,13 @@ import (
 	"github.com/protolambda/zrnt/eth2/beacon"
 	"github.com/protolambda/ztyp/codec"
 	"github.com/sirupsen/logrus"
+	"github.com/protolambda/rumor/control/actor/gossipimport"
 )
 
 type TopicLogCmd struct {
 	*base.Base
 	PeerStore *metrics.PeerStore
-	GossipState   *metrics.GossipState
+	GossipState   *gossipimport.GossipState
 	Eth2TopicName string `ask:"--eth-topic" help:"The name of the eth2 topics"`
 	ForkDigest    string `ask:"--fork-version" help:"The fork digest value of the network we want to join to (Default Mainnet)"`
 	Encoding      string `ask:"--encoding" help:"Encoding that is getting used"`

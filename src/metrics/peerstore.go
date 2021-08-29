@@ -4,23 +4,11 @@ import (
 	"os"
 	"sync"
 	"time"
-	"context"
 
 	"github.com/pkg/errors"
 	"github.com/protolambda/rumor/p2p/gossip/database"
 	log "github.com/sirupsen/logrus"
-	pgossip "github.com/protolambda/rumor/p2p/gossip"
 )
-
-// TODO: Move this out
-type GossipState struct {
-	GsNode  pgossip.GossipSub
-	CloseGS context.CancelFunc
-	// string -> *pubsub.Topic
-	Topics sync.Map
-	// Validation Filter Flag
-	SeenFilter bool
-}
 
 type PeerStore struct {
 	PeerStore       sync.Map

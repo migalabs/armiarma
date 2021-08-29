@@ -7,11 +7,12 @@ import (
 	"github.com/protolambda/rumor/control/actor/base"
 	"github.com/protolambda/rumor/metrics"
 	"github.com/protolambda/rumor/p2p/gossip"
+	"github.com/protolambda/rumor/control/actor/gossipimport"
 )
 
 type GossipStartCmd struct {
 	*base.Base
-	*metrics.GossipState
+	*gossipimport.GossipState
 	*metrics.PeerStore
 
 	SeenFilter bool `ask:"--seen-filter" help:"Enable or Disable the Received Message Validation (Default: True)"`

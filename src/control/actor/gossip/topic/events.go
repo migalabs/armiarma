@@ -9,12 +9,13 @@ import (
 	"github.com/protolambda/rumor/metrics"
 	"github.com/protolambda/rumor/p2p/gossip"
 	"github.com/protolambda/rumor/p2p/track"
+	"github.com/protolambda/rumor/control/actor/gossipimport"
 	"github.com/sirupsen/logrus"
 )
 
 type TopicEventsCmd struct {
 	*base.Base
-	GossipState   *metrics.GossipState
+	GossipState   *gossipimport.GossipState
 	PeerStore *metrics.PeerStore
 	Store         track.ExtendedPeerstore
 	//TopicName string `ask:"<topic>" help:"The name of the topic to track events of"`

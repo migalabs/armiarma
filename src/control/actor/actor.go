@@ -36,6 +36,7 @@ import (
 	vis "github.com/protolambda/rumor/visualizer"
 
 	//	"github.com/protolambda/zrnt/eth2/configs"
+	"github.com/protolambda/rumor/control/actor/gossipimport"
 	"github.com/sirupsen/logrus"
 )
 
@@ -65,7 +66,7 @@ type Actor struct {
 
 	Dv5State dv5.Dv5State
 
-	GossipState     metrics.GossipState
+	GossipState     gossipimport.GossipState
 	PeerStore   metrics.PeerStore
 	VisualizerState visualizer.VisualizerState
 

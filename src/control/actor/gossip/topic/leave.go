@@ -6,13 +6,13 @@ import (
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/protolambda/rumor/control/actor/base"
-	"github.com/protolambda/rumor/metrics"
 	"github.com/protolambda/rumor/p2p/gossip"
+	"github.com/protolambda/rumor/control/actor/gossipimport"
 )
 
 type TopicLeaveCmd struct {
 	*base.Base
-	GossipState   *metrics.GossipState
+	GossipState   *gossipimport.GossipState
 	Eth2TopicName string `ask:"--eth-topic" help:"The name of the eth2 topics"`
 	ForkDigest    string `ask:"--fork-version" help:"The fork digest value of the network we want to join to (Default Mainnet)"`
 	Encoding      string `ask:"--encoding" help:"Encoding that is getting used"`
