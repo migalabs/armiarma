@@ -87,7 +87,7 @@ func (pm *Peer) ConnectionAttemptEvent(succeed bool, err string) {
 		pm.Attempted = true
 	}
 	if succeed {
-		pm.Succeed = succeed
+		pm.Succeed = true
 		pm.Error = "None"
 	} else {
 		pm.Error = utils.FilterError(err)
