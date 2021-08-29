@@ -1,9 +1,13 @@
 package utils
 
 import (
+	"errors"
+	"fmt"
+	"net"
+	"strings"
+
 	pgossip "github.com/protolambda/rumor/p2p/gossip"
 	log "github.com/sirupsen/logrus"
-	"strings"
 )
 
 // Gets the client and version for a given userAgent
@@ -81,4 +85,37 @@ func ShortToFullTopicName(topicName string) string {
 	default:
 		return ""
 	}
+}
+
+func GetIPfromMultiaddress(multiaddr string) (ip string, err error) {
+	s := strings.Split(multiaddr, "/")
+	if len(s) < 3 {
+		return ip, errors.New(fmt.Sprintf("Multiaddress doesn't include an IP: %s", multiaddr))
+	}
+	return s[2], nil
+}
+
+// IP public filtering
+var PrivateIPNetworks = []net.IPNet{
+	net.IPNet{
+		IP:   net.ParseIP("10.0.0.0"),
+		Mask: net.CIDRMask(8, 32),
+	},
+	net.IPNet{
+		IP:   net.ParseIP("172.16.0.0"),
+		Mask: net.CIDRMask(12, 32),
+	},
+	net.IPNet{
+		IP:   net.ParseIP("192.168.0.0"),
+		Mask: net.CIDRMask(16, 32),
+	},
+}
+
+func IsPublic(ip net.IP) bool {
+	for _, ipNet := range PrivateIPNetworks {
+		if ipNet.Contains(ip) || ip.IsLoopback() || ip.IsUnspecified() {
+			return false
+		}
+	}
+	return true
 }

@@ -42,7 +42,8 @@ type Peer struct {
 	LastExport      int64 //(timestamp in seconds of the last exported time (backup for when we are loading the Peer)
 
 	// BeaconStatus
-	BeaconStatus beacon.Status
+	BeaconStatus   beacon.Status
+	BeaconMetadata beacon.MetaData
 
 	// Counters for the different topics
 	MessageMetrics map[string]*MessageMetric
@@ -129,6 +130,12 @@ func (pm *Peer) UpdateBeaconStatus(bStatus beacon.Status) {
 	pm.BeaconStatus.FinalizedEpoch = bStatus.FinalizedEpoch
 	pm.BeaconStatus.HeadRoot = bStatus.HeadRoot
 	pm.BeaconStatus.HeadSlot = bStatus.HeadSlot
+}
+
+// Update beacon Metadata of the peer
+func (pm *Peer) UpdateBeaconMetadata(bMetadata beacon.MetaData) {
+	pm.BeaconMetadata.SeqNumber = bMetadata.SeqNumber
+	pm.BeaconMetadata.Attnets = bMetadata.Attnets
 }
 
 // Count the messages we get per topis and its first/last timestamps
