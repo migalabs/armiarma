@@ -3,6 +3,7 @@ package host
 import (
 	"context"
 	"fmt"
+	"encoding/hex"
 	"time"
 	"github.com/pkg/errors"
 	
@@ -161,7 +162,7 @@ func ReqHostInfo(ctx context.Context, h host.Host , conn network.Conn) BasicHost
 	} 
 	pubk, err := conn.RemotePublicKey().Raw()
 	if err == nil {
-		hInfo.PubKey = string(pubk)
+		hInfo.PubKey = hex.EncodeToString(pubk)
 	}
 	prot, err := h.Peerstore().GetProtocols(peerID)
 	if err == nil {
