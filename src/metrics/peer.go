@@ -125,17 +125,12 @@ func (pm *Peer) ConnectionAttemptEvent(succeed bool, err string) {
 
 // Update beacon Status of the peer
 func (pm *Peer) UpdateBeaconStatus(bStatus beacon.Status) {
-	pm.BeaconStatus.ForkDigest = bStatus.ForkDigest
-	pm.BeaconStatus.FinalizedRoot = bStatus.FinalizedRoot
-	pm.BeaconStatus.FinalizedEpoch = bStatus.FinalizedEpoch
-	pm.BeaconStatus.HeadRoot = bStatus.HeadRoot
-	pm.BeaconStatus.HeadSlot = bStatus.HeadSlot
+	pm.BeaconStatus = bStatus
 }
 
 // Update beacon Metadata of the peer
 func (pm *Peer) UpdateBeaconMetadata(bMetadata beacon.MetaData) {
-	pm.BeaconMetadata.SeqNumber = bMetadata.SeqNumber
-	pm.BeaconMetadata.Attnets = bMetadata.Attnets
+	pm.BeaconMetadata = bMetadata
 }
 
 // Count the messages we get per topis and its first/last timestamps

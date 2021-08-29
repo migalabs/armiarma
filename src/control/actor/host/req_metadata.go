@@ -1,9 +1,8 @@
-package nodemetadata
+package host
 
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 	"github.com/pkg/errors"
 	
@@ -16,8 +15,6 @@ import (
 
 	"github.com/libp2p/go-libp2p/p2p/protocol/identify"
 	"github.com/libp2p/go-libp2p-core/network"
-
-	"github.com/libp2p/go-libp2p/p2p/protocol/ping"
 )
 
 var (
@@ -94,6 +91,7 @@ func ReqBeaconMetadata(ctx context.Context, h host.Host, peerID peer.ID) (data b
 
 // basic Host info that will be requested from the identification of a libp2p peer
 type BasicHostInfo struct {
+	TimeStamp time.Time
 	// Peer Host/Node Info
 	PeerID string
 	UserAgent string
@@ -118,98 +116,62 @@ type HostWithIDService interface {
 // TODO: So far, both request, ping request and identify request has been deplyed on the same func
 // 		 RTT can be also measured from identify request (a bit les accurate) which can leave us to remove the ping request
 // 		 Still leaving it there for Understanding purposes. Some Clients don't support /ipfs/ping/1.0.0, but all support "/eth2/beacon_chain/req/ping/1/" instead
-// DISCUSS the if the returning error should just be asociated to the identify request
-func ReqHostInfo(ctx context.Context, h host.Host , conn network.Conn) (hInfo BasicHostInfo, err error){
+// DISCUSS the if the returning error should just be asociated to the identify request [Currently removed since we always have few info about the peer]
+func ReqHostInfo(ctx context.Context, h host.Host , conn network.Conn) BasicHostInfo{
 	// time out for ping
 	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
 	tout := timeoutCtx.Done()
 	defer cancel()
-	var pingSucc bool = false
-	// synchronize the two go routines
-	var wg sync.WaitGroup
-	wg.Add(2)
-
 	peerID := conn.RemotePeer()
-	// Make Ping to the given Peer
-	go func () {
-		ps := ping.NewPingService(h)
-		ts := ps.Ping(ctx, peerID)
-		defer wg.Done()
-		select {
-			case res := <-ts:
-				if res.Error != nil {
-					log.Error(fmt.Sprintf("libp2p ping, %s", res.Error)) 
-					return
-				}
-				log.Info("ping took: ", res.RTT)
-				hInfo.RTT = res.RTT
-				pingSucc = true
-			case <-tout:
-				log.Error("failed to receive ping")
-			}
-		return
-	}()
+
+	var hInfo BasicHostInfo
+	hInfo.TimeStamp = time.Now()
 	
-	var rtt time.Duration
 	// Identify Peer to access main data
-	go func() {
-		defer wg.Done()
-		// convert host to IDService
-		withIdentify, ok := h.(HostWithIDService)
-		if !ok {
-			log.Error("host does not support libp2p identify protocol")
-			return 
-		}
-		t := time.Now()
-		idService := withIdentify.IDService()
-		if idService == nil {
-			log.Error("libp2p identify not enabled on this host")
-			return
-		}
-		
-		hInfo.MetadataRequest = true
-		select {
-			case <-idService.IdentifyWait(conn):
-				hInfo.MetadataSucceed = true
-				rtt = time.Since(t)
-				log.Info("completed identification")
-			case <-tout:
-				log.Info("awaiting identification timed out")
-			}
-		return
-	}()
-	
-	wg.Wait()
-
-	// Check if ping was successfully done
-	if !pingSucc {
-		hInfo.RTT = rtt
+	// convert host to IDService
+	withIdentify, ok := h.(HostWithIDService)
+	if !ok {
+		log.Error("host does not support libp2p identify protocol")
+		return hInfo
 	}
-
+	t := time.Now()
+	idService := withIdentify.IDService()
+	if idService == nil {
+		log.Error("libp2p identify not enabled on this host")
+		return hInfo
+	}
+	hInfo.MetadataRequest = true
+	var rtt time.Duration
+	select {
+		case <-idService.IdentifyWait(conn):
+			hInfo.MetadataSucceed = true
+			rtt = time.Since(t)
+			log.Info("completed identification")
+		case <-tout:
+			log.Info("awaiting identification timed out")
+	}
 	// Fulfill the hInfo struct
 	ua, err := h.Peerstore().Get(peerID, "AgentVersion")
 	if err == nil {
 		hInfo.UserAgent = ua.(string)
 	}
-	
 	pv, err := h.Peerstore().Get(peerID, "ProtocolVersion")
 	if err == nil {
 		hInfo.ProtocolVersion = pv.(string)
 	} 
-	
 	pubk, err := conn.RemotePublicKey().Raw()
-	if err != nil {
+	if err == nil {
 		hInfo.PubKey = string(pubk)
 	}
-
 	prot, err := h.Peerstore().GetProtocols(peerID)
 	if err == nil {
 		hInfo.Protocols = prot
 	}
 
+	hInfo.RTT = rtt
 	hInfo.PeerID = peerID.String()
 	hInfo.Addrs = conn.RemoteMultiaddr().String()
 	hInfo.Direction = conn.Stat().Direction.String()
 	
-	return hInfo, err
+	return hInfo
 }
