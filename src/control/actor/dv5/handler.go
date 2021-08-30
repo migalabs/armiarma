@@ -8,6 +8,7 @@ import (
 	"github.com/protolambda/rumor/p2p/track"
 	"github.com/protolambda/zrnt/eth2/beacon"
 	"github.com/protolambda/rumor/metrics"
+	"github.com/protolambda/rumor/metrics/utils"
 	"github.com/sirupsen/logrus"
 	"time"
 )
@@ -54,12 +55,19 @@ func (c *HandleENR) handle(log logrus.FieldLogger, res *enode.Node) error {
 			c.Store.SetAddr(peerID, addr, c.TTL)
 			log.WithFields(logrus.Fields{"id": res.ID().String()}).Infof("Updated ENR record")
 		}
-		// TODO: Add other information (i.e. country)
-		// logrus.Info(peerID, res.IP(), res.ID(), " ", res.TCP(), " ", res.UDP())
-		// res.IP() res.ID() res.TCP() res.UDP()
-		peerMetrics := metrics.NewPeer(peerID.String())
-		peerMetrics.Ip = res.IP().String()
-		c.PeerStore.StoreOrUpdatePeer(peerMetrics)
+
+		// store the peer
+		peer := metrics.NewPeer(peerID.String())
+		peer.Ip = res.IP().String()
+		// TODO: Add Addrs. Where to get it? ENR?
+		country, city, err := utils.GetLocationFromIp(res.IP().String())
+		if err != nil {
+			log.Warn("could not get location from ip: ", res.IP())
+		} else {
+			peer.Country = country
+			peer.City = city
+		}
+		c.PeerStore.StoreOrUpdatePeer(peer)
 	}
 	return nil
 }

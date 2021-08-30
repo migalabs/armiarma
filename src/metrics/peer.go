@@ -51,11 +51,11 @@ type MessageMetric struct {
 
 func NewPeer(peerId string) Peer {
 	pm := Peer{
-		PeerId:    peerId,
-		Error:     "None",
+		PeerId:             peerId,
+		Error:              "None",
 		ConnectionTimes:    make([]time.Time, 0),
 		DisconnectionTimes: make([]time.Time, 0),
-		MessageMetrics: make(map[string]*MessageMetric),
+		MessageMetrics:     make(map[string]*MessageMetric),
 	}
 	return pm
 }

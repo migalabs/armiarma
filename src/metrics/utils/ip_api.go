@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -29,14 +28,11 @@ type IpApiMessage struct {
 }
 
 // get IP, location country and City from the multiaddress of the peer on the peerstore
-func GetIpAndLocationFromAddrs(multiAddrs string) (ip string, country string, city string, err error) {
-	ip = strings.TrimPrefix(multiAddrs, "/ip4/")
-	ipSlices := strings.Split(ip, "/")
-	ip = ipSlices[0]
+func GetLocationFromIp(ip string) (country string, city string, err error) {
 	url := "http://ip-api.com/json/" + ip
 	resp, err := http.Get(url)
 	if err != nil {
-		return ip, "", "", errors.Wrap(err, "could not get country and city from ip")
+		return "", "", errors.Wrap(err, "could not get country and city from ip")
 	}
 
 	attemptsLeft, _ := strconv.Atoi(resp.Header["X-Rl"][0])
@@ -46,7 +42,7 @@ func GetIpAndLocationFromAddrs(multiAddrs string) (ip string, country string, ci
 		time.Sleep(time.Duration(timeLeft) * time.Second)
 		resp, err = http.Get(url)
 		if err != nil {
-			return ip, "", "", errors.Wrap(err, "could not get country and city from ip")
+			return "", "", errors.Wrap(err, "could not get country and city from ip")
 		}
 	}
 
@@ -59,7 +55,7 @@ func GetIpAndLocationFromAddrs(multiAddrs string) (ip string, country string, ci
 
 	// Check if the status of the request has been succesful
 	if ipApiResp.Status != "success" {
-		return ip, "", "", errors.Wrap(err, "could not get country and city from ip")
+		return "", "", errors.Wrap(err, "could not get country and city from ip")
 	}
 
 	country = ipApiResp.Country
@@ -67,9 +63,9 @@ func GetIpAndLocationFromAddrs(multiAddrs string) (ip string, country string, ci
 
 	// check if country and city are correctly imported
 	if len(country) == 0 || len(city) == 0 {
-		return ip, "", "", errors.Wrap(err, "country or city are empty")
+		return "", "", errors.Wrap(err, "country or city are empty")
 	}
 
 	// return the received values from the received message
-	return ip, country, city, nil
+	return country, city, nil
 }

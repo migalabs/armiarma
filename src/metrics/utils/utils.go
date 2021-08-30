@@ -1,9 +1,9 @@
 package utils
 
 import (
-	"strings"
 	pgossip "github.com/protolambda/rumor/p2p/gossip"
 	log "github.com/sirupsen/logrus"
+	"strings"
 )
 
 // Gets the client and version for a given userAgent
@@ -81,6 +81,12 @@ func ShortToFullTopicName(topicName string) string {
 	default:
 		return ""
 	}
+}
+
+func GetIpFromMultiAddress(multiAddrs string) string {
+	ip := strings.TrimPrefix(multiAddrs, "/ip4/")
+	ipSlices := strings.Split(ip, "/")
+	return ipSlices[0]
 }
 
 // Get the Real Ip Address from the multi Address list

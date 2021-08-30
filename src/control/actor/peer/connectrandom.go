@@ -13,6 +13,7 @@ import (
 	"github.com/protolambda/rumor/metrics"
 	"github.com/protolambda/rumor/p2p/track"
 	"github.com/protolambda/zrnt/eth2/beacon"
+	"github.com/protolambda/rumor/metrics/utils"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -106,10 +107,6 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host, store track
 			for tgap < c.Rescan {
 				p := randomPeer(peerList)
 				// loop until we arrive to a peer that we didn't connect before
-
-				// TODO: Add also IP taken from ENR of discovered peers
-				peerMetrics := metrics.NewPeer(p.String())
-				c.PeerStore.StoreOrUpdatePeer(peerMetrics)
 				_, ok := peerCache[p]
 				if ok {
 					if len(peerCache) == peerstoreLen {
@@ -127,15 +124,33 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host, store track
 					ID:    p,
 					Addrs: make([]ma.Multiaddr, 0, len(addrs)),
 				}
+				addrsStr := make([]string, 0)
 				for _, m := range addrs {
 					transport, _ := peer.SplitAddr(m)
 					if transport == nil {
 						continue
 					}
 					addrInfo.Addrs = append(addrInfo.Addrs, transport)
+					addrsStr = append(addrsStr, transport.String())
 				}
 				ctx, _ := context.WithTimeout(ctx, c.Timeout)
 				c.Log.Warnf("addrs %s attempting connection to peer", addrInfo.Addrs)
+
+				// store the peer
+				peer := metrics.NewPeer(p.String())
+				fullAddrs := utils.GetFullAddress(addrsStr)
+				country, city, err := utils.GetLocationFromIp(peer.Ip)
+
+				peer.Ip = utils.GetIpFromMultiAddress(fullAddrs)
+				// TODO Add full address
+				if err != nil {
+					log.Warn("could not get location from ip: ", peer.Ip)
+				} else {
+					peer.Country = country
+					peer.City = city
+				}
+				c.PeerStore.StoreOrUpdatePeer(peer)
+
 				// try to connect the peer
 				attempts := 0
 				for attempts <= c.MaxRetries {

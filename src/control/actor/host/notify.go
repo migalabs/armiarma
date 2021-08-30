@@ -61,15 +61,13 @@ func (c *HostNotifyCmd) connectedF(net network.Network, conn network.Conn) {
 		"DIRECTION": fmtDirection(conn.Stat().Direction),
 	}).Info("Peer: ", conn.RemotePeer().String())
 
-	// add the peer
+	// create the peer
 	peer := metrics.NewPeer(conn.RemotePeer().String())
-	c.PeerStore.StoreOrUpdatePeer(peer)
 
 	// try to request metadata for the peer
 	peerData, err := PollPeerMetadata(conn.RemotePeer(), c.Base, c.PeerMetadataState, c.Store, c.PeerStore)
 	if err == nil {
 		peer = fetchPeerExtraInfo(peerData)
-		c.PeerStore.StoreOrUpdatePeer(peer)
 		logrus.WithFields(logrus.Fields{
 			"EVENT": "Metadata request OK",
 		}).Info("Peer: ", conn.RemotePeer().String())
@@ -78,6 +76,7 @@ func (c *HostNotifyCmd) connectedF(net network.Network, conn network.Conn) {
 			"EVENT": "Metadata request NOK",
 		}).Info("Peer: ", conn.RemotePeer().String())
 	}
+	c.PeerStore.StoreOrUpdatePeer(peer)
 	c.PeerStore.ConnectionEvent(conn.RemotePeer().String(), fmtDirection(conn.Stat().Direction))
 
 	// End of metric traces to track the connections and disconnections
@@ -185,8 +184,9 @@ func fmtDirection(d network.Direction) string {
 func fetchPeerExtraInfo(peerData *track.PeerAllData) metrics.Peer {
 	client, version := utils.FilterClientType(peerData.UserAgent)
 	address := utils.GetFullAddress(peerData.Addrs)
+	ip := utils.GetIpFromMultiAddress(address)
 
-	ip, country, city, err := utils.GetIpAndLocationFromAddrs(address)
+	country, city, err := utils.GetLocationFromIp(ip)
 	if err != nil {
 		log.Error("error when fetching country/city from ip", err)
 	}
