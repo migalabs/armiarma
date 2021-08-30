@@ -66,7 +66,9 @@ func (c *HostNotifyCmd) connectedF(net network.Network, conn network.Conn) {
 
 	// try to request metadata for the peer
 	peerData, err := PollPeerMetadata(conn.RemotePeer(), c.Base, c.PeerMetadataState, c.Store, c.PeerStore)
-	if err == nil {
+
+	// double check that the peerData is not empty
+	if err == nil || peerData == nil {
 		peer = fetchPeerExtraInfo(peerData)
 		logrus.WithFields(logrus.Fields{
 			"EVENT": "Metadata request OK",
