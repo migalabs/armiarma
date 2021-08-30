@@ -55,13 +55,36 @@ func (c *PeerStore) AddNotChannel(topicName string) {
 	c.MsgNotChannels[topicName] = make(chan bool, 100)
 }
 
-// Adds or updates peer
-func (c *PeerStore) StorePeer(peer Peer) {
+// Updates the peer without overwritting all its content
+func (c *PeerStore) StoreOrUpdatePeer(peer Peer) {
 	// TODO: We could also store the old data if there was a change. For example
 	// if a given client upgrated it version. Use oldData
 	// See: https://github.com/migalabs/armiarma/issues/17
 	// Currently just overwritting what was before
-	//oldData, loaded := c.PeerStore.LoadOrStore(peer.PeerId, peer)
+	oldPeer, err := c.GetPeerData(peer.PeerId)
+
+	// if error means not found, just store it
+	if err != nil {
+		c.PeerStore.Store(peer.PeerId, peer)
+	} else {
+		// update only the following parameters
+		oldPeer.NodeId = peer.NodeId
+		oldPeer.UserAgent = peer.UserAgent
+		oldPeer.ClientName = peer.ClientName
+		oldPeer.ClientOS = peer.ClientOS
+		oldPeer.ClientVersion = peer.ClientVersion
+		oldPeer.Pubkey = peer.Pubkey
+		oldPeer.Addrs = peer.Addrs
+		oldPeer.Ip = peer.Ip
+		oldPeer.Country = peer.Country
+		oldPeer.City = peer.City
+		oldPeer.Latency = peer.Latency
+		c.PeerStore.Store(peer.PeerId, oldPeer)
+	}
+}
+
+// Stores exact peer, overwritting the existing peer. Use only internally
+func (c *PeerStore) StorePeer(peer Peer) {
 	c.PeerStore.Store(peer.PeerId, peer)
 }
 

@@ -59,7 +59,7 @@ func (c *HandleENR) handle(log logrus.FieldLogger, res *enode.Node) error {
 		// res.IP() res.ID() res.TCP() res.UDP()
 		peerMetrics := metrics.NewPeer(peerID.String())
 		peerMetrics.Ip = res.IP().String()
-		c.PeerStore.StorePeer(peerMetrics)
+		c.PeerStore.StoreOrUpdatePeer(peerMetrics)
 	}
 	return nil
 }

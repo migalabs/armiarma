@@ -63,13 +63,13 @@ func (c *HostNotifyCmd) connectedF(net network.Network, conn network.Conn) {
 
 	// add the peer
 	peer := metrics.NewPeer(conn.RemotePeer().String())
-	c.PeerStore.StorePeer(peer)
+	c.PeerStore.StoreOrUpdatePeer(peer)
 
 	// try to request metadata for the peer
 	peerData, err := PollPeerMetadata(conn.RemotePeer(), c.Base, c.PeerMetadataState, c.Store, c.PeerStore)
 	if err == nil {
 		peer = fetchPeerExtraInfo(peerData)
-		c.PeerStore.StorePeer(peer)
+		c.PeerStore.StoreOrUpdatePeer(peer)
 		logrus.WithFields(logrus.Fields{
 			"EVENT": "Metadata request OK",
 		}).Info("Peer: ", conn.RemotePeer().String())

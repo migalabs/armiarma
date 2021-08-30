@@ -109,7 +109,7 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host, store track
 
 				// TODO: Add also IP taken from ENR of discovered peers
 				peerMetrics := metrics.NewPeer(p.String())
-				c.PeerStore.StorePeer(peerMetrics)
+				c.PeerStore.StoreOrUpdatePeer(peerMetrics)
 				_, ok := peerCache[p]
 				if ok {
 					if len(peerCache) == peerstoreLen {
