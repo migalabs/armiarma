@@ -82,28 +82,3 @@ func ShortToFullTopicName(topicName string) string {
 		return ""
 	}
 }
-
-func GetIpFromMultiAddress(multiAddrs string) string {
-	ip := strings.TrimPrefix(multiAddrs, "/ip4/")
-	ipSlices := strings.Split(ip, "/")
-	return ipSlices[0]
-}
-
-// Get the Real Ip Address from the multi Address list
-// TODO: Implement the Private IP filter in a better way
-func GetFullAddress(multiAddrs []string) string {
-	var address string
-	if len(multiAddrs) > 0 {
-		for _, element := range multiAddrs {
-			if strings.Contains(element, "/ip4/192.168.") || strings.Contains(element, "/ip4/127.0.") || strings.Contains(element, "/ip6/") || strings.Contains(element, "/ip4/172.") || strings.Contains(element, "0.0.0.0") {
-				continue
-			} else {
-				address = element
-				break
-			}
-		}
-	} else {
-		address = "/ip4/127.0.0.1/tcp/9000"
-	}
-	return address
-}

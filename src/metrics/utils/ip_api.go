@@ -3,11 +3,11 @@ package utils
 import (
 	"encoding/json"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	"io/ioutil"
 	"net/http"
 	"strconv"
 	"time"
-	log "github.com/sirupsen/logrus"
 )
 
 // IP-API message structure
@@ -45,22 +45,24 @@ func GetLocationFromIp(ip string) (country string, city string, err error) {
 
 	resp, err := http.Get(url)
 	if err != nil {
-		return "", "", errors.Wrap(err, "could not get data from ip api")
+		return "", "", errors.Wrap(err, "error getting ip api http")
+	}
+	defer resp.Body.Close()
+	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", "", errors.Wrap(err, "could not read response body")
 	}
 
 	attemptsLeft, _ = strconv.Atoi(resp.Header["X-Rl"][0])
 	timeLeft, _ = strconv.Atoi(resp.Header["X-Ttl"][0])
 
-	defer resp.Body.Close()
-	bodyBytes, _ := ioutil.ReadAll(resp.Body)
-
-	// Convert response body to Todo struct
+	// Convert response body to struct
 	var ipApiResp IpApiMessage
 	json.Unmarshal(bodyBytes, &ipApiResp)
 
 	// Check if the status of the request has been succesful
 	if ipApiResp.Status != "success" {
-		return "", "", errors.New("status from ip different than success: " + ipApiResp.Status)
+		return "", "", errors.New("status from ip different than success, body: " + string(bodyBytes))
 	}
 
 	country = ipApiResp.Country

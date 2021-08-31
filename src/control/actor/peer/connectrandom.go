@@ -135,22 +135,27 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host, store track
 				ctx, _ := context.WithTimeout(ctx, c.Timeout)
 				c.Log.Warnf("addrs %s attempting connection to peer", addrInfo.Addrs)
 
-				peerData := c.Store.GetAllData(p)
 				peer := metrics.NewPeer(p.String())
+				peerEnr := c.Store.LatestENR(p)
 
-				addr, err := addrutil.EnodeToMultiAddr(peerData.ENR)
+				// ensure the enr is not nil
+				if peerEnr == nil {
+					continue
+				}
+
+				addr, err := addrutil.EnodeToMultiAddr(peerEnr)
 				if err != nil {
 					log.Error("failed to parse ENR address into multi-addr for libp2p: %v", err)
 				}
 
-				peer.Pubkey = peerData.Pubkey
-				peer.NodeId = peerData.NodeID.String()
-				peer.Ip = peerData.ENR.IP().String()
+				peer.Pubkey = p.String()
+				peer.NodeId = peerEnr.ID().String()
+				peer.Ip = peerEnr.IP().String()
 				peer.Addrs = addr.String()
 
 				country, city, err := utils.GetLocationFromIp(peer.Ip)
 				if err != nil {
-					log.Warn("could not get location from ip: ", peer.Ip)
+					log.Warn("could not get location from ip: ", peer.Ip, err)
 				} else {
 					peer.Country = country
 					peer.City = city

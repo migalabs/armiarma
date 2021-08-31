@@ -66,7 +66,7 @@ func (c *HandleENR) handle(log logrus.FieldLogger, res *enode.Node) error {
 
 		country, city, err := utils.GetLocationFromIp(res.IP().String())
 		if err != nil {
-			logrus.Warn("could not get location from ip: ", res.IP())
+			logrus.Warn("could not get location from ip: ", res.IP(), err)
 		} else {
 			peer.Country = country
 			peer.City = city
