@@ -68,7 +68,7 @@ func (c *HostNotifyCmd) connectedF(net network.Network, conn network.Conn) {
 	peerData, err := PollPeerMetadata(conn.RemotePeer(), c.Base, c.PeerMetadataState, c.Store, c.PeerStore)
 
 	// double check that the peerData is not empty
-	if err == nil || peerData == nil {
+	if err == nil && peerData.String() != "no data available" {
 		peer = fetchPeerExtraInfo(peerData)
 		logrus.WithFields(logrus.Fields{
 			"EVENT": "Metadata request OK",
@@ -78,6 +78,8 @@ func (c *HostNotifyCmd) connectedF(net network.Network, conn network.Conn) {
 			"EVENT": "Metadata request NOK",
 		}).Info("Peer: ", conn.RemotePeer().String())
 	}
+
+	// store the peer and record that the connection was ok
 	c.PeerStore.StoreOrUpdatePeer(peer)
 	c.PeerStore.ConnectionEvent(conn.RemotePeer().String(), fmtDirection(conn.Stat().Direction))
 
