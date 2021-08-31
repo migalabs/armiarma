@@ -390,7 +390,7 @@ def plotColumn(panda, pdf, opts):
     if opts['legendLabel'] != None:
         # Adding opts['legendSize'] as markerscale might not be the best option, try and see how it looks
         # if it doesn't look nice, change by adding a new flag 
-        ax.legend(markerscale=opts['legendSize'], loc=opts['legendPosition'], ncol=ncol, prop={'size':opts['legendSize']})
+        ax.legend(markerscale=opts['legendSize'], loc=opts['legendPosition'], ncol=opts['ncol'], prop={'size':opts['legendSize']})
     else:
         ax.get_legend().remove()
     
@@ -547,12 +547,10 @@ def main():
 
     # End of plotting variables
     csvFile = sys.argv[1]
-    peerstoreFile = sys.argv[2]
-    outputFigsFolder = sys.argv[3]
+    outputFigsFolder = sys.argv[2]
 
     pdfFile = outputFigsFolder + "/MetricsSummary.pdf"
     
-    peerstorePanda = getPandaFromPeerstoreJson(peerstoreFile)
     rumorMetricsPanda = pd.read_csv(csvFile)
 
 
@@ -565,30 +563,19 @@ def main():
 
     # Temporary measurments for the Armiarma Paper
 
-    # Count number of Prysm Peers on the Peerstore
-    ff = open(peerstoreFile)
-    peerstore = json.load(ff)
-
-    # TEMP CODE
-    # Remove the outlier of the metrics/peerstore
-    row = rumorMetricsPanda.loc[rumorMetricsPanda['Connected Time'].idxmax()]
-    rumorMetricsPanda = rumorMetricsPanda.drop([10261,1116,10427,4810,762,8658,4429], axis=0)
-    # END TEMP CODE
-
     cnt13000 = 0
     cnt9000 = 0
     cntOthers = 0
     noAddrs = 0
 
-    peerstoreLen = len(peerstore)
     metricsLen = len(rumorMetricsPanda)
     print()
-    print('Total amount of peers on the peerstore:',peerstoreLen)
-    for peer in peerstore:
+    print('Total amount of peers on the peerstore:', rumorMetricsPanda)
+    for index, row in rumorMetricsPanda.iterrows():
         try:
-            if '/13000' in peerstore[peer]["addrs"][0]:
+            if '/13000' in row["addrs"][0]:
                 cnt13000 = cnt13000 +1
-            elif '/9000' in peerstore[peer]["addrs"][0]:
+            elif '/9000' in row["addrs"][0]:
                 cnt9000 = cnt9000 +1
             else: 
                 cntOthers = cntOthers + 1
@@ -600,7 +587,6 @@ def main():
     tcp13000 = 0
     cunk1300 = 0
     for index, row in rumorMetricsPanda.iterrows():
-
         if '/13000' in str(row['Address']):
             tcp13000 = tcp13000 +1
             if row['Client'] == 'Unknown':
@@ -615,11 +601,10 @@ def main():
     print('Number of Unknown clients with 13000 TCP port:', unk13000)
     summ = cnt13000 + cnt9000 + cntOthers + noAddrs
     noPrysmPort = cnt9000 + cntOthers + noAddrs
-    if summ != peerstoreLen:
+    if summ != metricsLen:
         print("----> WARN: port total count doesn't match with the total peerstore")
-    print('percentage of "Prysm" peers from the peerstore:', round((cnt13000*100)/peerstoreLen,2))
+    print('percentage of "Prysm" peers from the peerstore:', round((cnt13000*100)/metricsLen,2))
 
-    ff.close()
 
     # get percentage of the total of messages received
 
@@ -713,23 +698,7 @@ def main():
             break
     print()
     print()
-    # End of Temporary code for the paper
-
-    # Temp
-    # Check if any of the Lodestar nodes was recognized with the  "js-libp2p/version" user agent
-    for index, row in rumorMetricsPanda.iterrows():
-        if row['Client'] == 'Unknown':
-            try:
-                if "js-libp2p" in peerstore[row['Peer Id']]["user_agent"]:
-                    print("Lodestar", peerstore[row['Peer Id']]["user_agent"])
-                    ua = peerstore[row['Peer Id']]["user_agent"].split('/')
-                    rumorMetricsPanda.at[index,'Client'] = "Lodestar"
-                    rumorMetricsPanda.at[index,'Version'] = ua[1]
-            except:   
-                pass
-
-    # End Temp
-
+   
     with PdfPages(pdfFile) as pdf:
         # plot the metrics gathered on the extra-metrics
         nonAttempted = 0
@@ -753,27 +722,21 @@ def main():
                 else:
                     succeed = succeed + 1
         
-        print("Not tried from the last peerstore copy:",nonAttempted)
+        print("Not tried from the entire peerstore:",nonAttempted)
         print("Tried and succeed:", succeed)
         print("Tried and failed", failed)
         print("Incoming connections:", connected)
-        nonAttempted = nonAttempted + (peerstoreLen - (len(rumorMetricsPanda)))
-        print("Total Not tried from the entrire peerstore", nonAttempted)
 
         # get length of the peerstore
-        peerstoreSize = getLengthOfPanda(peerstorePanda)
         peerMetricsSize = getLengthOfPanda(rumorMetricsPanda)
 
-        print("Peers in metrics", peerMetricsSize, "| On the peerstore", peerstoreSize)
-        if peerMetricsSize != peerstoreSize:
-            print("----> WARN: Peers in Peerstore and peers on the metrics don't match")
 
         ## -- website code --
         print("\n")
         #print("Results from crawler run on [month] running for [crawling time].\n<br>Total amount of peers on the peerstore:", peerstoreLen,".\n<br>Number of clients with the TPC port at 13000 (Prysm?):", cnt13000,".\n<br>Percentage of 'Prysm' peers from the peerstore (based on the TCP port):", round((cnt13000*100)/peerstoreLen,2),"%.\n<br>We manage to connect with", succeed,"peers from the peerstore.\n<br>This would be the distribution.")
         print("\n")
       
-        xarray = [[0, succeed], [0, connected], [0, failed], [0, nonAttempted], [peerstoreLen, 0]]
+        xarray = [[0, succeed], [0, connected], [0, failed], [0, nonAttempted], [peerMetricsSize, 0]]
         yarray = ['Peerstore', 'Peering Results']
         labels = ['connected', 'incoming', 'failed', 'not tried', 'peerstore']
         barColor = ['tab:blue', 'tab:green']
@@ -932,9 +895,8 @@ def main():
         # Get number of unknown peers that has the 13000 port 
 
         print('Number of Peers', peerMetricsSize)
-        print('Number in Peerstore', peerstoreLen)
         print('Number of peer with 13000 port', cnt13000)
-        print('No prysm port:', noPrysmPort, "real:", (peerstoreLen -cnt13000) )
+        print('No prysm port:', noPrysmPort, "real:", (peerMetricsSize -cnt13000) )
         # Get total of non prysm peers
         nonPrysmObserved = 0
         for k in clientsCnt:
