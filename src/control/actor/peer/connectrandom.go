@@ -14,6 +14,7 @@ import (
 	"github.com/protolambda/rumor/p2p/track"
 	"github.com/protolambda/zrnt/eth2/beacon"
 	"github.com/protolambda/rumor/metrics/utils"
+	"github.com/protolambda/rumor/p2p/addrutil"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -124,25 +125,30 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host, store track
 					ID:    p,
 					Addrs: make([]ma.Multiaddr, 0, len(addrs)),
 				}
-				addrsStr := make([]string, 0)
 				for _, m := range addrs {
 					transport, _ := peer.SplitAddr(m)
 					if transport == nil {
 						continue
 					}
 					addrInfo.Addrs = append(addrInfo.Addrs, transport)
-					addrsStr = append(addrsStr, transport.String())
 				}
 				ctx, _ := context.WithTimeout(ctx, c.Timeout)
 				c.Log.Warnf("addrs %s attempting connection to peer", addrInfo.Addrs)
 
-				// store the peer
+				peerData := c.Store.GetAllData(p)
 				peer := metrics.NewPeer(p.String())
-				fullAddrs := utils.GetFullAddress(addrsStr)
-				country, city, err := utils.GetLocationFromIp(peer.Ip)
 
-				peer.Ip = utils.GetIpFromMultiAddress(fullAddrs)
-				// TODO Add full address
+				addr, err := addrutil.EnodeToMultiAddr(peerData.ENR)
+				if err != nil {
+					log.Error("failed to parse ENR address into multi-addr for libp2p: %v", err)
+				}
+
+				peer.Pubkey = peerData.Pubkey
+				peer.NodeId = peerData.NodeID.String()
+				peer.Ip = peerData.ENR.IP().String()
+				peer.Addrs = addr.String()
+
+				country, city, err := utils.GetLocationFromIp(peer.Ip)
 				if err != nil {
 					log.Warn("could not get location from ip: ", peer.Ip)
 				} else {

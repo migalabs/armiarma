@@ -192,7 +192,7 @@ func fetchPeerExtraInfo(peerData *track.PeerAllData) metrics.Peer {
 
 	country, city, err := utils.GetLocationFromIp(ip)
 	if err != nil {
-		log.Error("error when fetching country/city from ip", err)
+		log.Warn("error when fetching country/city from ip", err)
 	}
 
 	peer := metrics.NewPeer(peerData.PeerID.String())

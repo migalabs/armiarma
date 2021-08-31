@@ -3,11 +3,11 @@ package utils
 import (
 	"encoding/json"
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
 	"io/ioutil"
 	"net/http"
 	"strconv"
 	"time"
+	log "github.com/sirupsen/logrus"
 )
 
 // IP-API message structure
@@ -37,8 +37,10 @@ func GetLocationFromIp(ip string) (country string, city string, err error) {
 	url := "http://ip-api.com/json/" + ip
 
 	// When getting close to 0 attempts
-	if attemptsLeft < 5 {
+	if attemptsLeft < 7 {
 		time.Sleep(time.Duration(timeLeft) * time.Second)
+	} else if attemptsLeft == 0 {
+		log.Warn("Attempt left reached: ", attemptsLeft)
 	}
 
 	resp, err := http.Get(url)
@@ -58,7 +60,7 @@ func GetLocationFromIp(ip string) (country string, city string, err error) {
 
 	// Check if the status of the request has been succesful
 	if ipApiResp.Status != "success" {
-		return "", "", errors.New("status from ip different than success")
+		return "", "", errors.New("status from ip different than success: " + ipApiResp.Status)
 	}
 
 	country = ipApiResp.Country

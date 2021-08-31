@@ -47,22 +47,26 @@ func (c *HandleENR) handle(log logrus.FieldLogger, res *enode.Node) error {
 		if err != nil {
 			return fmt.Errorf("enr update error: %v", err)
 		}
+		addr, err := addrutil.EnodeToMultiAddr(res)
+		if err != nil {
+			return fmt.Errorf("failed to parse ENR address into multi-addr for libp2p: %v", err)
+		}
 		if updated {
-			addr, err := addrutil.EnodeToMultiAddr(res)
-			if err != nil {
-				return fmt.Errorf("failed to parse ENR address into multi-addr for libp2p: %v", err)
-			}
 			c.Store.SetAddr(peerID, addr, c.TTL)
 			log.WithFields(logrus.Fields{"id": res.ID().String()}).Infof("Updated ENR record")
 		}
 
-		// store the peer
+		peerData := c.Store.GetAllData(peerID)
 		peer := metrics.NewPeer(peerID.String())
+
+		peer.Pubkey = peerData.Pubkey
+		peer.NodeId = peerData.NodeID.String()
 		peer.Ip = res.IP().String()
-		// TODO: Add Addrs. Where to get it? ENR?
+		peer.Addrs = addr.String()
+
 		country, city, err := utils.GetLocationFromIp(res.IP().String())
 		if err != nil {
-			log.Warn("could not get location from ip: ", res.IP())
+			logrus.Warn("could not get location from ip: ", res.IP())
 		} else {
 			peer.Country = country
 			peer.City = city

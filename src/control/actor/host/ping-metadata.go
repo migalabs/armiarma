@@ -22,7 +22,7 @@ func PollPeerMetadata(p peer.ID, base *base.Base, peerMetadataState *metadata.Pe
 	// apply timeout to each poll target in this round
 	reqCtx, _ := context.WithTimeout(context.Background(), timeout)
 	log.WithFields(log.Fields{
-		"EVENT": "Metadata request",
+		"EVENT": "Requesting metadata",
 	}).Info("Peer: ", p.String())
 
 	pingCmd := &metadata.PeerMetadataPingCmd{
