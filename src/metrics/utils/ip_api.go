@@ -3,6 +3,7 @@ package utils
 import (
 	"encoding/json"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	"io/ioutil"
 	"net/http"
 	"strconv"
@@ -27,24 +28,26 @@ type IpApiMessage struct {
 	As          string `json:"as"`
 }
 
-// get IP, location country and City from the multiaddress of the peer on the peerstore
+// TODO: temporal fix. put into a class
+var attemptsLeft int = 10
+var timeLeft int = 1
+
+// get location country and City from the multiaddress of the peer on the peerstore
 func GetLocationFromIp(ip string) (country string, city string, err error) {
 	url := "http://ip-api.com/json/" + ip
+
+	// When getting close to 0 attempts
+	if attemptsLeft < 5 {
+		time.Sleep(time.Duration(timeLeft) * time.Second)
+	}
+
 	resp, err := http.Get(url)
 	if err != nil {
-		return "", "", errors.Wrap(err, "could not get country and city from ip")
+		return "", "", errors.Wrap(err, "could not get data from ip api")
 	}
 
-	attemptsLeft, _ := strconv.Atoi(resp.Header["X-Rl"][0])
-	timeLeft, _ := strconv.Atoi(resp.Header["X-Ttl"][0])
-
-	if attemptsLeft == 0 { // We have exceeded the limit of requests 45req/min
-		time.Sleep(time.Duration(timeLeft) * time.Second)
-		resp, err = http.Get(url)
-		if err != nil {
-			return "", "", errors.Wrap(err, "could not get country and city from ip")
-		}
-	}
+	attemptsLeft, _ = strconv.Atoi(resp.Header["X-Rl"][0])
+	timeLeft, _ = strconv.Atoi(resp.Header["X-Ttl"][0])
 
 	defer resp.Body.Close()
 	bodyBytes, _ := ioutil.ReadAll(resp.Body)
@@ -55,7 +58,7 @@ func GetLocationFromIp(ip string) (country string, city string, err error) {
 
 	// Check if the status of the request has been succesful
 	if ipApiResp.Status != "success" {
-		return "", "", errors.Wrap(err, "could not get country and city from ip")
+		return "", "", errors.New("status from ip different than success")
 	}
 
 	country = ipApiResp.Country
@@ -63,7 +66,7 @@ func GetLocationFromIp(ip string) (country string, city string, err error) {
 
 	// check if country and city are correctly imported
 	if len(country) == 0 || len(city) == 0 {
-		return "", "", errors.Wrap(err, "country or city are empty")
+		return "", "", errors.New("country or city are empty")
 	}
 
 	// return the received values from the received message
