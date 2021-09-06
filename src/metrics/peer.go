@@ -3,10 +3,11 @@ package metrics
 import (
 	"fmt"
 	//"github.com/pkg/errors"
-	"github.com/protolambda/rumor/metrics/utils"
-	log "github.com/sirupsen/logrus"
 	"strconv"
 	"time"
+
+	"github.com/protolambda/rumor/metrics/utils"
+	log "github.com/sirupsen/logrus"
 )
 
 // Stores all the information related to a peer
@@ -105,18 +106,21 @@ func (pm *Peer) MessageEvent(topicName string, time time.Time) {
 }
 
 // Calculate the total connected time based on con/disc timestamps
+// Shifted some calculus to nanoseconds, Millisecons were leaving fields empty when exporting (less that 3 decimals)
 func (pm *Peer) GetConnectedTime() float64 {
 	var totalConnectedTime int64
 	for _, conTime := range pm.ConnectionTimes {
 		for _, discTime := range pm.DisconnectionTimes {
-			singleConnectionTime := discTime.Sub(conTime).Milliseconds()
+			singleConnectionTime := discTime.Sub(conTime)
 			if singleConnectionTime >= 0 {
-				totalConnectedTime += singleConnectionTime
+				totalConnectedTime += int64(singleConnectionTime * time.Nanosecond)
 				break
+			} else {
+
 			}
 		}
 	}
-	return float64(totalConnectedTime) / 60000
+	return float64(totalConnectedTime) / 60000000000
 }
 
 // Get the number of messages that we got for a given topic. Note that
@@ -159,7 +163,7 @@ func (pm *Peer) ToCsvLine() string {
 		fmt.Sprint(pm.Latency) + "," +
 		fmt.Sprintf("%d", len(pm.ConnectionTimes)) + "," +
 		fmt.Sprintf("%d", len(pm.DisconnectionTimes)) + "," +
-		fmt.Sprintf("%.3f", pm.GetConnectedTime()) + "," +
+		fmt.Sprintf("%.6f", pm.GetConnectedTime()) + "," +
 		strconv.FormatUint(pm.GetNumOfMsgFromTopic("BeaconBlock"), 10) + "," +
 		strconv.FormatUint(pm.GetNumOfMsgFromTopic("BeaconAggregateProof"), 10) + "," +
 		strconv.FormatUint(pm.GetNumOfMsgFromTopic("VoluntaryExit"), 10) + "," +
