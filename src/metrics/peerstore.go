@@ -67,18 +67,41 @@ func (c *PeerStore) StoreOrUpdatePeer(peer Peer) {
 	if err != nil {
 		c.PeerStore.Store(peer.PeerId, peer)
 	} else {
-		// update only the following parameters
-		oldPeer.NodeId = peer.NodeId
-		oldPeer.UserAgent = peer.UserAgent
-		oldPeer.ClientName = peer.ClientName
-		oldPeer.ClientOS = peer.ClientOS
-		oldPeer.ClientVersion = peer.ClientVersion
-		oldPeer.Pubkey = peer.Pubkey
-		oldPeer.Addrs = peer.Addrs
-		oldPeer.Ip = peer.Ip
-		oldPeer.Country = peer.Country
-		oldPeer.City = peer.City
-		oldPeer.Latency = peer.Latency
+		// update only the following parameters only if the incoming info is full
+		if peer.NodeId != "" {
+			oldPeer.NodeId = peer.NodeId
+		}
+		if peer.UserAgent != "" {
+			oldPeer.UserAgent = peer.UserAgent
+		}
+		if peer.ClientName != "" {
+			oldPeer.ClientName = peer.ClientName
+		}
+		if peer.ClientOS != "" {
+			oldPeer.ClientOS = peer.ClientOS
+		}
+		if peer.ClientVersion != "" {
+			oldPeer.ClientVersion = peer.ClientVersion
+		}
+		if peer.Pubkey != "" {
+			oldPeer.Pubkey = peer.Pubkey
+		}
+		if peer.Addrs != "" {
+			oldPeer.Addrs = peer.Addrs
+		}
+		if peer.Ip != "" {
+			oldPeer.Ip = peer.Ip
+		}
+		if peer.Country != "" {
+			oldPeer.Country = peer.Country
+		}
+		if peer.City != "" {
+			oldPeer.City = peer.City
+		}
+		if peer.Latency != 0 {
+			oldPeer.Latency = peer.Latency
+		}
+
 		c.PeerStore.Store(peer.PeerId, oldPeer)
 	}
 }
