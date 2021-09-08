@@ -3,10 +3,11 @@ package metrics
 import (
 	"fmt"
 	//"github.com/pkg/errors"
-	"github.com/protolambda/rumor/metrics/utils"
-	log "github.com/sirupsen/logrus"
 	"strconv"
 	"time"
+
+	"github.com/protolambda/rumor/metrics/utils"
+	log "github.com/sirupsen/logrus"
 )
 
 // Stores all the information related to a peer
@@ -51,11 +52,11 @@ type MessageMetric struct {
 
 func NewPeer(peerId string) Peer {
 	pm := Peer{
-		PeerId:    peerId,
-		Error:     "None",
+		PeerId:             peerId,
+		Error:              "None",
 		ConnectionTimes:    make([]time.Time, 0),
 		DisconnectionTimes: make([]time.Time, 0),
-		MessageMetrics: make(map[string]*MessageMetric),
+		MessageMetrics:     make(map[string]*MessageMetric),
 	}
 	return pm
 }
@@ -139,11 +140,11 @@ func (pm *Peer) GetAllMessagesCount() uint64 {
 }
 
 func (pm *Peer) ToCsvLine() string {
-	// register if the peer was conected 
+	// register if the peer was conected
 	connStablished := "false"
 	if len(pm.ConnectionTimes) > 0 {
 		connStablished = "true"
-	} 
+	}
 	csvRow := pm.PeerId + "," +
 		pm.NodeId + "," +
 		pm.UserAgent + "," +
@@ -161,7 +162,7 @@ func (pm *Peer) ToCsvLine() string {
 		// right now we would just write TRUE if the peer was connected when exporting the metrics
 		// However, we want to know if the peer established a connection with us
 		// Measure it, as we said from the length of the connection times
-		connStablished + "," + 
+		connStablished + "," +
 		strconv.FormatBool(pm.IsConnected) + "," +
 		strconv.FormatUint(pm.Attempts, 10) + "," +
 		pm.Error + "," +
