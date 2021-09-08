@@ -143,6 +143,11 @@ func (pm *Peer) GetAllMessagesCount() uint64 {
 }
 
 func (pm *Peer) ToCsvLine() string {
+	// register if the peer was conected
+	connStablished := "false"
+	if len(pm.ConnectionTimes) > 0 {
+		connStablished = "true"
+	}
 	csvRow := pm.PeerId + "," +
 		pm.NodeId + "," +
 		pm.UserAgent + "," +
@@ -157,6 +162,10 @@ func (pm *Peer) ToCsvLine() string {
 		strconv.FormatBool(pm.MetadataSucceed) + "," +
 		strconv.FormatBool(pm.Attempted) + "," +
 		strconv.FormatBool(pm.Succeed) + "," +
+		// right now we would just write TRUE if the peer was connected when exporting the metrics
+		// However, we want to know if the peer established a connection with us
+		// Measure it, as we said from the length of the connection times
+		connStablished + "," +
 		strconv.FormatBool(pm.IsConnected) + "," +
 		strconv.FormatUint(pm.Attempts, 10) + "," +
 		pm.Error + "," +
