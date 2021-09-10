@@ -1,5 +1,0 @@
-# Export the generated metrics from the network
-
-echo "Exporting the metrics to the folder $metricsFolder"
-
-gossip topic export-metrics

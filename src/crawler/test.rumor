@@ -1,5 +1,0 @@
-
-echo "Test rumor script running"
-armiarma: host start
-armiarma: host listen
-echo "Test finished"
