@@ -1,39 +1,21 @@
-# Armiarma
-Armiarma is a Eth2 network Analyzer based on the [Rumor](https://github.com/protolambda/rumor) client debugger. The current version of Armiarma is based on the latest update on Rumor on its [commit](https://github.com/protolambda/rumor/commit/d42e0da5729ca887e26f43e8cf4f290a61dbdc26).
+# Armiarma. A distributed network monitoring tool
 
-### Requisites
-To use the tool the following tools needs to be installed on the machine:
-- Go on its 1.15 version or above. Go needs to be executable from the terminal and despite previous versions might work, we recomend ussing the 1.15 for a better preformance of the crawler. The current [dv5.1](https://github.com/ethereum/devp2p/blob/master/discv5/discv5.md) version will not work with lower versions than the 1.15.
-- Python3 and pip3 needs to be installed and executable from the shell.
-- The viertualenv tool needs to be installed for the metrics analyzer. 
+## Motivation
+Distributed p2p networks are gaining popularity with the popularization of blockchain applications. On a case scenarion, where the critical message exchange complitely relies on the p2p network underneath, a deep and complete analysis on the real-time network status can directly prevent or spot vulnerabilities on the application protocol.
 
-### Usage
-The crawler can be easily executed from the `armiarma.sh` file (make sure that is an executable file). 
-The executable `armiarma.sh` launching shell script supports five different commands that correspond to the main functionalities of the tool.
-Those commands are:
+With this idea in mind, from Miga Labs, we want to provide a tool able to join, p2p networks (check the protocol compatibility list), share and adopt the using protocols, so that we can provide the datasets and the tools to study the new generation blockchain networks.   
 
-- `./armiarma.sh -h` to display the help text of the tool. 
-- `./armiarma.sh -c [network] [project-name]` to launch the armiarma crawler on the given network. The given project-name is the name of the folder where the gathered metrics and where all the related information will be saved. The folder will be placed on the `./examples` folder. 
-- `./armiarma.sh -p [project-name]` to launch the armiarma analyzer over the metrics from the given project. The generted plots of the analysis will be saved on the `./examples/[project-name]/plots` folder.
-- `./armiarma.sh -f [network] [project-name] [time]` to launch the armiarma crawler on the given network for the given `time` in minutes. The given project-name is the name of the folder where the gathered metrics and where all the related information will be saved. The folder will be placed on the `./examples` folder. After the crawling for the given time, the analyzer will be launched automatically. The summary results will be saved on the `./examples/[project-name]/plots` folder.
-- `./armiarma.sh -o` to launch the armiarma general overview analyzer over the metrics from the projects' folder. The generted results of the analysis will be saved on the `./general-resutls` folder.
+## Who are we?
+[Miga Labs](http://migalabs.es/) is a young department of the Barcelona Supercomputing Center (BSC). Miga Labs is a group specialized in next-generation Blockchain technology, with a focus on Sharding and Proof-of-Stake protocols.
 
-```
-    ./armiarma.sh --> -h
-                  '-> -c [network] [project-name]
-                  '-> -p [project-name]
-                  '-> -f [network] [project-name] [time](minutes)
-                  '-> -o 
-```
+## Installation
 
-The tool will get the Go packages and compile Rumor as generate the virtual env and install the python3 dependencies for the user.  
+Currently supported protocols:
+    - Ethereum 2
+        - Mainnet
 
-Currently supported networks:
-    - Mainnet
-
-### NOTES
+## NOTES
 Please, note that the tool is currently on a developing stage, any bugs reports or suggestions will be accepted.
 
-### LICENSE
-
+## LICENSE
 MIT, see [LICENSE](https://github.com/Cortze/armiarma/blob/master/LICENSE) file.

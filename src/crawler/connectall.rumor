@@ -1,2 +1,0 @@
-# Connect the crawler peers in an auto-mode
-peer connectall --filter-digest="$fork_digest" --max-peers=20000 --max-retries=50 --rescan=1m --timeout=10s --workers=6
