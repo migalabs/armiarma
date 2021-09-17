@@ -69,10 +69,17 @@ func (c *HostNotifyCmd) connectedF(net network.Network, conn network.Conn) {
 	var peer metrics.Peer
 	// Read ENR of the Peer from the generated enode
 	n := c.Store.LatestENR(conn.RemotePeer())
-
+	if n.ID().String() == "" {
+		// TODO: If the peer wasn't discovered via dv5 "n" will be empty
+		// we could compose new ENR with the beacon metadata and the host info
+		log.Warn("Peer ENR not found")
+	}
+	hInfo.NodeID = n.ID().String()
 	// fetch all the info gathered from the peer into a new Peer struct
-	peer = fetchPeerInfo(bStatus, bMetadata, hInfo, n)
-	log.Info("fetching info")
+	peer.FetchHostInfo(hInfo)
+	// TODO: Switch from Update ot Add in the future, when implementing metrics versions
+	peer.UpdateBeaconStatus(bStatus)
+	peer.UpdateBeaconMetadata(bMetadata)
 	// So far, just act like if we got new info, Update or Aggregate new info from a peer already on the Peerstore
 	c.PeerStore.AddPeer(peer)
 	c.PeerStore.AddConnectionEvent(conn.RemotePeer().String(), "Connection")
@@ -163,3 +170,20 @@ func (c *HostNotifyCmd) Run(ctx context.Context, args ...string) error {
 	})
 	return nil
 }
+<<<<<<< HEAD
+=======
+
+// DEPRECATE for Libp2p2 network.Direction.String() https://github.com/libp2p/go-libp2p-core/blob/094b0d3f8ba2934339cb35e1a875b11ab6d08839/network/network.go#L38
+func fmtDirection(d network.Direction) string {
+	switch d {
+	case network.DirInbound:
+		return "inbound"
+	case network.DirOutbound:
+		return "outbound"
+	case network.DirUnknown:
+		return "unknown"
+	default:
+		return "unknown"
+	}
+}
+>>>>>>> Organize Beacon Info of peer + Add new methods to fetch info from a peer + Adding test for fetching

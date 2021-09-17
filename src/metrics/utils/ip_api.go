@@ -3,12 +3,19 @@ package utils
 import (
 	"encoding/json"
 	"io/ioutil"
+<<<<<<< HEAD
+=======
+	"net"
+>>>>>>> Organize Beacon Info of peer + Add new methods to fetch info from a peer + Adding test for fetching
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/pkg/errors"
+<<<<<<< HEAD
 	log "github.com/sirupsen/logrus"
+=======
+>>>>>>> Organize Beacon Info of peer + Add new methods to fetch info from a peer + Adding test for fetching
 )
 
 // IP-API message structure
@@ -57,6 +64,7 @@ func GetLocationFromIp(ip string) (country string, city string, err error) {
 	attemptsLeft, _ = strconv.Atoi(resp.Header["X-Rl"][0])
 	timeLeft, _ = strconv.Atoi(resp.Header["X-Ttl"][0])
 
+<<<<<<< HEAD
 	// Convert response body to struct
 	var ipApiResp IpApiMessage
 	json.Unmarshal(bodyBytes, &ipApiResp)
@@ -64,10 +72,19 @@ func GetLocationFromIp(ip string) (country string, city string, err error) {
 	// Check if the status of the request has been succesful
 	if ipApiResp.Status != "success" {
 		return "", "", errors.New("status from ip different than success, body: " + string(bodyBytes))
+=======
+	// Convert response body to Todo struct
+	var ipAPIResp IpApiMessage
+	json.Unmarshal(bodyBytes, &ipAPIResp)
+
+	// Check if the status of the request has been succesful
+	if ipAPIResp.Status != "success" {
+		return "", "", errors.Wrap(err, "could not get country and city from ip")
+>>>>>>> Organize Beacon Info of peer + Add new methods to fetch info from a peer + Adding test for fetching
 	}
 
-	country = ipApiResp.Country
-	city = ipApiResp.City
+	country = ipAPIResp.Country
+	city = ipAPIResp.City
 
 	// check if country and city are correctly imported
 	if len(country) == 0 || len(city) == 0 {

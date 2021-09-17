@@ -2,7 +2,6 @@ package metrics
 
 import (
 	"fmt"
-	//"github.com/pkg/errors"
 	"strconv"
 	"time"
 
@@ -42,8 +41,8 @@ type Peer struct {
 	LastExport      int64 //(timestamp in seconds of the last exported time (backup for when we are loading the Peer)
 
 	// BeaconStatus
-	BeaconStatus   beacon.Status
-	BeaconMetadata beacon.MetaData
+	BeaconStatus   BeaconStatusStamped
+	BeaconMetadata BeaconMetadataStamped
 
 	// Counters for the different topics
 	MessageMetrics map[string]*MessageMetric
@@ -123,14 +122,73 @@ func (pm *Peer) ConnectionAttemptEvent(succeed bool, err string) {
 	}
 }
 
+// Fetch all the different metadata we received to save it into a new peer struct
+// TODO: Still few things to consider with new approach, like version handling
+// 		 or fetching the actual info with previous info from the peer
+func (pm *Peer) FetchHostInfo(hInfo BasicHostInfo) {
+	client, version := utils.FilterClientType(hInfo.UserAgent)
+	ip, err := utils.GetIPfromMultiaddress(hInfo.Addrs)
+	if err != nil {
+		// Almost impossible, when we are connected to a peer, we will always have a complete Multiaddrs after the Identify req
+		// leaving it emtpy to spot the problem, IP-Api request already makes a parse of the IP before making server petition
+		log.Error(err)
+	}
+	country, city, err := utils.GetLocationFromIP(ip)
+	if err != nil {
+		log.Error("error when fetching country/city from ip", err)
+	}
+
+	// TODO: NodeID and ENR should be received from the
+	if hInfo.PeerID != "" {
+		pm.PeerId = hInfo.PeerID
+	}
+	if hInfo.NodeID != "" {
+		pm.NodeId = hInfo.NodeID
+	}
+	// if the UserAgent is empty, Not update neither the client and version (to over)
+	if hInfo.UserAgent != "" {
+		pm.UserAgent = hInfo.UserAgent
+	}
+	if pm.ClientName == "" || pm.ClientName == "Unknown" {
+		pm.ClientName = client
+		pm.ClientVersion = version
+	}
+	pm.ClientOS = "TODO"
+	if hInfo.PubKey != "" {
+		pm.Pubkey = hInfo.PubKey
+	}
+	if hInfo.Addrs != "" {
+		pm.Addrs = hInfo.Addrs
+	}
+	if ip != "" {
+		pm.Ip = ip
+	}
+	if (city != "" && city != "Unknown") || pm.City == "" {
+		pm.City = city
+		pm.Country = country
+	}
+	if hInfo.RTT.Nanoseconds() > 0 {
+		pm.Latency = float64(hInfo.RTT/time.Millisecond) / 1000
+	}
+	// Metadata requested
+	if pm.MetadataRequest != true {
+		pm.MetadataRequest = hInfo.MetadataRequest
+	}
+	if pm.MetadataSucceed != true {
+		pm.MetadataSucceed = hInfo.MetadataSucceed
+	}
+
+	return
+}
+
 // Update beacon Status of the peer
 func (pm *Peer) UpdateBeaconStatus(bStatus beacon.Status) {
-	pm.BeaconStatus = bStatus
+	pm.BeaconStatus = NewBStatusStamped(bStatus)
 }
 
 // Update beacon Metadata of the peer
 func (pm *Peer) UpdateBeaconMetadata(bMetadata beacon.MetaData) {
-	pm.BeaconMetadata = bMetadata
+	pm.BeaconMetadata = NewBMetadataStamped(bMetadata)
 }
 
 // Count the messages we get per topis and its first/last timestamps
