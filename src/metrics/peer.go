@@ -5,10 +5,15 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/protolambda/rumor/metrics/utils"
 
 	"github.com/protolambda/zrnt/eth2/beacon"
 	log "github.com/sirupsen/logrus"
+)
+
+var (
+	DeprecationTime = 48 * time.Hour
 )
 
 // Stores all the information related to a peer
@@ -23,6 +28,7 @@ type Peer struct {
 	Addrs         string
 	Ip            string
 	Country       string
+	CountryCode   string
 	City          string
 	Latency       float64
 	// TODO: Store Enr
@@ -33,6 +39,11 @@ type Peer struct {
 	Succeed            bool   // If the connection attempt has been successful
 	Attempts           uint64 // Number of attempts done
 	Error              string // Type of error that we detected. TODO: We are just storing the last one
+
+	Deprecated           bool        // Flag to rummarize whether the peer is longer valid for statistics or not
+	WaitingDays          int         // number of days from last ping attempt that the crawler will wait to ping again
+	NegativeConnAttempts []time.Time // List of dates when the peer retreived a negative connection attempt (if there is a possitive one, clean the struct)
+
 	ConnectionTimes    []time.Time
 	DisconnectionTimes []time.Time
 
@@ -57,11 +68,12 @@ type MessageMetric struct {
 
 func NewPeer(peerId string) Peer {
 	pm := Peer{
-		PeerId:             peerId,
-		Error:              "None",
-		ConnectionTimes:    make([]time.Time, 0),
-		DisconnectionTimes: make([]time.Time, 0),
-		MessageMetrics:     make(map[string]*MessageMetric),
+		PeerId:               peerId,
+		Error:                "None",
+		NegativeConnAttempts: make([]time.Time, 0),
+		ConnectionTimes:      make([]time.Time, 0),
+		DisconnectionTimes:   make([]time.Time, 0),
+		MessageMetrics:       make(map[string]*MessageMetric),
 	}
 	return pm
 }
@@ -69,6 +81,52 @@ func NewPeer(peerId string) Peer {
 func (pm *Peer) ResetDynamicMetrics() {
 	pm.Attempts = 0
 	pm.MessageMetrics = make(map[string]*MessageMetric)
+}
+
+// returns true is peer has been deprecated for the further statistics
+func (pm Peer) IsDeprecated() bool {
+	return pm.Deprecated
+}
+
+// return waiting days that this peer has to wait untill next ping
+func (pm Peer) DaysToWait() int {
+	return pm.WaitingDays
+}
+
+// return the time of the last connection with this peer
+func (pm Peer) LastAttempt() (t time.Time, err error) {
+	if len(pm.NegativeConnAttempts) == 0 {
+		err = errors.New("no last negative connections for the peer")
+		return
+	}
+	t = pm.NegativeConnAttempts[len(pm.NegativeConnAttempts)-1]
+	err = nil
+	return
+}
+
+// Aggregate a new negative connection to the peer, check if the peer has been unreachable enough time to deprecate peer
+func (pm *Peer) AddNegativeConnAttempt() {
+	t := time.Now()
+	pm.NegativeConnAttempts = append(pm.NegativeConnAttempts, t)
+	// check if the last Negative connection attempt is in the range to consider the peer deprecated
+	tfirst := pm.NegativeConnAttempts[len(pm.NegativeConnAttempts)-1]
+	diff := t.Sub(tfirst)
+	if diff >= DeprecationTime {
+		pm.Deprecated = true
+	}
+	// Update waiting days to the pruning process
+	if pm.WaitingDays == 0 {
+		pm.WaitingDays = 1
+	} else {
+		pm.WaitingDays = pm.WaitingDays * 2
+	}
+}
+
+func (pm *Peer) AddPositiveConnAttempt() {
+	// Update peer deprecation related variables
+	pm.NegativeConnAttempts = make([]time.Time, 0)
+	pm.Deprecated = false
+	pm.WaitingDays = 0
 }
 
 // Register when a new connection was detected
