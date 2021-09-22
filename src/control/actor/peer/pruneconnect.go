@@ -73,6 +73,7 @@ func (c *PeerPruneConncetCmd) run(ctx context.Context, h host.Host, store track.
 	// set up the loop where every given time we will stop it to refresh the peerstore
 	go func() {
 		for quit != nil {
+			peercount := 0
 			// Make the copy of the peers from the peerstore
 			peerList := store.Peers()
 			log.Infof("the peerstore has been re-scanned")
@@ -93,7 +94,7 @@ func (c *PeerPruneConncetCmd) run(ctx context.Context, h host.Host, store track.
 					if err != nil {
 						log.Warnf("ERROR, the peer should have a last connection attempt but list is empty")
 					}
-					lconnSecs := lconn.Add(time.Duration(wtime*24) * time.Hour).Unix()
+					lconnSecs := lconn.Add(time.Duration(wtime*12) * time.Hour).Unix()
 					tnow := time.Now().Unix()
 					// Compare time now with last connection plus waiting list
 					if (tnow - lconnSecs) <= 0 {
@@ -102,6 +103,7 @@ func (c *PeerPruneConncetCmd) run(ctx context.Context, h host.Host, store track.
 						continue
 					}
 				}
+				peercount++
 				// Set the correct address format to connect the peers
 				// libp2p complains if we put multi-addresses that include the peer ID into the Addrs list.
 				addrs := c.Store.Addrs(p)
@@ -171,8 +173,13 @@ func (c *PeerPruneConncetCmd) run(ctx context.Context, h host.Host, store track.
 			// Measure all the PeerStore iteration times
 			c.PeerStore.NewPeerstoreIteration(tIter)
 			// Measure the time of the entire PeerStore loop
+<<<<<<< HEAD
 			log.Infof("Time to ping the entire peerstore (except deprecated): %s", tIter)
 			log.Infof("Peer attempted from the last reset: %d", len(peerList))
+=======
+			fmt.Println("Time to ping the entire peerstore (except deprecated)", tIter)
+			fmt.Println("Peer attempted", peercount, "from", len(peerList), "peers from the peerstore")
+>>>>>>> Fix time comparison on NewNegativeAttempt and exporting loop timings
 
 			// Check if we have received any quit signal
 			if quit == nil {
@@ -183,8 +190,11 @@ func (c *PeerPruneConncetCmd) run(ctx context.Context, h host.Host, store track.
 		log.Infof("Go routine to randomly connect has been canceled")
 	}()
 }
+<<<<<<< HEAD
 
 // Worker Implementations
 func peeringWorker(ctx context.Context, ps *metrics.PeerStore, peerChan chan string) {
 
 }
+=======
+>>>>>>> Fix time comparison on NewNegativeAttempt and exporting loop timings

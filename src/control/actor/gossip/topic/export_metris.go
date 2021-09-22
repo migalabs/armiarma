@@ -2,17 +2,18 @@ package topic
 
 import (
 	"context"
+
 	"github.com/pkg/errors"
 
 	"github.com/protolambda/rumor/control/actor/base"
 	"github.com/protolambda/rumor/metrics"
-	"github.com/protolambda/rumor/metrics/prometheus"
 	"github.com/protolambda/rumor/metrics/exporter"
+	"github.com/protolambda/rumor/metrics/prometheus"
 )
 
 type TopicExportMetricsCmd struct {
 	*base.Base
-	PeerStore         *metrics.PeerStore
+	PeerStore *metrics.PeerStore
 }
 
 func (c *TopicExportMetricsCmd) Default() {
