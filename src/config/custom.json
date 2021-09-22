@@ -1,0 +1,10 @@
+{
+    "IP": "127.0.0.1",
+    "TcpPort": 100,
+    "UdpPort": 101,
+    "TopicArray": ["echo", "ohce"],
+    "Network": "testnet",
+    "ForkDigest": "0xdlskgfn",
+    "UserAgent": "bsc_test",
+    "LogLevel": "info"
+}
