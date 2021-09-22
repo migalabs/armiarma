@@ -3,7 +3,6 @@ package peer
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/host"
@@ -11,19 +10,17 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/protolambda/rumor/control/actor/base"
 	"github.com/protolambda/rumor/metrics"
-	"github.com/protolambda/rumor/metrics/utils"
 	"github.com/protolambda/rumor/p2p/addrutil"
 	"github.com/protolambda/rumor/p2p/track"
 	"github.com/protolambda/zrnt/eth2/beacon"
 	log "github.com/sirupsen/logrus"
 )
 
-type PeerConnectRandomCmd struct {
+type PeerPruneConncetCmd struct {
 	*base.Base
 	Store      track.ExtendedPeerstore
 	PeerStore  *metrics.PeerStore
 	Timeout    time.Duration `ask:"--timeout" help:"connection timeout, 0 to disable"`
-	Rescan     time.Duration `ask:"--rescan" help:"rescan the peerscore for new peers to connect with this given interval"`
 	MaxRetries int           `ask:"--max-retries" help:"how many connection attempts until the peer is banned"`
 
 	FilterDigest beacon.ForkDigest `ask:"--filter-digest" help:"Only connect when the peer is known to have the given fork digest in ENR. Or connect to any if not specified."`
@@ -31,24 +28,22 @@ type PeerConnectRandomCmd struct {
 	Filtering    bool              `changed:"filter-digest"`
 }
 
-func (c *PeerConnectRandomCmd) Default() {
-	c.Timeout = 15 * time.Second
-	c.Rescan = 10 * time.Minute
-	c.MaxRetries = 3
+func (c *PeerPruneConncetCmd) Default() {
+	c.Timeout = 10 * time.Second
+	c.MaxRetries = 1
 	c.FilterPort = -1
 }
 
-func (c *PeerConnectRandomCmd) Help() string {
+func (c *PeerPruneConncetCmd) Help() string {
 	return "Auto-connect to peers in the peerstore with a random-peering strategy."
 }
 
-func (c *PeerConnectRandomCmd) Run(ctx context.Context, args ...string) error {
+func (c *PeerPruneConncetCmd) Run(ctx context.Context, args ...string) error {
 	c.Log.Infof("Randomly connecting peers")
 	h, err := c.Host()
 	if err != nil {
 		return err
 	}
-	fmt.Println("Peerstore Rescan Every:", c.Rescan)
 	bgCtx, bgCancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 	go func() {
@@ -66,58 +61,47 @@ func (c *PeerConnectRandomCmd) Run(ctx context.Context, args ...string) error {
 	return nil
 }
 
-// Get a random peer from the give peer list/slice
-func randomPeer(peerList peer.IDSlice) peer.ID {
-	rand.Seed(time.Now().UnixNano())
-	return peerList[rand.Intn(len(peerList))]
-}
-
 // main loop of the peering strategy.
 // every 3-4 minutes generate a local new copy of the peers in the peerstore.
 // It randomly selects one of the attempting to connect with it, recording the
 // results of the attempts. If the peer was already connected, just dropt it
-func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host, store track.ExtendedPeerstore) {
+func (c *PeerPruneConncetCmd) run(ctx context.Context, h host.Host, store track.ExtendedPeerstore) {
 	c.Log.Info("started randomly peering")
 	quit := make(chan struct{})
 	// Set the defer function to cancel the go routine
 	defer close(quit)
 	// set up the loop where every given time we will stop it to refresh the peerstore
 	go func() {
-		loopCount := 0
-		peerCache := make(map[peer.ID]bool)
 		for quit != nil {
-			if loopCount >= 10 {
-				fmt.Println("Reseting cache")
-				// generate a "cache of peers in this raw"
-				peerCache = make(map[peer.ID]bool)
-				loopCount = 0
-			}
-			// make the first copy of the peers from the Host
-			//p := h.Peerstore()
-			//peerList := p.Peers()
-
-			// Make the first copy of the peers from the peerstore
+			// Make the copy of the peers from the peerstore
 			peerList := store.Peers()
-			c.Log.Infof("the peerstore has been re-scanned")
+			log.Infof("the peerstore has been re-scanned")
 			peerstoreLen := len(peerList)
-			c.Log.Infof("len peerlist: %s", peerstoreLen)
-			fmt.Println("Peerstore Re-Scanned with", peerstoreLen, "peers")
+			log.Infof("len peerlist: %d", peerstoreLen)
 			t := time.Now()
-			// loop to attempt connetions for the given time
-			tgap := time.Since(t)
-			for tgap < c.Rescan {
-				p := randomPeer(peerList)
-				// loop until we arrive to a peer that we didn't connect before
-				_, ok := peerCache[p]
-				if ok {
-					if len(peerCache) == peerstoreLen {
-						loopCount += 1
-						break // Temporary commented
-					}
-					continue
+			for _, p := range peerList {
+				// read info about the peer
+				pinfo, err := c.PeerStore.GetPeerData(p.String())
+				if err != nil {
+					log.Warnf("peer info not found on the metrics peerstore. %s", p)
+					pinfo = metrics.NewPeer(p.String())
 				}
-				// add peer to the peerCache for this round
-				peerCache[p] = true
+				// check if peer has been already deprecated for being many hours without connected
+				wtime := pinfo.DaysToWait()
+				if wtime != 0 {
+					lconn, err := pinfo.LastAttempt()
+					if err != nil {
+						log.Warnf("ERROR, the peer should have a last connection attempt but list is empty")
+					}
+					lconnSecs := lconn.Add(time.Duration(wtime*24) * time.Hour).Unix()
+					tnow := time.Now().Unix()
+					// Compare time now with last connection plus waiting list
+					if (tnow - lconnSecs) <= 0 {
+						// If result is lower than 0, still have time to wait
+						// continue to next peer
+						continue
+					}
+				}
 				// Set the correct address format to connect the peers
 				// libp2p complains if we put multi-addresses that include the peer ID into the Addrs list.
 				addrs := c.Store.Addrs(p)
@@ -132,26 +116,22 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host, store track
 					}
 					addrInfo.Addrs = append(addrInfo.Addrs, transport)
 				}
-				ctx, _ := context.WithTimeout(ctx, c.Timeout)
-				c.Log.Warnf("attempting connection to peer at addr %s", addrInfo.Addrs)
-
-				peer := metrics.NewPeer(p.String())
+				// compose all the detailed info for the given peer
 				peerEnr := c.Store.LatestENR(p)
-
 				// ensure the enr is not nil
 				if peerEnr == nil {
 					continue
 				}
-
 				addr, err := addrutil.EnodeToMultiAddr(peerEnr)
 				if err != nil {
-					log.Error("failed to parse ENR address into multi-addr for libp2p: %v", err)
+					log.Error("failed to parse ENR address into multi-addr for libp2p: %s", err)
 				}
 
-				peer.Pubkey = p.String()
-				peer.NodeId = peerEnr.ID().String()
-				peer.Ip = peerEnr.IP().String()
-				peer.Addrs = addr.String()
+				pinfo.Pubkey = p.String()
+				pinfo.NodeId = peerEnr.ID().String()
+				pinfo.Ip = peerEnr.IP().String()
+				pinfo.Addrs = addr.String()
+				/* Deprecated for now, too many request for the IP-Localization
 
 				country, city, err := utils.GetLocationFromIp(peer.Ip)
 				if err != nil {
@@ -160,48 +140,51 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host, store track
 					peer.Country = country
 					peer.City = city
 				}
-				c.PeerStore.StoreOrUpdatePeer(peer)
+				*/
+				c.PeerStore.StoreOrUpdatePeer(pinfo)
+
+				ctx, _ := context.WithTimeout(ctx, c.Timeout)
+				c.Log.Warnf("addrs %s attempting connection to peer", addrInfo.Addrs)
 				// try to connect the peer
 				attempts := 0
 				for attempts < c.MaxRetries {
-					if conn_err := h.Connect(ctx, addrInfo); conn_err != nil {
+					if err := h.Connect(ctx, addrInfo); err != nil {
 						// the connetion failed
 						attempts += 1
-						err := c.PeerStore.AddConnectionAttempt(p.String(), false, conn_err.Error())
-						if err != nil {
-							log.Error("could not add new connection attemp: ", conn_err)
-						}
-						c.Log.WithError(conn_err).Warnf("attempts %d failed connection attempt", attempts)
+						c.PeerStore.AddConnectionAttempt(p.String(), false, err.Error())
+						c.Log.WithError(err).Warnf("attempts %d failed connection attempt", attempts)
 						continue
 					} else { // connection successfuly made
 						c.Log.Infof("peer_id %s successful connection made", p)
-						err := c.PeerStore.AddConnectionAttempt(p.String(), true, "None")
-						if err != nil {
-							log.Error("could not add new connection attemp: ", err)
-						}
+						c.PeerStore.AddConnectionAttempt(p.String(), true, "None")
+						// break the loop
 						break
 					}
 					if attempts >= c.MaxRetries {
 						c.Log.Warnf("attempts %d failed connection attempt, reached maximum, no retry", attempts)
+
 						break
 					}
 				}
-				tgap = time.Since(t)
-
 			}
-
-			fmt.Println("Restarting the peering")
-			fmt.Println("Peer attempted from the last reset:", len(peerCache))
+			tIter := time.Since(t)
+			// Measure all the PeerStore iteration times
+			c.PeerStore.NewPeerstoreIteration(tIter)
+			// Measure the time of the entire PeerStore loop
+			log.Infof("Time to ping the entire peerstore (except deprecated): %s", tIter)
+			log.Infof("Peer attempted from the last reset: %d", len(peerList))
 
 			// Check if we have received any quit signal
 			if quit == nil {
-				c.Log.Infof("Channel Quit has been closed")
-				fmt.Println("Quit has been closed")
+				log.Infof("Quit has been closed")
 				break
 			}
-			loopCount += 1
 		}
-		c.Log.Infof("Go routine to randomly connect has been canceled")
-		fmt.Println("Go routine to randomly connect has been canceled")
+		log.Infof("Go routine to randomly connect has been canceled")
 	}()
+}
+
+// Worker Implementations
+func peeringWorker(ctx context.Context, ps *metrics.PeerStore, peerChan chan string) {
+
 }

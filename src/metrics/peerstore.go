@@ -1,19 +1,22 @@
 package metrics
 
 import (
+	"fmt"
 	"os"
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/protolambda/rumor/metrics/utils"
 	"github.com/protolambda/rumor/p2p/gossip/database"
 	log "github.com/sirupsen/logrus"
 )
 
 type PeerStore struct {
-	PeerStore       PeerStoreStorage
-	MessageDatabase *database.MessageDatabase // TODO: Discuss
-	StartTime       time.Time
-	MsgNotChannels  map[string](chan bool) // TODO: Unused?
+	PeerStore         PeerStoreStorage
+	MessageDatabase   *database.MessageDatabase // TODO: Discuss
+	StartTime         time.Time
+	PeerstoreIterTime time.Duration
+	MsgNotChannels    map[string](chan bool) // TODO: Unused?
 }
 
 func NewPeerStore(dbtype string, path string) PeerStore {
@@ -101,6 +104,35 @@ func (c *PeerStore) GetPeerData(peerId string) (Peer, error) {
 	return peerData, nil
 }
 
+// Add a connection attempt event to the peer with the result of this one
+func (c *PeerStore) AddConnectionAttempt(id string, succeed bool, rec_err string) error {
+	p, err := c.GetPeerData(id)
+	if err != nil {
+		return fmt.Errorf("Not peer found with that ID %s", id)
+	}
+	// Update the counter and connection status
+	if !p.Attempted {
+		p.Attempted = true
+		//fmt.Println("Original ", err)
+		// MIGHT be nice to try if we can change the uncertain errors for the dial backoff
+		if rec_err != "" || rec_err != "dial backoff" {
+			p.Error = utils.FilterError(rec_err)
+		}
+	}
+	p.AddNegativeConnAttempt()
+	if succeed {
+		p.Succeed = succeed
+		p.Error = "None"
+		// clean the Negative connection Attempt list
+		p.AddPositiveConnAttempt()
+	}
+	p.Attempts += 1
+
+	// Store the new struct in the sync.Map
+	c.StorePeer(p)
+	return nil
+}
+
 // Add a connection Event to the given peer
 func (c *PeerStore) ConnectionEvent(peerId string, direction string) error {
 	peer, err := c.GetPeerData(peerId)
@@ -170,6 +202,11 @@ func (gm *PeerStore) GetErrorCounter() map[string]uint64 {
 	})
 
 	return errorsAndAmount
+}
+
+// Update the last iteration throught whole PeerStore
+func (c *PeerStore) NewPeerstoreIteration(t time.Duration) {
+	c.PeerstoreIterTime = t
 }
 
 // Exports to a csv, useful for debug

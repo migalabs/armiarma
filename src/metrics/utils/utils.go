@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -32,6 +31,8 @@ func FilterClientType(userAgent string) (string, string) {
 		return "Nimbus", "Unknown"
 	} else if strings.Contains(userAgentLower, "js-libp2p") {
 		return "Lodestar", cleanVersion(getVersionIfAny(fields, 1))
+	} else if strings.Contains(userAgentLower, " rust-libp2p") {
+		return "Grandine", cleanVersion(getVersionIfAny(fields, 1))
 	} else {
 		log.Warnf("Could not get client from userAgent: %s", userAgent)
 		return "Unknown", "Unknown"
@@ -73,8 +74,10 @@ func FilterError(err string) string {
 		errorPretty = "unreachable network"
 	} else if strings.Contains(err, "peer id mismatch") {
 		errorPretty = "peer id mismatch"
+	} else if err == "None" {
+		errorPretty = "none"
 	} else {
-		log.Errorf("uncertain error: ", err)
+		log.Errorf("uncertain error: %s", err)
 	}
 
 	return errorPretty
@@ -100,7 +103,7 @@ func ShortToFullTopicName(topicName string) string {
 func GetIPfromMultiaddress(multiaddr string) (ip string, err error) {
 	s := strings.Split(multiaddr, "/")
 	if len(s) < 3 {
-		return ip, errors.New(fmt.Sprintf("Multiaddress doesn't include an IP: %s", multiaddr))
+		return ip, fmt.Errorf("multiaddress doesn't include an IP: %s", multiaddr)
 	}
 	return s[2], nil
 }
