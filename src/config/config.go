@@ -1,3 +1,12 @@
+/**
+
+This package contains the structs and methods needed to import configuration
+parameters from a config file.
+It also contains default configuration in case some of the parameters were wrong
+
+
+*/
+
 package config
 
 import (
@@ -31,10 +40,12 @@ type ConfigData struct {
 	PrivateKey string `json:"PrivateKey"`
 }
 
+// Will create an empty object
 func NewEmptyConfigData() *ConfigData {
 	return &ConfigData{}
 }
 
+// Will create an object using default parameters
 func NewDefaultConfigData() *ConfigData {
 	return &ConfigData{
 		IP:      DEFAULT_IP,
@@ -51,6 +62,8 @@ func NewDefaultConfigData() *ConfigData {
 	}
 }
 
+// Receives an input file where to read configuration from and imports into
+// the current object
 func (c *ConfigData) ReadFromJSON(input_file string) error {
 
 	file, _ := ioutil.ReadFile(input_file)

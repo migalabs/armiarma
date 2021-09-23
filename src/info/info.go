@@ -1,3 +1,15 @@
+/**
+
+This package contains all needed structs and functions to
+create an object of type InfoData.
+InfoData will be considered the main source of parameter information
+for all other packages in this project.
+This way, we have a centralized information object where to get
+information from.
+This way we make sure the information is only stored once.
+
+*/
+
 package info
 
 import (
@@ -22,6 +34,7 @@ type InfoData struct {
 	privateKey string
 }
 
+// Will create an InfoData object using default values from config
 func NewDefaultInfoData() *InfoData {
 
 	config_object := config.NewDefaultConfigData()
@@ -36,6 +49,7 @@ func NewDefaultInfoData() *InfoData {
 	return &info_object
 }
 
+// Will create an InfoData object using imported values from config
 func NewCustomInfoData(input_file string) *InfoData {
 
 	config_object := config.NewDefaultConfigData()
@@ -53,6 +67,8 @@ func NewCustomInfoData(input_file string) *InfoData {
 	return &info_object
 }
 
+// This function will import the config values into the current InfoData
+// object
 func (i *InfoData) importFromConfig(input_config config.ConfigData) error {
 
 	i.SetIPFromString(input_config.GetIP())
@@ -65,6 +81,8 @@ func (i *InfoData) importFromConfig(input_config config.ConfigData) error {
 	i.SetNetwork(input_config.GetNetwork())
 	i.SetForkDigest(input_config.GetForkDigest())
 	i.SetLogLevel(input_config.GetLogLevel())
+
+	return nil
 
 }
 
