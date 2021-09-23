@@ -7,15 +7,14 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/protolambda/rumor/metrics/utils"
-	"github.com/protolambda/rumor/p2p/addrutil"
 	ma "github.com/multiformats/go-multiaddr"
+	"github.com/pkg/errors"
 	"github.com/protolambda/rumor/control/actor/base"
 	"github.com/protolambda/rumor/control/actor/peer/metadata"
 	"github.com/protolambda/rumor/metrics"
+	"github.com/protolambda/rumor/metrics/utils"
 	"github.com/protolambda/rumor/p2p/track"
 	"github.com/sirupsen/logrus"
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -59,39 +58,33 @@ func (c *HostNotifyCmd) listenCloseF(net network.Network, addr ma.Multiaddr) {
 
 func (c *HostNotifyCmd) connectedF(net network.Network, conn network.Conn) {
 	logrus.WithFields(logrus.Fields{
-		"EVENT": "Connection detected",
-		"DIRECTION": fmtDirection(conn.Stat().Direction),
+		"EVENT":     "Connection detected",
+		"DIRECTION": conn.Stat().Direction.String(),
 	}).Info("Peer: ", conn.RemotePeer().String())
-
 	// try to request metadata for the peer
 	peerData, err := PollPeerMetadata(conn.RemotePeer(), c.Base, c.PeerMetadataState, c.Store, c.PeerStore)
-
 	// double check that the peerData is not empty
-	if err == nil && peerData.String() != "no data available" {
-		// create the peer
-		peer := metrics.NewPeer(conn.RemotePeer().String())
-		peer, err = fetchPeerExtraInfo(peerData)
-		if err != nil {
-			log.Error("Could not fetch peer data for: " + conn.RemotePeer().String())
-		}
-		logrus.WithFields(logrus.Fields{
-			"EVENT": "Metadata request OK",
-		}).Info("Peer: ", conn.RemotePeer().String())
-		
-		// store the peer and record that the connection was ok
-		c.PeerStore.StoreOrUpdatePeer(peer)
-	} else {
+	if err != nil {
 		logrus.WithFields(logrus.Fields{
 			"EVENT": "Metadata request NOK",
 		}).Info("Peer: ", conn.RemotePeer().String())
 	}
-
-	c.PeerStore.ConnectionEvent(conn.RemotePeer().String(), fmtDirection(conn.Stat().Direction))
-
+	ma := conn.RemoteMultiaddr().String()
+	fmt.Println("Multiaddress of the peer", ma)
+	peer, err := fetchPeerExtraInfo(peerData, ma)
+	if err != nil {
+		log.Error("Could not fetch peer data for: " + conn.RemotePeer().String())
+	}
+	logrus.WithFields(logrus.Fields{
+		"EVENT": "Metadata request OK",
+	}).Info("Peer: ", conn.RemotePeer().String())
+	// store the peer and record that the connection was ok
+	c.PeerStore.StoreOrUpdatePeer(peer)
+	c.PeerStore.ConnectionEvent(conn.RemotePeer().String(), conn.Stat().Direction.String())
 	// End of metric traces to track the connections and disconnections
 	c.Log.WithFields(logrus.Fields{
 		"event": "connection_open", "peer": conn.RemotePeer().String(),
-		"direction": fmtDirection(conn.Stat().Direction),
+		"direction": conn.Stat().Direction.String(),
 	}).Debug("new peer connection")
 }
 
@@ -103,14 +96,14 @@ func (c *HostNotifyCmd) disconnectedF(net network.Network, conn network.Conn) {
 	// End of metric traces to track the connections and disconnections
 	c.Log.WithFields(logrus.Fields{
 		"event": "connection_close", "peer": conn.RemotePeer().String(),
-		"direction": fmtDirection(conn.Stat().Direction),
+		"direction": conn.Stat().Direction.String(),
 	}).Debug("peer disconnected")
 }
 
 func (c *HostNotifyCmd) openedStreamF(net network.Network, str network.Stream) {
 	c.Log.WithFields(logrus.Fields{
 		"event": "stream_open", "peer": str.Conn().RemotePeer().String(),
-		"direction": fmtDirection(str.Stat().Direction),
+		"direction": str.Stat().Direction.String(),
 		"protocol":  str.Protocol(),
 	}).Debug("opened stream")
 }
@@ -118,7 +111,7 @@ func (c *HostNotifyCmd) openedStreamF(net network.Network, str network.Stream) {
 func (c *HostNotifyCmd) closedStreamF(net network.Network, str network.Stream) {
 	c.Log.WithFields(logrus.Fields{
 		"event": "stream_close", "peer": str.Conn().RemotePeer().String(),
-		"direction": fmtDirection(str.Stat().Direction),
+		"direction": str.Stat().Direction.String(),
 		"protocol":  str.Protocol(),
 	}).Debug("closed stream")
 }
@@ -175,6 +168,7 @@ func (c *HostNotifyCmd) Run(ctx context.Context, args ...string) error {
 	return nil
 }
 
+/* Dismissed since stream.Stat().Direction includes method .String()
 func fmtDirection(d network.Direction) string {
 	switch d {
 	case network.DirInbound:
@@ -187,22 +181,19 @@ func fmtDirection(d network.Direction) string {
 		return "unknown"
 	}
 }
+*/
 
 // Convert from rumor PeerAllData to our Peer. Note that
 // some external data is fetched and some fields are parsed
-func fetchPeerExtraInfo(peerData *track.PeerAllData) (metrics.Peer, error) {
+func fetchPeerExtraInfo(peerData *track.PeerAllData, addr string) (metrics.Peer, error) {
 	client, version := utils.FilterClientType(peerData.UserAgent)
-	ip := peerData.ENR.IP().String()
-	addr, err := addrutil.EnodeToMultiAddr(peerData.ENR)
-	if err != nil {
-		return metrics.Peer{}, errors.New("could not get address from ENR")
-	}
-
+	// Obtaining the IP or MultiAddrs from the ENR increases the chances to get a Restringed IP
+	// therefore, this one can be obtained directly from the libp2p connection stream
+	ip := strings.Split(addr, "/")[2]
 	country, city, err := utils.GetLocationFromIp(ip)
 	if err != nil {
 		return metrics.Peer{}, errors.Wrap(err, "could not get location from ip")
 	}
-
 	peer := metrics.NewPeer(peerData.PeerID.String())
 	peer.NodeId = peerData.NodeID.String()
 	peer.UserAgent = peerData.UserAgent
@@ -210,7 +201,7 @@ func fetchPeerExtraInfo(peerData *track.PeerAllData) (metrics.Peer, error) {
 	peer.ClientVersion = version
 	peer.ClientOS = "TODO"
 	peer.Pubkey = peerData.Pubkey
-	peer.Addrs = addr.String()
+	peer.Addrs = addr
 	peer.Ip = ip
 	peer.Country = country
 	peer.City = city
