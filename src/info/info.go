@@ -16,7 +16,9 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/migalabs/armiarma/src/config"
+	"github.com/migalabs/armiarma/src/utils"
 )
 
 type InfoData struct {
@@ -31,7 +33,7 @@ type InfoData struct {
 	forkDigest string
 
 	logLevel   string
-	privateKey string
+	privateKey *crypto.Secp256k1PrivateKey
 }
 
 // Will create an InfoData object using default values from config
@@ -148,4 +150,25 @@ func (i *InfoData) GetLogLevel() string {
 }
 func (i *InfoData) SetLogLevel(input_string string) {
 	i.logLevel = input_string
+}
+
+func (i *InfoData) GetPrivKey() *crypto.Secp256k1PrivateKey {
+	return i.privateKey
+}
+func (i *InfoData) GetPrivKeyString() string {
+	return utils.PrivKeyToString(i.GetPrivKey())
+}
+func (i *InfoData) SetPrivKey(input_key *crypto.Secp256k1PrivateKey) {
+	i.privateKey = input_key
+}
+func (i *InfoData) SetPrivKeyFromString(input_key string) {
+	parsed_key, err := utils.ParsePrivateKey(input_key)
+
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	i.privateKey = parsed_key
+
 }
