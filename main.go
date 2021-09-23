@@ -15,7 +15,7 @@ limitations under the License.
 */
 package main
 
-import "armiarma/cmd"
+import "github.com/migalabs/armiarma/cmd"
 
 func main() {
 	cmd.Execute()
