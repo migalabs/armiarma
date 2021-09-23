@@ -67,9 +67,10 @@ func (c *HostNotifyCmd) connectedF(net network.Network, conn network.Conn) {
 	if err != nil {
 		logrus.WithFields(logrus.Fields{
 			"EVENT": "Metadata request NOK",
-		}).Error("Peer: ", conn.RemotePeer().String())
+		}).Info("Peer: ", conn.RemotePeer().String())
 	}
 	ma := conn.RemoteMultiaddr().String()
+	fmt.Println("Multiaddress of the peer", ma)
 	peer, err := fetchPeerExtraInfo(peerData, ma)
 	if err != nil {
 		log.Error("Could not fetch peer data for: " + conn.RemotePeer().String())
