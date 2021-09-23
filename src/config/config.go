@@ -58,7 +58,8 @@ func NewDefaultConfigData() *ConfigData {
 		Network:    DEFAULT_NETWORK,
 		ForkDigest: DEFAULT_FORK_DIGEST,
 
-		LogLevel: DEFAULT_LOG_LEVEL,
+		LogLevel:   DEFAULT_LOG_LEVEL,
+		PrivateKey: "",
 	}
 }
 
@@ -133,4 +134,11 @@ func (c *ConfigData) GetLogLevel() string {
 }
 func (c *ConfigData) SetLogLevel(input_string string) {
 	c.LogLevel = input_string
+}
+
+func (c *ConfigData) GetPrivKey() string {
+	return c.PrivateKey
+}
+func (c *ConfigData) SetPrivKey(input_string string) {
+	c.PrivateKey = input_string
 }
