@@ -11,7 +11,7 @@ type Option func(*Base) error
 type Base struct {
 	ctx    context.Context
 	cancel context.CancelFunc
-	Log    log.Logger
+	Log    log.FieldLogger
 }
 
 // Generate the Base of the shared module base
@@ -33,21 +33,22 @@ func NewBase(opts ...Option) (*Base, error) {
 }
 
 // Set specific context to the base model
-func WithContext(ctx context.Context) error {
+func WithContext(ctx context.Context) Option {
 	return func(b *Base) error {
-		p.ctx = ctx
+		b.ctx = ctx
 		return nil
 	}
 }
 
 // Set specific Logger for the Base model
-func WithLogger(opts LoggerOpts) error {
+func WithLogger(opts LogOpts) Option {
 	return func(b *Base) error {
-		logger := log.Logger(opts.ModName)
+		logger := log.New()
 		logger.SetFormatter(ParseLogFormatter(opts.Formatter))
 		logger.SetOutput(ParseLogOutput(opts.Output))
 		logger.SetLevel(ParseLogLevel(opts.Level))
-		p.Logger = logger
+		l := logger.WithField("module", opts.ModName)
+		b.Log = l
 		return nil
 	}
 }
@@ -59,5 +60,6 @@ func (b *Base) Ctx() context.Context {
 
 // function that cancels the base of the project
 func (b *Base) Cancel() {
-	return b.cancel()
+	b.cancel()
+	return
 }

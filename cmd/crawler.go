@@ -16,12 +16,14 @@ limitations under the License.
 package cmd
 
 import (
-	"fmt"
+	"context"
+	"os"
+	"os/signal"
 
-	log "github.com/sirupsen/logrus"
-	"github.com/spf13/cobra"
 	"github.com/migalabs/armiarma/src/base"
 	"github.com/migalabs/armiarma/src/hosts"
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
 )
 
 // crawler status containing the main basemodule and info that the app will ConnectedF
@@ -30,53 +32,53 @@ type CrawlerBase struct {
 	Host *hosts.BasicLibp2pHost
 }
 
-
 // crawlerCmd represents the crawler command
 var crawlerCmd = &cobra.Command{
 	Use:   "crawler",
 	Short: "Launch the Network Crawler on the given network",
-	Long: `Launch the Network Crawler on the given network`,
+	Long:  `Launch the Network Crawler on the given network`,
 	Run: func(cmd *cobra.Command, args []string) {
 		mainCtx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		// TODO: just hardcoded
 		logOpts := base.LogOpts{
-			ModName: "crawler app",
-			Output: "terminal",
+			ModName:   "crawler app",
+			Output:    "terminal",
 			Formatter: "text",
-			Level: "debug",
+			Level:     "debug",
 		}
 		// generata a base for the crawler app
-		base, err := base.NewBase(
-			base.WithContext(),
-			base.WithLogger(logOpts)
+		b, err := base.NewBase(
+			base.WithContext(mainCtx),
+			base.WithLogger(logOpts),
 		)
 		if err != nil {
 			log.Panic(err)
 		}
 		// TODO: just harcoded
-		hostOpts := BasicLibp2pHostOpts{
-			IP: "127.0.0.1",
-			TCP: "9018",
-			UDP: "9018",
+		baseOpts := base.LogOpts{
+			ModName:   "libp2p host",
+			Output:    "terminal",
+			Formatter: "text",
+			Level:     "debug",
+		}
+		hostOpts := hosts.BasicLibp2pHostOpts{
+			IP:        "127.0.0.1",
+			TCP:       "9054",
+			UDP:       "9054",
 			UserAgent: "BSC-Armiarma-Crawler",
-			PrivKey: "FA44444DE",
-			LogOpts: base.LogOpts{
-				ModName: "libp2p host",
-				Output: "terminal",
-				Formatter: "text",
-				Level: "debug",
-			},
+			PrivKey:   "026c60367b01fe3d7c7460bce1d585260ce465fa0abcb6e13619f88bf0dad54f",
+			LogOpts:   baseOpts,
 		}
 		// generate libp2pHost
-		host, err := hosts.NewBasicLibp2pHost(base.Ctx(), hostOpts)
+		host, err := hosts.NewBasicLibp2pHost(b.Ctx(), hostOpts)
 		if err != nil {
 			log.Panic(err)
 		}
 
 		// generate the CrawlerBase
 		crawler := CrawlerBase{
-			base,
+			Base: b,
 			Host: host,
 		}
 
@@ -109,10 +111,8 @@ func init() {
 	// is called directly, e.g.:
 	// crawlerCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 	var loglvl string
-	crawlerCmd.Flags().StringVarP(&loglvl, "log-level", "log-lvl", "debug", "Set the log level of the App")
-	fmt.Println("---> parsed flags", loglvl)
+	crawlerCmd.Flags().StringVar(&loglvl, "log-lvl", "debug", "Set the log level of the App")
 }
-
 
 // generate new CrawlerBase
 func (c *CrawlerBase) InitCrawler() error {

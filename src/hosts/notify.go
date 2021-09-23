@@ -24,6 +24,7 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 	c.Log.Debug(fmt.Sprintf("%+v\n", conn))
 
 	c.Log.Debug("PEers in PeerStore")
+	h := c.Host()
 	c.Log.Debug(fmt.Printf("%+v\n", h.Network().Peerstore().Peers()))
 }
 
@@ -43,18 +44,15 @@ func (c *BasicLibp2pHost) standardClosedF(net network.Network, str network.Strea
 func (c *BasicLibp2pHost) SetCustomNotifications() error {
 	// generate empty bundle to set custom notifiers
 	bundle := &network.NotifyBundle{
-		bundle.ListenF:       c.listenF,
-		bundle.ListenCloseF:  c.listenCloseF,
-		bundle.ConnectedF:    c.connectedF,
-		bundle.DisconnectedF: c.disconnectedF,
-		bundle.OpenedStreamF: c.openedStreamF,
-		bundle.ClosedStreamF: c.closedStreamF,
+		ListenF:       c.standardListenF,
+		ListenCloseF:  c.standardListenCloseF,
+		ConnectedF:    c.standardConnectF,
+		DisconnectedF: c.standardDisconnectF,
+		OpenedStreamF: c.standardOpenedStreamF,
+		ClosedStreamF: c.standardClosedF,
 	}
 	// read host from main struct
-	h, err := c.Host()
-	if err != nil {
-		return err
-	}
+	h := c.Host()
 	// set the custom notifiers to the host
 	h.Network().Notify(bundle)
 	return nil
