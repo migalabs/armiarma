@@ -92,12 +92,9 @@ type HostWithIDService interface {
 	IDService() *identify.IDService
 }
 
-// ReqHostInfo request the host infomartion regarding a given peer, from the libp2p perspective
-// return empty struct and error if failure
-// TODO: So far, both request, ping request and identify request has been deplyed on the same func
-// 		 RTT can be also measured from identify request (a bit les accurate) which can leave us to remove the ping request
-// 		 Still leaving it there for Understanding purposes. Some Clients don't support /ipfs/ping/1.0.0, but all support "/eth2/beacon_chain/req/ping/1/" instead
-// DISCUSS the if the returning error should just be asociated to the identify request [Currently removed since we always have few info about the peer]
+// ReqHostInfo returns the basic host information regarding a given peer, from the libp2p perspective
+// it aggregates the info from the libp2p Identify protocol adding some extra info such as RTT between local host and remote peer
+// return empty struct and error if failure on the identify process
 func ReqHostInfo(ctx context.Context, h host.Host, conn network.Conn) (hInfo metrics.BasicHostInfo, err error) {
 	// time out for ping
 	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
