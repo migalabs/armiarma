@@ -183,12 +183,18 @@ func (pm *Peer) FetchHostInfo(hInfo BasicHostInfo) {
 
 // Update beacon Status of the peer
 func (pm *Peer) UpdateBeaconStatus(bStatus beacon.Status) {
-	pm.BeaconStatus = NewBStatusStamped(bStatus)
+	pm.BeaconStatus = BeaconStatusStamped{
+		Timestamp: time.Now(),
+		Status:    bStatus,
+	}
 }
 
 // Update beacon Metadata of the peer
 func (pm *Peer) UpdateBeaconMetadata(bMetadata beacon.MetaData) {
-	pm.BeaconMetadata = NewBMetadataStamped(bMetadata)
+	pm.BeaconMetadata = BeaconMetadataStamped{
+		Timestamp: time.Now(),
+		Metadata:  bMetadata,
+	}
 }
 
 // Count the messages we get per topis and its first/last timestamps
@@ -294,4 +300,61 @@ func (pm *Peer) LogPeer() {
 		"City":          pm.City,
 		"Latency":       pm.Latency,
 	}).Info("Peer Info")
+}
+
+// BASIC HOST INFO
+
+// BasicHostInfo contains the basic Host info that will be requested from the identification of a libp2p peer
+type BasicHostInfo struct {
+	TimeStamp time.Time
+	// Peer Host/Node Info
+	PeerID          string
+	NodeID          string
+	UserAgent       string
+	ProtocolVersion string
+	Addrs           string
+	PubKey          string
+	RTT             time.Duration
+	Protocols       []string
+	// Information regarding the metadata exchange
+	Direction string
+	// Metadata requested
+	MetadataRequest bool
+	MetadataSucceed bool
+}
+
+// BEACON METADATA
+
+// Basic BeaconMetadata struct that includes the timestamp of the received beacon metadata
+type BeaconMetadataStamped struct {
+	Timestamp time.Time
+	Metadata  beacon.MetaData
+}
+
+// Funciton that returns de timestamp of the BeaconMetadata
+func (b *BeaconMetadataStamped) Time() time.Time {
+	return b.Timestamp
+}
+
+// Funciton that returns de content of the BeaconMetadata
+func (b *BeaconMetadataStamped) Content() beacon.MetaData {
+	return b.Metadata
+}
+
+// BEACON STATUS
+
+//  Basic BeaconMetadata struct that includes The timestamp of the received beacon Status
+type BeaconStatusStamped struct {
+	Timestamp time.Time
+	Status    beacon.Status
+}
+
+// Funciton that returns de timestamp of the BeaconMetadata
+func (b *BeaconStatusStamped) Time() time.Time {
+	return b.Timestamp
+}
+
+// Funciton that returns de content of the BeaconMetadata
+func (b *BeaconStatusStamped) Content() beacon.Status {
+	return b.Status
 }

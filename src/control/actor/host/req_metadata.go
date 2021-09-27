@@ -13,7 +13,6 @@ import (
 	"github.com/protolambda/rumor/p2p/rpc/methods"
 	"github.com/protolambda/rumor/p2p/rpc/reqresp"
 	"github.com/protolambda/zrnt/eth2/beacon"
-	log "github.com/sirupsen/logrus"
 
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p/p2p/protocol/identify"
@@ -99,26 +98,23 @@ type HostWithIDService interface {
 // 		 RTT can be also measured from identify request (a bit les accurate) which can leave us to remove the ping request
 // 		 Still leaving it there for Understanding purposes. Some Clients don't support /ipfs/ping/1.0.0, but all support "/eth2/beacon_chain/req/ping/1/" instead
 // DISCUSS the if the returning error should just be asociated to the identify request [Currently removed since we always have few info about the peer]
-func ReqHostInfo(ctx context.Context, h host.Host, conn network.Conn) metrics.BasicHostInfo {
+func ReqHostInfo(ctx context.Context, h host.Host, conn network.Conn) (hInfo metrics.BasicHostInfo, err error) {
 	// time out for ping
 	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
 	tout := timeoutCtx.Done()
 	defer cancel()
 	peerID := conn.RemotePeer()
 
-	var hInfo metrics.BasicHostInfo
 	// Identify Peer to access main data
 	// convert host to IDService
 	withIdentify, ok := h.(HostWithIDService)
 	if !ok {
-		log.Error("host does not support libp2p identify protocol")
-		return hInfo
+		return hInfo, errors.Errorf("host does not support libp2p identify protocol")
 	}
 	t := time.Now()
 	idService := withIdentify.IDService()
 	if idService == nil {
-		log.Error("libp2p identify not enabled on this host")
-		return hInfo
+		return hInfo, errors.Errorf("libp2p identify not enabled on this host")
 	}
 	hInfo.MetadataRequest = true
 	var rtt time.Duration
@@ -126,9 +122,8 @@ func ReqHostInfo(ctx context.Context, h host.Host, conn network.Conn) metrics.Ba
 	case <-idService.IdentifyWait(conn):
 		hInfo.MetadataSucceed = true
 		rtt = time.Since(t)
-		log.Info("completed identification")
 	case <-tout:
-		log.Info("awaiting identification timed out")
+		err = errors.Errorf("identification error caused by timed out")
 	}
 	// Fulfill the hInfo struct
 	ua, err := h.Peerstore().Get(peerID, "AgentVersion")
@@ -155,5 +150,5 @@ func ReqHostInfo(ctx context.Context, h host.Host, conn network.Conn) metrics.Ba
 	hInfo.Addrs = conn.RemoteMultiaddr().String()
 	hInfo.Direction = conn.Stat().Direction.String()
 
-	return hInfo
+	return
 }
