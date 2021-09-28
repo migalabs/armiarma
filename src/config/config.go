@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"strings"
 )
 
@@ -24,6 +25,9 @@ const DEFAULT_NETWORK string = "mainnet"
 const DEFAULT_FORK_DIGEST string = "0xffff"
 const DEFAULT_USER_AGENT string = "bsc_crawler"
 const DEFAULT_LOG_LEVEL string = "debug"
+
+const DEFAULT_EMPTY_INT int = 0
+const DEFAULT_EMPTY_STRING string = ""
 
 type ConfigData struct {
 	IP      string `json:"IP"`
@@ -38,11 +42,14 @@ type ConfigData struct {
 
 	LogLevel   string `json:"LogLevel"`
 	PrivateKey string `json:"PrivateKey"`
+	logging    log.Logger
 }
 
 // Will create an empty object
-func NewEmptyConfigData() *ConfigData {
-	return &ConfigData{}
+func NewEmptyConfigData(input_log log.Logger) *ConfigData {
+	return &ConfigData{
+		logging: input_log,
+	}
 }
 
 // Will create an object using default parameters
@@ -65,17 +72,56 @@ func NewDefaultConfigData() *ConfigData {
 
 // Receives an input file where to read configuration from and imports into
 // the current object
-func (c *ConfigData) ReadFromJSON(input_file string) error {
+func (c *ConfigData) ReadFromJSON(input_file string) {
 
 	file, _ := ioutil.ReadFile(input_file)
 
 	err := json.Unmarshal([]byte(file), c)
 
+	c.checkEmptyFields()
+
 	if err != nil {
 		fmt.Println(err)
-		return err
 	}
-	return nil
+}
+
+// iterate over the fields of
+func (c *ConfigData) checkEmptyFields() {
+	if c.IP == "" {
+		c.SetIP(DEFAULT_IP)
+		c.logging.Printf("setting default IP: %s", DEFAULT_IP)
+	}
+
+	if c.TcpPort == 0 {
+		c.SetTcpPort(DEFAULT_TCP_PORT)
+		c.logging.Printf("setting default TcpPort: %d", DEFAULT_TCP_PORT)
+	}
+
+	if c.UdpPort == 0 {
+		c.SetUdpPort(DEFAULT_UDP_PORT)
+		c.logging.Printf("setting default UdpPort: %d", DEFAULT_UDP_PORT)
+	}
+
+	if c.UserAgent == "" {
+		c.SetUserAgent(DEFAULT_USER_AGENT)
+		c.logging.Printf("setting default UserAgent: %s", DEFAULT_USER_AGENT)
+	}
+
+	if len(c.TopicArray) == 0 {
+		c.SetTopicArrayFromString(DEFAULT_TOPIC_ARRAY)
+		c.logging.Printf("setting default TopicArray: %s", DEFAULT_TOPIC_ARRAY)
+	}
+
+	if c.Network == "" {
+		c.SetNetwork(DEFAULT_NETWORK)
+		c.logging.Printf("setting default Network: %s", DEFAULT_NETWORK)
+	}
+
+	if c.ForkDigest == "" {
+		c.SetForkDigest(DEFAULT_FORK_DIGEST)
+		c.logging.Printf("setting default ForkDigest: %s", DEFAULT_FORK_DIGEST)
+	}
+
 }
 
 // getters and setters
@@ -113,6 +159,9 @@ func (c *ConfigData) GetTopicArray() []string {
 }
 func (c *ConfigData) SetTopicArray(input_list []string) {
 	c.TopicArray = input_list
+}
+func (c *ConfigData) SetTopicArrayFromString(input_list string) {
+	c.TopicArray = strings.Split(input_list, ",")
 }
 
 func (c *ConfigData) GetNetwork() string {

@@ -13,7 +13,7 @@ This way we make sure the information is only stored once.
 package info
 
 import (
-	"fmt"
+	"log"
 	"net"
 
 	"github.com/libp2p/go-libp2p-core/crypto"
@@ -34,57 +34,49 @@ type InfoData struct {
 
 	logLevel   string
 	privateKey *crypto.Secp256k1PrivateKey
+
+	logging log.Logger
 }
 
 // Will create an InfoData object using default values from config
-func NewDefaultInfoData() *InfoData {
+func NewDefaultInfoData(input_log log.Logger) *InfoData {
 
 	config_object := config.NewDefaultConfigData()
 
-	info_object := InfoData{}
-
-	err := info_object.importFromConfig(*config_object)
-	if err != nil {
-		fmt.Println(err)
+	info_object := InfoData{
+		logging: input_log,
 	}
+
+	info_object.importFromConfig(*config_object)
 
 	return &info_object
 }
 
 // Will create an InfoData object using imported values from config
-func NewCustomInfoData(input_file string) *InfoData {
+func NewCustomInfoData(input_file string, input_log log.Logger) *InfoData {
 
 	config_object := config.NewDefaultConfigData()
-	err := config_object.ReadFromJSON(input_file)
-	if err != nil {
-		fmt.Println(err)
-	}
+	config_object.ReadFromJSON(input_file)
 
-	info_object := InfoData{}
-	err = info_object.importFromConfig(*config_object)
-	if err != nil {
-		fmt.Println(err)
+	info_object := InfoData{
+		logging: input_log,
 	}
-
+	info_object.importFromConfig(*config_object)
 	return &info_object
 }
 
 // This function will import the config values into the current InfoData
 // object
-func (i *InfoData) importFromConfig(input_config config.ConfigData) error {
+func (i *InfoData) importFromConfig(input_config config.ConfigData) {
 
 	i.SetIPFromString(input_config.GetIP())
 	i.SetTcpPort(input_config.GetTcpPort())
 	i.SetUdpPort(input_config.GetUdpPort())
-
 	i.SetUserAgent(input_config.GetUserAgent())
-
 	i.SetTopicArray(input_config.GetTopicArray())
 	i.SetNetwork(input_config.GetNetwork())
 	i.SetForkDigest(input_config.GetForkDigest())
 	i.SetLogLevel(input_config.GetLogLevel())
-
-	return nil
 
 }
 
@@ -94,13 +86,24 @@ func (i *InfoData) GetTcpPort() int {
 	return i.tcpPort
 }
 func (i *InfoData) SetTcpPort(input_port int) {
+	if input_port > 65000 || input_port < 0 {
+		i.logging.Printf("TCP port not valid, applying default %d", config.DEFAULT_TCP_PORT)
+		i.tcpPort = config.DEFAULT_TCP_PORT
+		return
+	}
 	i.tcpPort = input_port
 }
 
 func (i *InfoData) GetUdpPort() int {
+
 	return i.udpPort
 }
 func (i *InfoData) SetUdpPort(input_port int) {
+	if input_port > 65000 || input_port < 0 {
+		i.logging.Printf("UDP port not valid, applying default %d", config.DEFAULT_UDP_PORT)
+		i.udpPort = config.DEFAULT_UDP_PORT
+		return
+	}
 	i.udpPort = input_port
 }
 
@@ -165,7 +168,7 @@ func (i *InfoData) SetPrivKeyFromString(input_key string) {
 	parsed_key, err := utils.ParsePrivateKey(input_key)
 
 	if err != nil {
-		fmt.Println(err)
+		i.logging.Panicf("Wrong Private Key parsing %s", input_key)
 		return
 	}
 

@@ -1,7 +1,7 @@
 {
     "IP": "127.0.0.1",
-    "TcpPort": 100,
-    "UdpPort": 101,
+    "TcpPor": 100,
+    "UdpPor": 101,
     "TopicArray": ["echo", "ohce"],
     "Network": "testnet",
     "ForkDigest": "0xdlskgfn",
