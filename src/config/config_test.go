@@ -1,20 +1,15 @@
 package config
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
 func TestReadJSON(t *testing.T) {
-	config_object := NewDefaultConfigData()
+	config_object := NewEmptyConfigData() //NewDefaultConfigData()
 
-	err := config_object.ReadFromJSON("custom.json")
-
-	if err != nil {
-		fmt.Println(err)
-	}
+	config_object.ReadFromJSON("custom.json")
 
 	require.Equal(t, config_object.GetIP(), "127.0.0.1")
 	require.Equal(t, config_object.GetTcpPort(), 100)
