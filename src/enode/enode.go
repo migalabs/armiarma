@@ -35,7 +35,7 @@ func NewLocalNode(ctx context.Context, info_obj *info.InfoData, opts base.LogOpt
 	if err != nil {
 		log.Panicf("Could not create local DB %s", err)
 	}
-
+	new_base.Log.Debugf("Creating Local Node")
 	return &LocalNode{
 		base:      *new_base,
 		LocalNode: *enode.NewLocalNode(new_db, (*ecdsa.PrivateKey)(info_obj.GetPrivKey())),

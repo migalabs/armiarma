@@ -10,11 +10,18 @@ It also contains default configuration in case some of the parameters were wrong
 package config
 
 import (
+	"crypto/ecdsa"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"strings"
+
+	gcrypto "github.com/ethereum/go-ethereum/crypto"
+	"github.com/libp2p/go-libp2p-core/crypto"
+	"github.com/migalabs/armiarma/src/base"
 )
 
 const DEFAULT_IP string = "0.0.0.0"
@@ -30,6 +37,8 @@ const DEFAULT_EMPTY_INT int = 0
 const DEFAULT_EMPTY_STRING string = ""
 
 type ConfigData struct {
+	base base.Base
+
 	IP      string `json:"IP"`
 	TcpPort int    `json:"TcpPort"`
 	UdpPort int    `json:"UdpPort"`
@@ -42,19 +51,44 @@ type ConfigData struct {
 
 	LogLevel   string `json:"LogLevel"`
 	PrivateKey string `json:"PrivateKey"`
-	logging    log.Logger
 }
 
 // Will create an empty object
-func NewEmptyConfigData(input_log log.Logger) *ConfigData {
+func NewEmptyConfigData(opts base.LogOpts) *ConfigData {
+	new_base, err := base.NewBase(
+		base.WithLogger(base.LogOpts{
+			ModName:   opts.ModName,
+			Output:    opts.Output,
+			Formatter: opts.Formatter,
+			Level:     opts.Level,
+		}),
+	)
+	if err != nil {
+		log.Panicf("Could not create base object %s", err)
+	}
+
 	return &ConfigData{
-		logging: input_log,
+		base: *new_base,
 	}
 }
 
 // Will create an object using default parameters
-func NewDefaultConfigData() *ConfigData {
+func NewDefaultConfigData(opts base.LogOpts) *ConfigData {
+
+	new_base, err := base.NewBase(
+		base.WithLogger(base.LogOpts{
+			ModName:   opts.ModName,
+			Output:    opts.Output,
+			Formatter: opts.Formatter,
+			Level:     opts.Level,
+		}),
+	)
+	if err != nil {
+		log.Panicf("Could not create base object %s", err)
+	}
+
 	return &ConfigData{
+		base:    *new_base,
 		IP:      DEFAULT_IP,
 		TcpPort: DEFAULT_TCP_PORT,
 		UdpPort: DEFAULT_UDP_PORT,
@@ -73,7 +107,7 @@ func NewDefaultConfigData() *ConfigData {
 // Receives an input file where to read configuration from and imports into
 // the current object
 func (c *ConfigData) ReadFromJSON(input_file string) {
-
+	c.base.Log.Debugf("Reading configuration from: ", input_file)
 	file, _ := ioutil.ReadFile(input_file)
 
 	err := json.Unmarshal([]byte(file), c)
@@ -87,41 +121,67 @@ func (c *ConfigData) ReadFromJSON(input_file string) {
 
 // iterate over the fields of
 func (c *ConfigData) checkEmptyFields() {
-	if c.IP == "" {
+	if c.GetIP() == "" {
 		c.SetIP(DEFAULT_IP)
-		c.logging.Printf("setting default IP: %s", DEFAULT_IP)
+		c.base.Log.Debugf("Setting default IP: %s", DEFAULT_IP)
 	}
 
-	if c.TcpPort == 0 {
+	if c.GetTcpPort() == 0 {
 		c.SetTcpPort(DEFAULT_TCP_PORT)
-		c.logging.Printf("setting default TcpPort: %d", DEFAULT_TCP_PORT)
+		c.base.Log.Debugf("Setting default TcpPort: %d", DEFAULT_TCP_PORT)
 	}
 
-	if c.UdpPort == 0 {
+	if c.GetUdpPort() == 0 {
 		c.SetUdpPort(DEFAULT_UDP_PORT)
-		c.logging.Printf("setting default UdpPort: %d", DEFAULT_UDP_PORT)
+		c.base.Log.Debugf("Setting default UdpPort: %d", DEFAULT_UDP_PORT)
 	}
 
-	if c.UserAgent == "" {
+	if c.GetUserAgent() == "" {
 		c.SetUserAgent(DEFAULT_USER_AGENT)
-		c.logging.Printf("setting default UserAgent: %s", DEFAULT_USER_AGENT)
+		c.base.Log.Debugf("Setting default UserAgent: %s", DEFAULT_USER_AGENT)
 	}
 
-	if len(c.TopicArray) == 0 {
+	if len(c.GetTopicArray()) == 0 {
 		c.SetTopicArrayFromString(DEFAULT_TOPIC_ARRAY)
-		c.logging.Printf("setting default TopicArray: %s", DEFAULT_TOPIC_ARRAY)
+		c.base.Log.Debugf("Setting default TopicArray: %s", DEFAULT_TOPIC_ARRAY)
 	}
 
-	if c.Network == "" {
+	if c.GetNetwork() == "" {
 		c.SetNetwork(DEFAULT_NETWORK)
-		c.logging.Printf("setting default Network: %s", DEFAULT_NETWORK)
+		c.base.Log.Debugf("Setting default Network: %s", DEFAULT_NETWORK)
 	}
 
-	if c.ForkDigest == "" {
+	if c.GetForkDigest() == "" {
 		c.SetForkDigest(DEFAULT_FORK_DIGEST)
-		c.logging.Printf("setting default ForkDigest: %s", DEFAULT_FORK_DIGEST)
+		c.base.Log.Debugf("Setting default ForkDigest: %s", DEFAULT_FORK_DIGEST)
 	}
 
+	if c.GetPrivKey() == "" {
+		c.base.Log.Debugf("Could not read private key from config file")
+		c.generate_privKey()
+
+	}
+
+}
+
+func (c *ConfigData) generate_privKey() {
+
+	key, err := ecdsa.GenerateKey(gcrypto.S256(), rand.Reader)
+
+	if err != nil {
+		c.base.Log.Panicf("failed to generate key: %v", err)
+	}
+
+	secpKey := (*crypto.Secp256k1PrivateKey)(key)
+
+	keyBytes, err := secpKey.Raw()
+
+	if err != nil {
+		c.base.Log.Panicf("failed to serialize key: %v", err)
+	}
+
+	c.SetPrivKey(hex.EncodeToString(keyBytes))
+	c.base.Log.Debugf("Generated Key!: ", hex.EncodeToString(keyBytes))
 }
 
 // getters and setters
