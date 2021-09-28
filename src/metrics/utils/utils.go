@@ -33,7 +33,7 @@ func FilterClientType(userAgent string) (string, string) {
 	} else if strings.Contains(userAgentLower, "js-libp2p") {
 		return "Lodestar", cleanVersion(getVersionIfAny(fields, 1))
 	} else {
-		log.Warn("Could not get client from userAgent: ", userAgent)
+		log.Warnf("Could not get client from userAgent: %s", userAgent)
 		return "Unknown", "Unknown"
 	}
 }

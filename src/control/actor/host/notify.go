@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/libp2p/go-libp2p-core/network"
 	ma "github.com/multiformats/go-multiaddr"
@@ -53,23 +54,28 @@ func (c *HostNotifyCmd) listenCloseF(net network.Network, addr ma.Multiaddr) {
 
 func (c *HostNotifyCmd) connectedF(net network.Network, conn network.Conn) {
 	logrus.Info("connection detected: ", conn.RemotePeer().String())
+	// Generate new peer to aggregate new data
+	peer := metrics.NewPeer(conn.RemotePeer().String())
 	h, _ := c.Host()
 	// Request the Host Metadata
-	hInfo, err := ReqHostInfo(context.Background(), h, conn)
+	err := ReqHostInfo(context.Background(), h, conn, &peer)
 	if err != nil {
-		log.Warn(err)
+		log.Warnf("host info request. %s", err)
 	}
 	// Request the BeaconMetadata
 	bMetadata, err := ReqBeaconMetadata(context.Background(), h, conn.RemotePeer())
 	if err != nil {
-		log.Warn(err)
+		log.Warnf("node beacon metadata request. %s", err)
+	} else {
+		peer.UpdateBeaconMetadata(bMetadata)
 	}
 	// request BeaconStatus metadata as we connect to a peer
 	bStatus, err := ReqBeaconStatus(context.Background(), h, conn.RemotePeer())
 	if err != nil {
-		log.Warn(err)
+		log.Warnf("node beacon status request. %s", err)
+	} else {
+		peer.UpdateBeaconStatus(bStatus)
 	}
-	var peer metrics.Peer
 	// Read ENR of the Peer from the generated enode
 	n := c.Store.LatestENR(conn.RemotePeer())
 	if n.ID().String() == "" {
@@ -77,17 +83,12 @@ func (c *HostNotifyCmd) connectedF(net network.Network, conn network.Conn) {
 		log.Warn("Peer ENR not found")
 	} else {
 		// We can only get the node.ID if the ENR of the peer was already in the PeerStore fromt dv5
-		hInfo.NodeID = n.ID().String()
+		peer.NodeId = n.ID().String()
 	}
-
-	// fetch all the info gathered from the peer into a new Peer struct
-	peer.FetchHostInfo(hInfo)
-	// TODO: Switch from Update to AddVersion in the future, when implementing metrics versions
-	peer.UpdateBeaconStatus(bStatus)
-	peer.UpdateBeaconMetadata(bMetadata)
-	// So far, just act like if we got new info, Update or Aggregate new info from a peer already on the Peerstore
-	c.PeerStore.AddPeer(peer)
-
+	// Add new connection event
+	peer.ConnectionEvent(conn.Stat().Direction.String(), time.Now())
+	// Add new peer or aggregate info to existing peer
+	c.PeerStore.StoreOrUpdatePeer(peer)
 	// End of metric traces to track the connections and disconnections
 	c.Log.WithFields(logrus.Fields{
 		"event": "connection_open", "peer": conn.RemotePeer().String(),

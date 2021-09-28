@@ -57,33 +57,11 @@ type MessageMetric struct {
 
 func NewPeer(peerId string) Peer {
 	pm := Peer{
-
-		PeerId:    peerId,
-		NodeId:    "",
-		UserAgent: "",
-		Pubkey:    "",
-		Addrs:     "",
-		Ip:        "",
-		Country:   "",
-		City:      "",
-		Latency:   0,
-
-		Attempted:          false,
-		Succeed:            false,
-		IsConnected:        false,
-		Attempts:           0,
+		PeerId:             peerId,
 		Error:              "None",
 		ConnectionTimes:    make([]time.Time, 0),
 		DisconnectionTimes: make([]time.Time, 0),
-
-		MetadataRequest: false,
-		MetadataSucceed: false,
-		BeaconStatus:    beacon.Status{},
-
-		LastExport: 0,
-
-		// Counters for the different topics
-		MessageMetrics: make(map[string]*MessageMetric),
+		MessageMetrics:     make(map[string]*MessageMetric),
 	}
 	return pm
 }
@@ -122,63 +100,58 @@ func (pm *Peer) ConnectionAttemptEvent(succeed bool, err string) {
 	}
 }
 
-// Fetch all the different metadata we received to save it into a new peer struct
-// TODO: Still few things to consider with new approach, like version handling
-// 		 or fetching the actual info with previous info from the peer
-func (pm *Peer) FetchHostInfo(hInfo BasicHostInfo) {
-	client, version := utils.FilterClientType(hInfo.UserAgent)
-	ip, err := utils.GetIPfromMultiaddress(hInfo.Addrs)
-	if err != nil {
-		// Almost impossible, when we are connected to a peer, we will always have a complete Multiaddrs after the Identify req
-		// leaving it emtpy to spot the problem, IP-Api request already makes a parse of the IP before making server petition
-		log.Error(err)
-	}
-	country, city, err := utils.GetLocationFromIP(ip)
-	if err != nil {
-		log.Error("error when fetching country/city from ip", err)
-	}
-
-	// TODO: NodeID and ENR should be received from the
-	if hInfo.PeerID != "" {
-		pm.PeerId = hInfo.PeerID
-	}
-	if hInfo.NodeID != "" {
-		pm.NodeId = hInfo.NodeID
-	}
-	// if the UserAgent is empty, Not update neither the client and version (to over)
-	if hInfo.UserAgent != "" {
-		pm.UserAgent = hInfo.UserAgent
-	}
+// Fetch Peer information from another Peer info
+func (pm *Peer) FetchPeerInfoFromPeer(newPeer Peer) {
+	// Somehow weird to update the peerID, since it is going to be the same one
+	pm.PeerId = getNonEmpty(pm.PeerId, newPeer.PeerId)
+	pm.NodeId = getNonEmpty(pm.NodeId, newPeer.NodeId)
+	// Check User Agent and derivated client type/version/OS
+	pm.UserAgent = getNonEmpty(pm.UserAgent, newPeer.UserAgent)
+	pm.ClientOS = getNonEmpty(pm.ClientOS, newPeer.ClientOS)
 	if pm.ClientName == "" || pm.ClientName == "Unknown" {
-		pm.ClientName = client
-		pm.ClientVersion = version
+		pm.ClientName = newPeer.ClientName
+		pm.ClientVersion = newPeer.ClientVersion
 	}
-	pm.ClientOS = "TODO"
-	if hInfo.PubKey != "" {
-		pm.Pubkey = hInfo.PubKey
+	pm.Pubkey = getNonEmpty(pm.Pubkey, newPeer.Pubkey)
+	pm.Addrs = getNonEmpty(pm.Addrs, newPeer.Addrs)
+	pm.Ip = getNonEmpty(pm.Ip, newPeer.Ip)
+	if (pm.City == "" || pm.City == "Unknown") && newPeer.City != "" {
+		pm.City = newPeer.City
+		pm.Country = newPeer.Country
 	}
-	if hInfo.Addrs != "" {
-		pm.Addrs = hInfo.Addrs
-	}
-	if ip != "" {
-		pm.Ip = ip
-	}
-	if (city != "" && city != "Unknown") || pm.City == "" {
-		pm.City = city
-		pm.Country = country
-	}
-	if hInfo.RTT.Nanoseconds() > 0 {
-		pm.Latency = float64(hInfo.RTT/time.Millisecond) / 1000
+	if newPeer.Latency > 0 {
+		pm.Latency = newPeer.Latency
 	}
 	// Metadata requested
-	if pm.MetadataRequest != true {
-		pm.MetadataRequest = hInfo.MetadataRequest
+	if !pm.MetadataRequest {
+		pm.MetadataRequest = newPeer.MetadataRequest
 	}
-	if pm.MetadataSucceed != true {
-		pm.MetadataSucceed = hInfo.MetadataSucceed
+	if !pm.MetadataSucceed {
+		pm.MetadataSucceed = newPeer.MetadataSucceed
 	}
+	// Beacon Metadata and Status
+	if newPeer.BeaconMetadata != (BeaconMetadataStamped{}) {
+		pm.BeaconMetadata = newPeer.BeaconMetadata
+	}
+	if newPeer.BeaconStatus != (BeaconStatusStamped{}) {
+		pm.BeaconStatus = newPeer.BeaconStatus
+	}
+	// Aggregate connections and disconnections
+	for _, time := range newPeer.ConnectionTimes {
+		pm.ConnectionEvent(newPeer.ConnectedDirection, time)
+	}
+	for _, time := range newPeer.DisconnectionTimes {
+		pm.DisconnectionEvent(time)
+	}
+}
 
-	return
+// getNonEmpty compares whether the new string is not empty
+// it returns the new one if its not empty or the old one it it was
+func getNonEmpty(old string, new string) string {
+	if new != "" {
+		return new
+	}
+	return old
 }
 
 // Update beacon Status of the peer
@@ -271,7 +244,7 @@ func (pm *Peer) ToCsvLine() string {
 		strconv.FormatBool(pm.IsConnected) + "," +
 		strconv.FormatUint(pm.Attempts, 10) + "," +
 		pm.Error + "," +
-		fmt.Sprint(pm.Latency) + "," +
+		fmt.Sprintf("%.6f", pm.Latency) + "," +
 		fmt.Sprintf("%d", len(pm.ConnectionTimes)) + "," +
 		fmt.Sprintf("%d", len(pm.DisconnectionTimes)) + "," +
 		fmt.Sprintf("%.6f", pm.GetConnectedTime()) + "," +
@@ -302,27 +275,6 @@ func (pm *Peer) LogPeer() {
 	}).Info("Peer Info")
 }
 
-// BASIC HOST INFO
-
-// BasicHostInfo contains the basic Host info that will be requested from the identification of a libp2p peer
-type BasicHostInfo struct {
-	TimeStamp time.Time
-	// Peer Host/Node Info
-	PeerID          string
-	NodeID          string
-	UserAgent       string
-	ProtocolVersion string
-	Addrs           string
-	PubKey          string
-	RTT             time.Duration
-	Protocols       []string
-	// Information regarding the metadata exchange
-	Direction string
-	// Metadata requested
-	MetadataRequest bool
-	MetadataSucceed bool
-}
-
 // BEACON METADATA
 
 // Basic BeaconMetadata struct that includes the timestamp of the received beacon metadata
@@ -331,30 +283,10 @@ type BeaconMetadataStamped struct {
 	Metadata  beacon.MetaData
 }
 
-// Funciton that returns de timestamp of the BeaconMetadata
-func (b *BeaconMetadataStamped) Time() time.Time {
-	return b.Timestamp
-}
-
-// Funciton that returns de content of the BeaconMetadata
-func (b *BeaconMetadataStamped) Content() beacon.MetaData {
-	return b.Metadata
-}
-
 // BEACON STATUS
 
 //  Basic BeaconMetadata struct that includes The timestamp of the received beacon Status
 type BeaconStatusStamped struct {
 	Timestamp time.Time
 	Status    beacon.Status
-}
-
-// Funciton that returns de timestamp of the BeaconMetadata
-func (b *BeaconStatusStamped) Time() time.Time {
-	return b.Timestamp
-}
-
-// Funciton that returns de content of the BeaconMetadata
-func (b *BeaconStatusStamped) Content() beacon.Status {
-	return b.Status
 }

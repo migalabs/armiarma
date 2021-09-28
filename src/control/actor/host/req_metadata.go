@@ -3,13 +3,16 @@ package host
 import (
 	"context"
 	"encoding/hex"
+	"fmt"
 	"time"
 
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/protolambda/rumor/metrics"
+	"github.com/protolambda/rumor/metrics/utils"
 	"github.com/protolambda/rumor/p2p/rpc/methods"
 	"github.com/protolambda/rumor/p2p/rpc/reqresp"
 	"github.com/protolambda/zrnt/eth2/beacon"
@@ -95,7 +98,7 @@ type HostWithIDService interface {
 // ReqHostInfo returns the basic host information regarding a given peer, from the libp2p perspective
 // it aggregates the info from the libp2p Identify protocol adding some extra info such as RTT between local host and remote peer
 // return empty struct and error if failure on the identify process
-func ReqHostInfo(ctx context.Context, h host.Host, conn network.Conn) (hInfo metrics.BasicHostInfo, err error) {
+func ReqHostInfo(ctx context.Context, h host.Host, conn network.Conn, peer *metrics.Peer) (err_ident error) {
 	// time out for ping
 	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
 	tout := timeoutCtx.Done()
@@ -106,46 +109,65 @@ func ReqHostInfo(ctx context.Context, h host.Host, conn network.Conn) (hInfo met
 	// convert host to IDService
 	withIdentify, ok := h.(HostWithIDService)
 	if !ok {
-		return hInfo, errors.Errorf("host does not support libp2p identify protocol")
+		return errors.Errorf("host does not support libp2p identify protocol")
 	}
 	t := time.Now()
 	idService := withIdentify.IDService()
 	if idService == nil {
-		return hInfo, errors.Errorf("libp2p identify not enabled on this host")
+		return errors.Errorf("libp2p identify not enabled on this host")
 	}
-	hInfo.MetadataRequest = true
+	peer.MetadataRequest = true
 	var rtt time.Duration
 	select {
 	case <-idService.IdentifyWait(conn):
-		hInfo.MetadataSucceed = true
+		peer.MetadataSucceed = true
 		rtt = time.Since(t)
+		log.Info("Identify OK")
 	case <-tout:
-		err = errors.Errorf("identification error caused by timed out")
+		err_ident = errors.Errorf("identification error caused by timed out")
+		log.Info("Identify !OK")
 	}
-	// Fulfill the hInfo struct
-	ua, err := h.Peerstore().Get(peerID, "AgentVersion")
-	if err == nil {
-		hInfo.UserAgent = ua.(string)
-	}
+
+	/* Not defined yet on the Peer struct
 	pv, err := h.Peerstore().Get(peerID, "ProtocolVersion")
 	if err == nil {
 		hInfo.ProtocolVersion = pv.(string)
-	}
-	pubk, err := conn.RemotePublicKey().Raw()
-	if err == nil {
-		hInfo.PubKey = hex.EncodeToString(pubk)
 	}
 	prot, err := h.Peerstore().GetProtocols(peerID)
 	if err == nil {
 		hInfo.Protocols = prot
 	}
-
+	*/
 	// Update the values of the
-	hInfo.TimeStamp = time.Now()
-	hInfo.RTT = rtt
-	hInfo.PeerID = peerID.String()
-	hInfo.Addrs = conn.RemoteMultiaddr().String()
-	hInfo.Direction = conn.Stat().Direction.String()
-
-	return
+	peer.Latency = float64(rtt/time.Millisecond) / 1000
+	peer.PeerId = peerID.String()
+	peer.Addrs = conn.RemoteMultiaddr().String() + "/p2p/" + peerID.String()
+	peer.ConnectedDirection = conn.Stat().Direction.String()
+	// Extract Client type and version
+	peer.ClientName, peer.ClientVersion = utils.FilterClientType(peer.UserAgent)
+	peer.ClientOS = "TODO"
+	var err error
+	peer.Ip, err = utils.GetIPfromMultiaddress(peer.Addrs)
+	if err != nil {
+		// Almost impossible, when we are connected to a peer, we will always have a complete Multiaddrs after the Identify req
+		// leaving it emtpy to spot the problem, IP-Api request already makes a parse of the IP before making server petition
+		log.Error(err)
+	}
+	peer.Country, peer.City, err = utils.GetLocationFromIp(peer.Ip)
+	if err != nil {
+		log.Error("error when fetching country/city from ip", err)
+	}
+	// Fulfill the hInfo struct
+	ua, err := h.Peerstore().Get(peerID, "AgentVersion")
+	if err == nil {
+		fmt.Println(ua.(string))
+		peer.UserAgent = ua.(string)
+	} else {
+		log.Warn("UserAgent not available")
+	}
+	pubk, err := conn.RemotePublicKey().Raw()
+	if err == nil {
+		peer.Pubkey = hex.EncodeToString(pubk)
+	}
+	return err_ident
 }

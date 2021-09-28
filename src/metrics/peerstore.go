@@ -67,40 +67,8 @@ func (c *PeerStore) StoreOrUpdatePeer(peer Peer) {
 	if err != nil {
 		c.PeerStore.Store(peer.PeerId, peer)
 	} else {
-		// update only the following parameters only if the incoming info is full
-		if peer.NodeId != "" {
-			oldPeer.NodeId = peer.NodeId
-		}
-		if peer.UserAgent != "" {
-			oldPeer.UserAgent = peer.UserAgent
-		}
-		if peer.ClientName != "" {
-			oldPeer.ClientName = peer.ClientName
-		}
-		if peer.ClientOS != "" {
-			oldPeer.ClientOS = peer.ClientOS
-		}
-		if peer.ClientVersion != "" {
-			oldPeer.ClientVersion = peer.ClientVersion
-		}
-		if peer.Pubkey != "" {
-			oldPeer.Pubkey = peer.Pubkey
-		}
-		if peer.Addrs != "" {
-			oldPeer.Addrs = peer.Addrs
-		}
-		if peer.Ip != "" {
-			oldPeer.Ip = peer.Ip
-		}
-		if peer.Country != "" {
-			oldPeer.Country = peer.Country
-		}
-		if peer.City != "" {
-			oldPeer.City = peer.City
-		}
-		if peer.Latency != 0 {
-			oldPeer.Latency = peer.Latency
-		}
+		// Fetch the new info of a peer directly from the new peer struct
+		oldPeer.FetchPeerInfoFromPeer(peer)
 
 		c.PeerStore.Store(peer.PeerId, oldPeer)
 	}

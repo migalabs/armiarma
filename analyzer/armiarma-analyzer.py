@@ -630,12 +630,12 @@ def main():
 	        totalMessageCounter = totalMessageCounter + row['Total Messages']
 	        messageCounterArray.append(row['Total Messages'])
 
-	for msgCount in messageCounterArray:
-	    percent = msgCount/totalMessageCounter
-	    messagePercentageArray.append(percent)
-
-	messageCounterArray = sorted(messageCounterArray, reverse = True)
-	messagePercentageArray = sorted(messagePercentageArray, reverse = True)
+	if totalMessageCounter > 0 :
+		for msgCount in messageCounterArray:
+			percent = msgCount/totalMessageCounter
+			messagePercentageArray.append(percent)
+		messageCounterArray = sorted(messageCounterArray, reverse = True)
+		messagePercentageArray = sorted(messagePercentageArray, reverse = True)
 
 	#print(messageCounterArray[:5])
 	print("\nTotal of received messages:", totalMessageCounter)
@@ -675,13 +675,14 @@ def main():
 	for index, row in rumorMetricsPanda.iterrows():
 	    totalBlockCounter = totalBlockCounter + row['Beacon Blocks']
 	    messageCounterArray.append(row['Beacon Blocks'])
+		
+	if totalMessageCounter > 0 :
+		for msgCount in messageCounterArray:
+			percent = msgCount/totalBlockCounter
+			messagePercentageArray.append(percent)
 
-	for msgCount in messageCounterArray:
-	    percent = msgCount/totalBlockCounter
-	    messagePercentageArray.append(percent)
-
-	messageCounterArray = sorted(messageCounterArray, reverse = True)
-	messagePercentageArray = sorted(messagePercentageArray, reverse = True)
+		messageCounterArray = sorted(messageCounterArray, reverse = True)
+		messagePercentageArray = sorted(messagePercentageArray, reverse = True)
 
 	#print(messageCounterArray[:5])
 	print("\nTotal of received blocks:", totalBlockCounter)
