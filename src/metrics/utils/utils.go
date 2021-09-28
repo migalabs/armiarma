@@ -59,12 +59,18 @@ func FilterError(err string) string {
 	// filter the error type
 	if strings.Contains(err, "connection reset by peer") {
 		errorPretty = "Connection reset by peer"
-	} else if strings.Contains(err, "i/o timeout") {
+	} else if strings.Contains(err, "i/o timeout") || strings.Contains(err, "context deadline exceeded") {
 		errorPretty = "i/o timeout"
 	} else if strings.Contains(err, "dial to self attempted") {
 		errorPretty = "dial to self attempted"
 	} else if strings.Contains(err, "dial backoff") {
 		errorPretty = "dial backoff"
+	} else if strings.Contains(err, "connection refused") {
+		errorPretty = "connection refused"
+	} else if strings.Contains(err, "no route to host") {
+		errorPretty = "no route to host"
+	} else {
+		fmt.Println(err)
 	}
 
 	return errorPretty
