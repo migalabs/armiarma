@@ -17,11 +17,13 @@ import (
 	"net"
 
 	"github.com/libp2p/go-libp2p-core/crypto"
+	"github.com/migalabs/armiarma/src/base"
 	"github.com/migalabs/armiarma/src/config"
 	"github.com/migalabs/armiarma/src/utils"
 )
 
 type InfoData struct {
+	base    base.Base
 	iP      net.IP
 	tcpPort int
 	udpPort int
@@ -34,17 +36,34 @@ type InfoData struct {
 
 	logLevel   string
 	privateKey *crypto.Secp256k1PrivateKey
-
-	logging log.Logger
 }
 
 // Will create an InfoData object using default values from config
-func NewDefaultInfoData(input_log log.Logger) *InfoData {
+func NewDefaultInfoData(opts base.LogOpts) *InfoData { //input_log log.Logger) *InfoData {
 
-	config_object := config.NewDefaultConfigData()
+	baseConfigOpts := base.LogOpts{
+		ModName:   "Config",
+		Output:    "terminal",
+		Formatter: "text",
+		Level:     "debug",
+	}
+
+	new_base, err := base.NewBase(
+		base.WithLogger(base.LogOpts{
+			ModName:   opts.ModName,
+			Output:    opts.Output,
+			Formatter: opts.Formatter,
+			Level:     opts.Level,
+		}),
+	)
+	if err != nil {
+		log.Panicf("Could not create base object %s", err)
+	}
+
+	config_object := config.NewEmptyConfigData(baseConfigOpts)
 
 	info_object := InfoData{
-		logging: input_log,
+		base: *new_base,
 	}
 
 	info_object.importFromConfig(*config_object)
@@ -53,13 +72,32 @@ func NewDefaultInfoData(input_log log.Logger) *InfoData {
 }
 
 // Will create an InfoData object using imported values from config
-func NewCustomInfoData(input_file string, input_log log.Logger) *InfoData {
+func NewCustomInfoData(input_file string, opts base.LogOpts) *InfoData { //, input_log log.Logger) *InfoData {
 
-	config_object := config.NewDefaultConfigData()
+	baseConfigOpts := base.LogOpts{
+		ModName:   "Config",
+		Output:    "terminal",
+		Formatter: "text",
+		Level:     "debug",
+	}
+
+	new_base, err := base.NewBase(
+		base.WithLogger(base.LogOpts{
+			ModName:   opts.ModName,
+			Output:    opts.Output,
+			Formatter: opts.Formatter,
+			Level:     opts.Level,
+		}),
+	)
+	if err != nil {
+		log.Panicf("Could not create base object %s", err)
+	}
+
+	config_object := config.NewEmptyConfigData(baseConfigOpts)
 	config_object.ReadFromJSON(input_file)
 
 	info_object := InfoData{
-		logging: input_log,
+		base: *new_base,
 	}
 	info_object.importFromConfig(*config_object)
 	return &info_object
@@ -69,6 +107,7 @@ func NewCustomInfoData(input_file string, input_log log.Logger) *InfoData {
 // object
 func (i *InfoData) importFromConfig(input_config config.ConfigData) {
 
+	i.base.Log.Debugf("Importing from Config into Info...")
 	i.SetIPFromString(input_config.GetIP())
 	i.SetTcpPort(input_config.GetTcpPort())
 	i.SetUdpPort(input_config.GetUdpPort())
@@ -77,6 +116,8 @@ func (i *InfoData) importFromConfig(input_config config.ConfigData) {
 	i.SetNetwork(input_config.GetNetwork())
 	i.SetForkDigest(input_config.GetForkDigest())
 	i.SetLogLevel(input_config.GetLogLevel())
+	i.SetPrivKeyFromString(input_config.GetPrivKey())
+	i.base.Log.Debugf("Imported!")
 
 }
 
@@ -87,7 +128,7 @@ func (i *InfoData) GetTcpPort() int {
 }
 func (i *InfoData) SetTcpPort(input_port int) {
 	if input_port > 65000 || input_port < 0 {
-		i.logging.Printf("TCP port not valid, applying default %d", config.DEFAULT_TCP_PORT)
+		// i.logging.Printf("TCP port not valid, applying default %d", config.DEFAULT_TCP_PORT)
 		i.tcpPort = config.DEFAULT_TCP_PORT
 		return
 	}
@@ -100,7 +141,7 @@ func (i *InfoData) GetUdpPort() int {
 }
 func (i *InfoData) SetUdpPort(input_port int) {
 	if input_port > 65000 || input_port < 0 {
-		i.logging.Printf("UDP port not valid, applying default %d", config.DEFAULT_UDP_PORT)
+		// i.logging.Printf("UDP port not valid, applying default %d", config.DEFAULT_UDP_PORT)
 		i.udpPort = config.DEFAULT_UDP_PORT
 		return
 	}
@@ -168,7 +209,7 @@ func (i *InfoData) SetPrivKeyFromString(input_key string) {
 	parsed_key, err := utils.ParsePrivateKey(input_key)
 
 	if err != nil {
-		i.logging.Panicf("Wrong Private Key parsing %s", input_key)
+		// i.logging.Panicf("Wrong Private Key parsing %s", input_key)
 		return
 	}
 

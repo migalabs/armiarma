@@ -64,7 +64,7 @@ func NewDiscovery(ctx context.Context, input_node *enode.LocalNode, info_obj *in
 }
 
 // start dv5 service and listening in given port
-func (d *Discovery) start_dv5(import_json_file string) {
+func (d *Discovery) Start_dv5(import_json_file string) {
 
 	// udp address to listen
 	udpAddr := &net.UDPAddr{
@@ -82,7 +82,7 @@ func (d *Discovery) start_dv5(import_json_file string) {
 	gethLogger := geth_log.New()
 	gethLogger.SetHandler(geth_log.FuncHandler(func(r *geth_log.Record) error {
 
-		d.b.Log.Panicf("%+v\n", r)
+		d.b.Log.Debugf("%+v\n", r)
 		return nil
 	}))
 
@@ -131,17 +131,15 @@ func (d *Discovery) ImportBootNodeList(import_json_file string) {
 		fmt.Println(err)
 	}
 
-	for index, element := range bootNodeListString.BootNodes {
+	for _, element := range bootNodeListString.BootNodes {
 
 		bootNodeList = append(bootNodeList, eth_enode.MustParse(element))
 
-		// d.b.Log.Debugf("Adding %d bootNode/s", index)
-		fmt.Println("yes: ", index)
 	}
 
 	//bootNodeList = append(bootNodeList, eth_enode.MustParse("enr:-Ku4QImhMc1z8yCiNJ1TyUxdcfNucje3BGwEHzodEZUan8PherEo4sF7pPHPSIB1NNuSg5fZy7qFsjmUKs2ea1Whi0EBh2F0dG5ldHOIAAAAAAAAAACEZXRoMpD1pf1CAAAAAP__________gmlkgnY0gmlwhBLf22SJc2VjcDI1NmsxoQOVphkDqal4QzPMksc5wnpuC3gvSC8AfbFOnZY_On34wIN1ZHCCIyg"))
 	d.SetBootNodeList(bootNodeList)
-	fmt.Println("finished import", len(d.GetBootNodeList()))
+	d.b.Log.Debugf("Added %d bootNode/s", len(d.GetBootNodeList()))
 
 }
 
