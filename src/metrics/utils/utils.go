@@ -69,8 +69,12 @@ func FilterError(err string) string {
 		errorPretty = "connection refused"
 	} else if strings.Contains(err, "no route to host") {
 		errorPretty = "no route to host"
+	} else if strings.Contains(err, "network is unreachable") {
+		errorPretty = "unreachable network"
+	} else if strings.Contains(err, "peer id mismatch") {
+		errorPretty = "peer id mismatch, peer dissmissed"
 	} else {
-		fmt.Println(err)
+		log.Errorf("uncertain error: ", err)
 	}
 
 	return errorPretty
