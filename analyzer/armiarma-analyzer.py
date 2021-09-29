@@ -829,7 +829,7 @@ def main():
 	    counter = 0
 	    auxMetricsPanda = rumorMetricsPanda.copy()
 	    for index, row in auxMetricsPanda.iterrows():
-	        if row['Request Metadata'] == False: # If we didn't exchange metadata with them, remove them from the panda copy
+	        if row['Success Metadata'] == False: # If we didn't exchange metadata with them, remove them from the panda copy
 	            indexToDrop.append(index)
 	        else:
 	            counter += 1
