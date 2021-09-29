@@ -44,15 +44,15 @@ func ReqBeaconStatus(ctx context.Context, h host.Host, peerID peer.ID) (data bea
 				if err != nil {
 					return err
 				}
-				return errors.Errorf("error requesting BeaconState RPC: %s", msg)
+				return errors.Errorf("error requesting BeaconStatus RPC: %s", msg)
 			case reqresp.SuccessCode:
 				var stat beacon.Status
 				if err := chunk.ReadObj(&stat); err != nil {
-					return err
+					return errors.Wrap(err, "from requesting BeaconMetadata RPC")
 				}
 				data = stat
 			default:
-				return errors.New("unexpected result code")
+				return errors.New("unexpected result code for BeaconStatus RPC request")
 			}
 			return nil
 		})
@@ -79,11 +79,11 @@ func ReqBeaconMetadata(ctx context.Context, h host.Host, peerID peer.ID) (data b
 			case reqresp.SuccessCode:
 				var meta beacon.MetaData
 				if err := chunk.ReadObj(&meta); err != nil {
-					return err
+					return errors.Wrap(err, "from requesting BeaconMetadata RPC")
 				}
 				data = meta
 			default:
-				return errors.New("unexpected result code")
+				return errors.New("unexpected result code for BeaconMetadata RPC request")
 			}
 			return nil
 		})

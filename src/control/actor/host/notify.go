@@ -53,26 +53,35 @@ func (c *HostNotifyCmd) listenCloseF(net network.Network, addr ma.Multiaddr) {
 }
 
 func (c *HostNotifyCmd) connectedF(net network.Network, conn network.Conn) {
-	logrus.Info("connection detected: ", conn.RemotePeer().String())
+	log.WithFields(logrus.Fields{
+		"EVENT":     "Connection detected",
+		"DIRECTION": conn.Stat().Direction.String(),
+	}).Info("Peer: ", conn.RemotePeer().String())
 	// Generate new peer to aggregate new data
 	peer := metrics.NewPeer(conn.RemotePeer().String())
 	h, _ := c.Host()
 	// Request the Host Metadata
 	err := ReqHostInfo(context.Background(), h, conn, &peer)
 	if err != nil {
-		log.Warnf("host info request. %s", err)
+		log.WithFields(logrus.Fields{
+			"ERROR": err,
+		}).Warn("Peer: ", conn.RemotePeer().String())
 	}
 	// Request the BeaconMetadata
 	bMetadata, err := ReqBeaconMetadata(context.Background(), h, conn.RemotePeer())
 	if err != nil {
-		log.Warnf("node beacon metadata request. %s", err)
+		log.WithFields(logrus.Fields{
+			"ERROR": err,
+		}).Warn("Peer: ", conn.RemotePeer().String())
 	} else {
 		peer.UpdateBeaconMetadata(bMetadata)
 	}
 	// request BeaconStatus metadata as we connect to a peer
 	bStatus, err := ReqBeaconStatus(context.Background(), h, conn.RemotePeer())
 	if err != nil {
-		log.Warnf("node beacon status request. %s", err)
+		log.WithFields(logrus.Fields{
+			"ERROR": err,
+		}).Warn("Peer: ", conn.RemotePeer().String())
 	} else {
 		peer.UpdateBeaconStatus(bStatus)
 	}
@@ -80,7 +89,9 @@ func (c *HostNotifyCmd) connectedF(net network.Network, conn network.Conn) {
 	n := c.Store.LatestENR(conn.RemotePeer())
 	if n.ID().String() == "" {
 		// TODO: If the peer wasn't discovered via dv5 "n" will be empty
-		log.Warn("Peer ENR not found")
+		log.WithFields(logrus.Fields{
+			"ERROR": "Peer ENR not found",
+		}).Warn("Peer: ", conn.RemotePeer().String())
 	} else {
 		// We can only get the node.ID if the ENR of the peer was already in the PeerStore fromt dv5
 		peer.NodeId = n.ID().String()
