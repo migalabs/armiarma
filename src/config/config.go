@@ -14,14 +14,15 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
-	"log"
+
+	"os"
 	"strings"
 
 	gcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/migalabs/armiarma/src/base"
+	log "github.com/sirupsen/logrus"
 )
 
 const DEFAULT_IP string = "0.0.0.0"
@@ -37,61 +38,35 @@ const DEFAULT_EMPTY_INT int = 0
 const DEFAULT_EMPTY_STRING string = ""
 
 type ConfigData struct {
-	base base.Base
-
-	IP      string `json:"IP"`
-	TcpPort int    `json:"TcpPort"`
-	UdpPort int    `json:"UdpPort"`
-
-	UserAgent string `json:"UserAgent"`
-
-	TopicArray []string `json:"TopicArray"`
-	Network    string   `json:"Network"`
-	ForkDigest string   `json:"ForkDigest"`
-
-	LogLevel   string `json:"LogLevel"`
-	PrivateKey string `json:"PrivateKey"`
+	localLogger   log.FieldLogger
+	IP            string   `json:"IP"`
+	TcpPort       int      `json:"TcpPort"`
+	UdpPort       int      `json:"UdpPort"`
+	UserAgent     string   `json:"UserAgent"`
+	TopicArray    []string `json:"TopicArray"`
+	Network       string   `json:"Network"`
+	ForkDigest    string   `json:"ForkDigest"`
+	LogLevel      string   `json:"LogLevel"`
+	PrivateKey    string   `json:"PrivateKey"`
+	BootNodesFile string   `json:"BootNodesFile"`
 }
 
 // Will create an empty object
 func NewEmptyConfigData(opts base.LogOpts) *ConfigData {
-	new_base, err := base.NewBase(
-		base.WithLogger(base.LogOpts{
-			ModName:   opts.ModName,
-			Output:    opts.Output,
-			Formatter: opts.Formatter,
-			Level:     opts.Level,
-		}),
-	)
-	if err != nil {
-		log.Panicf("Could not create base object %s", err)
-	}
 
 	return &ConfigData{
-		base: *new_base,
+		localLogger: base.CreateLogger(opts),
 	}
 }
 
 // Will create an object using default parameters
 func NewDefaultConfigData(opts base.LogOpts) *ConfigData {
 
-	new_base, err := base.NewBase(
-		base.WithLogger(base.LogOpts{
-			ModName:   opts.ModName,
-			Output:    opts.Output,
-			Formatter: opts.Formatter,
-			Level:     opts.Level,
-		}),
-	)
-	if err != nil {
-		log.Panicf("Could not create base object %s", err)
-	}
-
 	return &ConfigData{
-		base:    *new_base,
-		IP:      DEFAULT_IP,
-		TcpPort: DEFAULT_TCP_PORT,
-		UdpPort: DEFAULT_UDP_PORT,
+		localLogger: base.CreateLogger(opts),
+		IP:          DEFAULT_IP,
+		TcpPort:     DEFAULT_TCP_PORT,
+		UdpPort:     DEFAULT_UDP_PORT,
 
 		UserAgent: DEFAULT_USER_AGENT,
 
@@ -107,59 +82,71 @@ func NewDefaultConfigData(opts base.LogOpts) *ConfigData {
 // Receives an input file where to read configuration from and imports into
 // the current object
 func (c *ConfigData) ReadFromJSON(input_file string) {
-	c.base.Log.Debugf("Reading configuration from: ", input_file)
-	file, _ := ioutil.ReadFile(input_file)
+	c.localLogger.Debugf("Reading configuration from: ", input_file)
 
-	err := json.Unmarshal([]byte(file), c)
+	if _, err := os.Stat(input_file); os.IsNotExist(err) {
+		c.localLogger.Debugf("Could not read file")
+	} else {
 
-	c.checkEmptyFields()
-
-	if err != nil {
-		fmt.Println(err)
+		file, err := ioutil.ReadFile(input_file)
+		if err == nil {
+			err := json.Unmarshal([]byte(file), c)
+			if err != nil {
+				c.localLogger.Debugf("Could not Unmarshal Config file: %s", err)
+			}
+		} else {
+			c.localLogger.Debugf("Could not read Config file: %s", err)
+		}
 	}
+
+	c.checkEmptyFields() // tis function will check any field that was not read and apply the default
+
 }
 
-// iterate over the fields of
+// iterate over the fields and apply defaults if needed
 func (c *ConfigData) checkEmptyFields() {
 	if c.GetIP() == "" {
 		c.SetIP(DEFAULT_IP)
-		c.base.Log.Debugf("Setting default IP: %s", DEFAULT_IP)
+		c.localLogger.Debugf("Setting default IP: %s", DEFAULT_IP)
 	}
 
 	if c.GetTcpPort() == 0 {
 		c.SetTcpPort(DEFAULT_TCP_PORT)
-		c.base.Log.Debugf("Setting default TcpPort: %d", DEFAULT_TCP_PORT)
+		c.localLogger.Debugf("Setting default TcpPort: %d", DEFAULT_TCP_PORT)
 	}
 
 	if c.GetUdpPort() == 0 {
 		c.SetUdpPort(DEFAULT_UDP_PORT)
-		c.base.Log.Debugf("Setting default UdpPort: %d", DEFAULT_UDP_PORT)
+		c.localLogger.Debugf("Setting default UdpPort: %d", DEFAULT_UDP_PORT)
 	}
 
 	if c.GetUserAgent() == "" {
 		c.SetUserAgent(DEFAULT_USER_AGENT)
-		c.base.Log.Debugf("Setting default UserAgent: %s", DEFAULT_USER_AGENT)
+		c.localLogger.Debugf("Setting default UserAgent: %s", DEFAULT_USER_AGENT)
 	}
 
 	if len(c.GetTopicArray()) == 0 {
 		c.SetTopicArrayFromString(DEFAULT_TOPIC_ARRAY)
-		c.base.Log.Debugf("Setting default TopicArray: %s", DEFAULT_TOPIC_ARRAY)
+		c.localLogger.Debugf("Setting default TopicArray: %s", DEFAULT_TOPIC_ARRAY)
 	}
 
 	if c.GetNetwork() == "" {
 		c.SetNetwork(DEFAULT_NETWORK)
-		c.base.Log.Debugf("Setting default Network: %s", DEFAULT_NETWORK)
+		c.localLogger.Debugf("Setting default Network: %s", DEFAULT_NETWORK)
 	}
 
 	if c.GetForkDigest() == "" {
 		c.SetForkDigest(DEFAULT_FORK_DIGEST)
-		c.base.Log.Debugf("Setting default ForkDigest: %s", DEFAULT_FORK_DIGEST)
+		c.localLogger.Debugf("Setting default ForkDigest: %s", DEFAULT_FORK_DIGEST)
 	}
 
 	if c.GetPrivKey() == "" {
-		c.base.Log.Debugf("Could not read private key from config file")
+		c.localLogger.Debugf("Could not read private key from config file")
 		c.generate_privKey()
+	}
 
+	if c.GetBootNodesFile() == "" {
+		c.localLogger.Debugf("Could not find bootnodes file")
 	}
 
 }
@@ -169,7 +156,7 @@ func (c *ConfigData) generate_privKey() {
 	key, err := ecdsa.GenerateKey(gcrypto.S256(), rand.Reader)
 
 	if err != nil {
-		c.base.Log.Panicf("failed to generate key: %v", err)
+		c.localLogger.Panicf("failed to generate key: %v", err)
 	}
 
 	secpKey := (*crypto.Secp256k1PrivateKey)(key)
@@ -177,11 +164,11 @@ func (c *ConfigData) generate_privKey() {
 	keyBytes, err := secpKey.Raw()
 
 	if err != nil {
-		c.base.Log.Panicf("failed to serialize key: %v", err)
+		c.localLogger.Panicf("failed to serialize key: %v", err)
 	}
 
 	c.SetPrivKey(hex.EncodeToString(keyBytes))
-	c.base.Log.Debugf("Generated Key!: ", hex.EncodeToString(keyBytes))
+	c.localLogger.Debugf("Generated Key!: ", hex.EncodeToString(keyBytes))
 }
 
 // getters and setters
@@ -250,4 +237,11 @@ func (c *ConfigData) GetPrivKey() string {
 }
 func (c *ConfigData) SetPrivKey(input_string string) {
 	c.PrivateKey = input_string
+}
+
+func (c *ConfigData) GetBootNodesFile() string {
+	return c.BootNodesFile
+}
+func (c *ConfigData) SetBootNodesFile(input_string string) {
+	c.BootNodesFile = input_string
 }
