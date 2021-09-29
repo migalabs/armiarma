@@ -3,7 +3,6 @@ package host
 import (
 	"context"
 	"encoding/hex"
-	"fmt"
 	"time"
 
 	"github.com/pkg/errors"
@@ -122,12 +121,10 @@ func ReqHostInfo(ctx context.Context, h host.Host, conn network.Conn, peer *metr
 	case <-idService.IdentifyWait(conn):
 		peer.MetadataSucceed = true
 		rtt = time.Since(t)
-		log.Info("Identify OK")
 	case <-tout:
 		err_ident = errors.Errorf("identification error caused by timed out")
-		log.Info("Identify !OK")
 	}
-
+	var err error
 	/* Not defined yet on the Peer struct
 	pv, err := h.Peerstore().Get(peerID, "ProtocolVersion")
 	if err == nil {
@@ -135,7 +132,8 @@ func ReqHostInfo(ctx context.Context, h host.Host, conn network.Conn, peer *metr
 	}
 	prot, err := h.Peerstore().GetProtocols(peerID)
 	if err == nil {
-		hInfo.Protocols = prot
+		//hInfo.Protocols = prot
+		log.Infof("peer on protocol %s", prot)
 	}
 	*/
 	// Update the values of the
@@ -143,10 +141,6 @@ func ReqHostInfo(ctx context.Context, h host.Host, conn network.Conn, peer *metr
 	peer.PeerId = peerID.String()
 	peer.Addrs = conn.RemoteMultiaddr().String() + "/p2p/" + peerID.String()
 	peer.ConnectedDirection = conn.Stat().Direction.String()
-	// Extract Client type and version
-	peer.ClientName, peer.ClientVersion = utils.FilterClientType(peer.UserAgent)
-	peer.ClientOS = "TODO"
-	var err error
 	peer.Ip, err = utils.GetIPfromMultiaddress(peer.Addrs)
 	if err != nil {
 		// Almost impossible, when we are connected to a peer, we will always have a complete Multiaddrs after the Identify req
@@ -160,11 +154,16 @@ func ReqHostInfo(ctx context.Context, h host.Host, conn network.Conn, peer *metr
 	// Fulfill the hInfo struct
 	ua, err := h.Peerstore().Get(peerID, "AgentVersion")
 	if err == nil {
-		fmt.Println(ua.(string))
 		peer.UserAgent = ua.(string)
 	} else {
-		log.Warn("UserAgent not available")
+		// EDGY CASE: when peers refuse the connection, the callback gets called and the identify protocol
+		// returns an empty struct (we are unable to identify them)
+		err_ident = errors.Errorf("identification error caused by connection refuse")
+		peer.MetadataSucceed = false
 	}
+	// Extract Client type and version
+	peer.ClientName, peer.ClientVersion = utils.FilterClientType(peer.UserAgent)
+	peer.ClientOS = "TODO"
 	pubk, err := conn.RemotePublicKey().Raw()
 	if err == nil {
 		peer.Pubkey = hex.EncodeToString(pubk)

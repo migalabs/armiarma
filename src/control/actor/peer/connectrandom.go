@@ -161,7 +161,6 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host, store track
 					peer.City = city
 				}
 				c.PeerStore.StoreOrUpdatePeer(peer)
-				log.Infof("attempting peer %s", peer.PeerId)
 				// try to connect the peer
 				attempts := 0
 				for attempts < c.MaxRetries {
@@ -172,7 +171,6 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host, store track
 						if err != nil {
 							log.Error("could not add new connection attemp: ", conn_err)
 						}
-						log.Errorf("connection failed. %s", conn_err)
 						c.Log.WithError(conn_err).Warnf("attempts %d failed connection attempt", attempts)
 						continue
 					} else { // connection successfuly made
@@ -181,7 +179,6 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host, store track
 						if err != nil {
 							log.Error("could not add new connection attemp: ", err)
 						}
-						log.Info("connection succed")
 						break
 					}
 					if attempts >= c.MaxRetries {
