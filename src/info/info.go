@@ -13,33 +13,31 @@ This way we make sure the information is only stored once.
 package info
 
 import (
-	"log"
 	"net"
 
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/migalabs/armiarma/src/base"
 	"github.com/migalabs/armiarma/src/config"
 	"github.com/migalabs/armiarma/src/utils"
+	log "github.com/sirupsen/logrus"
 )
 
 type InfoData struct {
-	base    base.Base
-	iP      net.IP
-	tcpPort int
-	udpPort int
-
-	userAgent string
-
-	topicArray []string
-	network    string
-	forkDigest string
-
-	logLevel   string
-	privateKey *crypto.Secp256k1PrivateKey
+	localLogger   log.FieldLogger
+	iP            net.IP
+	tcpPort       int
+	udpPort       int
+	userAgent     string
+	topicArray    []string
+	network       string
+	forkDigest    string
+	logLevel      string
+	privateKey    *crypto.Secp256k1PrivateKey
+	bootNodesFile string
 }
 
 // Will create an InfoData object using default values from config
-func NewDefaultInfoData(opts base.LogOpts) *InfoData { //input_log log.Logger) *InfoData {
+func NewDefaultInfoData(opts base.LogOpts) *InfoData {
 
 	baseConfigOpts := base.LogOpts{
 		ModName:   "Config",
@@ -48,22 +46,10 @@ func NewDefaultInfoData(opts base.LogOpts) *InfoData { //input_log log.Logger) *
 		Level:     "debug",
 	}
 
-	new_base, err := base.NewBase(
-		base.WithLogger(base.LogOpts{
-			ModName:   opts.ModName,
-			Output:    opts.Output,
-			Formatter: opts.Formatter,
-			Level:     opts.Level,
-		}),
-	)
-	if err != nil {
-		log.Panicf("Could not create base object %s", err)
-	}
-
 	config_object := config.NewEmptyConfigData(baseConfigOpts)
 
 	info_object := InfoData{
-		base: *new_base,
+		localLogger: base.CreateLogger(opts),
 	}
 
 	info_object.importFromConfig(*config_object)
@@ -72,7 +58,7 @@ func NewDefaultInfoData(opts base.LogOpts) *InfoData { //input_log log.Logger) *
 }
 
 // Will create an InfoData object using imported values from config
-func NewCustomInfoData(input_file string, opts base.LogOpts) *InfoData { //, input_log log.Logger) *InfoData {
+func NewCustomInfoData(input_file string, opts base.LogOpts) *InfoData {
 
 	baseConfigOpts := base.LogOpts{
 		ModName:   "Config",
@@ -81,23 +67,11 @@ func NewCustomInfoData(input_file string, opts base.LogOpts) *InfoData { //, inp
 		Level:     "debug",
 	}
 
-	new_base, err := base.NewBase(
-		base.WithLogger(base.LogOpts{
-			ModName:   opts.ModName,
-			Output:    opts.Output,
-			Formatter: opts.Formatter,
-			Level:     opts.Level,
-		}),
-	)
-	if err != nil {
-		log.Panicf("Could not create base object %s", err)
-	}
-
 	config_object := config.NewEmptyConfigData(baseConfigOpts)
 	config_object.ReadFromJSON(input_file)
 
 	info_object := InfoData{
-		base: *new_base,
+		localLogger: base.CreateLogger(opts),
 	}
 	info_object.importFromConfig(*config_object)
 	return &info_object
@@ -107,7 +81,7 @@ func NewCustomInfoData(input_file string, opts base.LogOpts) *InfoData { //, inp
 // object
 func (i *InfoData) importFromConfig(input_config config.ConfigData) {
 
-	i.base.Log.Debugf("Importing from Config into Info...")
+	i.localLogger.Debugf("Importing from Config into Info...")
 	i.SetIPFromString(input_config.GetIP())
 	i.SetTcpPort(input_config.GetTcpPort())
 	i.SetUdpPort(input_config.GetUdpPort())
@@ -117,7 +91,8 @@ func (i *InfoData) importFromConfig(input_config config.ConfigData) {
 	i.SetForkDigest(input_config.GetForkDigest())
 	i.SetLogLevel(input_config.GetLogLevel())
 	i.SetPrivKeyFromString(input_config.GetPrivKey())
-	i.base.Log.Debugf("Imported!")
+	i.SetBootNodeFile(input_config.GetBootNodesFile())
+	i.localLogger.Debugf("Imported!")
 
 }
 
@@ -128,7 +103,7 @@ func (i *InfoData) GetTcpPort() int {
 }
 func (i *InfoData) SetTcpPort(input_port int) {
 	if input_port > 65000 || input_port < 0 {
-		// i.logging.Printf("TCP port not valid, applying default %d", config.DEFAULT_TCP_PORT)
+		i.localLogger.Debugf("TCP port not valid, applying default %d", config.DEFAULT_TCP_PORT)
 		i.tcpPort = config.DEFAULT_TCP_PORT
 		return
 	}
@@ -141,7 +116,7 @@ func (i *InfoData) GetUdpPort() int {
 }
 func (i *InfoData) SetUdpPort(input_port int) {
 	if input_port > 65000 || input_port < 0 {
-		// i.logging.Printf("UDP port not valid, applying default %d", config.DEFAULT_UDP_PORT)
+		i.localLogger.Debugf("UDP port not valid, applying default %d", config.DEFAULT_UDP_PORT)
 		i.udpPort = config.DEFAULT_UDP_PORT
 		return
 	}
@@ -209,10 +184,15 @@ func (i *InfoData) SetPrivKeyFromString(input_key string) {
 	parsed_key, err := utils.ParsePrivateKey(input_key)
 
 	if err != nil {
-		// i.logging.Panicf("Wrong Private Key parsing %s", input_key)
+		i.localLogger.Panicf("Could not parse Private Key %s", input_key)
 		return
 	}
-
 	i.privateKey = parsed_key
+}
 
+func (i *InfoData) GetBootNodeFile() string {
+	return i.bootNodesFile
+}
+func (i *InfoData) SetBootNodeFile(input_string string) {
+	i.bootNodesFile = input_string
 }

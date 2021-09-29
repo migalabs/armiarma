@@ -1,5 +1,5 @@
 {
-    "IPP": "0.0.0.0",
+    "IP": "0.0.0.0",
     "TcpPort": 9006,
     "UdpPort": 9007,
     "TopicArray": ["/eth2/b5303f2a/beacon_block/ssz_snappy"],
@@ -7,5 +7,6 @@
     "ForkDigest": "0xdlskgfn",
     "UserAgent": "bsc_test",
     "LogLevel": "info",
-    "PrivateKe": "026c60367b01fe3d7c7460bce1d585260ce465fa0abcb6e13619f88bf0dad54f"
+    "PrivateKey": "026c60367b01fe3d7c7460bce1d585260ce465fa0abcb6e13619f88bf0dad54f",
+    "BootNodesFile": "./src/discovery/bootnodes_mainnet.json"
 }
