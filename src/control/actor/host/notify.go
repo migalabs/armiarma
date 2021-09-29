@@ -87,14 +87,15 @@ func (c *HostNotifyCmd) connectedF(net network.Network, conn network.Conn) {
 	}
 	// Read ENR of the Peer from the generated enode
 	n := c.Store.LatestENR(conn.RemotePeer())
-	if n.ID().String() == "" {
+	if n != nil {
+		n.ID().String()
+		// We can only get the node.ID if the ENR of the peer was already in the PeerStore fromt dv5
+		peer.NodeId = n.ID().String()
+	} else {
 		// TODO: If the peer wasn't discovered via dv5 "n" will be empty
 		log.WithFields(logrus.Fields{
 			"ERROR": "Peer ENR not found",
 		}).Warn("Peer: ", conn.RemotePeer().String())
-	} else {
-		// We can only get the node.ID if the ENR of the peer was already in the PeerStore fromt dv5
-		peer.NodeId = n.ID().String()
 	}
 	// Add new connection event
 	peer.ConnectionEvent(conn.Stat().Direction.String(), time.Now())
