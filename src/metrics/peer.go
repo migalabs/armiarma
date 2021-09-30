@@ -96,7 +96,7 @@ func (pm Peer) DaysToWait() int {
 // return the time of the last connection with this peer
 func (pm Peer) LastAttempt() (t time.Time, err error) {
 	if len(pm.NegativeConnAttempts) == 0 {
-		err = errors.New("no last negative connections for the peer")
+		err = errors.New("no negative connections for the peer")
 		return
 	}
 	t = pm.NegativeConnAttempts[len(pm.NegativeConnAttempts)-1]
@@ -104,15 +104,40 @@ func (pm Peer) LastAttempt() (t time.Time, err error) {
 	return
 }
 
-// Aggregate a new negative connection to the peer, check if the peer has been unreachable enough time to deprecate peer
-func (pm *Peer) AddNegativeConnAttempt() {
+// return the time of the last connection with this peer
+func (pm Peer) FirstAttempt() (t time.Time, err error) {
+	if len(pm.NegativeConnAttempts) == 0 {
+		err = errors.New("no negative connections for the peer")
+		return
+	}
+	t = pm.NegativeConnAttempts[0]
+	err = nil
+	return
+}
+
+func (pm *Peer) AddNegConnAtt() {
 	t := time.Now()
+	if len(pm.NegativeConnAttempts) > 0 {
+		// check if the last Negative connection attempt is in the range to consider the peer deprecated
+		tfirst := pm.NegativeConnAttempts[len(pm.NegativeConnAttempts)-1]
+		diff := t.Unix() - tfirst.Unix()
+		if time.Duration(diff)*time.Second >= DeprecationTime {
+			pm.Deprecated = true
+		}
+	}
+	pm.WaitingDays = 0
 	pm.NegativeConnAttempts = append(pm.NegativeConnAttempts, t)
-	// check if the last Negative connection attempt is in the range to consider the peer deprecated
-	tfirst := pm.NegativeConnAttempts[len(pm.NegativeConnAttempts)-1]
-	diff := t.Sub(tfirst)
-	if diff >= DeprecationTime {
-		pm.Deprecated = true
+}
+
+func (pm *Peer) AddNegConnAttWithPenalty() {
+	t := time.Now()
+	if len(pm.NegativeConnAttempts) > 0 {
+		// check if the last Negative connection attempt is in the range to consider the peer deprecated
+		tfirst := pm.NegativeConnAttempts[len(pm.NegativeConnAttempts)-1]
+		diff := t.Unix() - tfirst.Unix()
+		if time.Duration(diff)*time.Second >= DeprecationTime {
+			pm.Deprecated = true
+		}
 	}
 	// Update waiting days to the pruning process
 	if pm.WaitingDays == 0 {
@@ -120,10 +145,10 @@ func (pm *Peer) AddNegativeConnAttempt() {
 	} else {
 		pm.WaitingDays = pm.WaitingDays * 2
 	}
+	pm.NegativeConnAttempts = append(pm.NegativeConnAttempts, t)
 }
 
 func (pm *Peer) AddPositiveConnAttempt() {
-	// Update peer deprecation related variables
 	pm.NegativeConnAttempts = make([]time.Time, 0)
 	pm.Deprecated = false
 	pm.WaitingDays = 0

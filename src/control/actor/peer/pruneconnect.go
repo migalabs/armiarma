@@ -3,6 +3,8 @@ package peer
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/host"
@@ -10,6 +12,7 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/protolambda/rumor/control/actor/base"
 	"github.com/protolambda/rumor/metrics"
+	"github.com/protolambda/rumor/metrics/utils"
 	"github.com/protolambda/rumor/p2p/addrutil"
 	"github.com/protolambda/rumor/p2p/track"
 	"github.com/protolambda/zrnt/eth2/beacon"
@@ -44,10 +47,14 @@ func (c *PeerPruneConncetCmd) Run(ctx context.Context, args ...string) error {
 	if err != nil {
 		return err
 	}
+	// TEMPORARY FIX TO SEE HOW MANY PEERS MIGRATE OF PEER ID
+	f, err := os.OpenFile("peerid_migrations.txt", os.O_RDWR|os.O_CREATE, 0755)
+
+	// END TEMPORARY FIX
 	bgCtx, bgCancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 	go func() {
-		c.run(bgCtx, h, c.Store)
+		c.run(bgCtx, h, c.Store, f)
 		close(done)
 	}()
 
@@ -55,6 +62,10 @@ func (c *PeerPruneConncetCmd) Run(ctx context.Context, args ...string) error {
 		bgCancel()
 		c.Log.Infof("Stopped auto-connecting")
 		fmt.Println("Stop Autoconnected")
+		fmt.Println("Closing migraption of peerID file")
+		if err := f.Close(); err != nil {
+			panic(err)
+		}
 		<-done
 		return nil
 	})
@@ -65,7 +76,7 @@ func (c *PeerPruneConncetCmd) Run(ctx context.Context, args ...string) error {
 // every 3-4 minutes generate a local new copy of the peers in the peerstore.
 // It randomly selects one of the attempting to connect with it, recording the
 // results of the attempts. If the peer was already connected, just dropt it
-func (c *PeerPruneConncetCmd) run(ctx context.Context, h host.Host, store track.ExtendedPeerstore) {
+func (c *PeerPruneConncetCmd) run(ctx context.Context, h host.Host, store track.ExtendedPeerstore, f *os.File) {
 	c.Log.Info("started randomly peering")
 	quit := make(chan struct{})
 	// Set the defer function to cancel the go routine
@@ -151,14 +162,14 @@ func (c *PeerPruneConncetCmd) run(ctx context.Context, h host.Host, store track.
 				attempts := 0
 				for attempts < c.MaxRetries {
 					if err := h.Connect(ctx, addrInfo); err != nil {
+						c.Log.WithError(err).Warnf("attempts %d failed connection attempt", attempts)
 						// the connetion failed
 						attempts += 1
-						c.PeerStore.AddConnectionAttempt(p.String(), false, err.Error())
-						c.Log.WithError(err).Warnf("attempts %d failed connection attempt", attempts)
+						c.RecErrorHandler(p, err.Error(), f)
 						continue
 					} else { // connection successfuly made
 						c.Log.Infof("peer_id %s successful connection made", p)
-						c.PeerStore.AddConnectionAttempt(p.String(), true, "None")
+						c.GossipMetrics.AddNewPosConnectionAttempt(p)
 						// break the loop
 						break
 					}
@@ -173,13 +184,8 @@ func (c *PeerPruneConncetCmd) run(ctx context.Context, h host.Host, store track.
 			// Measure all the PeerStore iteration times
 			c.PeerStore.NewPeerstoreIteration(tIter)
 			// Measure the time of the entire PeerStore loop
-<<<<<<< HEAD
 			log.Infof("Time to ping the entire peerstore (except deprecated): %s", tIter)
 			log.Infof("Peer attempted from the last reset: %d", len(peerList))
-=======
-			fmt.Println("Time to ping the entire peerstore (except deprecated)", tIter)
-			fmt.Println("Peer attempted", peercount, "from", len(peerList), "peers from the peerstore")
->>>>>>> Fix time comparison on NewNegativeAttempt and exporting loop timings
 
 			// Check if we have received any quit signal
 			if quit == nil {
@@ -190,11 +196,70 @@ func (c *PeerPruneConncetCmd) run(ctx context.Context, h host.Host, store track.
 		log.Infof("Go routine to randomly connect has been canceled")
 	}()
 }
-<<<<<<< HEAD
 
 // Worker Implementations
 func peeringWorker(ctx context.Context, ps *metrics.PeerStore, peerChan chan string) {
 
 }
-=======
->>>>>>> Fix time comparison on NewNegativeAttempt and exporting loop timings
+
+// function that selects actuation method for each of the possible errors while actively dialing peers
+//
+func (c *PeerPruneConncetCmd) RecErrorHandler(pe peer.ID, rec_err string, f *os.File) {
+	var fn func(p *metrics.Peer)
+	switch metrics.FilterError(rec_err) {
+	case "Connection reset by peer":
+		fn = func(p *metrics.Peer) {
+			p.AddNegConnAtt()
+		}
+	case "i/o timeout":
+		fn = func(p *metrics.Peer) {
+			p.AddNegConnAttWithPenalty()
+		}
+	case "dial to self attempted":
+		// we tried to peer ourselfs! deprecate the peer
+		fn = func(p *metrics.Peer) {
+			p.Deprecated = true
+		}
+	case "dial backoff":
+		fn = func(p *metrics.Peer) {
+			p.AddNegConnAttWithPenalty()
+		}
+	case "connection refused":
+		fn = func(p *metrics.Peer) {
+			p.AddNegConnAtt()
+		}
+	case "no route to host":
+		fn = func(p *metrics.Peer) {
+			p.Deprecated = true
+		}
+	case "unreachable network":
+		fn = func(p *metrics.Peer) {
+			p.Deprecated = true
+		}
+	case "peer id mismatch, peer dissmissed":
+		// deprecate old peer and generate a new one
+		// trim new peerID from error message
+		np := strings.Split(rec_err, "key matches ")[1]
+		np = strings.Replace(np, ")", "", -1)
+		newPeerID := peer.ID(np)
+		f.WriteString(fmt.Sprintf("%s shifted to %s\n", pe.String(), newPeerID))
+		// Generate a new Peer with the addrs of the previous one and the ID suggested at the
+		log.Infof("deprecating peer %s, but adding possible new peer %s", pe.String(), np)
+		// Generate new Addrs for the possible new discovered peer
+		addrs := c.Store.Addrs(pe)
+		enr := c.Store.LatestENR(pe)
+		newP := utils.NewPeerMetrics(newPeerID)
+		c.GossipMetrics.GossipMetrics.Store(newPeerID, newP)
+		_, _ = c.Store.UpdateENRMaybe(newPeerID, enr)
+		c.Store.AddAddrs(newPeerID, addrs, time.Duration(48)*time.Hour)
+		fn = func(p *metrics.Peer) {
+			p.AddNegConnAtt()
+			p.Deprecated = true
+		}
+	default:
+		fn = func(p *metrics.Peer) {
+			p.AddNegConnAttWithPenalty()
+		}
+	}
+	c.PeerStore.AddNewNegConnectionAttempt(pe, rec_err, fn)
+}
