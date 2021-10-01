@@ -50,23 +50,21 @@ func (c *PrometheusRunner) Run(ctx context.Context) error {
 			nOfConnectedPeers := 0
 			geoDist := make(map[string]float64)
 
-			c.PeerStore.PeerStore.Range(func(k, val interface{}) bool {
-				peerData := val.(metrics.Peer)
-
-				if peerData.ClientName != "" {
-					clients.AddClientVersion(peerData.ClientName, peerData.ClientVersion)
+			c.PeerStore.PeerStore.Range(func(key string, value metrics.Peer) bool {
+				if value.ClientName != "" {
+					clients.AddClientVersion(value.ClientName, value.ClientVersion)
 				}
 
-				if peerData.IsConnected {
+				if value.IsConnected {
 					nOfConnectedPeers++
 				}
 
 				// TODO: Expose also the city
-				_, ok := geoDist[peerData.Country]
+				_, ok := geoDist[value.Country]
 				if ok {
-					geoDist[peerData.Country]++
+					geoDist[value.Country]++
 				} else {
-					geoDist[peerData.Country] = 1
+					geoDist[value.Country] = 1
 				}
 
 				nOfDiscoveredPeers++

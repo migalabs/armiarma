@@ -67,7 +67,7 @@ type Actor struct {
 	Dv5State dv5.Dv5State
 
 	GossipState     gossipimport.GossipState
-	PeerStore   metrics.PeerStore
+	PeerStore       metrics.PeerStore
 	VisualizerState visualizer.VisualizerState
 
 	RPCState rpc.RPCState
@@ -97,7 +97,7 @@ func NewActor(id ActorID, globals *GlobalActorData) *Actor {
 		ActorCtx:         ctxAll,
 		actorCancel:      cancelAll,
 		CurrentPeerstore: track.NewDynamicPeerstore(),
-		PeerStore:    metrics.NewPeerStore(),
+		PeerStore:        metrics.NewPeerStore("bolt", ""), // default config
 		VisualizerState:  chainV,
 	}
 	return act
@@ -189,7 +189,7 @@ func (c *ActorCmd) Cmd(route string) (cmd interface{}, err error) {
 			GlobalPeerstores:  c.GlobalPeerstores,
 			CurrentPeerstore:  c.CurrentPeerstore,
 			PeerMetadataState: &c.PeerMetadataState,
-			PeerStore:     &c.PeerStore,
+			PeerStore:         &c.PeerStore,
 		}
 	case "enr":
 		cmd = &enr.EnrCmd{Base: b, Lazy: &c.LazyEnrState, PrivSettings: c, WithHostPriv: &c.HostState}
@@ -203,7 +203,7 @@ func (c *ActorCmd) Cmd(route string) (cmd interface{}, err error) {
 			PeerStatusState:   &c.PeerStatusState,
 			PeerMetadataState: &c.PeerMetadataState,
 			Store:             store,
-			PeerStore:     &c.PeerStore,
+			PeerStore:         &c.PeerStore,
 		}
 	case "peerstore":
 		cmd = &peerstore.PeerstoreCmd{
@@ -234,7 +234,7 @@ func (c *ActorCmd) Cmd(route string) (cmd interface{}, err error) {
 			StateDBState:    &c.StatesState,
 			Chains:          c.GlobalChains,
 			ChainState:      &c.ChainState,
-			PeerStore:   &c.PeerStore,
+			PeerStore:       &c.PeerStore,
 			PeerStatusState: &c.PeerStatusState,
 			VisualizerState: &c.VisualizerState}
 	case "chain-visualizer":

@@ -8,6 +8,7 @@ require (
 	github.com/adejoux/grafanaclient v0.2.0
 	github.com/anmitsu/go-shlex v0.0.0-20200514113438-38f4b401e2be // indirect
 	github.com/aristanetworks/goarista v0.0.0-20200805130819-fd197cf57d96 // indirect
+	github.com/boltdb/bolt v1.3.1
 	github.com/btcsuite/btcd v0.21.0-beta
 	github.com/christophberger/grada v0.0.0-20171107123403-5b073dc6bb99
 	github.com/chzyer/logex v1.1.10 // indirect
