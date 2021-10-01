@@ -89,46 +89,48 @@ func parseTime(strTime string, t *testing.T) time.Time {
 	return parsedTime
 }
 
-// Testing the HInfo fetch into the peer struct
-// Waiting for update for the peer method FetchPeerInfoFromPeer
 func Test_FetchPeerInfoFromPeer(t *testing.T) {
 	// generate base peer
 	peerBase := NewPeer("Peer1")
 
+	peer2 := NewPeer("Peer1")
+	peer2.NodeId = "Node1"
+	peer2.UserAgent = "Prysm/v0.0.0"
+	peer2.ClientName = "Prysm"
+	peer2.ClientVersion = "v0.0.0"
+	peer2.ClientOS = "Linux"
+	peer2.Pubkey = "PubKey"
+	peer2.Addrs = "/ip4/95.169.232.98/tcp/9000"
+	peer2.Ip = "95.169.232.98"
+	peer2.City = "City1"
+	peer2.Country = "Country1"
+	peer2.Latency = float64(2) / 1000
+	peer2.MetadataRequest = true
+	peer2.MetadataSucceed = true
+	// Connected for 5 secs
+	peer2.ConnectionEvent("inbound", parseTime("2021-08-23T01:00:00.000Z", t))
+	peer2.DisconnectionEvent(parseTime("2021-08-23T01:00:05.000Z", t))
+	peerBase.FetchPeerInfoFromPeer(peer2)
+
+	// Peer Host/Node Info
+	require.Equal(t, peerBase.PeerId, "Peer1")
+	require.Equal(t, peerBase.NodeId, "Node1")
+	require.Equal(t, peerBase.UserAgent, "Prysm/v0.0.0")
+	require.Equal(t, peerBase.Addrs, "/ip4/95.169.232.98/tcp/9000")
+	require.Equal(t, peerBase.Ip, "95.169.232.98")
+	require.Equal(t, peerBase.Country, "Country1")
+	require.Equal(t, peerBase.City, "City1")
+	require.Equal(t, peerBase.Pubkey, "PubKey")
+	require.Equal(t, float64(2)/1000, peerBase.Latency)
+	require.Equal(t, peerBase.MetadataRequest, true)
+	require.Equal(t, peerBase.MetadataSucceed, true)
+	require.Equal(t, len(peerBase.ConnectionTimes), 1)
+	require.Equal(t, len(peerBase.DisconnectionTimes), 1)
+	conTime1 := peer2.GetConnectedTime()
+	// total connection time 1 minute
+	require.Equal(t, conTime1, float64(5)/60)
+
 	/*
-			// generate the fetching info
-			bhost := BasicHostInfo{
-				TimeStamp: time.Now(),
-				// Peer Host/Node Info
-				PeerID:          "Peer1",
-				NodeID:          "Node1",
-				UserAgent:       "TestPeer",
-				ProtocolVersion: "Protocol",
-				Addrs:           "/ip4/95.169.232.98/tcp/9000",
-				PubKey:          "PubKey",
-				RTT:             2 * time.Millisecond,
-				Protocols:       make([]string, 0),
-				// Information regarding the metadata exchange
-				Direction: "inbound",
-				// Metadata requested
-				MetadataRequest: true,
-				MetadataSucceed: false,
-			}
-
-
-		// Peer Host/Node Info
-		require.Equal(t, peerBase.PeerId, "Peer1")
-		require.Equal(t, peerBase.NodeId, "Node1")
-		require.Equal(t, peerBase.UserAgent, "TestPeer")
-		require.Equal(t, peerBase.Addrs, "/ip4/95.169.232.98/tcp/9000")
-		require.Equal(t, peerBase.Ip, "95.169.232.98")
-		require.Equal(t, peerBase.Country, "Spain")
-		require.Equal(t, peerBase.City, "Barcelona")
-		require.Equal(t, peerBase.Pubkey, "PubKey")
-		require.Equal(t, float64(2)/1000, peerBase.Latency)
-		require.Equal(t, peerBase.MetadataRequest, true)
-		require.Equal(t, peerBase.MetadataSucceed, false)
-
 		// Generate second host Info to fetch the info
 		// generate the fetching info
 		bhost2 := BasicHostInfo{

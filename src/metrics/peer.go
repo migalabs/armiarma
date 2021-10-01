@@ -108,14 +108,14 @@ func (pm *Peer) FetchPeerInfoFromPeer(newPeer Peer) {
 	// Check User Agent and derivated client type/version/OS
 	pm.UserAgent = getNonEmpty(pm.UserAgent, newPeer.UserAgent)
 	pm.ClientOS = getNonEmpty(pm.ClientOS, newPeer.ClientOS)
-	if pm.ClientName == "" || pm.ClientName == "Unknown" {
+	if newPeer.ClientName != "" || pm.ClientName == "" || pm.ClientName == "Unknown" {
 		pm.ClientName = newPeer.ClientName
 		pm.ClientVersion = newPeer.ClientVersion
 	}
 	pm.Pubkey = getNonEmpty(pm.Pubkey, newPeer.Pubkey)
 	pm.Addrs = getNonEmpty(pm.Addrs, newPeer.Addrs)
 	pm.Ip = getNonEmpty(pm.Ip, newPeer.Ip)
-	if (pm.City == "" || pm.City == "Unknown") && newPeer.City != "" {
+	if pm.City == "" || pm.City == "Unknown" || newPeer.City != "" {
 		pm.City = newPeer.City
 		pm.Country = newPeer.Country
 	}
