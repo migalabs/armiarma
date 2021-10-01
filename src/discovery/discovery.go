@@ -10,9 +10,9 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net"
+	"os"
 
 	"github.com/migalabs/armiarma/src/base"
 	"github.com/migalabs/armiarma/src/enode"
@@ -24,8 +24,10 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discover"
 )
 
+const PKG_NAME string = "DV5"
+
 type Discovery struct {
-	b            base.Base
+	b            *base.Base
 	Node         *enode.LocalNode
 	ListenPort   int
 	BootNodeList []*eth_enode.Node
@@ -38,16 +40,14 @@ func NewEmptyDiscovery() *Discovery {
 }
 
 // constructor
-func NewDiscovery(ctx context.Context, input_node *enode.LocalNode, info_obj *info.InfoData, input_port int, opts base.LogOpts) *Discovery {
+func NewDiscovery(ctx context.Context, input_node *enode.LocalNode, info_obj *info.InfoData, input_port int, stdOpts base.LogOpts) *Discovery {
+
+	localLogger := dv5LoggerOpts(stdOpts, info_obj)
+
 	// instance base
 	new_base, err := base.NewBase(
 		base.WithContext(ctx),
-		base.WithLogger(base.LogOpts{
-			ModName:   opts.ModName,
-			Output:    opts.Output,
-			Formatter: opts.Formatter,
-			Level:     opts.Level,
-		}),
+		base.WithLogger(localLogger),
 	)
 
 	if err != nil {
@@ -56,7 +56,7 @@ func NewDiscovery(ctx context.Context, input_node *enode.LocalNode, info_obj *in
 
 	// return the Discovery object
 	return &Discovery{
-		b:          *new_base,
+		b:          new_base,
 		Node:       input_node,
 		info_data:  info_obj,
 		ListenPort: input_port,
@@ -64,7 +64,7 @@ func NewDiscovery(ctx context.Context, input_node *enode.LocalNode, info_obj *in
 }
 
 // start dv5 service and listening in given port
-func (d *Discovery) Start_dv5(import_json_file string) {
+func (d *Discovery) Start_dv5() {
 
 	// udp address to listen
 	udpAddr := &net.UDPAddr{
@@ -86,7 +86,7 @@ func (d *Discovery) Start_dv5(import_json_file string) {
 		return nil
 	}))
 
-	d.ImportBootNodeList(import_json_file)
+	d.ImportBootNodeList(d.GetInfoObj().GetBootNodeFile())
 
 	// configuration of the discovery5
 	cfg := discover.Config{
@@ -98,7 +98,7 @@ func (d *Discovery) Start_dv5(import_json_file string) {
 		ValidSchemes: eth_enode.ValidSchemes,
 	}
 
-	d.b.Log.Debug("dv5 starting to listen: ")
+	d.b.Log.Infof("dv5 starting to listen: ")
 
 	// start the discovery5 service and listen using the given connection
 	d.Dv5Listener, err = discover.ListenV5(conn, &d.Node.LocalNode, cfg)
@@ -119,16 +119,19 @@ func (d *Discovery) ImportBootNodeList(import_json_file string) {
 
 	bootNodeListString := BootNodeListString{}
 
-	file, err := ioutil.ReadFile(import_json_file)
+	if _, err := os.Stat(import_json_file); os.IsNotExist(err) {
+		d.b.Log.Errorf("Bootnodes file does not exist")
+	} else {
 
-	if err != nil {
-		d.b.Log.Panicf(err.Error())
-	}
-
-	err = json.Unmarshal([]byte(file), &bootNodeListString)
-
-	if err != nil {
-		fmt.Println(err)
+		file, err := ioutil.ReadFile(import_json_file)
+		if err == nil {
+			err := json.Unmarshal([]byte(file), &bootNodeListString)
+			if err != nil {
+				d.b.Log.Errorf("Could not Unmarshal BootNodes file: %s", err)
+			}
+		} else {
+			d.b.Log.Errorf("Could not read BootNodes file: %s", err)
+		}
 	}
 
 	for _, element := range bootNodeListString.BootNodes {
@@ -141,6 +144,13 @@ func (d *Discovery) ImportBootNodeList(import_json_file string) {
 	d.SetBootNodeList(bootNodeList)
 	d.b.Log.Debugf("Added %d bootNode/s", len(d.GetBootNodeList()))
 
+}
+
+func dv5LoggerOpts(input_opts base.LogOpts, info_data *info.InfoData) base.LogOpts {
+	input_opts.ModName = PKG_NAME
+	input_opts.Level = info_data.GetLogLevel()
+
+	return input_opts
 }
 
 // getters and setters
