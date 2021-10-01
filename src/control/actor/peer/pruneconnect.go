@@ -216,8 +216,13 @@ func (c *PeerPruneConncetCmd) RecErrorHandler(pe peer.ID, rec_err string, f *os.
 			p.Deprecated = true
 		}
 	case "dial backoff":
+<<<<<<< HEAD
 		fn = func(p *metrics.Peer) {
 			p.AddNegConnAttWithPenalty()
+=======
+		fn = func(p *utils.PeerMetrics) {
+			p.AddNegConnAtt()
+>>>>>>> remove extra log traces
 		}
 	case "connection refused":
 		fn = func(p *metrics.Peer) {
@@ -242,18 +247,29 @@ func (c *PeerPruneConncetCmd) RecErrorHandler(pe peer.ID, rec_err string, f *os.
 		f.WriteString(fmt.Sprintf("%s shifted to %s\n", pe.String(), newPeerID))
 		// Generate a new Peer with the addrs of the previous one and the ID suggested at the
 		log.Infof("deprecating peer %s, but adding possible new peer %s", pe.String(), np)
-		// Generate new Addrs for the possible new discovered peer
-		addrs := c.Store.Addrs(pe)
-		enr := c.Store.LatestENR(pe)
-		fmt.Println("len old", len(pe.String()), "len new", len(newPeerID.String()))
-		fmt.Println(rec_err)
-		// Info about the peer should be added to the metrics
-		// *** Carefull - problems with reading the pubkey ***
-		//newP := utils.NewPeerMetrics(newPeerID)
-		//c.GossipMetrics.GossipMetrics.Store(newPeerID, newP)
-		_, _ = c.Store.UpdateENRMaybe(newPeerID, enr)
-		c.Store.AddAddrs(newPeerID, addrs, time.Duration(48)*time.Hour)
-		fn = func(p *metrics.Peer) {
+		/*
+			_, err := newPeerID.ExtractPublicKey()
+			if err != nil {
+				fmt.Println("error obtainign pubkey from peerid", err)
+			} else {
+				fmt.Println("pubkey success, obtained")
+			}
+			TODO: -Fix empty pubkey originated from adding the new PeerID to the Peerstore
+					-Apparently the len of the new peer doesn't have the same one as the previous one
+			// Generate new Addrs for the possible new discovered peer
+			addrs := c.Store.Addrs(pe)
+			enr := c.Store.LatestENR(pe)
+			fmt.Println("len old", len(pe.String()), "len new", len(newPeerID.String()))
+			fmt.Println(rec_err)
+
+			// Info about the peer should be added to the metrics
+			// *** Carefull - problems with reading the pubkey ***
+			//newP := metrics.NewPeer(newPeerID.String())
+			//c.PeerStore.Store(newPeerID.String(), newP)
+			_, _ = c.Store.UpdateENRMaybe(newPeerID, enr)
+			c.Store.AddAddrs(newPeerID, addrs, time.Duration(48)*time.Hour)
+		*/
+		fn = func(p *utils.PeerMetrics) {
 			p.AddNegConnAtt()
 			p.Deprecated = true
 		}
