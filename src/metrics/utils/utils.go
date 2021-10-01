@@ -72,7 +72,7 @@ func FilterError(err string) string {
 	} else if strings.Contains(err, "network is unreachable") {
 		errorPretty = "unreachable network"
 	} else if strings.Contains(err, "peer id mismatch") {
-		errorPretty = "peer id mismatch, peer dissmissed"
+		errorPretty = "peer id mismatch"
 	} else {
 		log.Errorf("uncertain error: ", err)
 	}
