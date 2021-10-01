@@ -12,7 +12,6 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/protolambda/rumor/control/actor/base"
 	"github.com/protolambda/rumor/metrics"
-	"github.com/protolambda/rumor/metrics/utils"
 	"github.com/protolambda/rumor/p2p/addrutil"
 	"github.com/protolambda/rumor/p2p/track"
 	"github.com/protolambda/zrnt/eth2/beacon"
@@ -61,8 +60,6 @@ func (c *PeerPruneConncetCmd) Run(ctx context.Context, args ...string) error {
 	c.Control.RegisterStop(func(ctx context.Context) error {
 		bgCancel()
 		c.Log.Infof("Stopped auto-connecting")
-		fmt.Println("Stop Autoconnected")
-		fmt.Println("Closing migraption of peerID file")
 		if err := f.Close(); err != nil {
 			panic(err)
 		}
@@ -169,6 +166,7 @@ func (c *PeerPruneConncetCmd) run(ctx context.Context, h host.Host, store track.
 						continue
 					} else { // connection successfuly made
 						c.Log.Infof("peer_id %s successful connection made", p)
+						fmt.Println("successfull connection")
 						c.GossipMetrics.AddNewPosConnectionAttempt(p)
 						// break the loop
 						break
@@ -218,6 +216,7 @@ func (c *PeerPruneConncetCmd) RecErrorHandler(pe peer.ID, rec_err string, f *os.
 	case "dial to self attempted":
 		// we tried to peer ourselfs! deprecate the peer
 		fn = func(p *metrics.Peer) {
+			p.AddNegConnAtt()
 			p.Deprecated = true
 		}
 	case "dial backoff":
@@ -230,10 +229,12 @@ func (c *PeerPruneConncetCmd) RecErrorHandler(pe peer.ID, rec_err string, f *os.
 		}
 	case "no route to host":
 		fn = func(p *metrics.Peer) {
+			p.AddNegConnAtt()
 			p.Deprecated = true
 		}
 	case "unreachable network":
 		fn = func(p *metrics.Peer) {
+			p.AddNegConnAtt()
 			p.Deprecated = true
 		}
 	case "peer id mismatch, peer dissmissed":
@@ -248,8 +249,10 @@ func (c *PeerPruneConncetCmd) RecErrorHandler(pe peer.ID, rec_err string, f *os.
 		// Generate new Addrs for the possible new discovered peer
 		addrs := c.Store.Addrs(pe)
 		enr := c.Store.LatestENR(pe)
-		newP := utils.NewPeerMetrics(newPeerID)
-		c.GossipMetrics.GossipMetrics.Store(newPeerID, newP)
+		// Info about the peer should be added to the metrics
+		// *** Carefull - problems with reading the pubkey ***
+		//newP := utils.NewPeerMetrics(newPeerID)
+		//c.GossipMetrics.GossipMetrics.Store(newPeerID, newP)
 		_, _ = c.Store.UpdateENRMaybe(newPeerID, enr)
 		c.Store.AddAddrs(newPeerID, addrs, time.Duration(48)*time.Hour)
 		fn = func(p *metrics.Peer) {

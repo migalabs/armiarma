@@ -176,69 +176,73 @@ func (ep *dsExtendedPeerstore) Close() error {
 
 func (ep *dsExtendedPeerstore) GetAllData(id peer.ID) *track.PeerAllData {
 	pub := ep.PubKey(id)
-	secpKey, ok := (pub).(*ic.Secp256k1PublicKey)
-	if !ok {
-		auxRsaKey := (pub).(*ic.RsaPublicKey)
-		k, _ := auxRsaKey.Bytes()
-		auxSecpKey, err := ic.UnmarshalSecp256k1PublicKey(k)
+	if pub != nil {
+		secpKey, ok := (pub).(*ic.Secp256k1PublicKey)
+		if !ok {
+			auxRsaKey := (pub).(*ic.RsaPublicKey)
+			k, _ := auxRsaKey.Bytes()
+			auxSecpKey, err := ic.UnmarshalSecp256k1PublicKey(k)
+			if err != nil {
+				fmt.Println("error converting RAS pub key into Secp256 pubkey. Error: ", err)
+			}
+			secpKey = auxSecpKey.(*ic.Secp256k1PublicKey)
+			fmt.Printf("Peer with ID: %s  had a rsaKey \n", id.String())
+
+		}
+		keyBytes, err := secpKey.Raw()
+		pubStr := ""
+		if err == nil {
+			pubStr = hex.EncodeToString(keyBytes[:])
+		}
+
+		nodeID := enode.PubkeyToIDV4((*ecdsa.PublicKey)(secpKey))
+		protocols, err := ep.GetProtocols(id)
 		if err != nil {
-			fmt.Println("error converting RAS pub key into Secp256 pubkey. Error: ", err)
+			fmt.Printf("couldn't get protocols: %v\n", err)
 		}
-		secpKey = auxSecpKey.(*ic.Secp256k1PublicKey)
-		fmt.Printf("Peer with ID: %s  had a rsaKey \n", id.String())
-
-	}
-	keyBytes, err := secpKey.Raw()
-	pubStr := ""
-	if err == nil {
-		pubStr = hex.EncodeToString(keyBytes[:])
-	}
-
-	nodeID := enode.PubkeyToIDV4((*ecdsa.PublicKey)(secpKey))
-	protocols, err := ep.GetProtocols(id)
-	if err != nil {
-		fmt.Printf("couldn't get protocols: %v\n", err)
-	}
-	userAgent, _ := ep.UserAgent(id)
-	protVersion, _ := ep.ProtocolVersion(id)
-	seq, _ := ep.ClaimedSeq(id)
-	var multiAddrs []string
-	for _, addr := range ep.Addrs(id) {
-		multiAddrs = append(multiAddrs, addr.String())
-	}
-	var enrAttnets *beacon.AttnetBits
-
-	var forkDigest *beacon.ForkDigest
-	var nextForkVersion *beacon.Version
-	var nextForkEpoch *beacon.Epoch
-
-	en := ep.LatestENR(id)
-	if en != nil {
-		if dat, exists, err := addrutil.ParseEnrEth2Data(en); err == nil && exists {
-			forkDigest = &dat.ForkDigest
-			nextForkVersion = &dat.NextForkVersion
-			nextForkEpoch = &dat.NextForkEpoch
+		userAgent, _ := ep.UserAgent(id)
+		protVersion, _ := ep.ProtocolVersion(id)
+		seq, _ := ep.ClaimedSeq(id)
+		var multiAddrs []string
+		for _, addr := range ep.Addrs(id) {
+			multiAddrs = append(multiAddrs, addr.String())
 		}
-		if dat, exists, err := addrutil.ParseEnrAttnets(en); err == nil && exists {
-			enrAttnets = dat
+		var enrAttnets *beacon.AttnetBits
+
+		var forkDigest *beacon.ForkDigest
+		var nextForkVersion *beacon.Version
+		var nextForkEpoch *beacon.Epoch
+
+		en := ep.LatestENR(id)
+		if en != nil {
+			if dat, exists, err := addrutil.ParseEnrEth2Data(en); err == nil && exists {
+				forkDigest = &dat.ForkDigest
+				nextForkVersion = &dat.NextForkVersion
+				nextForkEpoch = &dat.NextForkEpoch
+			}
+			if dat, exists, err := addrutil.ParseEnrAttnets(en); err == nil && exists {
+				enrAttnets = dat
+			}
 		}
-	}
-	return &track.PeerAllData{
-		PeerID:          id,
-		NodeID:          nodeID,
-		Pubkey:          pubStr,
-		Addrs:           multiAddrs,
-		Protocols:       protocols,
-		Latency:         ep.LatencyEWMA(id),
-		UserAgent:       userAgent,
-		ProtocolVersion: protVersion,
-		ForkDigest:      forkDigest,
-		NextForkVersion: nextForkVersion,
-		NextForkEpoch:   nextForkEpoch,
-		Attnets:         enrAttnets,
-		MetaData:        ep.Metadata(id),
-		ClaimedSeq:      seq,
-		Status:          ep.Status(id),
-		ENR:             en,
+		return &track.PeerAllData{
+			PeerID:          id,
+			NodeID:          nodeID,
+			Pubkey:          pubStr,
+			Addrs:           multiAddrs,
+			Protocols:       protocols,
+			Latency:         ep.LatencyEWMA(id),
+			UserAgent:       userAgent,
+			ProtocolVersion: protVersion,
+			ForkDigest:      forkDigest,
+			NextForkVersion: nextForkVersion,
+			NextForkEpoch:   nextForkEpoch,
+			Attnets:         enrAttnets,
+			MetaData:        ep.Metadata(id),
+			ClaimedSeq:      seq,
+			Status:          ep.Status(id),
+			ENR:             en,
+		}
+	} else {
+		return &track.PeerAllData{}
 	}
 }
