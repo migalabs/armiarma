@@ -170,12 +170,12 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host, store track
 						fn := func(p *metrics.Peer) {
 							p.AddNegConnAtt()
 						}
-						c.PeerStore.AddNewNegConnectionAttempt(p, err.Error(), fn)
+						c.PeerStore.AddNewNegConnectionAttempt(p.String(), err.Error(), fn)
 						c.Log.WithError(err).Warnf("attempts %d failed connection attempt", attempts)
 						continue
 					} else { // connection successfuly made
 						c.Log.Infof("peer_id %s successful connection made", p)
-						c.PeerStore.AddNewPosConnectionAttempt(p)
+						c.PeerStore.AddNewPosConnectionAttempt(p.String())
 						// break the loop
 						break
 					}
