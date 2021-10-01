@@ -1,7 +1,6 @@
 package metrics
 
 import (
-	"fmt"
 	"os"
 	"sync"
 	"time"
@@ -65,10 +64,8 @@ func (c *PeerStore) StoreOrUpdatePeer(peer Peer) {
 	oldPeer, err := c.GetPeerData(peer.PeerId)
 	// if error means not found, just store it
 	if err != nil {
-		fmt.Println("error reading peer from PeerStore:", err)
 		c.PeerStore.Store(peer.PeerId, peer)
 	} else {
-		fmt.Println("fetching new peer info")
 		// Fetch the new info of a peer directly from the new peer struct
 		oldPeer.FetchPeerInfoFromPeer(peer)
 

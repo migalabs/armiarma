@@ -126,44 +126,27 @@ func Test_FetchPeerInfoFromPeer(t *testing.T) {
 	require.Equal(t, peerBase.MetadataSucceed, true)
 	require.Equal(t, len(peerBase.ConnectionTimes), 1)
 	require.Equal(t, len(peerBase.DisconnectionTimes), 1)
-	conTime1 := peer2.GetConnectedTime()
+	conTime1 := peerBase.GetConnectedTime()
 	// total connection time 1 minute
 	require.Equal(t, conTime1, float64(5)/60)
 
-	/*
-		// Generate second host Info to fetch the info
-		// generate the fetching info
-		bhost2 := BasicHostInfo{
-			TimeStamp: time.Now(),
-			// Peer Host/Node Info
-			PeerID:          "",
-			NodeID:          "",
-			UserAgent:       "UpdateUser",
-			ProtocolVersion: "",
-			Addrs:           "/ip4/212.230.135.2/tcp/9000",
-			PubKey:          "PubKey",
-			RTT:             3 * time.Millisecond,
-			Protocols:       make([]string, 0),
-			// Information regarding the metadata exchange
-			Direction: "inbound",
-			// Metadata requested
-			MetadataRequest: false,
-			MetadataSucceed: false,
-		}
+	peerMod := NewPeer("Peer1")
+	peerMod.UserAgent = "UpdateUser"
+	peerMod.MetadataRequest = true
+	peerMod.MetadataSucceed = false
+	// Connected for 5 secs
+	peerMod.ConnectionEvent("inbound", parseTime("2021-08-23T01:00:10.000Z", t))
+	peerMod.DisconnectionEvent(parseTime("2021-08-23T01:00:15.000Z", t))
+	peerBase.FetchPeerInfoFromPeer(peerMod)
 
-		peerBase.FetchHostInfo(bhost2)
-
-		// Check if fetch was successfull
-		require.Equal(t, peerBase.PeerId, "Peer1")
-		require.Equal(t, peerBase.NodeId, "Node1")
-		require.Equal(t, peerBase.UserAgent, "UpdateUser")
-		require.Equal(t, peerBase.Addrs, "/ip4/212.230.135.2/tcp/9000")
-		require.Equal(t, peerBase.Ip, "212.230.135.2")
-		require.Equal(t, peerBase.Country, "Spain")
-		require.Equal(t, peerBase.City, "Alcobendas")
-		require.Equal(t, peerBase.Pubkey, "PubKey")
-		require.Equal(t, float64(3)/1000, peerBase.Latency)
-		require.Equal(t, peerBase.MetadataRequest, true)
-		require.Equal(t, peerBase.MetadataSucceed, false)
-	*/
+	// Peer Host/Node Info
+	require.Equal(t, peerBase.PeerId, "Peer1")
+	require.Equal(t, peerBase.UserAgent, "UpdateUser")
+	require.Equal(t, peerBase.MetadataRequest, true)
+	require.Equal(t, peerBase.MetadataSucceed, true)
+	require.Equal(t, len(peerBase.ConnectionTimes), 2)
+	require.Equal(t, len(peerBase.DisconnectionTimes), 2)
+	conTime2 := peerBase.GetConnectedTime()
+	// total connection time 1 minute
+	require.Equal(t, conTime2, float64(10)/60)
 }
