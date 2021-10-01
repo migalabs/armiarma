@@ -12,6 +12,7 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/protolambda/rumor/control/actor/base"
 	"github.com/protolambda/rumor/metrics"
+	"github.com/protolambda/rumor/metrics/utils"
 	"github.com/protolambda/rumor/p2p/addrutil"
 	"github.com/protolambda/rumor/p2p/track"
 	"github.com/protolambda/zrnt/eth2/beacon"
@@ -153,7 +154,8 @@ func (c *PeerPruneConncetCmd) run(ctx context.Context, h host.Host, store track.
 				*/
 				c.PeerStore.StoreOrUpdatePeer(pinfo)
 
-				ctx, _ := context.WithTimeout(ctx, c.Timeout)
+				ctx, cancel := context.WithTimeout(ctx, c.Timeout)
+				defer cancel()
 				c.Log.Warnf("addrs %s attempting connection to peer", addrInfo.Addrs)
 				// try to connect the peer
 				attempts := 0
@@ -161,19 +163,13 @@ func (c *PeerPruneConncetCmd) run(ctx context.Context, h host.Host, store track.
 					if err := h.Connect(ctx, addrInfo); err != nil {
 						c.Log.WithError(err).Warnf("attempts %d failed connection attempt", attempts)
 						// the connetion failed
-						attempts += 1
 						c.RecErrorHandler(p, err.Error(), f)
+						attempts++
 						continue
 					} else { // connection successfuly made
 						c.Log.Infof("peer_id %s successful connection made", p)
-						fmt.Println("successfull connection")
-						c.GossipMetrics.AddNewPosConnectionAttempt(p)
+						c.PeerStore.AddNewPosConnectionAttempt(p.String())
 						// break the loop
-						break
-					}
-					if attempts >= c.MaxRetries {
-						c.Log.Warnf("attempts %d failed connection attempt, reached maximum, no retry", attempts)
-
 						break
 					}
 				}
@@ -204,7 +200,7 @@ func peeringWorker(ctx context.Context, ps *metrics.PeerStore, peerChan chan str
 //
 func (c *PeerPruneConncetCmd) RecErrorHandler(pe peer.ID, rec_err string, f *os.File) {
 	var fn func(p *metrics.Peer)
-	switch metrics.FilterError(rec_err) {
+	switch utils.FilterError(rec_err) {
 	case "Connection reset by peer":
 		fn = func(p *metrics.Peer) {
 			p.AddNegConnAtt()
@@ -249,6 +245,8 @@ func (c *PeerPruneConncetCmd) RecErrorHandler(pe peer.ID, rec_err string, f *os.
 		// Generate new Addrs for the possible new discovered peer
 		addrs := c.Store.Addrs(pe)
 		enr := c.Store.LatestENR(pe)
+		fmt.Println("len old", len(pe.String()), "len new", len(newPeerID.String()))
+		fmt.Println(rec_err)
 		// Info about the peer should be added to the metrics
 		// *** Carefull - problems with reading the pubkey ***
 		//newP := utils.NewPeerMetrics(newPeerID)
@@ -264,5 +262,5 @@ func (c *PeerPruneConncetCmd) RecErrorHandler(pe peer.ID, rec_err string, f *os.
 			p.AddNegConnAttWithPenalty()
 		}
 	}
-	c.PeerStore.AddNewNegConnectionAttempt(pe, rec_err, fn)
+	c.PeerStore.AddNewNegConnectionAttempt(pe.String(), rec_err, fn)
 }
