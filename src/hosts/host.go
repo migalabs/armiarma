@@ -7,7 +7,7 @@ import (
 	"net"
 
 	"github.com/migalabs/armiarma/src/base"
-	"github.com/migalabs/armiarma/src/utils"
+	"github.com/migalabs/armiarma/src/info"
 
 	libp2p "github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/crypto"
@@ -39,12 +39,8 @@ type BasicLibp2pHost struct {
 }
 
 type BasicLibp2pHostOpts struct {
-	IP        string
-	TCP       string
-	UDP       string
-	UserAgent string
-	PrivKey   string
-	LogOpts   base.LogOpts
+	Info_obj info.InfoData
+	LogOpts  base.LogOpts
 	// TODO: -Add IdService for the libp2p host
 }
 
@@ -65,51 +61,28 @@ func NewBasicLibp2pHost(ctx context.Context, opts BasicLibp2pHostOpts) (*BasicLi
 		log.Panicf("couldn't create base for host module. %s", err)
 	}
 	// check the parsed host options
-	ip := net.ParseIP(opts.IP)
-	if opts.IP == "" {
-		b.Log.Debugf("s% - IP: s%, setting default IP: %s", err, ip.String(), DefaultIP)
-		// If the parsed IP is wrong/empty, simply the default one "0.0.0.0"
-		ip = net.ParseIP(DefaultIP)
-	}
-	tcp := opts.TCP
-	if tcp == "" {
-		b.Log.Debugf("empty tcp given, setting tcp port to default to %s", DefaultTCP)
-		tcp = DefaultTCP
-	}
-	udp := opts.UDP
-	if udp == "" {
-		b.Log.Debugf("empty udp given, setting udp port to default to %s", DefaultUDP)
-		udp = DefaultUDP
-	}
-	useragent := opts.UserAgent
-	if useragent == "" {
-		b.Log.Debugf("empty user-agent given, setting user-agent port to default to %s", DefaultUserAgent)
-		useragent = DefaultUserAgent
-	}
+
+	ip := opts.Info_obj.GetIPToString()
+	tcp := opts.Info_obj.GetIPToString()
+
 	// generate de multiaddress
 	multiaddr := fmt.Sprintf("/ip4/%s/tcp/%s", ip, tcp)
 	muladdr, err := ma.NewMultiaddr(multiaddr)
 	if err != nil {
-		b.Log.Debugf("couldn't generate multiaddres from ip %s and tcp %s", ip, tcp)
+		b.Log.Debugf("couldn't generate multiaddress from ip %s and tcp %s", ip, tcp)
 		multiaddr = fmt.Sprintf("/ip4/%s/tcp/%s", DefaultIP, DefaultTCP)
 		muladdr, _ = ma.NewMultiaddr(multiaddr)
 	}
 	b.Log.Debugf("setting multiaddres to %s", muladdr)
-	// parse the privKey of the host
-	pkey := opts.PrivKey
-	privkey, err := utils.ParsePrivateKey(pkey)
-	if err != nil {
-		b.Log.Error(err)
-		// TODO: if empty privkey was given, generate new one and export it for later userAgent
-		//		Perhaps this key, generation parsing, should be done before
-		b.Log.Debugf("empty privkey given, generating new one: %s", pkey)
-	}
+
+	privkey := opts.Info_obj.GetPrivKey()
+
 	// Generate the main Libp2p host that will be exposed to the network
 	host, err := libp2p.New(
 		b.Ctx(),
 		libp2p.ListenAddrs(muladdr),
 		libp2p.Identity(privkey),
-		libp2p.UserAgent(useragent),
+		libp2p.UserAgent(opts.Info_obj.GetUserAgent()),
 	)
 	if err != nil {
 		return nil, err
@@ -117,9 +90,9 @@ func NewBasicLibp2pHost(ctx context.Context, opts BasicLibp2pHostOpts) (*BasicLi
 	peerId := host.ID().String()
 	fmaddr := host.Addrs()[0].String() + "/p2p/" + host.ID().String()
 	localMultiaddr, _ := ma.NewMultiaddr(fmaddr)
-	b.Log.Debugf("full multiaddres %s", localMultiaddr)
+	b.Log.Debugf("full multiaddress %s", localMultiaddr)
 	// generate the identify service
-	ids, err := identify.NewIDService(host, identify.UserAgent(useragent), identify.DisableSignedPeerRecord())
+	ids, err := identify.NewIDService(host, identify.UserAgent(opts.Info_obj.GetUserAgent()), identify.DisableSignedPeerRecord())
 	if err != nil {
 		b.Log.Error(err)
 	}
@@ -128,14 +101,14 @@ func NewBasicLibp2pHost(ctx context.Context, opts BasicLibp2pHostOpts) (*BasicLi
 		Base:          b,
 		host:          host,
 		identify:      ids,
-		ip:            ip,
-		tcp:           tcp,
-		udp:           udp,
+		ip:            opts.Info_obj.GetIP(),
+		tcp:           opts.Info_obj.GetTcpPortString(),
+		udp:           opts.Info_obj.GetUdpPortString(),
 		multiAddr:     muladdr,
 		fullMultiAddr: localMultiaddr,
 		peerID:        peer.ID(peerId),
-		userAgent:     useragent,
-		privKey:       privkey,
+		userAgent:     opts.Info_obj.GetUserAgent(),
+		privKey:       opts.Info_obj.GetPrivKey(),
 	}
 	b.Log.Debug("setting custom notification functions")
 	basicHost.SetCustomNotifications()

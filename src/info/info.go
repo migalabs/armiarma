@@ -13,6 +13,7 @@ This way we make sure the information is only stored once.
 package info
 
 import (
+	"fmt"
 	"net"
 
 	"github.com/libp2p/go-libp2p-core/crypto"
@@ -21,6 +22,8 @@ import (
 	"github.com/migalabs/armiarma/src/utils"
 	log "github.com/sirupsen/logrus"
 )
+
+const PKG_NAME string = "INFO"
 
 type InfoData struct {
 	localLogger   log.FieldLogger
@@ -37,51 +40,39 @@ type InfoData struct {
 }
 
 // Will create an InfoData object using default values from config
-func NewDefaultInfoData(opts base.LogOpts) *InfoData {
+// Receive stdOpts (meaning, without the mod name and the level)
+func NewDefaultInfoData(stdOpts base.LogOpts) *InfoData {
 
-	baseConfigOpts := base.LogOpts{
-		ModName:   "Config",
-		Output:    "terminal",
-		Formatter: "text",
-		Level:     "debug",
-	}
+	config_object := config.NewEmptyConfigData(stdOpts)
 
-	config_object := config.NewEmptyConfigData(baseConfigOpts)
+	info_object := InfoData{}
 
-	info_object := InfoData{
-		localLogger: base.CreateLogger(opts),
-	}
-
-	info_object.importFromConfig(*config_object)
+	info_object.importFromConfig(*config_object, stdOpts)
 
 	return &info_object
 }
 
 // Will create an InfoData object using imported values from config
-func NewCustomInfoData(input_file string, opts base.LogOpts) *InfoData {
+func NewCustomInfoData(input_file string, stdOpts base.LogOpts) *InfoData {
 
-	baseConfigOpts := base.LogOpts{
-		ModName:   "Config",
-		Output:    "terminal",
-		Formatter: "text",
-		Level:     "debug",
-	}
-
-	config_object := config.NewEmptyConfigData(baseConfigOpts)
+	config_object := config.NewEmptyConfigData(stdOpts)
 	config_object.ReadFromJSON(input_file)
 
-	info_object := InfoData{
-		localLogger: base.CreateLogger(opts),
-	}
-	info_object.importFromConfig(*config_object)
+	info_object := InfoData{}
+	info_object.importFromConfig(*config_object, stdOpts)
+
 	return &info_object
 }
 
 // This function will import the config values into the current InfoData
 // object
-func (i *InfoData) importFromConfig(input_config config.ConfigData) {
+func (i *InfoData) importFromConfig(input_config config.ConfigData, stdOpts base.LogOpts) {
 
-	i.localLogger.Debugf("Importing from Config into Info...")
+	i.SetLogLevel(input_config.GetLogLevel())
+	//set the local logger usign the stadOpts and the custom info opts
+	infoLogOpts := i.infoLoggerOpts(stdOpts)
+	i.localLogger = base.CreateLogger(infoLogOpts)
+	i.localLogger.Infof("Importing from Config into Info...")
 	i.SetIPFromString(input_config.GetIP())
 	i.SetTcpPort(input_config.GetTcpPort())
 	i.SetUdpPort(input_config.GetUdpPort())
@@ -90,16 +81,28 @@ func (i *InfoData) importFromConfig(input_config config.ConfigData) {
 	i.SetNetwork(input_config.GetNetwork())
 	i.SetForkDigest(input_config.GetForkDigest())
 	i.SetLogLevel(input_config.GetLogLevel())
+
 	i.SetPrivKeyFromString(input_config.GetPrivKey())
 	i.SetBootNodeFile(input_config.GetBootNodesFile())
-	i.localLogger.Debugf("Imported!")
+	i.localLogger.Infof("Imported!")
 
+}
+
+func (i *InfoData) infoLoggerOpts(input_opts base.LogOpts) base.LogOpts {
+	input_opts.ModName = PKG_NAME
+	input_opts.Level = i.GetLogLevel()
+
+	return input_opts
 }
 
 // getters and setters
 
 func (i *InfoData) GetTcpPort() int {
 	return i.tcpPort
+}
+func (i *InfoData) GetTcpPortString() string {
+
+	return fmt.Sprintf("%d", i.tcpPort)
 }
 func (i *InfoData) SetTcpPort(input_port int) {
 	if input_port > 65000 || input_port < 0 {
@@ -113,6 +116,10 @@ func (i *InfoData) SetTcpPort(input_port int) {
 func (i *InfoData) GetUdpPort() int {
 
 	return i.udpPort
+}
+func (i *InfoData) GetUdpPortString() string {
+
+	return fmt.Sprintf("%d", i.udpPort)
 }
 func (i *InfoData) SetUdpPort(input_port int) {
 	if input_port > 65000 || input_port < 0 {

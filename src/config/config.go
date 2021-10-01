@@ -37,6 +37,8 @@ const DEFAULT_LOG_LEVEL string = "debug"
 const DEFAULT_EMPTY_INT int = 0
 const DEFAULT_EMPTY_STRING string = ""
 
+const PKG_NAME string = "Config"
+
 type ConfigData struct {
 	localLogger   log.FieldLogger
 	IP            string   `json:"IP"`
@@ -53,7 +55,7 @@ type ConfigData struct {
 
 // Will create an empty object
 func NewEmptyConfigData(opts base.LogOpts) *ConfigData {
-
+	opts = defaultConfigLoggerOpts(opts)
 	return &ConfigData{
 		localLogger: base.CreateLogger(opts),
 	}
@@ -61,6 +63,8 @@ func NewEmptyConfigData(opts base.LogOpts) *ConfigData {
 
 // Will create an object using default parameters
 func NewDefaultConfigData(opts base.LogOpts) *ConfigData {
+
+	opts = defaultConfigLoggerOpts(opts)
 
 	return &ConfigData{
 		localLogger: base.CreateLogger(opts),
@@ -82,7 +86,7 @@ func NewDefaultConfigData(opts base.LogOpts) *ConfigData {
 // Receives an input file where to read configuration from and imports into
 // the current object
 func (c *ConfigData) ReadFromJSON(input_file string) {
-	c.localLogger.Debugf("Reading configuration from: ", input_file)
+	c.localLogger.Infof("Reading configuration from: ", input_file)
 
 	if _, err := os.Stat(input_file); os.IsNotExist(err) {
 		c.localLogger.Debugf("Could not read file")
@@ -99,7 +103,7 @@ func (c *ConfigData) ReadFromJSON(input_file string) {
 		}
 	}
 
-	c.checkEmptyFields() // tis function will check any field that was not read and apply the default
+	c.checkEmptyFields() // this function will check any field that was not read and apply the default
 
 }
 
@@ -149,6 +153,11 @@ func (c *ConfigData) checkEmptyFields() {
 		c.localLogger.Debugf("Could not find bootnodes file")
 	}
 
+	if c.GetLogLevel() == "" {
+		c.SetLogLevel(DEFAULT_LOG_LEVEL)
+		c.localLogger.Debugf("Setting default LogLevel: %s", DEFAULT_LOG_LEVEL)
+	}
+
 }
 
 func (c *ConfigData) generate_privKey() {
@@ -169,6 +178,13 @@ func (c *ConfigData) generate_privKey() {
 
 	c.SetPrivKey(hex.EncodeToString(keyBytes))
 	c.localLogger.Debugf("Generated Key!: ", hex.EncodeToString(keyBytes))
+}
+
+func defaultConfigLoggerOpts(input_opts base.LogOpts) base.LogOpts {
+	input_opts.ModName = PKG_NAME
+	input_opts.Level = DEFAULT_LOG_LEVEL
+
+	return input_opts
 }
 
 // getters and setters
