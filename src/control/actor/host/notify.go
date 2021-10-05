@@ -63,6 +63,7 @@ func (c *HostNotifyCmd) connectedF(net network.Network, conn network.Conn) {
 	// Request the Host Metadata
 	err := ReqHostInfo(context.Background(), h, conn, &peer)
 	if err != nil {
+		peer.MetadataSucceed = false
 		log.WithFields(logrus.Fields{
 			"ERROR": err,
 		}).Warn("Peer: ", conn.RemotePeer().String())

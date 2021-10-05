@@ -64,7 +64,7 @@ func ReqBeaconMetadata(ctx context.Context, h host.Host, peerID peer.ID) (data b
 	comp := reqresp.SnappyCompression{}
 	// Generate the Server Error Code
 	var resCode reqresp.ResponseCode // error by default
-	err = methods.MetaDataRPCv1.RunRequest(ctx, h.NewStream, peerID, comp, reqresp.RequestSSZInput{Obj: &data}, 1,
+	err = methods.MetaDataRPCv1.RunRequest(ctx, h.NewStream, peerID, comp, reqresp.RequestSSZInput{Obj: nil}, 1,
 		func() error {
 			return nil
 		},
@@ -159,7 +159,6 @@ func ReqHostInfo(ctx context.Context, h host.Host, conn network.Conn, peer *metr
 		// EDGY CASE: when peers refuse the connection, the callback gets called and the identify protocol
 		// returns an empty struct (we are unable to identify them)
 		err_ident = errors.Errorf("identification error caused by connection refuse")
-		peer.MetadataSucceed = false
 	}
 	// Extract Client type and version
 	peer.ClientName, peer.ClientVersion = utils.FilterClientType(peer.UserAgent)
