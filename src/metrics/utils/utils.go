@@ -31,7 +31,7 @@ func FilterClientType(userAgent string) (string, string) {
 		return "Nimbus", "Unknown"
 	} else if strings.Contains(userAgentLower, "js-libp2p") {
 		return "Lodestar", cleanVersion(getVersionIfAny(fields, 1))
-	} else if strings.Contains(userAgentLower, " rust-libp2p") {
+	} else if strings.Contains(userAgentLower, "rust-libp2p") {
 		return "Grandine", cleanVersion(getVersionIfAny(fields, 1))
 	} else {
 		log.Warnf("Could not get client from userAgent: %s", userAgent)
@@ -75,7 +75,7 @@ func FilterError(err string) string {
 	} else if strings.Contains(err, "peer id mismatch") {
 		errorPretty = "peer id mismatch"
 	} else {
-		log.Errorf("uncertain error: ", err)
+		log.Errorf("uncertain error: %s", err)
 	}
 
 	return errorPretty
