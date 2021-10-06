@@ -4,13 +4,11 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"net"
 
 	"github.com/migalabs/armiarma/src/base"
 	"github.com/migalabs/armiarma/src/info"
 
 	libp2p "github.com/libp2p/go-libp2p"
-	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p/p2p/protocol/identify"
@@ -26,16 +24,11 @@ type BasicLibp2pHost struct {
 	identify *identify.IDService
 
 	// Basic Host Metadata
-	ip            net.IP
-	tcp           string
-	udp           string
+	info_obj      *info.InfoData
 	multiAddr     ma.Multiaddr
 	fullMultiAddr ma.Multiaddr
 
-	userAgent string
-	peerID    peer.ID
-
-	privKey crypto.PrivKey
+	peerID peer.ID
 }
 
 type BasicLibp2pHostOpts struct {
@@ -64,6 +57,8 @@ func NewBasicLibp2pHost(ctx context.Context, opts BasicLibp2pHostOpts) (*BasicLi
 
 	ip := opts.Info_obj.GetIPToString()
 	tcp := opts.Info_obj.GetIPToString()
+	privkey := opts.Info_obj.GetPrivKey()
+	userAgent := opts.Info_obj.GetUserAgent()
 
 	// generate de multiaddress
 	multiaddr := fmt.Sprintf("/ip4/%s/tcp/%s", ip, tcp)
@@ -73,9 +68,7 @@ func NewBasicLibp2pHost(ctx context.Context, opts BasicLibp2pHostOpts) (*BasicLi
 		multiaddr = fmt.Sprintf("/ip4/%s/tcp/%s", DefaultIP, DefaultTCP)
 		muladdr, _ = ma.NewMultiaddr(multiaddr)
 	}
-	b.Log.Debugf("setting multiaddres to %s", muladdr)
-
-	privkey := opts.Info_obj.GetPrivKey()
+	b.Log.Debugf("setting multiaddress to %s", muladdr)
 
 	// Generate the main Libp2p host that will be exposed to the network
 	host, err := libp2p.New(
@@ -92,7 +85,7 @@ func NewBasicLibp2pHost(ctx context.Context, opts BasicLibp2pHostOpts) (*BasicLi
 	localMultiaddr, _ := ma.NewMultiaddr(fmaddr)
 	b.Log.Debugf("full multiaddress %s", localMultiaddr)
 	// generate the identify service
-	ids, err := identify.NewIDService(host, identify.UserAgent(opts.Info_obj.GetUserAgent()), identify.DisableSignedPeerRecord())
+	ids, err := identify.NewIDService(host, identify.UserAgent(userAgent), identify.DisableSignedPeerRecord())
 	if err != nil {
 		b.Log.Error(err)
 	}
@@ -101,14 +94,10 @@ func NewBasicLibp2pHost(ctx context.Context, opts BasicLibp2pHostOpts) (*BasicLi
 		Base:          b,
 		host:          host,
 		identify:      ids,
-		ip:            opts.Info_obj.GetIP(),
-		tcp:           opts.Info_obj.GetTcpPortString(),
-		udp:           opts.Info_obj.GetUdpPortString(),
+		info_obj:      &opts.Info_obj,
 		multiAddr:     muladdr,
 		fullMultiAddr: localMultiaddr,
 		peerID:        peer.ID(peerId),
-		userAgent:     opts.Info_obj.GetUserAgent(),
-		privKey:       opts.Info_obj.GetPrivKey(),
 	}
 	b.Log.Debug("setting custom notification functions")
 	basicHost.SetCustomNotifications()

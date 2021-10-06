@@ -33,6 +33,7 @@ func NewLocalNode(ctx context.Context, info_obj *info.InfoData, stdOpts base.Log
 		log.Panicf("Could not create local DB %s", err)
 	}
 	new_base.Log.Infof("Creating Local Node")
+
 	return &LocalNode{
 		base:      *new_base,
 		LocalNode: *enode.NewLocalNode(new_db, (*ecdsa.PrivateKey)(info_obj.GetPrivKey())),
@@ -45,6 +46,11 @@ func nodeLoggerOpts(input_opts base.LogOpts, info_data *info.InfoData) base.LogO
 	input_opts.Level = info_data.GetLogLevel()
 
 	return input_opts
+}
+
+func (l *LocalNode) AddEntries() {
+	l.LocalNode.Set(NewAttnetsENREntry("ffffffffffffffff"))
+	l.LocalNode.Set(NewEth2DataEntry("b5303f2a"))
 }
 
 // getters and setters

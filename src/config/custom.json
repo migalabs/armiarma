@@ -3,10 +3,12 @@
     "TcpPort": 9006,
     "UdpPort": 9007,
     "TopicArray": ["/eth2/b5303f2a/beacon_block/ssz_snappy"],
-    "Network": "testnet",
-    "ForkDigest": "0xdlskgfn",
+    "Network": "mainnet",
+    "ForkDigest": "b5303f2a",
     "UserAgent": "bsc_test",
     "LogLevel": "info",
     "PrivateKey": "026c60367b01fe3d7c7460bce1d585260ce465fa0abcb6e13619f88bf0dad54f",
-    "BootNodesFile": "./src/discovery/bootnodes_mainnet.json"
+    "BootNodesFile": "./src/discovery/bootnodes_mainnet.json",
+    "DBPath": "",
+    "DBType": ""
 }
