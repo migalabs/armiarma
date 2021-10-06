@@ -216,13 +216,8 @@ func (c *PeerPruneConncetCmd) RecErrorHandler(pe peer.ID, rec_err string, f *os.
 			p.Deprecated = true
 		}
 	case "dial backoff":
-<<<<<<< HEAD
-		fn = func(p *metrics.Peer) {
-			p.AddNegConnAttWithPenalty()
-=======
 		fn = func(p *utils.PeerMetrics) {
 			p.AddNegConnAtt()
->>>>>>> remove extra log traces
 		}
 	case "connection refused":
 		fn = func(p *metrics.Peer) {
