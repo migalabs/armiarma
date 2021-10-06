@@ -87,7 +87,6 @@ func (c *PeerStore) StoreOrUpdatePeer(peer Peer) {
 	} else {
 		// Fetch the new info of a peer directly from the new peer struct
 		oldPeer.FetchPeerInfoFromPeer(peer)
-
 		c.PeerStore.Store(peer.PeerId, oldPeer)
 	}
 }
