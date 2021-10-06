@@ -90,10 +90,15 @@ func (c *PeerPruneConncetCmd) run(ctx context.Context, h host.Host, store track.
 			log.Infof("len peerlist: %d", peerstoreLen)
 			t := time.Now()
 			for _, p := range peerList {
+				// check if the peers is the crawler itself
+				if p == h.ID() {
+					log.Debug("Calling to self host")
+					continue
+				}
 				// read info about the peer
 				pinfo, err := c.PeerStore.GetPeerData(p.String())
 				if err != nil {
-					log.Warnf("peer info not found on the metrics peerstore. %s", p)
+					log.Warn(err)
 					pinfo = metrics.NewPeer(p.String())
 				}
 				// check if peer has been already deprecated for being many hours without connected
@@ -216,7 +221,7 @@ func (c *PeerPruneConncetCmd) RecErrorHandler(pe peer.ID, rec_err string, f *os.
 			p.Deprecated = true
 		}
 	case "dial backoff":
-		fn = func(p *utils.PeerMetrics) {
+		fn = func(p *metrics.Peer) {
 			p.AddNegConnAtt()
 		}
 	case "connection refused":
@@ -264,7 +269,7 @@ func (c *PeerPruneConncetCmd) RecErrorHandler(pe peer.ID, rec_err string, f *os.
 			_, _ = c.Store.UpdateENRMaybe(newPeerID, enr)
 			c.Store.AddAddrs(newPeerID, addrs, time.Duration(48)*time.Hour)
 		*/
-		fn = func(p *utils.PeerMetrics) {
+		fn = func(p *metrics.Peer) {
 			p.AddNegConnAtt()
 			p.Deprecated = true
 		}
