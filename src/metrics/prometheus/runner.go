@@ -159,9 +159,9 @@ func (c *PrometheusRunner) Run(ctx context.Context) error {
 						} else {
 							tctDis[tct] = 1
 						}
-					} else {
-						nOfDeprecatedPeers++
 					}
+				} else {
+					nOfDeprecatedPeers++
 				}
 				nOfDiscoveredPeers++
 
@@ -233,6 +233,7 @@ func (c *PrometheusRunner) Run(ctx context.Context) error {
 				"GeoDist":            geoDist,
 				"NOfDiscoveredPeers": nOfDiscoveredPeers,
 				"NOfConnectedPeers":  nOfConnectedPeers,
+				"NOfDeprecatedPeers": nOfDeprecatedPeers,
 				"LastErrors":         allLastErrors,
 				"BeaconBlocks":       bb,
 				"BeaconAttestations": ba,
