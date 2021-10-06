@@ -11,20 +11,20 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/protolambda/rumor/control/actor/base"
 	"github.com/protolambda/rumor/metrics"
-	"github.com/protolambda/rumor/p2p/track"
-	"github.com/protolambda/zrnt/eth2/beacon"
 	"github.com/protolambda/rumor/metrics/utils"
 	"github.com/protolambda/rumor/p2p/addrutil"
+	"github.com/protolambda/rumor/p2p/track"
+	"github.com/protolambda/zrnt/eth2/beacon"
 	log "github.com/sirupsen/logrus"
 )
 
 type PeerConnectRandomCmd struct {
 	*base.Base
-	Store         track.ExtendedPeerstore
-	PeerStore *metrics.PeerStore
-	Timeout       time.Duration `ask:"--timeout" help:"connection timeout, 0 to disable"`
-	Rescan        time.Duration `ask:"--rescan" help:"rescan the peerscore for new peers to connect with this given interval"`
-	MaxRetries    int           `ask:"--max-retries" help:"how many connection attempts until the peer is banned"`
+	Store      track.ExtendedPeerstore
+	PeerStore  *metrics.PeerStore
+	Timeout    time.Duration `ask:"--timeout" help:"connection timeout, 0 to disable"`
+	Rescan     time.Duration `ask:"--rescan" help:"rescan the peerscore for new peers to connect with this given interval"`
+	MaxRetries int           `ask:"--max-retries" help:"how many connection attempts until the peer is banned"`
 
 	FilterDigest beacon.ForkDigest `ask:"--filter-digest" help:"Only connect when the peer is known to have the given fork digest in ENR. Or connect to any if not specified."`
 	FilterPort   int               `ask:"--filter-port" help:"Only connect to peers that has the given port advertised on the ENR."`
@@ -161,18 +161,17 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host, store track
 					peer.City = city
 				}
 				c.PeerStore.StoreOrUpdatePeer(peer)
-
 				// try to connect the peer
 				attempts := 0
-				for attempts <= c.MaxRetries {
-					if err := h.Connect(ctx, addrInfo); err != nil {
+				for attempts < c.MaxRetries {
+					if conn_err := h.Connect(ctx, addrInfo); conn_err != nil {
 						// the connetion failed
 						attempts += 1
-						err := c.PeerStore.ConnectionAttemptEvent(p.String(), false, err.Error())
+						err := c.PeerStore.ConnectionAttemptEvent(p.String(), false, conn_err.Error())
 						if err != nil {
-							log.Error("could not add new connection attemp: ", err)
+							log.Error("could not add new connection attemp: ", conn_err)
 						}
-						c.Log.WithError(err).Warnf("attempts %d failed connection attempt", attempts)
+						c.Log.WithError(conn_err).Warnf("attempts %d failed connection attempt", attempts)
 						continue
 					} else { // connection successfuly made
 						c.Log.Infof("peer_id %s successful connection made", p)
@@ -182,7 +181,7 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host, store track
 						}
 						break
 					}
-					if attempts > c.MaxRetries {
+					if attempts >= c.MaxRetries {
 						c.Log.Warnf("attempts %d failed connection attempt, reached maximum, no retry", attempts)
 						break
 					}

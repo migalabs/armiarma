@@ -2,11 +2,12 @@ package metrics
 
 import (
 	"fmt"
-	//"github.com/pkg/errors"
 	"strconv"
 	"time"
 
 	"github.com/protolambda/rumor/metrics/utils"
+
+	"github.com/protolambda/zrnt/eth2/beacon"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -38,6 +39,10 @@ type Peer struct {
 	MetadataRequest bool  // If the peer has been attempted to request its metadata
 	MetadataSucceed bool  // If the peer has been successfully requested its metadata
 	LastExport      int64 //(timestamp in seconds of the last exported time (backup for when we are loading the Peer)
+
+	// BeaconStatus
+	BeaconStatus   BeaconStatusStamped
+	BeaconMetadata BeaconMetadataStamped
 
 	// Counters for the different topics
 	MessageMetrics map[string]*MessageMetric
@@ -92,6 +97,76 @@ func (pm *Peer) ConnectionAttemptEvent(succeed bool, err string) {
 		pm.Error = "None"
 	} else {
 		pm.Error = utils.FilterError(err)
+	}
+}
+
+// Fetch Peer information from another Peer info
+func (pm *Peer) FetchPeerInfoFromPeer(newPeer Peer) {
+	// Somehow weird to update the peerID, since it is going to be the same one
+	pm.PeerId = getNonEmpty(pm.PeerId, newPeer.PeerId)
+	pm.NodeId = getNonEmpty(pm.NodeId, newPeer.NodeId)
+	// Check User Agent and derivated client type/version/OS
+	pm.UserAgent = getNonEmpty(pm.UserAgent, newPeer.UserAgent)
+	pm.ClientOS = getNonEmpty(pm.ClientOS, newPeer.ClientOS)
+	if newPeer.ClientName != "" || pm.ClientName == "" {
+		pm.ClientName = newPeer.ClientName
+		pm.ClientVersion = newPeer.ClientVersion
+	}
+	pm.Pubkey = getNonEmpty(pm.Pubkey, newPeer.Pubkey)
+	pm.Addrs = getNonEmpty(pm.Addrs, newPeer.Addrs)
+	pm.Ip = getNonEmpty(pm.Ip, newPeer.Ip)
+	if pm.City == "" || newPeer.City != "" {
+		pm.City = newPeer.City
+		pm.Country = newPeer.Country
+	}
+	if newPeer.Latency > 0 {
+		pm.Latency = newPeer.Latency
+	}
+	// Metadata requested
+	if !pm.MetadataRequest {
+		pm.MetadataRequest = newPeer.MetadataRequest
+	}
+	if !pm.MetadataSucceed {
+		pm.MetadataSucceed = newPeer.MetadataSucceed
+	}
+	// Beacon Metadata and Status
+	if newPeer.BeaconMetadata != (BeaconMetadataStamped{}) {
+		pm.BeaconMetadata = newPeer.BeaconMetadata
+	}
+	if newPeer.BeaconStatus != (BeaconStatusStamped{}) {
+		pm.BeaconStatus = newPeer.BeaconStatus
+	}
+	// Aggregate connections and disconnections
+	for _, time := range newPeer.ConnectionTimes {
+		pm.ConnectionEvent(newPeer.ConnectedDirection, time)
+	}
+	for _, time := range newPeer.DisconnectionTimes {
+		pm.DisconnectionEvent(time)
+	}
+}
+
+// getNonEmpty compares whether the new string is not empty
+// it returns the new one if its not empty or the old one it it was
+func getNonEmpty(old string, new string) string {
+	if new != "" {
+		return new
+	}
+	return old
+}
+
+// Update beacon Status of the peer
+func (pm *Peer) UpdateBeaconStatus(bStatus beacon.Status) {
+	pm.BeaconStatus = BeaconStatusStamped{
+		Timestamp: time.Now(),
+		Status:    bStatus,
+	}
+}
+
+// Update beacon Metadata of the peer
+func (pm *Peer) UpdateBeaconMetadata(bMetadata beacon.MetaData) {
+	pm.BeaconMetadata = BeaconMetadataStamped{
+		Timestamp: time.Now(),
+		Metadata:  bMetadata,
 	}
 }
 
@@ -169,7 +244,7 @@ func (pm *Peer) ToCsvLine() string {
 		strconv.FormatBool(pm.IsConnected) + "," +
 		strconv.FormatUint(pm.Attempts, 10) + "," +
 		pm.Error + "," +
-		fmt.Sprint(pm.Latency) + "," +
+		fmt.Sprintf("%.6f", pm.Latency) + "," +
 		fmt.Sprintf("%d", len(pm.ConnectionTimes)) + "," +
 		fmt.Sprintf("%d", len(pm.DisconnectionTimes)) + "," +
 		fmt.Sprintf("%.6f", pm.GetConnectedTime()) + "," +
@@ -198,4 +273,20 @@ func (pm *Peer) LogPeer() {
 		"City":          pm.City,
 		"Latency":       pm.Latency,
 	}).Info("Peer Info")
+}
+
+// BEACON METADATA
+
+// Basic BeaconMetadata struct that includes the timestamp of the received beacon metadata
+type BeaconMetadataStamped struct {
+	Timestamp time.Time
+	Metadata  beacon.MetaData
+}
+
+// BEACON STATUS
+
+//  Basic BeaconMetadata struct that includes The timestamp of the received beacon Status
+type BeaconStatusStamped struct {
+	Timestamp time.Time
+	Status    beacon.Status
 }

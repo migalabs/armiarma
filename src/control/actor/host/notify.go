@@ -8,11 +8,9 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/network"
 	ma "github.com/multiformats/go-multiaddr"
-	"github.com/pkg/errors"
 	"github.com/protolambda/rumor/control/actor/base"
 	"github.com/protolambda/rumor/control/actor/peer/metadata"
 	"github.com/protolambda/rumor/metrics"
-	"github.com/protolambda/rumor/metrics/utils"
 	"github.com/protolambda/rumor/p2p/track"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
@@ -32,14 +30,12 @@ func (c *HostNotifyCmd) Help() string {
 func (c *HostNotifyCmd) HelpLong() string {
 	return `
 Args: <event-types>...
-
 Network event notifications.
 Valid event types:
  - listen (listen_open listen_close)
  - connection (connection_open connection_close)
  - stream (stream_open stream_close)
  - all
-
 Notification logs will have keys: "event" - one of the above detailed event types, e.g. listen_close.
 - "peer": peer ID
 - "direction": "inbound"/"outbound"/"unknown", for connections and streams
@@ -57,30 +53,55 @@ func (c *HostNotifyCmd) listenCloseF(net network.Network, addr ma.Multiaddr) {
 }
 
 func (c *HostNotifyCmd) connectedF(net network.Network, conn network.Conn) {
-	logrus.WithFields(logrus.Fields{
+	log.WithFields(logrus.Fields{
 		"EVENT":     "Connection detected",
 		"DIRECTION": conn.Stat().Direction.String(),
 	}).Info("Peer: ", conn.RemotePeer().String())
-	// try to request metadata for the peer
-	peerData, err := PollPeerMetadata(conn.RemotePeer(), c.Base, c.PeerMetadataState, c.Store, c.PeerStore)
-	// double check that the peerData is not empty
+	// Generate new peer to aggregate new data
+	peer := metrics.NewPeer(conn.RemotePeer().String())
+	h, _ := c.Host()
+	// Request the Host Metadata
+	err := ReqHostInfo(context.Background(), h, conn, &peer)
 	if err != nil {
-		logrus.WithFields(logrus.Fields{
-			"EVENT": "Metadata request NOK",
-		}).Info("Peer: ", conn.RemotePeer().String())
+		peer.MetadataSucceed = false
+		log.WithFields(logrus.Fields{
+			"ERROR": err,
+		}).Warn("Peer: ", conn.RemotePeer().String())
 	}
-	ma := conn.RemoteMultiaddr().String()
-	fmt.Println("Multiaddress of the peer", ma)
-	peer, err := fetchPeerExtraInfo(peerData, ma)
+	// Request the BeaconMetadata
+	bMetadata, err := ReqBeaconMetadata(context.Background(), h, conn.RemotePeer())
 	if err != nil {
-		log.Error("Could not fetch peer data for: " + conn.RemotePeer().String())
+		log.WithFields(logrus.Fields{
+			"ERROR": err,
+		}).Warn("Peer: ", conn.RemotePeer().String())
+	} else {
+		peer.UpdateBeaconMetadata(bMetadata)
 	}
-	logrus.WithFields(logrus.Fields{
-		"EVENT": "Metadata request OK",
-	}).Info("Peer: ", conn.RemotePeer().String())
-	// store the peer and record that the connection was ok
+	// request BeaconStatus metadata as we connect to a peer
+	bStatus, err := ReqBeaconStatus(context.Background(), h, conn.RemotePeer())
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"ERROR": err,
+		}).Warn("Peer: ", conn.RemotePeer().String())
+	} else {
+		peer.UpdateBeaconStatus(bStatus)
+	}
+	// Read ENR of the Peer from the generated enode
+	n := c.Store.LatestENR(conn.RemotePeer())
+	if n != nil {
+		n.ID().String()
+		// We can only get the node.ID if the ENR of the peer was already in the PeerStore fromt dv5
+		peer.NodeId = n.ID().String()
+	} else {
+		// TODO: If the peer wasn't discovered via dv5 "n" will be empty
+		log.WithFields(logrus.Fields{
+			"ERROR": "Peer ENR not found",
+		}).Warn("Peer: ", conn.RemotePeer().String())
+	}
+	// Add new connection event
+	peer.ConnectionEvent(conn.Stat().Direction.String(), time.Now())
+	// Add new peer or aggregate info to existing peer
 	c.PeerStore.StoreOrUpdatePeer(peer)
-	c.PeerStore.ConnectionEvent(conn.RemotePeer().String(), conn.Stat().Direction.String())
 	// End of metric traces to track the connections and disconnections
 	c.Log.WithFields(logrus.Fields{
 		"event": "connection_open", "peer": conn.RemotePeer().String(),
@@ -166,46 +187,4 @@ func (c *HostNotifyCmd) Run(ctx context.Context, args ...string) error {
 		return nil
 	})
 	return nil
-}
-
-/* Dismissed since stream.Stat().Direction includes method .String()
-func fmtDirection(d network.Direction) string {
-	switch d {
-	case network.DirInbound:
-		return "inbound"
-	case network.DirOutbound:
-		return "outbound"
-	case network.DirUnknown:
-		return "unknown"
-	default:
-		return "unknown"
-	}
-}
-*/
-
-// Convert from rumor PeerAllData to our Peer. Note that
-// some external data is fetched and some fields are parsed
-func fetchPeerExtraInfo(peerData *track.PeerAllData, addr string) (metrics.Peer, error) {
-	client, version := utils.FilterClientType(peerData.UserAgent)
-	// Obtaining the IP or MultiAddrs from the ENR increases the chances to get a Restringed IP
-	// therefore, this one can be obtained directly from the libp2p connection stream
-	ip := strings.Split(addr, "/")[2]
-	country, city, err := utils.GetLocationFromIp(ip)
-	if err != nil {
-		return metrics.Peer{}, errors.Wrap(err, "could not get location from ip")
-	}
-	peer := metrics.NewPeer(peerData.PeerID.String())
-	peer.NodeId = peerData.NodeID.String()
-	peer.UserAgent = peerData.UserAgent
-	peer.ClientName = client
-	peer.ClientVersion = version
-	peer.ClientOS = "TODO"
-	peer.Pubkey = peerData.Pubkey
-	peer.Addrs = addr
-	peer.Ip = ip
-	peer.Country = country
-	peer.City = city
-	peer.Latency = float64(peerData.Latency/time.Millisecond) / 1000
-
-	return peer, nil
 }

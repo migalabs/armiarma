@@ -2,7 +2,6 @@ package host
 
 import (
 	"context"
-	"time"
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/pkg/errors"
@@ -15,7 +14,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var timeout time.Duration = 5 * time.Second
+// DEPRECATED FOR metrics/nodemetadata/req_metadata (no the final destination)
+// TODO: Still few things to consider with new approach, like version handling
 
 // Polls metadata for a given peer and return its metadata if ok
 func PollPeerMetadata(p peer.ID, base *base.Base, peerMetadataState *metadata.PeerMetadataState, store track.ExtendedPeerstore, gm *metrics.PeerStore) (*track.PeerAllData, error) {

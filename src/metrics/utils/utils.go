@@ -1,9 +1,13 @@
 package utils
 
 import (
+	"errors"
+	"fmt"
+	"net"
+	"strings"
+
 	pgossip "github.com/protolambda/rumor/p2p/gossip"
 	log "github.com/sirupsen/logrus"
-	"strings"
 )
 
 // Gets the client and version for a given userAgent
@@ -29,7 +33,7 @@ func FilterClientType(userAgent string) (string, string) {
 	} else if strings.Contains(userAgentLower, "js-libp2p") {
 		return "Lodestar", cleanVersion(getVersionIfAny(fields, 1))
 	} else {
-		log.Warn("Could not get client from userAgent: ", userAgent)
+		log.Warnf("Could not get client from userAgent: %s", userAgent)
 		return "Unknown", "Unknown"
 	}
 }
@@ -55,12 +59,22 @@ func FilterError(err string) string {
 	// filter the error type
 	if strings.Contains(err, "connection reset by peer") {
 		errorPretty = "Connection reset by peer"
-	} else if strings.Contains(err, "i/o timeout") {
+	} else if strings.Contains(err, "i/o timeout") || strings.Contains(err, "context deadline exceeded") {
 		errorPretty = "i/o timeout"
 	} else if strings.Contains(err, "dial to self attempted") {
 		errorPretty = "dial to self attempted"
 	} else if strings.Contains(err, "dial backoff") {
 		errorPretty = "dial backoff"
+	} else if strings.Contains(err, "connection refused") {
+		errorPretty = "connection refused"
+	} else if strings.Contains(err, "no route to host") {
+		errorPretty = "no route to host"
+	} else if strings.Contains(err, "network is unreachable") {
+		errorPretty = "unreachable network"
+	} else if strings.Contains(err, "peer id mismatch") {
+		errorPretty = "peer id mismatch"
+	} else {
+		log.Errorf("uncertain error: ", err)
 	}
 
 	return errorPretty
@@ -81,4 +95,37 @@ func ShortToFullTopicName(topicName string) string {
 	default:
 		return ""
 	}
+}
+
+func GetIPfromMultiaddress(multiaddr string) (ip string, err error) {
+	s := strings.Split(multiaddr, "/")
+	if len(s) < 3 {
+		return ip, errors.New(fmt.Sprintf("Multiaddress doesn't include an IP: %s", multiaddr))
+	}
+	return s[2], nil
+}
+
+// IP public filtering
+var PrivateIPNetworks = []net.IPNet{
+	net.IPNet{
+		IP:   net.ParseIP("10.0.0.0"),
+		Mask: net.CIDRMask(8, 32),
+	},
+	net.IPNet{
+		IP:   net.ParseIP("172.16.0.0"),
+		Mask: net.CIDRMask(12, 32),
+	},
+	net.IPNet{
+		IP:   net.ParseIP("192.168.0.0"),
+		Mask: net.CIDRMask(16, 32),
+	},
+}
+
+func IsPublic(ip net.IP) bool {
+	for _, ipNet := range PrivateIPNetworks {
+		if ipNet.Contains(ip) || ip.IsLoopback() || ip.IsUnspecified() {
+			return false
+		}
+	}
+	return true
 }
