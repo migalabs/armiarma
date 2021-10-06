@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/libp2p/go-libp2p-core/network"
 	ma "github.com/multiformats/go-multiaddr"
@@ -12,11 +13,12 @@ import (
 	"github.com/protolambda/rumor/metrics"
 	"github.com/protolambda/rumor/p2p/track"
 	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
 type HostNotifyCmd struct {
 	*base.Base
-	*metrics.GossipMetrics
+	*metrics.PeerStore
 	*metadata.PeerMetadataState
 	Store track.ExtendedPeerstore
 }
@@ -28,14 +30,12 @@ func (c *HostNotifyCmd) Help() string {
 func (c *HostNotifyCmd) HelpLong() string {
 	return `
 Args: <event-types>...
-
-Network event notifications. 
-Valid event types: 
+Network event notifications.
+Valid event types:
  - listen (listen_open listen_close)
- - connection (connection_open connection_close) 
+ - connection (connection_open connection_close)
  - stream (stream_open stream_close)
  - all
-
 Notification logs will have keys: "event" - one of the above detailed event types, e.g. listen_close.
 - "peer": peer ID
 - "direction": "inbound"/"outbound"/"unknown", for connections and streams
@@ -53,31 +53,78 @@ func (c *HostNotifyCmd) listenCloseF(net network.Network, addr ma.Multiaddr) {
 }
 
 func (c *HostNotifyCmd) connectedF(net network.Network, conn network.Conn) {
-	_ = c.GossipMetrics.AddNewPeer(conn.RemotePeer())
-	c.GossipMetrics.AddConnectionEvent(conn.RemotePeer(), "Connection")
-	// request metadata as soon as we connect to a peer
-	metrics.PollPeerMetadata(conn.RemotePeer(), c.Base, c.PeerMetadataState, c.Store, c.GossipMetrics)
-
+	log.WithFields(logrus.Fields{
+		"EVENT":     "Connection detected",
+		"DIRECTION": conn.Stat().Direction.String(),
+	}).Info("Peer: ", conn.RemotePeer().String())
+	// Generate new peer to aggregate new data
+	peer := metrics.NewPeer(conn.RemotePeer().String())
+	h, _ := c.Host()
+	// Request the Host Metadata
+	err := ReqHostInfo(context.Background(), h, conn, &peer)
+	if err != nil {
+		peer.MetadataSucceed = false
+		log.WithFields(logrus.Fields{
+			"ERROR": err,
+		}).Warn("Peer: ", conn.RemotePeer().String())
+	}
+	// Request the BeaconMetadata
+	bMetadata, err := ReqBeaconMetadata(context.Background(), h, conn.RemotePeer())
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"ERROR": err,
+		}).Warn("Peer: ", conn.RemotePeer().String())
+	} else {
+		peer.UpdateBeaconMetadata(bMetadata)
+	}
+	// request BeaconStatus metadata as we connect to a peer
+	bStatus, err := ReqBeaconStatus(context.Background(), h, conn.RemotePeer())
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"ERROR": err,
+		}).Warn("Peer: ", conn.RemotePeer().String())
+	} else {
+		peer.UpdateBeaconStatus(bStatus)
+	}
+	// Read ENR of the Peer from the generated enode
+	n := c.Store.LatestENR(conn.RemotePeer())
+	if n != nil {
+		n.ID().String()
+		// We can only get the node.ID if the ENR of the peer was already in the PeerStore fromt dv5
+		peer.NodeId = n.ID().String()
+	} else {
+		// TODO: If the peer wasn't discovered via dv5 "n" will be empty
+		log.WithFields(logrus.Fields{
+			"ERROR": "Peer ENR not found",
+		}).Warn("Peer: ", conn.RemotePeer().String())
+	}
+	// Add new connection event
+	peer.ConnectionEvent(conn.Stat().Direction.String(), time.Now())
+	// Add new peer or aggregate info to existing peer
+	c.PeerStore.StoreOrUpdatePeer(peer)
 	// End of metric traces to track the connections and disconnections
 	c.Log.WithFields(logrus.Fields{
 		"event": "connection_open", "peer": conn.RemotePeer().String(),
-		"direction": fmtDirection(conn.Stat().Direction),
+		"direction": conn.Stat().Direction.String(),
 	}).Debug("new peer connection")
 }
 
 func (c *HostNotifyCmd) disconnectedF(net network.Network, conn network.Conn) {
-	c.GossipMetrics.AddConnectionEvent(conn.RemotePeer(), "Disconnection")
+	logrus.WithFields(logrus.Fields{
+		"EVENT": "Disconnection detected",
+	}).Info("Peer: ", conn.RemotePeer().String())
+	c.PeerStore.DisconnectionEvent(conn.RemotePeer().String())
 	// End of metric traces to track the connections and disconnections
 	c.Log.WithFields(logrus.Fields{
 		"event": "connection_close", "peer": conn.RemotePeer().String(),
-		"direction": fmtDirection(conn.Stat().Direction),
+		"direction": conn.Stat().Direction.String(),
 	}).Debug("peer disconnected")
 }
 
 func (c *HostNotifyCmd) openedStreamF(net network.Network, str network.Stream) {
 	c.Log.WithFields(logrus.Fields{
 		"event": "stream_open", "peer": str.Conn().RemotePeer().String(),
-		"direction": fmtDirection(str.Stat().Direction),
+		"direction": str.Stat().Direction.String(),
 		"protocol":  str.Protocol(),
 	}).Debug("opened stream")
 }
@@ -85,7 +132,7 @@ func (c *HostNotifyCmd) openedStreamF(net network.Network, str network.Stream) {
 func (c *HostNotifyCmd) closedStreamF(net network.Network, str network.Stream) {
 	c.Log.WithFields(logrus.Fields{
 		"event": "stream_close", "peer": str.Conn().RemotePeer().String(),
-		"direction": fmtDirection(str.Stat().Direction),
+		"direction": str.Stat().Direction.String(),
 		"protocol":  str.Protocol(),
 	}).Debug("closed stream")
 }
@@ -140,17 +187,4 @@ func (c *HostNotifyCmd) Run(ctx context.Context, args ...string) error {
 		return nil
 	})
 	return nil
-}
-
-func fmtDirection(d network.Direction) string {
-	switch d {
-	case network.DirInbound:
-		return "inbound"
-	case network.DirOutbound:
-		return "outbound"
-	case network.DirUnknown:
-		return "unknown"
-	default:
-		return "unknown"
-	}
 }

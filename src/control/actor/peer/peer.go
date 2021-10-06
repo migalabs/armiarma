@@ -16,7 +16,7 @@ type PeerCmd struct {
 	*status.PeerStatusState
 	*metadata.PeerMetadataState
 	Store track.ExtendedPeerstore
-	*metrics.GossipMetrics
+	*metrics.PeerStore
 }
 
 func (c *PeerCmd) Cmd(route string) (cmd interface{}, err error) {
@@ -31,7 +31,7 @@ func (c *PeerCmd) Cmd(route string) (cmd interface{}, err error) {
 	case "connectall":
 		cmd = &PeerConnectAllCmd{Base: c.Base, Store: c.Store}
 	case "connect-random":
-		cmd = &PeerConnectRandomCmd{Base: c.Base, Store: c.Store, GossipMetrics: c.GossipMetrics}
+		cmd = &PeerConnectRandomCmd{Base: c.Base, Store: c.Store, PeerStore: c.PeerStore}
 	case "protect":
 		cmd = &PeerProtectCmd{Base: c.Base}
 	case "unprotect":

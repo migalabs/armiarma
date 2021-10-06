@@ -8,12 +8,13 @@ import (
 	"github.com/protolambda/rumor/metrics"
 	"github.com/protolambda/rumor/p2p/gossip/database"
 	"github.com/protolambda/zrnt/eth2/configs"
+	"github.com/protolambda/rumor/control/actor/gossipimport"
 )
 
 type GossipMessageDBCmd struct {
 	*base.Base
-	GossipState   *metrics.GossipState
-	GossipMetrics *metrics.GossipMetrics
+	GossipState   *gossipimport.GossipState
+	PeerStore *metrics.PeerStore
 
 	MessageLimit int `ask:"--temp-msg-limit" help:"The number of Messages that will be kept on the Temporary Database (Like a Cache of messages)"`
 	// For later, when the real database is stored`
@@ -34,8 +35,8 @@ func (c *GossipMessageDBCmd) Run(ctx context.Context, args ...string) error {
 		return NoGossipErr
 	}
 	// config has been harcoded to the Mainnet Network
-	c.GossipMetrics.MessageDatabase = database.NewMessageDatabase(configs.Mainnet, c.MessageLimit, c.StorePath)
-	if c.GossipMetrics.MessageDatabase == nil {
+	c.PeerStore.MessageDatabase = database.NewMessageDatabase(configs.Mainnet, c.MessageLimit, c.StorePath)
+	if c.PeerStore.MessageDatabase == nil {
 		return fmt.Errorf("The Message Database failed to initialize")
 	}
 	// TODO: Implement the Real database to be exported every certain time

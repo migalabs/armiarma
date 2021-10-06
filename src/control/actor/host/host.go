@@ -24,7 +24,7 @@ type HostCmd struct {
 	CurrentPeerstore track.DynamicPeerstore
 
 	PeerMetadataState *metadata.PeerMetadataState
-	GossipMetrics     *metrics.GossipMetrics
+	PeerStore     *metrics.PeerStore
 
 	WithSetHost
 	WithCloseHost
@@ -44,7 +44,7 @@ func (c *HostCmd) Cmd(route string) (cmd interface{}, err error) {
 	case "listen":
 		cmd = &HostListenCmd{Base: c.Base, WithEnrNode: c.WithEnrNode}
 	case "notify":
-		cmd = &HostNotifyCmd{Base: c.Base, GossipMetrics: c.GossipMetrics, Store: c.CurrentPeerstore, PeerMetadataState: c.PeerMetadataState}
+		cmd = &HostNotifyCmd{Base: c.Base, PeerStore: c.PeerStore, Store: c.CurrentPeerstore, PeerMetadataState: c.PeerMetadataState}
 	default:
 		return nil, ask.UnrecognizedErr
 	}

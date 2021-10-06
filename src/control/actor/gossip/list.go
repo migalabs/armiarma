@@ -3,12 +3,12 @@ package gossip
 import (
 	"context"
 	"github.com/protolambda/rumor/control/actor/base"
-    "github.com/protolambda/rumor/metrics"
+  "github.com/protolambda/rumor/control/actor/gossipimport"
 )
 
 type GossipListCmd struct {
 	*base.Base
-	*metrics.GossipState
+	*gossipimport.GossipState
 }
 
 func (c *GossipListCmd) Help() string {

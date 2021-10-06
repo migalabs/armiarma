@@ -58,12 +58,14 @@ require (
 	github.com/multiformats/go-multiaddr-net v0.1.5
 	github.com/multiformats/go-multistream v0.1.2
 	github.com/olekukonko/tablewriter v0.0.2-0.20190409134802-7e037d187b0c
+	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.5.0
 	github.com/protolambda/ask v0.0.5
 	github.com/protolambda/zrnt v0.13.2
 	github.com/protolambda/ztyp v0.1.2
 	github.com/sirupsen/logrus v1.6.0
 	github.com/spf13/cobra v1.1.1
+	github.com/stretchr/testify v1.7.0
 	github.com/ugorji/go v1.1.4 // indirect
 	golang.org/x/crypto v0.0.0-20210317152858-513c2a44f670 // indirect
 	golang.org/x/sync v0.0.0-20200625203802-6e8e738ad208 // indirect

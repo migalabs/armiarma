@@ -18,7 +18,6 @@ import (
 	"github.com/protolambda/rumor/control/actor/blocks"
 	"github.com/protolambda/rumor/control/actor/chain"
 	visualizer "github.com/protolambda/rumor/control/actor/chainvisualizer"
-	"github.com/protolambda/rumor/control/actor/prometheus"
 	"github.com/protolambda/rumor/control/actor/dv5"
 	"github.com/protolambda/rumor/control/actor/enr"
 	"github.com/protolambda/rumor/control/actor/gossip"
@@ -37,6 +36,7 @@ import (
 	vis "github.com/protolambda/rumor/visualizer"
 
 	//	"github.com/protolambda/zrnt/eth2/configs"
+	"github.com/protolambda/rumor/control/actor/gossipimport"
 	"github.com/sirupsen/logrus"
 )
 
@@ -66,8 +66,8 @@ type Actor struct {
 
 	Dv5State dv5.Dv5State
 
-	GossipState     metrics.GossipState
-	GossipMetrics   metrics.GossipMetrics
+	GossipState     gossipimport.GossipState
+	PeerStore   metrics.PeerStore
 	VisualizerState visualizer.VisualizerState
 
 	RPCState rpc.RPCState
@@ -97,7 +97,7 @@ func NewActor(id ActorID, globals *GlobalActorData) *Actor {
 		ActorCtx:         ctxAll,
 		actorCancel:      cancelAll,
 		CurrentPeerstore: track.NewDynamicPeerstore(),
-		GossipMetrics:    metrics.NewGossipMetrics(),
+		PeerStore:    metrics.NewPeerStore(),
 		VisualizerState:  chainV,
 	}
 	return act
@@ -189,7 +189,7 @@ func (c *ActorCmd) Cmd(route string) (cmd interface{}, err error) {
 			GlobalPeerstores:  c.GlobalPeerstores,
 			CurrentPeerstore:  c.CurrentPeerstore,
 			PeerMetadataState: &c.PeerMetadataState,
-			GossipMetrics:     &c.GossipMetrics,
+			PeerStore:     &c.PeerStore,
 		}
 	case "enr":
 		cmd = &enr.EnrCmd{Base: b, Lazy: &c.LazyEnrState, PrivSettings: c, WithHostPriv: &c.HostState}
@@ -203,7 +203,7 @@ func (c *ActorCmd) Cmd(route string) (cmd interface{}, err error) {
 			PeerStatusState:   &c.PeerStatusState,
 			PeerMetadataState: &c.PeerMetadataState,
 			Store:             store,
-			GossipMetrics:     &c.GossipMetrics,
+			PeerStore:     &c.PeerStore,
 		}
 	case "peerstore":
 		cmd = &peerstore.PeerstoreCmd{
@@ -216,13 +216,13 @@ func (c *ActorCmd) Cmd(route string) (cmd interface{}, err error) {
 		if settings == nil {
 			return nil, errors.New("Discv5 needs an ENR first. Use 'enr make'.")
 		}
-		cmd = &dv5.Dv5Cmd{Base: b, Dv5State: &c.Dv5State, Dv5Settings: settings, CurrentPeerstore: c.CurrentPeerstore}
+		cmd = &dv5.Dv5Cmd{Base: b, Dv5State: &c.Dv5State, Dv5Settings: settings, CurrentPeerstore: c.CurrentPeerstore, PeerStore: &c.PeerStore}
 	case "gossip":
 		store := c.CurrentPeerstore
 		if !store.Initialized() {
 			store = nil
 		}
-		cmd = &gossip.GossipCmd{Base: b, GossipState: &c.GossipState, GossipMetrics: &c.GossipMetrics, Store: store}
+		cmd = &gossip.GossipCmd{Base: b, GossipState: &c.GossipState, PeerStore: &c.PeerStore, Store: store}
 	case "rpc":
 		cmd = &rpc.RpcCmd{Base: b, RPCState: &c.RPCState}
 	case "gossip-import":
@@ -234,7 +234,7 @@ func (c *ActorCmd) Cmd(route string) (cmd interface{}, err error) {
 			StateDBState:    &c.StatesState,
 			Chains:          c.GlobalChains,
 			ChainState:      &c.ChainState,
-			GossipMetrics:   &c.GossipMetrics,
+			PeerStore:   &c.PeerStore,
 			PeerStatusState: &c.PeerStatusState,
 			VisualizerState: &c.VisualizerState}
 	case "chain-visualizer":
@@ -243,8 +243,6 @@ func (c *ActorCmd) Cmd(route string) (cmd interface{}, err error) {
 			VisualizerState: &c.VisualizerState,
 			BlockDBState:    &c.BlocksState,
 			StateDBState:    &c.StatesState}
-	case "prometheus":
-		cmd = &prometheus.PrometheusCmd{Base: b,GossipMetrics: &c.GossipMetrics}
 	case "blocks":
 		cmd = &blocks.BlocksCmd{Base: b, DBs: c.GlobalBlocksDBs, DBState: &c.BlocksState}
 	case "states":
@@ -270,7 +268,7 @@ func (c *ActorCmd) Cmd(route string) (cmd interface{}, err error) {
 	return cmd, nil
 }
 
-var topRoutes = []string{"host", "enr", "peer", "peerstore", "dv5", "gossip", "prometheus",
+var topRoutes = []string{"host", "enr", "peer", "peerstore", "dv5", "gossip",
 	"rpc", "blocks", "states", "gossip-import", "chain", "chain-visualizer", "sleep", "tool"}
 var topRoutesMap = map[string]struct{}{}
 

@@ -17,5 +17,9 @@ website-summary/*
 .DS_Store
 ._.DS_Store
 
-# ignore the venv
-src/analyzer/venv
+# ignore the Analyzer venv and deprecated .py s
+analyzer/venv
+analyzer/crawler-progression.py
+analyzer/total-overview-analysis.py
+
+data/*

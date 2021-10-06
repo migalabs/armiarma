@@ -18,12 +18,13 @@ import (
 	"github.com/protolambda/zrnt/eth2/beacon"
 	"github.com/protolambda/ztyp/codec"
 	"github.com/sirupsen/logrus"
+	"github.com/protolambda/rumor/control/actor/gossipimport"
 )
 
 type TopicLogCmd struct {
 	*base.Base
-	GossipMetrics *metrics.GossipMetrics
-	GossipState   *metrics.GossipState
+	PeerStore *metrics.PeerStore
+	GossipState   *gossipimport.GossipState
 	Eth2TopicName string `ask:"--eth-topic" help:"The name of the eth2 topics"`
 	ForkDigest    string `ask:"--fork-version" help:"The fork digest value of the network we want to join to (Default Mainnet)"`
 	Encoding      string `ask:"--encoding" help:"Encoding that is getting used"`
@@ -86,14 +87,14 @@ func (c *TopicLogCmd) Run(ctx context.Context, args ...string) error {
 								"signature": hex.EncodeToString(msg.Signature),
 								"seq_no":    hex.EncodeToString(msg.Seqno),
 							}).Infof("new message on %s", topicName)
-							c.GossipMetrics.IncomingMessageManager(msg.ReceivedFrom, topicName)
+							c.PeerStore.MessageEvent(msg.ReceivedFrom.String(), topicName)
 							// Add notification on the notification channel
-							c.GossipMetrics.MsgNotChannels[topicName] <- true
+							c.PeerStore.MsgNotChannels[topicName] <- true
 							// Deserialize the message depending on the topic name
 							// generate a new ReceivedMessage on the Temp Database
 							// check if the topic has a db asiciated
-							if c.GossipMetrics.MessageDatabase != nil {
-								err = AddMsgToMsgDB(c.GossipMetrics.MessageDatabase, msgData, msg.ReceivedFrom, msg.ArrivalTime, msg.MessageID, topicName)
+							if c.PeerStore.MessageDatabase != nil {
+								err = AddMsgToMsgDB(c.PeerStore.MessageDatabase, msgData, msg.ReceivedFrom, msg.ArrivalTime, msg.MessageID, topicName)
 								if err != nil {
 									c.Log.WithError(err).WithField("topic", topicName).Error("Error saving message on temp database")
 								}

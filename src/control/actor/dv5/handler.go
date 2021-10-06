@@ -7,6 +7,8 @@ import (
 	"github.com/protolambda/rumor/p2p/addrutil"
 	"github.com/protolambda/rumor/p2p/track"
 	"github.com/protolambda/zrnt/eth2/beacon"
+	"github.com/protolambda/rumor/metrics"
+	"github.com/protolambda/rumor/metrics/utils"
 	"github.com/sirupsen/logrus"
 	"time"
 )
@@ -18,6 +20,7 @@ type HandleENR struct {
 	FilterDigest beacon.ForkDigest `ask:"--filter-digest" help:"Only add peers with the given digest to the peerstore"`
 	TTL          time.Duration     `ask:"--ttl" help:"When adding the node, apply this TTL"`
 	Filtering    bool              `changed:"filter-digest"`
+	PeerStore *metrics.PeerStore
 }
 
 func (c *HandleENR) handle(log logrus.FieldLogger, res *enode.Node) error {
@@ -44,14 +47,31 @@ func (c *HandleENR) handle(log logrus.FieldLogger, res *enode.Node) error {
 		if err != nil {
 			return fmt.Errorf("enr update error: %v", err)
 		}
+		addr, err := addrutil.EnodeToMultiAddr(res)
+		if err != nil {
+			return fmt.Errorf("failed to parse ENR address into multi-addr for libp2p: %v", err)
+		}
 		if updated {
-			addr, err := addrutil.EnodeToMultiAddr(res)
-			if err != nil {
-				return fmt.Errorf("failed to parse ENR address into multi-addr for libp2p: %v", err)
-			}
 			c.Store.SetAddr(peerID, addr, c.TTL)
 			log.WithFields(logrus.Fields{"id": res.ID().String()}).Infof("Updated ENR record")
 		}
+
+		peerData := c.Store.GetAllData(peerID)
+		peer := metrics.NewPeer(peerID.String())
+
+		peer.Pubkey = peerData.Pubkey
+		peer.NodeId = peerData.NodeID.String()
+		peer.Ip = res.IP().String()
+		peer.Addrs = addr.String()
+
+		country, city, err := utils.GetLocationFromIp(res.IP().String())
+		if err != nil {
+			logrus.Warn("could not get location from ip: ", res.IP(), err)
+		} else {
+			peer.Country = country
+			peer.City = city
+		}
+		c.PeerStore.StoreOrUpdatePeer(peer)
 	}
 	return nil
 }
