@@ -24,6 +24,8 @@ import (
 )
 
 const PKG_NAME string = "INFO"
+const MIN_PORT int = 0
+const MAX_PORT int = 65000
 
 type InfoData struct {
 	localLogger   log.FieldLogger

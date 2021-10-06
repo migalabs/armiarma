@@ -10,18 +10,13 @@ It also contains default configuration in case some of the parameters were wrong
 package config
 
 import (
-	"crypto/ecdsa"
-	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"io/ioutil"
-
 	"os"
 	"strings"
 
-	gcrypto "github.com/ethereum/go-ethereum/crypto"
-	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/migalabs/armiarma/src/base"
+	"github.com/migalabs/armiarma/src/utils"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -36,6 +31,8 @@ const DEFAULT_LOG_LEVEL string = "debug"
 
 const DEFAULT_EMPTY_INT int = 0
 const DEFAULT_EMPTY_STRING string = ""
+const DEFAULT_DB_PATH string = ""
+const DEFAULT_DB_TYPE string = ""
 
 const PKG_NAME string = "Config"
 
@@ -51,6 +48,8 @@ type ConfigData struct {
 	LogLevel      string   `json:"LogLevel"`
 	PrivateKey    string   `json:"PrivateKey"`
 	BootNodesFile string   `json:"BootNodesFile"`
+	DBPath        string   `json:"DBPath"`
+	DBType        string   `json:"DBType"`
 }
 
 // Will create an empty object
@@ -80,6 +79,8 @@ func NewDefaultConfigData(opts base.LogOpts) *ConfigData {
 
 		LogLevel:   DEFAULT_LOG_LEVEL,
 		PrivateKey: "",
+		DBPath:     DEFAULT_DB_PATH,
+		DBType:     DEFAULT_DB_TYPE,
 	}
 }
 
@@ -146,7 +147,7 @@ func (c *ConfigData) checkEmptyFields() {
 
 	if c.GetPrivKey() == "" {
 		c.localLogger.Debugf("Could not read private key from config file")
-		c.generate_privKey()
+		c.SetPrivKey(utils.Generate_privKey())
 	}
 
 	if c.GetBootNodesFile() == "" {
@@ -158,26 +159,16 @@ func (c *ConfigData) checkEmptyFields() {
 		c.localLogger.Debugf("Setting default LogLevel: %s", DEFAULT_LOG_LEVEL)
 	}
 
-}
-
-func (c *ConfigData) generate_privKey() {
-
-	key, err := ecdsa.GenerateKey(gcrypto.S256(), rand.Reader)
-
-	if err != nil {
-		c.localLogger.Panicf("failed to generate key: %v", err)
+	if c.GetDBPath() == "" {
+		c.SetDBPath(DEFAULT_DB_PATH)
+		c.localLogger.Debugf("Setting default DB Path: %s", DEFAULT_DB_PATH)
 	}
 
-	secpKey := (*crypto.Secp256k1PrivateKey)(key)
-
-	keyBytes, err := secpKey.Raw()
-
-	if err != nil {
-		c.localLogger.Panicf("failed to serialize key: %v", err)
+	if c.GetDBType() == "" {
+		c.SetDBType(DEFAULT_DB_TYPE)
+		c.localLogger.Debugf("Setting default DB Type: %s", DEFAULT_DB_TYPE)
 	}
 
-	c.SetPrivKey(hex.EncodeToString(keyBytes))
-	c.localLogger.Debugf("Generated Key!: ", hex.EncodeToString(keyBytes))
 }
 
 func defaultConfigLoggerOpts(input_opts base.LogOpts) base.LogOpts {
@@ -260,4 +251,18 @@ func (c *ConfigData) GetBootNodesFile() string {
 }
 func (c *ConfigData) SetBootNodesFile(input_string string) {
 	c.BootNodesFile = input_string
+}
+
+func (c *ConfigData) GetDBPath() string {
+	return c.DBPath
+}
+func (c *ConfigData) SetDBPath(input_string string) {
+	c.DBPath = input_string
+}
+
+func (c *ConfigData) GetDBType() string {
+	return c.DBPath
+}
+func (c *ConfigData) SetDBType(input_string string) {
+	c.DBType = input_string
 }

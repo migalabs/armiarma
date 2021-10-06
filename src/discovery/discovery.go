@@ -10,18 +10,24 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net"
 	"os"
 
+	"github.com/btcsuite/btcd/btcec"
 	"github.com/migalabs/armiarma/src/base"
 	"github.com/migalabs/armiarma/src/enode"
+	"github.com/migalabs/armiarma/src/hosts"
 	"github.com/migalabs/armiarma/src/info"
 
 	eth_enode "github.com/ethereum/go-ethereum/p2p/enode"
 
 	geth_log "github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/discover"
+	"github.com/libp2p/go-libp2p-core/crypto"
+	"github.com/libp2p/go-libp2p-core/peer"
+	ma "github.com/multiformats/go-multiaddr"
 )
 
 const PKG_NAME string = "DV5"
@@ -82,7 +88,7 @@ func (d *Discovery) Start_dv5() {
 	gethLogger := geth_log.New()
 	gethLogger.SetHandler(geth_log.FuncHandler(func(r *geth_log.Record) error {
 
-		d.b.Log.Debugf("%+v\n", r)
+		// d.b.Log.Debugf("%+v\n", r)
 		return nil
 	}))
 
@@ -107,8 +113,39 @@ func (d *Discovery) Start_dv5() {
 	}
 }
 
-func (d Discovery) FindRandomNodes() eth_enode.Iterator {
-	return d.Dv5Listener.RandomNodes()
+func (d Discovery) FindRandomNodes(h hosts.BasicLibp2pHost) {
+	iterator := d.Dv5Listener.RandomNodes()
+
+	for iterator.Next() {
+		d.b.Log.Infof("new randon node:  %s\n", iterator.Node().ID().String())
+		node := iterator.Node()
+
+		ipScheme := "ip4"
+		if len(node.IP()) == net.IPv6len {
+			ipScheme = "ip6"
+		}
+		pubkey := node.Pubkey()
+
+		peerID, _ := peer.IDFromPublicKey(crypto.PubKey((*crypto.Secp256k1PublicKey)((*btcec.PublicKey)(pubkey))))
+
+		multiAddrStr := fmt.Sprintf("/%s/%s/tcp/%d/p2p/%s", ipScheme, node.IP().String(), node.TCP(), peerID)
+		multiAddr, err := ma.NewMultiaddr(multiAddrStr)
+		if err != nil {
+			fmt.Println(err)
+			continue
+		}
+
+		new_addr_info, err := peer.AddrInfoFromP2pAddr(multiAddr)
+
+		if err != nil {
+			fmt.Println(err)
+			continue
+		}
+
+		h.Host().Connect(h.Ctx(), *new_addr_info)
+		d.b.Log.Infof("%+v\n", h.Host().Network().Peerstore().Peers())
+
+	}
 }
 
 // function which will return the boot node array to initialize our discovery5 listener
@@ -133,7 +170,7 @@ func (d *Discovery) ImportBootNodeList(import_json_file string) {
 			d.b.Log.Errorf("Could not read BootNodes file: %s", err)
 		}
 	}
-
+	// parse bootnode strings into enodes
 	for _, element := range bootNodeListString.BootNodes {
 
 		bootNodeList = append(bootNodeList, eth_enode.MustParse(element))

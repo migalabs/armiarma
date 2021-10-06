@@ -22,14 +22,11 @@ func (c *BasicLibp2pHost) standardListenCloseF(net network.Network, addr ma.Mult
 func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Conn) {
 	c.Log.Debug("Connection")
 	c.Log.Debug(fmt.Sprintf("%+v\n", conn))
-
-	c.Log.Debug("PEers in PeerStore")
-	h := c.Host()
-	c.Log.Debug(fmt.Printf("%+v\n", h.Network().Peerstore().Peers()))
+	// c.Log.Debugf("%+v\n", c.Host().Network().Peerstore().Peers())
 }
 
 func (c *BasicLibp2pHost) standardDisconnectF(net network.Network, conn network.Conn) {
-	c.Log.Debug("Disconnect")
+	c.Log.Debugf("Disconnect")
 }
 
 func (c *BasicLibp2pHost) standardOpenedStreamF(net network.Network, str network.Stream) {

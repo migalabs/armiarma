@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"crypto/ecdsa"
+	"crypto/rand"
 	"encoding/hex"
 	"strings"
 
@@ -50,6 +52,28 @@ func PrivKeyToString(input_key *crypto.Secp256k1PrivateKey) string {
 		return ""
 	}
 
+	return hex.EncodeToString(keyBytes)
+}
+
+func Generate_privKey() string {
+
+	localLogger := CreateKeysLogger()
+
+	key, err := ecdsa.GenerateKey(gcrypto.S256(), rand.Reader)
+
+	if err != nil {
+		localLogger.Panicf("failed to generate key: %v", err)
+	}
+
+	secpKey := (*crypto.Secp256k1PrivateKey)(key)
+
+	keyBytes, err := secpKey.Raw()
+
+	if err != nil {
+		localLogger.Panicf("failed to serialize key: %v", err)
+	}
+
+	localLogger.Debugf("Generated Key!: ", hex.EncodeToString(keyBytes))
 	return hex.EncodeToString(keyBytes)
 }
 
