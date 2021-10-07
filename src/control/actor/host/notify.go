@@ -6,11 +6,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/libp2p/go-libp2p-core/network"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/protolambda/rumor/control/actor/base"
 	"github.com/protolambda/rumor/control/actor/peer/metadata"
 	"github.com/protolambda/rumor/metrics"
+	"github.com/protolambda/rumor/p2p/addrutil"
 	"github.com/protolambda/rumor/p2p/track"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
@@ -93,10 +95,13 @@ func (c *HostNotifyCmd) connectedF(net network.Network, conn network.Conn) {
 		// We can only get the node.ID if the ENR of the peer was already in the PeerStore fromt dv5
 		peer.NodeId = n.ID().String()
 	} else {
-		// TODO: If the peer wasn't discovered via dv5 "n" will be empty
-		log.WithFields(logrus.Fields{
-			"ERROR": "Peer ENR not found",
-		}).Warn("Peer: ", conn.RemotePeer().String())
+		edcsakey, err := addrutil.ParsePubkey(peer.Pubkey)
+		if err != nil {
+			log.WithFields(logrus.Fields{
+				"ERROR": "parsing pubkey",
+			}).Warn("Peer: ", conn.RemotePeer().String())
+		}
+		peer.NodeId = enode.PubkeyToIDV4(edcsakey).String()
 	}
 	// Add new connection event
 	peer.ConnectionEvent(conn.Stat().Direction.String(), time.Now())
