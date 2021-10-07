@@ -117,11 +117,15 @@ func (c *PrometheusRunner) Run(ctx context.Context) error {
 							}
 						*/
 						// Generate the Country Code distribution
-						_, ok := geoDist[peerData.CountryCode]
+						countrycode := peerData.CountryCode
+						if countrycode == "" {
+							countrycode = "--"
+						}
+						_, ok := geoDist[countrycode]
 						if ok {
-							geoDist[peerData.CountryCode] += 1
+							geoDist[countrycode] += 1
 						} else {
-							geoDist[peerData.CountryCode] = 1
+							geoDist[countrycode] = 1
 						}
 						// Client Version Distribution
 						client, version := utils.FilterClientType(peerData.UserAgent)
