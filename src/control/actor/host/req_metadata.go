@@ -147,7 +147,7 @@ func ReqHostInfo(ctx context.Context, h host.Host, conn network.Conn, peer *metr
 		// leaving it emtpy to spot the problem, IP-Api request already makes a parse of the IP before making server petition
 		log.Error(err)
 	}
-	peer.Country, peer.City, err = utils.GetLocationFromIp(peer.Ip)
+	peer.Country, peer.City, peer.CountryCode, err = utils.GetLocationFromIp(peer.Ip)
 	if err != nil {
 		log.Error("error when fetching country/city from ip", err)
 	}
