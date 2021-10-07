@@ -5,7 +5,7 @@ echo "priv key = $priv_key"
 # And tag, see how many users identify us
 host start --identify=true --libp2p-ping=true \
   --lo-peers=9000 --hi-peers=10000 \
-  --peer-grace-period=30s --agent="BSC-Armiarma" --priv="$priv_key"
+  --peer-grace-period=30s --agent="armiarma-crawler" --priv="$priv_key"
   
 # Set all the connections and streams as visible
 host notify all
