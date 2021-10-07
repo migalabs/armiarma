@@ -33,8 +33,12 @@ func FilterClientType(userAgent string) (string, string) {
 		return "Lodestar", cleanVersion(getVersionIfAny(fields, 1))
 	} else if strings.Contains(userAgentLower, "rust-libp2p") {
 		return "Grandine", cleanVersion(getVersionIfAny(fields, 1))
+	} else if strings.Contains(userAgentLower, "eth2-crawler") {
+		return "NodeWatch", ""
+	} else if strings.Contains(userAgentLower, "bsc-armiarma") {
+		return "BSC-Armiarma", ""
 	} else {
-		log.Warnf("Could not get client from userAgent: %s", userAgent)
+		log.Debugf("Could not get client from userAgent: %s", userAgent)
 		return "Unknown", "Unknown"
 	}
 }
