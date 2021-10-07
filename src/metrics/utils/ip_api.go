@@ -34,7 +34,7 @@ var attemptsLeft int = 10
 var timeLeft int = 1
 
 // get location country and City from the multiaddress of the peer on the peerstore
-func GetLocationFromIp(ip string) (country string, city string, err error) {
+func GetLocationFromIp(ip string) (country string, city string, countrycode string, err error) {
 	url := "http://ip-api.com/json/" + ip
 
 	// When getting close to 0 attempts
@@ -46,12 +46,12 @@ func GetLocationFromIp(ip string) (country string, city string, err error) {
 
 	resp, err := http.Get(url)
 	if err != nil {
-		return "", "", errors.Wrap(err, "error getting ip api http")
+		return "", "", "", errors.Wrap(err, "error getting ip api http")
 	}
 	defer resp.Body.Close()
 	bodyBytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return "", "", errors.Wrap(err, "could not read response body")
+		return "", "", "", errors.Wrap(err, "could not read response body")
 	}
 
 	attemptsLeft, _ = strconv.Atoi(resp.Header["X-Rl"][0])
@@ -63,17 +63,18 @@ func GetLocationFromIp(ip string) (country string, city string, err error) {
 
 	// Check if the status of the request has been succesful
 	if ipApiResp.Status != "success" {
-		return "", "", errors.New("status from ip different than success, body: " + string(bodyBytes))
+		return "", "", "", errors.New("status from ip different than success, body: " + string(bodyBytes))
 	}
 
 	country = ipApiResp.Country
+	countrycode = ipApiResp.CountryCode
 	city = ipApiResp.City
 
 	// check if country and city are correctly imported
 	if len(country) == 0 || len(city) == 0 {
-		return "", "", errors.New("country or city are empty")
+		return "", "", "", errors.New("country or city are empty")
 	}
 
 	// return the received values from the received message
-	return country, city, nil
+	return country, city, countrycode, nil
 }

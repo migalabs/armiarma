@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	DeprecationTime = 48 * time.Hour
+	DeprecationTime = 24 * time.Hour
 )
 
 // Stores all the information related to a peer

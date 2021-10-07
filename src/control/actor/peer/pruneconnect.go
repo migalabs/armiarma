@@ -19,6 +19,10 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+var (
+	DefaultDelay = 24 // hours of dealy after each negative attempt with delay
+)
+
 type PeerPruneConncetCmd struct {
 	*base.Base
 	Store      track.ExtendedPeerstore
@@ -108,7 +112,7 @@ func (c *PeerPruneConncetCmd) run(ctx context.Context, h host.Host, store track.
 					if err != nil {
 						log.Warnf("ERROR, the peer should have a last connection attempt but list is empty")
 					}
-					lconnSecs := lconn.Add(time.Duration(wtime*12) * time.Hour).Unix()
+					lconnSecs := lconn.Add(time.Duration(wtime*DefaultDelay) * time.Hour).Unix()
 					tnow := time.Now().Unix()
 					// Compare time now with last connection plus waiting list
 					if (tnow - lconnSecs) <= 0 {

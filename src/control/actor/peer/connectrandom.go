@@ -153,11 +153,12 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host, store track
 				peer.Ip = peerEnr.IP().String()
 				peer.Addrs = addr.String()
 
-				country, city, err := utils.GetLocationFromIp(peer.Ip)
+				country, city, countrycode, err := utils.GetLocationFromIp(peer.Ip)
 				if err != nil {
 					log.Warn("could not get location from ip: ", peer.Ip, err)
 				} else {
 					peer.Country = country
+					peer.CountryCode = countrycode
 					peer.City = city
 				}
 				c.PeerStore.StoreOrUpdatePeer(peer)

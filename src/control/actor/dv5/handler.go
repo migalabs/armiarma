@@ -3,14 +3,15 @@ package dv5
 import (
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/ethereum/go-ethereum/p2p/enode"
+	"github.com/protolambda/rumor/metrics"
+	"github.com/protolambda/rumor/metrics/utils"
 	"github.com/protolambda/rumor/p2p/addrutil"
 	"github.com/protolambda/rumor/p2p/track"
 	"github.com/protolambda/zrnt/eth2/beacon"
-	"github.com/protolambda/rumor/metrics"
-	"github.com/protolambda/rumor/metrics/utils"
 	"github.com/sirupsen/logrus"
-	"time"
 )
 
 type HandleENR struct {
@@ -20,7 +21,7 @@ type HandleENR struct {
 	FilterDigest beacon.ForkDigest `ask:"--filter-digest" help:"Only add peers with the given digest to the peerstore"`
 	TTL          time.Duration     `ask:"--ttl" help:"When adding the node, apply this TTL"`
 	Filtering    bool              `changed:"filter-digest"`
-	PeerStore *metrics.PeerStore
+	PeerStore    *metrics.PeerStore
 }
 
 func (c *HandleENR) handle(log logrus.FieldLogger, res *enode.Node) error {
@@ -64,11 +65,12 @@ func (c *HandleENR) handle(log logrus.FieldLogger, res *enode.Node) error {
 		peer.Ip = res.IP().String()
 		peer.Addrs = addr.String()
 
-		country, city, err := utils.GetLocationFromIp(res.IP().String())
+		country, city, countrycode, err := utils.GetLocationFromIp(res.IP().String())
 		if err != nil {
 			logrus.Warn("could not get location from ip: ", res.IP(), err)
 		} else {
 			peer.Country = country
+			peer.CountryCode = countrycode
 			peer.City = city
 		}
 		c.PeerStore.StoreOrUpdatePeer(peer)

@@ -35,7 +35,7 @@ func FilterClientType(userAgent string) (string, string) {
 		return "Grandine", cleanVersion(getVersionIfAny(fields, 1))
 	} else if strings.Contains(userAgentLower, "eth2-crawler") {
 		return "NodeWatch", ""
-	} else if strings.Contains(userAgentLower, "bsc-armiarma") {
+	} else if strings.Contains(userAgentLower, "armiarma-crawler") {
 		return "BSC-Armiarma", ""
 	} else {
 		log.Debugf("Could not get client from userAgent: %s", userAgent)
@@ -81,6 +81,9 @@ func FilterError(err string) string {
 	} else {
 		log.Errorf("uncertain error: %s", err)
 	}
+	// TODO: Further encountered errors:
+	// 		 - stream reset
+	// 		 - no good address
 
 	return errorPretty
 }
