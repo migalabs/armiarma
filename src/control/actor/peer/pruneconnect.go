@@ -177,6 +177,10 @@ func (c *PeerPruneConncetCmd) run(ctx context.Context, h host.Host, store track.
 						// break the loop
 						break
 					}
+					if attempts >= c.MaxRetries {
+						c.Log.Warnf("attempts %d failed connection attempt, reached maximum, no retry", attempts)
+						break
+					}
 				}
 			}
 			tIter := time.Since(t)
