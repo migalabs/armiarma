@@ -7,6 +7,7 @@ import (
 const ATTNETS_KEY = "attnets"
 const ETH2_ENR_KEY = "eth2"
 
+// Attended networks are the networks the node will be participating in
 type AttnetsENREntry []byte
 
 func NewAttnetsENREntry(input_bytes string) AttnetsENREntry {
@@ -24,6 +25,7 @@ func (aee AttnetsENREntry) ENRKey() string {
 	return ATTNETS_KEY
 }
 
+// With this entry we allow the node to have a registered fork digest
 type Eth2ENREntry []byte
 
 func NewEth2DataEntry(input_bytes string) Eth2ENREntry {
