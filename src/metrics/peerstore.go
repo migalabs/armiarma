@@ -149,50 +149,6 @@ func (c *PeerStore) AddNewPosConnectionAttempt(id string) error {
 	return nil
 }
 
-/// AddNewAttempts adds the resuts of a negative new attempt over an existing peer
-// increasing the attempt counter and the respective fields
-func (c *PeerStore) AddNewNegConnectionAttempt(id string, rec_err string, fn ErrorHandling) error {
-	p, err := c.GetPeerData(id)
-	if err != nil { // the peer was already in the sync.Map return true
-		return fmt.Errorf("Not peer found with that ID %s", id)
-	}
-	// Update the counter and connection status
-	p.Attempts += 1
-	if !p.Attempted {
-		p.Attempted = true
-		p.Error = utils.FilterError(rec_err)
-
-	}
-	// Handle each of the different error types as defined currently at pruneconnect.go
-	fn(&p)
-
-	// Store the new struct in the sync.Map
-	c.StorePeer(p)
-	return nil
-}
-
-// AddNewPosConnectionAttempt adds the resuts of a possitive new attempt over an existing peer
-// increasing the attempt counter and the respective fields
-func (c *PeerStore) AddNewPosConnectionAttempt(id string) error {
-	p, err := c.GetPeerData(id)
-	if err != nil { // the peer was already in the sync.Map return true
-		return fmt.Errorf("Not peer found with that ID %s", id)
-	}
-	// Update the counter and connection status
-	p.Attempts += 1
-	if !p.Attempted {
-		p.Attempted = true
-
-	}
-	p.Succeed = true
-	p.Error = "None"
-	// clean the Negative connection Attempt list
-	p.AddPositiveConnAttempt()
-	// Store the new struct in the sync.Map
-	c.StorePeer(p)
-	return nil
-}
-
 // Add a connection Event to the given peer
 func (c *PeerStore) ConnectionEvent(peerId string, direction string) error {
 	peer, err := c.GetPeerData(peerId)
