@@ -18,6 +18,7 @@ type LocalNode struct {
 	info_data *info.InfoData
 }
 
+// This constructor will return an Enode object using the given parameters
 func NewLocalNode(ctx context.Context, info_obj *info.InfoData, stdOpts base.LogOpts) *LocalNode {
 	localOpts := nodeLoggerOpts(stdOpts)
 	new_base, err := base.NewBase(
@@ -41,12 +42,14 @@ func NewLocalNode(ctx context.Context, info_obj *info.InfoData, stdOpts base.Log
 	}
 }
 
+// This function will fill the custom logging options to this struct
 func nodeLoggerOpts(input_opts base.LogOpts) base.LogOpts {
 	input_opts.ModName = PKG_NAME
 
 	return input_opts
 }
 
+// Add needed Eth2 entries to the node
 func (l *LocalNode) AddEntries() {
 	l.LocalNode.Set(NewAttnetsENREntry("ffffffffffffffff"))
 	l.LocalNode.Set(NewEth2DataEntry("b5303f2a"))

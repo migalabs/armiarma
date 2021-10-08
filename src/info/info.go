@@ -90,6 +90,8 @@ func (i *InfoData) importFromConfig(input_config config.ConfigData, stdOpts base
 
 }
 
+// This method fills the missing logging parameters from the base objecy
+// received
 func (i *InfoData) infoLoggerOpts(input_opts base.LogOpts) base.LogOpts {
 	input_opts.ModName = PKG_NAME
 	input_opts.Level = i.GetLogLevel()

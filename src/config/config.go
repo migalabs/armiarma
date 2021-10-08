@@ -171,6 +171,8 @@ func (c *ConfigData) checkEmptyFields() {
 
 }
 
+// Fills default logging options for the Config object
+// This is because we have not read the configuration file yet
 func defaultConfigLoggerOpts(input_opts base.LogOpts) base.LogOpts {
 	input_opts.ModName = PKG_NAME
 	input_opts.Level = DEFAULT_LOG_LEVEL
