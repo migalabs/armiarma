@@ -19,7 +19,7 @@ type LocalNode struct {
 }
 
 func NewLocalNode(ctx context.Context, info_obj *info.InfoData, stdOpts base.LogOpts) *LocalNode {
-	localOpts := nodeLoggerOpts(stdOpts, info_obj)
+	localOpts := nodeLoggerOpts(stdOpts)
 	new_base, err := base.NewBase(
 		base.WithContext(ctx),
 		base.WithLogger(localOpts),
@@ -41,9 +41,8 @@ func NewLocalNode(ctx context.Context, info_obj *info.InfoData, stdOpts base.Log
 	}
 }
 
-func nodeLoggerOpts(input_opts base.LogOpts, info_data *info.InfoData) base.LogOpts {
+func nodeLoggerOpts(input_opts base.LogOpts) base.LogOpts {
 	input_opts.ModName = PKG_NAME
-	input_opts.Level = info_data.GetLogLevel()
 
 	return input_opts
 }

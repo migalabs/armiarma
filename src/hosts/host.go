@@ -126,3 +126,7 @@ func (b *BasicLibp2pHost) Stop() {
 	b.Log.Info("stopping Libp2p host")
 	b.Cancel()
 }
+
+func (b *BasicLibp2pHost) GetInfoObj() *info.InfoData {
+	return b.info_obj
+}
