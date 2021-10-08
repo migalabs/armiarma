@@ -21,7 +21,11 @@ import (
 	"os/signal"
 
 	"github.com/migalabs/armiarma/src/base"
+	"github.com/migalabs/armiarma/src/discovery"
+	"github.com/migalabs/armiarma/src/enode"
+	"github.com/migalabs/armiarma/src/gossipsub"
 	"github.com/migalabs/armiarma/src/hosts"
+	"github.com/migalabs/armiarma/src/info"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -30,7 +34,14 @@ import (
 type CrawlerBase struct {
 	*base.Base
 	Host *hosts.BasicLibp2pHost
+	Node *enode.LocalNode
+	Dv5  *discovery.Discovery
+	Gs   *gossipsub.GossipSub
+	Info *info.InfoData
 }
+
+// variable to be used as a flag from command line
+var inputconfigFile string
 
 // crawlerCmd represents the crawler command
 var crawlerCmd = &cobra.Command{
@@ -47,7 +58,7 @@ var crawlerCmd = &cobra.Command{
 			Formatter: "text",
 			Level:     "debug",
 		}
-		// generata a base for the crawler app
+		// generate a base for the crawler app
 		b, err := base.NewBase(
 			base.WithContext(mainCtx),
 			base.WithLogger(logOpts),
@@ -55,20 +66,26 @@ var crawlerCmd = &cobra.Command{
 		if err != nil {
 			log.Panic(err)
 		}
+
+		stdOpts := base.LogOpts{
+			Output:    "terminal",
+			Formatter: "text",
+		}
+
+		info_tmp := info.NewCustomInfoData(inputconfigFile, stdOpts)
+		stdOpts.Level = info_tmp.GetLogLevel()
+
 		// TODO: just harcoded
 		baseOpts := base.LogOpts{
 			ModName:   "libp2p host",
 			Output:    "terminal",
 			Formatter: "text",
-			Level:     "debug",
+			Level:     info_tmp.GetLogLevel(),
 		}
+
 		hostOpts := hosts.BasicLibp2pHostOpts{
-			IP:        "127.0.0.1",
-			TCP:       "9054",
-			UDP:       "9054",
-			UserAgent: "BSC-Armiarma-Crawler",
-			PrivKey:   "026c60367b01fe3d7c7460bce1d585260ce465fa0abcb6e13619f88bf0dad54f",
-			LogOpts:   baseOpts,
+			Info_obj: *info_tmp,
+			LogOpts:  baseOpts,
 		}
 		// generate libp2pHost
 		host, err := hosts.NewBasicLibp2pHost(b.Ctx(), hostOpts)
@@ -76,10 +93,18 @@ var crawlerCmd = &cobra.Command{
 			log.Panic(err)
 		}
 
+		node_tmp := enode.NewLocalNode(b.Ctx(), info_tmp, stdOpts)
+		//node_tmp.AddEntries()
+		dv5_tmp := discovery.NewDiscovery(b.Ctx(), node_tmp, info_tmp, 9006, stdOpts)
+		gs_tmp := gossipsub.NewGossipSub(b.Ctx(), *host, stdOpts)
 		// generate the CrawlerBase
 		crawler := CrawlerBase{
 			Base: b,
 			Host: host,
+			Info: info_tmp,
+			Node: node_tmp,
+			Dv5:  dv5_tmp,
+			Gs:   gs_tmp,
 		}
 
 		// Initialization Phase for the crawler
@@ -110,13 +135,20 @@ func init() {
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
 	// crawlerCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
-	var loglvl string
-	crawlerCmd.Flags().StringVar(&loglvl, "log-lvl", "debug", "Set the log level of the App")
+
+	crawlerCmd.Flags().StringVar(&inputconfigFile, "config-file", "", "Set the configuration file to import")
 }
 
 // generate new CrawlerBase
 func (c *CrawlerBase) InitCrawler() error {
 	// initialization secuence for the crawler
+
 	c.Host.Start()
-	return nil
+	c.Dv5.Start_dv5()
+	go c.Dv5.FindRandomNodes(*c.Host)
+
+	c.Gs.JoinAndSubscribe("/eth2/b5303f2a/beacon_block/ssz_snappy")
+
+	select {}
+	// return nil
 }
