@@ -107,7 +107,7 @@ func (i *InfoData) GetTcpPortString() string {
 	return fmt.Sprintf("%d", i.tcpPort)
 }
 func (i *InfoData) SetTcpPort(input_port int) {
-	if input_port > 65000 || input_port < 0 {
+	if input_port > MAX_PORT || input_port < MIN_PORT {
 		i.localLogger.Debugf("TCP port not valid, applying default %d", config.DEFAULT_TCP_PORT)
 		i.tcpPort = config.DEFAULT_TCP_PORT
 		return
@@ -124,7 +124,7 @@ func (i *InfoData) GetUdpPortString() string {
 	return fmt.Sprintf("%d", i.udpPort)
 }
 func (i *InfoData) SetUdpPort(input_port int) {
-	if input_port > 65000 || input_port < 0 {
+	if input_port > MAX_PORT || input_port < MIN_PORT {
 		i.localLogger.Debugf("UDP port not valid, applying default %d", config.DEFAULT_UDP_PORT)
 		i.udpPort = config.DEFAULT_UDP_PORT
 		return

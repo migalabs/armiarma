@@ -48,7 +48,7 @@ func NewEmptyDiscovery() *Discovery {
 // constructor
 func NewDiscovery(ctx context.Context, input_node *enode.LocalNode, info_obj *info.InfoData, input_port int, stdOpts base.LogOpts) *Discovery {
 
-	localLogger := dv5LoggerOpts(stdOpts, info_obj)
+	localLogger := dv5LoggerOpts(stdOpts)
 
 	// instance base
 	new_base, err := base.NewBase(
@@ -113,7 +113,7 @@ func (d *Discovery) Start_dv5() {
 	}
 }
 
-func (d Discovery) FindRandomNodes(h hosts.BasicLibp2pHost) {
+func (d *Discovery) FindRandomNodes(h hosts.BasicLibp2pHost) {
 	iterator := d.Dv5Listener.RandomNodes()
 
 	for iterator.Next() {
@@ -143,7 +143,7 @@ func (d Discovery) FindRandomNodes(h hosts.BasicLibp2pHost) {
 		}
 
 		h.Host().Connect(h.Ctx(), *new_addr_info)
-		d.b.Log.Infof("%+v\n", h.Host().Network().Peerstore().Peers())
+		// d.b.Log.Infof("%+v\n", h.Host().Network().Peerstore().Peers())
 
 	}
 }
@@ -183,9 +183,8 @@ func (d *Discovery) ImportBootNodeList(import_json_file string) {
 
 }
 
-func dv5LoggerOpts(input_opts base.LogOpts, info_data *info.InfoData) base.LogOpts {
+func dv5LoggerOpts(input_opts base.LogOpts) base.LogOpts {
 	input_opts.ModName = PKG_NAME
-	input_opts.Level = info_data.GetLogLevel()
 
 	return input_opts
 }

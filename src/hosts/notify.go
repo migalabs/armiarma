@@ -1,8 +1,6 @@
 package hosts
 
 import (
-	"fmt"
-
 	"github.com/libp2p/go-libp2p-core/network"
 	ma "github.com/multiformats/go-multiaddr"
 )
@@ -21,7 +19,7 @@ func (c *BasicLibp2pHost) standardListenCloseF(net network.Network, addr ma.Mult
 
 func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Conn) {
 	c.Log.Debug("Connection")
-	c.Log.Debug(fmt.Sprintf("%+v\n", conn))
+	// c.Log.Debug(fmt.Sprintf("%+v\n", conn))
 	// c.Log.Debugf("%+v\n", c.Host().Network().Peerstore().Peers())
 }
 
