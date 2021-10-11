@@ -13,7 +13,7 @@ func TestPeerStoreStorage(t *testing.T) {
 	// Test the BoltDB to store the information about a peer
 	db := NewBoltPeerDB(path)
 	defer db.Close()
-	defer os.Remove("test.db")
+	defer os.Remove("test_db")
 	testStorage(t, db)
 	m := NewMemoryDB()
 	// Test the Memory DB to store the information about a peer
@@ -48,8 +48,11 @@ func testStorage(t *testing.T, p PeerStoreStorage) {
 	require.True(t, ok)
 	require.Equal(t, "Client2", peer_test.ClientName)
 
-	var peerStoreTest []Peer
+	peer_test, ok = p.Load("3")
+	require.True(t, ok)
+	require.Equal(t, "Client3", peer_test.ClientName)
 
+	var peerStoreTest []Peer
 	p.Range(func(key string, value Peer) bool {
 		peerStoreTest = append(peerStoreTest, value)
 		return true

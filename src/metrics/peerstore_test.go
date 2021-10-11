@@ -7,7 +7,7 @@ import (
 
 func Test_StoreOrUpdatePeer(t *testing.T) {
 	// stores a peer
-	peerStore := NewPeerStore()
+	peerStore := NewPeerStore("memory", "")
 	p1 := NewPeer("Peer1")
 	p1.ClientName = "Client1"
 	peerStore.StoreOrUpdatePeer(p1)

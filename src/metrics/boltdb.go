@@ -60,7 +60,6 @@ func (p BoltPeerDB) Load(key string) (value Peer, ok bool) {
 	if !ok {
 		return Peer{}, false
 	}
-
 	err := json.Unmarshal(value_marshalled, &value)
 	if err != nil {
 		log.Error(err)
@@ -116,7 +115,7 @@ func (db *BoltDB) Close() {
 	db.db.Close()
 }
 
-func (db *BoltDB) Load(key []byte) (value []byte, ok bool) {
+func (db BoltDB) Load(key []byte) (value []byte, ok bool) {
 	db.db.Update(func(t *bolt.Tx) error {
 		b := t.Bucket([]byte(db.bucket))
 		value = b.Get(key)
@@ -148,7 +147,7 @@ func (db *BoltDB) Delete(key []byte) {
 	})
 }
 
-func (db *BoltDB) Range(f func(key, value []byte) bool) {
+func (db BoltDB) Range(f func(key, value []byte) bool) {
 	db.db.View(func(t *bolt.Tx) error {
 		b := t.Bucket([]byte(db.bucket))
 		err := b.ForEach(func(k, v []byte) error {
