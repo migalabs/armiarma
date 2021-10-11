@@ -217,12 +217,10 @@ func (c *PrometheusRunner) Run(ctx context.Context) error {
 
 			peerstoreIterTime.Set(float64(c.PeerStore.PeerstoreIterTime) / (60 * 1000000000))
 
-			// get the message counter
+			// get the message counter per minutes
 			secs := c.RefreshInterval.Seconds()
-			bb := float64(beacBlock) / secs
-			//fmt.Println("Beacon_blocks", beacBlock, "m/ps", bb)
-			ba := float64(beacAttestation) / secs
-			//fmt.Println("Beacon_Attestation", beacAttestation, "m/ps", ba)
+			bb := (float64(beacBlock) / secs) * 60
+			ba := (float64(beacAttestation) / secs) * 60
 			tot := float64(totalMsg)
 
 			receivedMessages.WithLabelValues("beacon_blocks").Set(bb)
