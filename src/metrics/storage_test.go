@@ -13,7 +13,7 @@ func TestPeerStoreStorage(t *testing.T) {
 	// Test the BoltDB to store the information about a peer
 	db := NewBoltPeerDB(path)
 	defer db.Close()
-	defer os.Remove("test_db")
+	defer os.Remove("./test_db")
 	testStorage(t, db)
 	m := NewMemoryDB()
 	// Test the Memory DB to store the information about a peer
