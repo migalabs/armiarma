@@ -27,6 +27,10 @@ func Test_FilterClientType(t *testing.T) {
 	require.Equal(t, client, "Lighthouse")
 	require.Equal(t, version, "v1.5.1")
 
+	client, version = FilterClientType("Lighthouse/v2.0.0-7c88f58/x86_64-linux")
+	require.Equal(t, client, "Lighthouse")
+	require.Equal(t, version, "v2.0.0")
+
 	client, version = FilterClientType("nimbus")
 	require.Equal(t, client, "Nimbus")
 	require.Equal(t, version, "Unknown")
@@ -39,7 +43,7 @@ func Test_FilterClientType(t *testing.T) {
 	require.Equal(t, client, "NodeWatch")
 	require.Equal(t, version, "")
 
-	client, version = FilterClientType("BSC-Armiarma")
+	client, version = FilterClientType("armiarma-crawler")
 	require.Equal(t, client, "BSC-Armiarma")
 	require.Equal(t, version, "")
 
