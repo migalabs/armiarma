@@ -3,6 +3,7 @@ package metrics
 import (
 	"fmt"
 	"os"
+	"runtime"
 	"time"
 
 	"github.com/pkg/errors"
@@ -89,6 +90,8 @@ func (c *PeerStore) StoreOrUpdatePeer(peer Peer) {
 		oldPeer.FetchPeerInfoFromPeer(peer)
 		c.PeerStore.Store(peer.PeerId, oldPeer)
 	}
+	// Force Garbage collector
+	runtime.GC()
 }
 
 // Stores exact peer, overwritting the existing peer. Use only internally
@@ -249,6 +252,7 @@ func (c *PeerStore) ExportToCSV(filePath string) error {
 	if err != nil {
 		return errors.Wrap(err, "could not export peer metrics")
 	}
-
+	// Force Garbage collector
+	runtime.GC()
 	return nil
 }

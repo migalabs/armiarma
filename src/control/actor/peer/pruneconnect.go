@@ -2,8 +2,7 @@ package peer
 
 import (
 	"context"
-	"fmt"
-	"os"
+	"runtime"
 	"strings"
 	"time"
 
@@ -51,23 +50,16 @@ func (c *PeerPruneConncetCmd) Run(ctx context.Context, args ...string) error {
 	if err != nil {
 		return err
 	}
-	// TEMPORARY FIX TO SEE HOW MANY PEERS MIGRATE OF PEER ID
-	f, err := os.OpenFile("peerid_migrations.txt", os.O_RDWR|os.O_CREATE, 0755)
-
-	// END TEMPORARY FIX
 	bgCtx, bgCancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 	go func() {
-		c.run(bgCtx, h, c.Store, f)
+		c.run(bgCtx, h, c.Store)
 		close(done)
 	}()
 
 	c.Control.RegisterStop(func(ctx context.Context) error {
 		bgCancel()
 		c.Log.Infof("Stopped auto-connecting")
-		if err := f.Close(); err != nil {
-			panic(err)
-		}
 		<-done
 		return nil
 	})
@@ -78,7 +70,7 @@ func (c *PeerPruneConncetCmd) Run(ctx context.Context, args ...string) error {
 // every 3-4 minutes generate a local new copy of the peers in the peerstore.
 // It randomly selects one of the attempting to connect with it, recording the
 // results of the attempts. If the peer was already connected, just dropt it
-func (c *PeerPruneConncetCmd) run(ctx context.Context, h host.Host, store track.ExtendedPeerstore, f *os.File) {
+func (c *PeerPruneConncetCmd) run(ctx context.Context, h host.Host, store track.ExtendedPeerstore) {
 	c.Log.Info("started randomly peering")
 	quit := make(chan struct{})
 	// Set the defer function to cancel the go routine
@@ -172,7 +164,7 @@ func (c *PeerPruneConncetCmd) run(ctx context.Context, h host.Host, store track.
 					if err := h.Connect(ctx, addrInfo); err != nil {
 						c.Log.WithError(err).Warnf("attempts %d failed connection attempt", attempts)
 						// the connetion failed
-						c.RecErrorHandler(p, err.Error(), f)
+						c.RecErrorHandler(p, err.Error())
 						attempts++
 						continue
 					} else { // connection successfuly made
@@ -193,6 +185,8 @@ func (c *PeerPruneConncetCmd) run(ctx context.Context, h host.Host, store track.
 			// Measure the time of the entire PeerStore loop
 			log.Infof("Time to ping the entire peerstore (except deprecated): %s", tIter)
 			log.Infof("Peer attempted from the last reset: %d", len(peerList))
+			// Force Garbage collector
+			runtime.GC()
 
 			// Check if we have received any quit signal
 			if quit == nil {
@@ -211,7 +205,7 @@ func peeringWorker(ctx context.Context, ps *metrics.PeerStore, peerChan chan str
 
 // function that selects actuation method for each of the possible errors while actively dialing peers
 //
-func (c *PeerPruneConncetCmd) RecErrorHandler(pe peer.ID, rec_err string, f *os.File) {
+func (c *PeerPruneConncetCmd) RecErrorHandler(pe peer.ID, rec_err string) {
 	var fn func(p *metrics.Peer)
 	switch utils.FilterError(rec_err) {
 	case "Connection reset by peer":
@@ -251,8 +245,8 @@ func (c *PeerPruneConncetCmd) RecErrorHandler(pe peer.ID, rec_err string, f *os.
 		// trim new peerID from error message
 		np := strings.Split(rec_err, "key matches ")[1]
 		np = strings.Replace(np, ")", "", -1)
-		newPeerID := peer.ID(np)
-		f.WriteString(fmt.Sprintf("%s shifted to %s\n", pe.String(), newPeerID))
+		//newPeerID := peer.ID(np)
+		//f.WriteString(fmt.Sprintf("%s shifted to %s\n", pe.String(), newPeerID))
 		// Generate a new Peer with the addrs of the previous one and the ID suggested at the
 		log.Infof("deprecating peer %s, but adding possible new peer %s", pe.String(), np)
 		/*
