@@ -2,7 +2,6 @@ package peer
 
 import (
 	"context"
-	"runtime"
 	"strings"
 	"time"
 
@@ -185,8 +184,11 @@ func (c *PeerPruneConncetCmd) run(ctx context.Context, h host.Host, store track.
 			// Measure the time of the entire PeerStore loop
 			log.Infof("Time to ping the entire peerstore (except deprecated): %s", tIter)
 			log.Infof("Peer attempted from the last reset: %d", len(peerList))
-			// Force Garbage collector
-			runtime.GC()
+			/*
+				// Force Garbage collector
+				runtime.GC()
+				runtime.FreeOSMemory()
+			*/
 
 			// Check if we have received any quit signal
 			if quit == nil {

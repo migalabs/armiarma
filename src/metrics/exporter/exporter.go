@@ -19,7 +19,7 @@ func NewExporter(gm *metrics.PeerStore) Exporter {
 	return Exporter{
 		PeerStore:      gm,
 		CsvFileName:    "metrics.csv",
-		ExportInterval: 30 * time.Second,
+		ExportInterval: 10 * time.Minute,
 	}
 }
 
