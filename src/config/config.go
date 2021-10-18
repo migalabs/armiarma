@@ -52,7 +52,10 @@ type ConfigData struct {
 	DBType        string   `json:"DBType"`
 }
 
-// Will create an empty object
+// NewEmptyConfig
+// * This method will create a ConfigData empty object
+// @param opts The parameter including the logging options
+// @return A ConfigData object
 func NewEmptyConfigData(opts base.LogOpts) *ConfigData {
 	opts = defaultConfigLoggerOpts(opts)
 	return &ConfigData{
@@ -60,7 +63,11 @@ func NewEmptyConfigData(opts base.LogOpts) *ConfigData {
 	}
 }
 
-// Will create an object using default parameters
+// NewDefaultConfigData
+// * This method will create a ConfigData object using Default parameters
+// * hardoded in the code
+// @param opts The parameter including the logging options
+// @return A ConfigData object
 func NewDefaultConfigData(opts base.LogOpts) *ConfigData {
 
 	opts = defaultConfigLoggerOpts(opts)
@@ -84,8 +91,10 @@ func NewDefaultConfigData(opts base.LogOpts) *ConfigData {
 	}
 }
 
-// Receives an input file where to read configuration from and imports into
-// the current object
+// ReadFromJSON
+// *This method will parse a Configuration file and retrieve the data
+// * into the current ConfigData object
+// @param input_file where to read configuration from
 func (c *ConfigData) ReadFromJSON(input_file string) {
 	c.localLogger.Infof("Reading configuration from: ", input_file)
 
@@ -108,7 +117,10 @@ func (c *ConfigData) ReadFromJSON(input_file string) {
 
 }
 
-// iterate over the fields and apply defaults if needed
+// checkEmptyFields
+// * This method will iterate over all fields in the current
+// * ConfigData object and check if any is empty.
+// *If so, apply the default
 func (c *ConfigData) checkEmptyFields() {
 	if c.GetIP() == "" {
 		c.SetIP(DEFAULT_IP)
@@ -171,8 +183,11 @@ func (c *ConfigData) checkEmptyFields() {
 
 }
 
-// Fills default logging options for the Config object
-// This is because we have not read the configuration file yet
+// defaultConfigLoggerOpts
+// * This method will apply logging options on top of an existing
+// * logging object for a ConfigData.
+// @param opts the base logging object
+// @return the modified logging object adjusted to ConfigData
 func defaultConfigLoggerOpts(input_opts base.LogOpts) base.LogOpts {
 	input_opts.ModName = PKG_NAME
 	input_opts.Level = DEFAULT_LOG_LEVEL
