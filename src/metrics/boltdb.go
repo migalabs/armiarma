@@ -9,8 +9,6 @@ import (
 	"runtime"
 	"time"
 
-	"unsafe"
-
 	log "github.com/sirupsen/logrus"
 	bolt "go.etcd.io/bbolt"
 )
@@ -76,15 +74,7 @@ func (p BoltPeerDB) Delete(key string) {
 }
 
 func (p BoltPeerDB) Range(f func(key string, value Peer) bool) {
-	// Temporary
-	var lenPeerstore int = 0
-	var totReadedBytes int = 0
-	var peerStructBytes int = 0
-
 	p.db.Range(func(key, value []byte) bool {
-		lenPeerstore++
-		totReadedBytes += len(value)
-
 		var value_unmarshalled Peer
 		err := json.Unmarshal(value, &value_unmarshalled)
 		if err != nil {
@@ -92,12 +82,8 @@ func (p BoltPeerDB) Range(f func(key string, value Peer) bool) {
 			return false
 		}
 		ok := f(string(key), value_unmarshalled)
-		peerStructBytes += int(unsafe.Sizeof(value_unmarshalled))
 		return ok
 	})
-	if totReadedBytes > 0 {
-		fmt.Printf("items on the DB: %d | total size of readed MB: %d | total size of real readed strutc: %d | average size for item MB/peer: %d\n", lenPeerstore, totReadedBytes/1000000, peerStructBytes/1000000, (totReadedBytes/lenPeerstore)/1000000)
-	}
 }
 
 func (p BoltPeerDB) Close() {
@@ -149,19 +135,11 @@ func (db *BoltDB) Load(key []byte) ([]byte, bool) {
 }
 
 func (db *BoltDB) Store(key, value []byte) {
-	// Temp code
-	// CHECK HOW MANY BUCKETS ARE OPEN AT THE BOLT.DB
-	// end
 	db.db.Update(func(t *bolt.Tx) error {
 		b := t.Bucket([]byte(db.bucket))
 		err := b.Put(key, value)
 		return err
 	})
-	// Temp code
-	// CHECK HOW MANY BUCKETS ARE OPEN AT THE BOLT.DB
-	fmt.Println("A Alloc size in BoltDB", db.db.AllocSize)
-	fmt.Println("A Stats in BoltDB\n", db.db.Stats())
-	// end
 }
 
 func (db *BoltDB) Delete(key []byte) {
