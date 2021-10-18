@@ -41,8 +41,12 @@ type InfoData struct {
 	bootNodesFile string
 }
 
-// Will create an InfoData object using default values from config
-// Receive stdOpts (meaning, without the mod name and the level)
+// NewDefaultInfoData
+// * This method will create an empty InfoData object
+// * This method will create an InfoData object
+// * using default values from config
+// @param stdOpts (meaning, without the mod name and the level)
+// @return An InfoData object
 func NewDefaultInfoData(stdOpts base.LogOpts) *InfoData {
 
 	config_object := config.NewEmptyConfigData(stdOpts)
@@ -54,7 +58,12 @@ func NewDefaultInfoData(stdOpts base.LogOpts) *InfoData {
 	return &info_object
 }
 
-// Will create an InfoData object using imported values from config
+// NewCustomInfoData
+// * This method will create an InfoData object
+// * using imported values from config
+// @param input_file which to give to the ConfigData object
+// @param stdOpts (meaning, mod name and the level will be added here)
+// @return An InfoData object
 func NewCustomInfoData(input_file string, stdOpts base.LogOpts) *InfoData {
 
 	config_object := config.NewEmptyConfigData(stdOpts)
@@ -66,8 +75,12 @@ func NewCustomInfoData(input_file string, stdOpts base.LogOpts) *InfoData {
 	return &info_object
 }
 
-// This function will import the config values into the current InfoData
-// object
+// importFromConfig
+// * This method will import all data from the given ConfigData object
+// * As soon as we read the log level from the config object
+// * we create the logger object
+// @param input_config object to import data from
+// @param stdOpts base logging options
 func (i *InfoData) importFromConfig(input_config config.ConfigData, stdOpts base.LogOpts) {
 
 	i.SetLogLevel(input_config.GetLogLevel())
@@ -90,8 +103,10 @@ func (i *InfoData) importFromConfig(input_config config.ConfigData, stdOpts base
 
 }
 
-// This method fills the missing logging parameters from the base objecy
-// received
+// infoLoggerOpts
+// * This methos will modify logging options accordingly for the InfoData object
+// @param input_opts the base logging options
+// @return the mordified logging options from the input
 func (i *InfoData) infoLoggerOpts(input_opts base.LogOpts) base.LogOpts {
 	input_opts.ModName = PKG_NAME
 	input_opts.Level = i.GetLogLevel()
