@@ -38,7 +38,6 @@ func NewBoltPeerDB(path string) BoltPeerDB {
 		peercnt++
 		return true
 	})
-	fmt.Println("Peers in DB", peercnt)
 	if peercnt > 0 {
 		log.Infof("loaded BoltDB with %d peer on it", peercnt)
 	} else {
