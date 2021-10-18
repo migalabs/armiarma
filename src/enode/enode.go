@@ -18,7 +18,12 @@ type LocalNode struct {
 	info_data *info.InfoData
 }
 
-// This constructor will return an Enode object using the given parameters
+// NewLocalNode
+// * This method will create a LocalNode object using the given arguments
+// @param ctx the context, usually inherited from the base
+// @param info_obj the InfoData object where to get the configuration data from the user
+// @param stdOpts the logging options object
+// @return the LocalNode object
 func NewLocalNode(ctx context.Context, info_obj *info.InfoData, stdOpts base.LogOpts) *LocalNode {
 	localOpts := nodeLoggerOpts(stdOpts)
 	new_base, err := base.NewBase(
@@ -42,14 +47,19 @@ func NewLocalNode(ctx context.Context, info_obj *info.InfoData, stdOpts base.Log
 	}
 }
 
-// This function will fill the custom logging options to this struct
+// nodeLoggerOpts
+// * This method will fill the custom logging options to this struct
+// @param input_opts the logging options object
+// @return the modified logging options object
 func nodeLoggerOpts(input_opts base.LogOpts) base.LogOpts {
 	input_opts.ModName = PKG_NAME
 
 	return input_opts
 }
 
-// Add needed Eth2 entries to the node
+// AddEntries
+// * This method will add specific Eth2 Key Value entries to the created Node
+// TODO: confirm which data to add and structure appropiately
 func (l *LocalNode) AddEntries() {
 	l.LocalNode.Set(NewAttnetsENREntry("ffffffffffffffff"))
 	l.LocalNode.Set(NewEth2DataEntry("b5303f2a"))
