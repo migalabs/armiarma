@@ -96,7 +96,6 @@ func (c *PrometheusRunner) Run(ctx context.Context) error {
 			ipDist := make(map[string]float64)
 			rttDis := make(map[string]float64)
 			tctDis := make(map[string]float64)
-
 			c.PeerStore.PeerStore.Range(func(k string, peerData metrics.Peer) bool {
 				if !peerData.IsDeprecated() {
 					if peerData.MetadataRequest {

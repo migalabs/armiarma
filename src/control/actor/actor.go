@@ -97,7 +97,7 @@ func NewActor(id ActorID, globals *GlobalActorData) *Actor {
 		ActorCtx:         ctxAll,
 		actorCancel:      cancelAll,
 		CurrentPeerstore: track.NewDynamicPeerstore(),
-		PeerStore:        metrics.NewPeerStore("bolt", ""), // default config
+		PeerStore:        metrics.NewPeerStore("memory", ""), // default config
 		VisualizerState:  chainV,
 	}
 	return act
