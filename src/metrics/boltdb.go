@@ -9,8 +9,8 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/boltdb/bolt"
 	log "github.com/sirupsen/logrus"
+	bolt "go.etcd.io/bbolt"
 )
 
 // PeerStoreDb save the peer's data in a persistant Db.
@@ -60,7 +60,6 @@ func (p BoltPeerDB) Load(key string) (value Peer, ok bool) {
 	if !ok {
 		return Peer{}, false
 	}
-
 	err := json.Unmarshal(value_marshalled, &value)
 	if err != nil {
 		log.Error(err)
@@ -116,20 +115,22 @@ func (db *BoltDB) Close() {
 	db.db.Close()
 }
 
-func (db *BoltDB) Load(key []byte) (value []byte, ok bool) {
-	db.db.Update(func(t *bolt.Tx) error {
-		b := t.Bucket([]byte(db.bucket))
-		value = b.Get(key)
+func (db *BoltDB) Load(key []byte) ([]byte, bool) {
+	var got []byte
+	err := db.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(db.bucket))
+		if b == nil {
+			return fmt.Errorf("bucket is nil")
+		}
+		got = b.Get([]byte(key))
 		return nil
 	})
-
-	if value == nil {
-		ok = false
-	} else {
-		ok = true
+	if err != nil || got == nil {
+		return got, false
 	}
-
-	return
+	value := make([]byte, len(got))
+	copy(value, got)
+	return value, true
 }
 
 func (db *BoltDB) Store(key, value []byte) {

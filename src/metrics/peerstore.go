@@ -1,19 +1,25 @@
 package metrics
 
 import (
+	"fmt"
 	"os"
+	"runtime"
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/protolambda/rumor/metrics/utils"
 	"github.com/protolambda/rumor/p2p/gossip/database"
 	log "github.com/sirupsen/logrus"
 )
 
+type ErrorHandling func(*Peer)
+
 type PeerStore struct {
-	PeerStore       PeerStoreStorage
-	MessageDatabase *database.MessageDatabase // TODO: Discuss
-	StartTime       time.Time
-	MsgNotChannels  map[string](chan bool) // TODO: Unused?
+	PeerStore         PeerStoreStorage
+	MessageDatabase   *database.MessageDatabase // TODO: Discuss
+	StartTime         time.Time
+	PeerstoreIterTime time.Duration
+	MsgNotChannels    map[string](chan bool) // TODO: Unused?
 }
 
 func NewPeerStore(dbtype string, path string) PeerStore {
@@ -82,9 +88,10 @@ func (c *PeerStore) StoreOrUpdatePeer(peer Peer) {
 	} else {
 		// Fetch the new info of a peer directly from the new peer struct
 		oldPeer.FetchPeerInfoFromPeer(peer)
-
 		c.PeerStore.Store(peer.PeerId, oldPeer)
 	}
+	// Force Garbage collector
+	runtime.GC()
 }
 
 // Stores exact peer, overwritting the existing peer. Use only internally
@@ -99,6 +106,50 @@ func (c *PeerStore) GetPeerData(peerId string) (Peer, error) {
 		return Peer{}, errors.New("could not find peer in peerstore: " + peerId)
 	}
 	return peerData, nil
+}
+
+/// AddNewAttempts adds the resuts of a negative new attempt over an existing peer
+// increasing the attempt counter and the respective fields
+func (c *PeerStore) AddNewNegConnectionAttempt(id string, rec_err string, fn ErrorHandling) error {
+	p, err := c.GetPeerData(id)
+	if err != nil { // the peer was already in the sync.Map return true
+		return fmt.Errorf("Not peer found with that ID %s", id)
+	}
+	// Update the counter and connection status
+	p.Attempts += 1
+	if !p.Attempted {
+		p.Attempted = true
+		p.Error = utils.FilterError(rec_err)
+
+	}
+	// Handle each of the different error types as defined currently at pruneconnect.go
+	fn(&p)
+
+	// Store the new struct in the sync.Map
+	c.StorePeer(p)
+	return nil
+}
+
+// AddNewPosConnectionAttempt adds the resuts of a possitive new attempt over an existing peer
+// increasing the attempt counter and the respective fields
+func (c *PeerStore) AddNewPosConnectionAttempt(id string) error {
+	p, err := c.GetPeerData(id)
+	if err != nil { // the peer was already in the sync.Map return true
+		return fmt.Errorf("Not peer found with that ID %s", id)
+	}
+	// Update the counter and connection status
+	p.Attempts += 1
+	if !p.Attempted {
+		p.Attempted = true
+
+	}
+	p.Succeed = true
+	p.Error = "None"
+	// clean the Negative connection Attempt list
+	p.AddPositiveConnAttempt()
+	// Store the new struct in the sync.Map
+	c.StorePeer(p)
+	return nil
 }
 
 // Add a connection Event to the given peer
@@ -172,6 +223,11 @@ func (gm *PeerStore) GetErrorCounter() map[string]uint64 {
 	return errorsAndAmount
 }
 
+// Update the last iteration throught whole PeerStore
+func (c *PeerStore) NewPeerstoreIteration(t time.Duration) {
+	c.PeerstoreIterTime = t
+}
+
 // Exports to a csv, useful for debug
 func (c *PeerStore) ExportToCSV(filePath string) error {
 	log.Info("Exporting metrics to csv: ", filePath)
@@ -196,6 +252,7 @@ func (c *PeerStore) ExportToCSV(filePath string) error {
 	if err != nil {
 		return errors.Wrap(err, "could not export peer metrics")
 	}
-
+	// Force Garbage collector
+	runtime.GC()
 	return nil
 }

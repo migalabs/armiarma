@@ -133,7 +133,7 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host, store track
 					addrInfo.Addrs = append(addrInfo.Addrs, transport)
 				}
 				ctx, _ := context.WithTimeout(ctx, c.Timeout)
-				c.Log.Warnf("addrs %s attempting connection to peer", addrInfo.Addrs)
+				c.Log.Warnf("attempting connection to peer at addr %s", addrInfo.Addrs)
 
 				peer := metrics.NewPeer(p.String())
 				peerEnr := c.Store.LatestENR(p)
@@ -153,11 +153,12 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host, store track
 				peer.Ip = peerEnr.IP().String()
 				peer.Addrs = addr.String()
 
-				country, city, err := utils.GetLocationFromIp(peer.Ip)
+				country, city, countrycode, err := utils.GetLocationFromIp(peer.Ip)
 				if err != nil {
 					log.Warn("could not get location from ip: ", peer.Ip, err)
 				} else {
 					peer.Country = country
+					peer.CountryCode = countrycode
 					peer.City = city
 				}
 				c.PeerStore.StoreOrUpdatePeer(peer)
@@ -167,18 +168,16 @@ func (c *PeerConnectRandomCmd) run(ctx context.Context, h host.Host, store track
 					if conn_err := h.Connect(ctx, addrInfo); conn_err != nil {
 						// the connetion failed
 						attempts += 1
-						err := c.PeerStore.ConnectionAttemptEvent(p.String(), false, conn_err.Error())
-						if err != nil {
-							log.Error("could not add new connection attemp: ", conn_err)
+						fn := func(p *metrics.Peer) {
+							p.AddNegConnAtt()
 						}
-						c.Log.WithError(conn_err).Warnf("attempts %d failed connection attempt", attempts)
+						c.PeerStore.AddNewNegConnectionAttempt(p.String(), err.Error(), fn)
+						c.Log.WithError(err).Warnf("attempts %d failed connection attempt", attempts)
 						continue
 					} else { // connection successfuly made
 						c.Log.Infof("peer_id %s successful connection made", p)
-						err := c.PeerStore.ConnectionAttemptEvent(p.String(), true, "None")
-						if err != nil {
-							log.Error("could not add new connection attemp: ", err)
-						}
+						c.PeerStore.AddNewPosConnectionAttempt(p.String())
+						// break the loop
 						break
 					}
 					if attempts >= c.MaxRetries {

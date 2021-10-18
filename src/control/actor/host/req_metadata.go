@@ -147,7 +147,7 @@ func ReqHostInfo(ctx context.Context, h host.Host, conn network.Conn, peer *metr
 		// leaving it emtpy to spot the problem, IP-Api request already makes a parse of the IP before making server petition
 		log.Error(err)
 	}
-	peer.Country, peer.City, err = utils.GetLocationFromIp(peer.Ip)
+	peer.Country, peer.City, peer.CountryCode, err = utils.GetLocationFromIp(peer.Ip)
 	if err != nil {
 		log.Error("error when fetching country/city from ip", err)
 	}
@@ -155,14 +155,14 @@ func ReqHostInfo(ctx context.Context, h host.Host, conn network.Conn, peer *metr
 	ua, err := h.Peerstore().Get(peerID, "AgentVersion")
 	if err == nil {
 		peer.UserAgent = ua.(string)
+		// Extract Client type and version
+		peer.ClientName, peer.ClientVersion = utils.FilterClientType(peer.UserAgent)
+		peer.ClientOS = "TODO"
 	} else {
 		// EDGY CASE: when peers refuse the connection, the callback gets called and the identify protocol
 		// returns an empty struct (we are unable to identify them)
 		err_ident = errors.Errorf("identification error caused by connection refuse")
 	}
-	// Extract Client type and version
-	peer.ClientName, peer.ClientVersion = utils.FilterClientType(peer.UserAgent)
-	peer.ClientOS = "TODO"
 	pubk, err := conn.RemotePublicKey().Raw()
 	if err == nil {
 		peer.Pubkey = hex.EncodeToString(pubk)

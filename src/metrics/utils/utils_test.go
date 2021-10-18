@@ -1,8 +1,9 @@
 package utils
 
 import (
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func Test_FilterClientType(t *testing.T) {
@@ -26,9 +27,25 @@ func Test_FilterClientType(t *testing.T) {
 	require.Equal(t, client, "Lighthouse")
 	require.Equal(t, version, "v1.5.1")
 
+	client, version = FilterClientType("Lighthouse/v2.0.0-7c88f58/x86_64-linux")
+	require.Equal(t, client, "Lighthouse")
+	require.Equal(t, version, "v2.0.0")
+
 	client, version = FilterClientType("nimbus")
 	require.Equal(t, client, "Nimbus")
 	require.Equal(t, version, "Unknown")
+
+	client, version = FilterClientType("rust-libp2p/0.31.0")
+	require.Equal(t, client, "Grandine")
+	require.Equal(t, version, "0.31.0")
+
+	client, version = FilterClientType("eth2-crawler")
+	require.Equal(t, client, "NodeWatch")
+	require.Equal(t, version, "")
+
+	client, version = FilterClientType("armiarma-crawler")
+	require.Equal(t, client, "BSC-Armiarma")
+	require.Equal(t, version, "")
 
 	// Check it doesn't break for an unexpected agent
 	client, version = FilterClientType("43g56g-asd34/ssd")

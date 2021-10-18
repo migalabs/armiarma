@@ -176,6 +176,7 @@ func (ep *dsExtendedPeerstore) Close() error {
 
 func (ep *dsExtendedPeerstore) GetAllData(id peer.ID) *track.PeerAllData {
 	pub := ep.PubKey(id)
+
 	secpKey, ok := (pub).(*ic.Secp256k1PublicKey)
 	if !ok {
 		auxRsaKey := (pub).(*ic.RsaPublicKey)
