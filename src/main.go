@@ -10,8 +10,6 @@ import (
 
 	"net/http"
 	_ "net/http/pprof"
-
-	"github.com/sirupsen/logrus"
 )
 
 func main() {
@@ -24,7 +22,8 @@ func main() {
 		Short: "Start Rumor",
 	}
 	mainCmd.AddCommand(sh.AttachCmd(), sh.BareCmd(), sh.FileCmd(), sh.ServeCmd(), sh.ShellCmd(), sh.ToolCmd())
-	logrus.SetLevel(logrus.ErrorLevel)
+	// Set extra logging level for Armiarma Additional logs
+	//logrus.SetLevel(logrus.ErrorLevel)
 
 	if err := mainCmd.Execute(); err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "failed to run Rumor: %v", err)
