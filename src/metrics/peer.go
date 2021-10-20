@@ -2,14 +2,21 @@ package metrics
 
 import (
 	"fmt"
+	"net"
 	"strconv"
+	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum/p2p/enode"
+	m_utils "github.com/migalabs/armiarma/src/metrics/utils"
+	"github.com/migalabs/armiarma/src/utils"
+	ma "github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
-	"github.com/protolambda/zrnt/eth2/beacon"
+	beacon "github.com/protolambda/zrnt/eth2/beacon/common"
 	log "github.com/sirupsen/logrus"
 )
 
+const DEFAULT_DELAY = 24 // hours of delay after each negative attempt with delay
 var (
 	DeprecationTime = 24 * time.Hour
 )
@@ -23,13 +30,21 @@ type Peer struct {
 	ClientOS      string //TODO:
 	ClientVersion string
 	Pubkey        string
-	Addrs         string
-	Ip            string
-	Country       string
-	CountryCode   string
-	City          string
-	Latency       float64
+	// Addrs         string
+	Ip          string
+	Country     string
+	CountryCode string
+	City        string
+	Latency     float64
+
 	// TODO: Store Enr
+	// Latest ENR
+	ENR *enode.Node
+
+	MAddrs     []ma.Multiaddr
+	Protocols []string
+
+	ProtocolVersion string
 
 	ConnectedDirection string
 	IsConnected        bool
@@ -89,6 +104,34 @@ func (pm Peer) IsDeprecated() bool {
 // return waiting days that this peer has to wait untill next ping
 func (pm Peer) DaysToWait() int {
 	return pm.WaitingDays
+}
+
+// ReadyToConnect
+// * This method evaluates if the given peer pm is ready to be connectd.
+// * This means that the current time has exceeded the
+// * lastAttempt + waiting time, so we have already waited enough
+// @return True of False if we are in position to connect or not
+func (pm Peer) ReadyToConnect() bool {
+
+	lastConnectionAttempt := pm.ConnectionTimes[len(pm.ConnectionTimes)-1]
+	delayTime := time.Duration(pm.DaysToWait()*DEFAULT_DELAY) * time.Hour
+
+	// add both things to get the next time we would have to connect
+	nextConnectionTime := lastConnectionAttempt.Add(delayTime).Unix()
+
+	current_time := time.Now().Unix()
+
+	// Compare time now with last connection plus waiting list
+	if (current_time - nextConnectionTime) <= 0 {
+		// If the current time is greater than the next connection time
+		// it means connection time is in the past, so we can already connect
+
+		// If both times are the same, then next connection time is the current time
+		// so we are ready to connect again
+		return true
+	}
+	return false // otherwise
+
 }
 
 // return the time of the last connection with this peer
@@ -177,8 +220,22 @@ func (pm *Peer) ConnectionAttemptEvent(succeed bool, err string) {
 		pm.Succeed = true
 		pm.Error = "None"
 	} else {
-		pm.Error = utils.FilterError(err)
+		pm.Error = m_utils.FilterError(err)
 	}
+}
+
+// AddAddr
+// * This method adds a new multiaddress in string format to the 
+// * Addrs array. 
+// @return Any error. Otherwise nil.
+func (pm *Peer) AddAddr(input_addr string) error {
+	new_ma, err := ma.NewMultiaddr(input_addr) // parse and format
+
+	if err != nil {
+		return err
+	}
+	pm.MAddrs = append(pm.MAddrs, ma.NewMultiaddr(input_addr))
+
 }
 
 // Fetch Peer information from another Peer info
@@ -194,7 +251,7 @@ func (pm *Peer) FetchPeerInfoFromPeer(newPeer Peer) {
 		pm.ClientVersion = newPeer.ClientVersion
 	}
 	pm.Pubkey = getNonEmpty(pm.Pubkey, newPeer.Pubkey)
-	pm.Addrs = getNonEmpty(pm.Addrs, newPeer.Addrs)
+	pm.MAddrs = getNonEmptyAddrArray(pm.MAddrs, newPeer.MAddrs)
 	pm.Ip = getNonEmpty(pm.Ip, newPeer.Ip)
 	if pm.City == "" || newPeer.City != "" {
 		pm.City = newPeer.City
@@ -233,6 +290,35 @@ func getNonEmpty(old string, new string) string {
 		return new
 	}
 	return old
+}
+
+// getNonEmptyAddrArray compares whether the new mAddr array is not empty.
+// If not empty, return the new one. If empty, return the old one
+func getNonEmptyAddrArray(old []ma.Multiaddr, new []ma.Multiaddr) []ma.Multiaddr {
+	if len(new) != 0 {
+		return new
+	}
+	return old
+}
+
+// ExtractPublicAddr
+// * This method loops over all multiaddress and extract the one that has
+// * a public IP. There must be only one.
+// @return the found multiaddress, nil if error
+func (pm *Peer) ExtractPublicAddr() ma.Multiaddr {
+
+	// loop over all multiaddresses in the array
+	for _, temp_addr := range pm.MAddrs {
+		temp_extracted_ip := utils.ExtractIPFromMAddr(temp_addr)
+
+		// check if IP is public
+		if utils.IsIPPublic(temp_extracted_ip) == true {
+			// the IP is public
+			return temp_addr
+		}
+
+	return nil // ended loop without returning a public address
+
 }
 
 // Update beacon Status of the peer
@@ -282,7 +368,7 @@ func (pm *Peer) GetConnectedTime() float64 {
 // Get the number of messages that we got for a given topic. Note that
 // the topic name is the shortened name i.e. BeaconBlock
 func (pm *Peer) GetNumOfMsgFromTopic(shortTopic string) uint64 {
-	msgMetric := pm.MessageMetrics[utils.ShortToFullTopicName(shortTopic)]
+	msgMetric := pm.MessageMetrics[m_utils.ShortToFullTopicName(shortTopic)]
 	if msgMetric != nil {
 		return msgMetric.Count
 	}
@@ -310,7 +396,7 @@ func (pm *Peer) ToCsvLine() string {
 		pm.ClientName + "," +
 		pm.ClientVersion + "," +
 		pm.Pubkey + "," +
-		pm.Addrs + "," +
+		pm.ExtractPublicAddr().String() + "," +
 		pm.Ip + "," +
 		pm.Country + "," +
 		pm.City + "," +
@@ -348,7 +434,7 @@ func (pm *Peer) LogPeer() {
 		"ClientOS":      pm.ClientOS,
 		"ClientVersion": pm.ClientVersion,
 		"Pubkey":        pm.Pubkey,
-		"Addrs":         pm.Addrs,
+		"Addrs":         pm.MAddrs,
 		"Ip":            pm.Ip,
 		"Country":       pm.Country,
 		"City":          pm.City,
