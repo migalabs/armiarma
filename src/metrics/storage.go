@@ -13,5 +13,6 @@ type PeerStoreStorage interface {
 	Delete(key string)
 	Range(f func(key string, value Peer) bool)
 	Close()
+	Peers() []string
 	// TODO: -Implement statistics directly from the PeerStoreStorage module?
 }

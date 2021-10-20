@@ -6,6 +6,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/migalabs/armiarma/src/metrics/utils"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
@@ -104,6 +105,13 @@ func (c *PeerStore) GetPeerData(peerId string) (Peer, error) {
 		return Peer{}, errors.New("could not find peer in peerstore: " + peerId)
 	}
 	return peerData, nil
+}
+
+// GetPeerList
+// * This method returns the list of PeerIDs in the DB
+// @return the list of PeerIDs in string format
+func (c *PeerStore) GetPeerList() []string {
+	return c.PeerStore.Peers()
 }
 
 /// AddNewAttempts adds the resuts of a negative new attempt over an existing peer
