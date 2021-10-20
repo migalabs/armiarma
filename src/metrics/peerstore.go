@@ -7,8 +7,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/protolambda/rumor/metrics/utils"
-	"github.com/protolambda/rumor/p2p/gossip/database"
 	log "github.com/sirupsen/logrus"
 )
 
