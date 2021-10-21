@@ -308,6 +308,7 @@ func (pm *Peer) ToCsvLine() string {
 	}
 	csvRow := pm.PeerId + "," +
 		pm.NodeId + "," +
+		pm.BeaconStatus.Status.ForkDigest.String() + "," +
 		pm.UserAgent + "," +
 		pm.ClientName + "," +
 		pm.ClientVersion + "," +

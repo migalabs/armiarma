@@ -238,7 +238,7 @@ func (c *PeerStore) ExportToCSV(filePath string) error {
 	defer csvFile.Close()
 
 	// First raw of the file will be the Titles of the columns
-	_, err = csvFile.WriteString("Peer Id,Node Id,User Agent,Client,Version,Pubkey,Address,Ip,Country,City,Request Metadata,Success Metadata,Attempted,Succeed,ConnStablished,IsConnected,Attempts,Error,Latency,Connections,Disconnections,Connected Time,Beacon Blocks,Beacon Aggregations,Voluntary Exits,Proposer Slashings,Attester Slashings,Total Messages\n")
+	_, err = csvFile.WriteString("Peer Id,Node Id,ForkDigest,User Agent,Client,Version,Pubkey,Address,Ip,Country,City,Request Metadata,Success Metadata,Attempted,Succeed,ConnStablished,IsConnected,Attempts,Error,Latency,Connections,Disconnections,Connected Time,Beacon Blocks,Beacon Aggregations,Voluntary Exits,Proposer Slashings,Attester Slashings,Total Messages\n")
 	if err != nil {
 		errors.Wrap(err, "error while writing the titles on the csv "+filePath)
 	}

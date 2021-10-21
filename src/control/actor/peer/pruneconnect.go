@@ -2,6 +2,7 @@ package peer
 
 import (
 	"context"
+	"encoding/hex"
 	"strings"
 	"time"
 
@@ -137,22 +138,17 @@ func (c *PeerPruneConncetCmd) run(ctx context.Context, h host.Host, store track.
 				if err != nil {
 					log.Error("failed to parse ENR address into multi-addr for libp2p: %s", err)
 				}
+				// Generating
+				peer := metrics.NewPeer(pinfo.PeerId)
+				peer.PeerId = p.String()
+				k, _ := p.ExtractPublicKey()
+				pubk, _ := k.Raw()
+				peer.Pubkey = hex.EncodeToString(pubk)
+				peer.NodeId = peerEnr.ID().String()
+				peer.Ip = peerEnr.IP().String()
+				peer.Addrs = addr.String()
 
-				pinfo.Pubkey = p.String()
-				pinfo.NodeId = peerEnr.ID().String()
-				pinfo.Ip = peerEnr.IP().String()
-				pinfo.Addrs = addr.String()
-				/* Deprecated for now, too many request for the IP-Localization
-
-				country, city, err := utils.GetLocationFromIp(peer.Ip)
-				if err != nil {
-					log.Warn("could not get location from ip: ", peer.Ip, err)
-				} else {
-					peer.Country = country
-					peer.City = city
-				}
-				*/
-				c.PeerStore.StoreOrUpdatePeer(pinfo)
+				c.PeerStore.StoreOrUpdatePeer(peer)
 
 				ctx, cancel := context.WithTimeout(ctx, c.Timeout)
 				defer cancel()
