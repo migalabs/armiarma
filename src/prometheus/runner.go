@@ -7,26 +7,26 @@ import (
 	"net/http"
 	"time"
 
-	pgossip "github.com/libp2p/go-libp2p-pubsub"
-	"github.com/migalabs/armiarma/src/metrics"
+	"github.com/migalabs/armiarma/src/db"
+	"github.com/migalabs/armiarma/src/gossipsub"
 	"github.com/migalabs/armiarma/src/metrics/utils"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
 )
 
-const GOSSIP_BEACON_BLOCK int = 32
-const GOSSIP_AGGREGATION_PROOF int = 32
+const GOSSIP_BEACON_BLOCK string = "32"
+const GOSSIP_AGGREGATION_PROOF string = "32"
 
 type PrometheusRunner struct {
-	PeerStore *metrics.PeerStore
+	PeerStore *db.PeerStore
 
 	ExposePort      string
 	EndpointUrl     string
 	RefreshInterval time.Duration
 }
 
-func NewPrometheusRunner(gm *metrics.PeerStore) PrometheusRunner {
+func NewPrometheusRunner(gm *db.PeerStore) PrometheusRunner {
 	return PrometheusRunner{
 		PeerStore:       gm,
 		ExposePort:      "9080",
@@ -63,11 +63,11 @@ func (c *PrometheusRunner) Run(ctx context.Context) error {
 	// go routine to keep track of the received messages
 	go func() {
 		for {
-			select {
-			case <-c.PeerStore.MsgNotChannels[pgossip. .BeaconBlock]:
+			select { // TODO: change the constants
+			case <-c.PeerStore.MsgNotChannels[gossipsub.BeaconBlock]:
 				beacBlock += 1
-				totalMsg += 1
-			case <-c.PeerStore.MsgNotChannels[pgossip.BeaconAggregateProof]:
+				totalMsg += 1 // TODO: change the constants
+			case <-c.PeerStore.MsgNotChannels[gossipsub.BeaconAggregateProof]:
 				beacAttestation += 1
 				totalMsg += 1
 			case <-resetChan:
@@ -85,7 +85,7 @@ func (c *PrometheusRunner) Run(ctx context.Context) error {
 
 	go func() {
 		for {
-			clients := metrics.NewClients()
+			clients := db.NewClients()
 
 			// TODO: Use the Gossip Metrics to populate the metrics
 			nOfDiscoveredPeers := 0
@@ -96,7 +96,7 @@ func (c *PrometheusRunner) Run(ctx context.Context) error {
 			ipDist := make(map[string]float64)
 			rttDis := make(map[string]float64)
 			tctDis := make(map[string]float64)
-			c.PeerStore.PeerStore.Range(func(k string, peerData metrics.Peer) bool {
+			c.PeerStore.PeerStore.Range(func(k string, peerData db.Peer) bool {
 				if !peerData.IsDeprecated() {
 					if peerData.MetadataRequest {
 						if peerData.ClientName != "" {
