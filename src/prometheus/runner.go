@@ -7,14 +7,11 @@ import (
 	"net/http"
 	"time"
 
+	pgossip "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/migalabs/armiarma/src/metrics"
 	"github.com/migalabs/armiarma/src/metrics/utils"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-
-	pgossip "github.com/libp2p/go-libp2p-pubsub"
-
-	//"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 )
 
