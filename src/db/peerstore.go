@@ -6,7 +6,8 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/migalabs/armiarma/src/metrics/utils"
+	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/migalabs/armiarma/src/db/utils"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
@@ -119,7 +120,7 @@ func (c *PeerStore) GetPeerData(peerId string) (Peer, error) {
 // GetPeerList
 // * This method returns the list of PeerIDs in the DB
 // @return the list of PeerIDs in string format
-func (c *PeerStore) GetPeerList() []string {
+func (c *PeerStore) GetPeerList() []peer.ID {
 	return c.PeerStore.Peers()
 }
 

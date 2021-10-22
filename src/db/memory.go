@@ -3,6 +3,8 @@ package db
 import (
 	"sync"
 	"time"
+
+	"github.com/libp2p/go-libp2p-core/peer"
 )
 
 // PeerStoreMemory save the peer's data in RAM.
@@ -65,11 +67,15 @@ func (p MemoryDB) Close() {
 // * existing in the DB.
 // * These would be the keys of each entry in the map
 // @return the string array containing the PeerIDs
-func (p MemoryDB) Peers() []string {
-	result := make([]string, 0)
+func (p MemoryDB) Peers() []peer.ID {
+	result := make([]peer.ID, 0)
 
 	p.m.Range(func(key, value interface{}) bool {
-		result = append(result, key.(string))
+		peerID_obj, err := peer.IDFromString(key.(string))
+		if err != nil {
+			return false
+		}
+		result = append(result, peerID_obj)
 		return true
 	})
 	return result

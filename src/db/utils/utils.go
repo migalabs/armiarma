@@ -5,7 +5,6 @@ import (
 	"net"
 	"strings"
 
-	pgossip "github.com/protolambda/rumor/p2p/gossip"
 	log "github.com/sirupsen/logrus"
 )
 
