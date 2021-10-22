@@ -14,8 +14,8 @@ import (
 type ErrorHandling func(*Peer)
 
 type PeerStore struct {
-	PeerStore         PeerStoreStorage
-	MessageDatabase   *database.MessageDatabase // TODO: Discuss
+	PeerStore PeerStoreStorage
+	// MessageDatabase   *database.MessageDatabase // TODO: Discuss
 	StartTime         time.Time
 	PeerstoreIterTime time.Duration
 	MsgNotChannels    map[string](chan bool) // TODO: Unused?
@@ -23,7 +23,8 @@ type PeerStore struct {
 
 func NewPeerStore(dbtype string, path string) PeerStore {
 	var db PeerStoreStorage
-	switch dbtype {
+	// TODO: once the db works well and it is defined
+	/*switch dbtype {
 	case "bold":
 		if len(path) <= 0 {
 			path = default_db_path
@@ -36,7 +37,8 @@ func NewPeerStore(dbtype string, path string) PeerStore {
 			path = default_db_path
 		}
 		db = NewBoltPeerDB(path)
-	}
+	}*/
+	db = NewMemoryDB()
 	ps := PeerStore{
 		PeerStore:      db,
 		StartTime:      time.Now(),
@@ -93,12 +95,19 @@ func (c *PeerStore) StoreOrUpdatePeer(peer Peer) {
 	runtime.GC()
 }
 
-// Stores exact peer, overwritting the existing peer. Use only internally
+// StorePeer
+// * This method stores a single peer in the peerstore.
+// * It will use the peerID as key
+// @param peer: the peer object to store
 func (c *PeerStore) StorePeer(peer Peer) {
 	c.PeerStore.Store(peer.PeerId, peer)
 }
 
-// Get peer data
+// GetPeerData
+// * This method return a Peer object from the peerstore
+// * using the given peerID.
+// @param peerID: the peerID to look for in string format
+// @return the found Peer object and an error if there was
 func (c *PeerStore) GetPeerData(peerId string) (Peer, error) {
 	peerData, ok := c.PeerStore.Load(peerId)
 	if !ok {
@@ -235,6 +244,11 @@ func (c *PeerStore) NewPeerstoreIteration(t time.Duration) {
 }
 
 // Exports to a csv, useful for debug
+// ExportToCSV
+// * This method will export the whole peerstore into a CSV file
+// @param filePath file where to dumpt the CSV lines
+// (create / open)
+// @return an error if there was
 func (c *PeerStore) ExportToCSV(filePath string) error {
 	log.Info("Exporting metrics to csv: ", filePath)
 	csvFile, err := os.Create(filePath)

@@ -44,14 +44,14 @@ func (th *TopicHandler) readLoop() {
 	for {
 		th.Log.Infof("Read Loop: %s", th.Sub.Topic())
 
-		msg, err := th.Sub.Next(th.Ctx())
+		_, err := th.Sub.Next(th.Ctx())
 		if err != nil {
 			th.Log.Infof("Exit Read Loop:")
 			th.Log.Errorf(err.Error())
 
 			return
 		}
-		th.Log.Infof(msg.String())
+		// th.Log.Infof(msg.String())
 
 	}
 }
