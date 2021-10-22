@@ -26,6 +26,7 @@ import (
 	"github.com/migalabs/armiarma/src/gossipsub"
 	"github.com/migalabs/armiarma/src/hosts"
 	"github.com/migalabs/armiarma/src/info"
+	"github.com/migalabs/armiarma/src/peering"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -33,11 +34,12 @@ import (
 // crawler status containing the main basemodule and info that the app will ConnectedF
 type CrawlerBase struct {
 	*base.Base
-	Host *hosts.BasicLibp2pHost
-	Node *enode.LocalNode
-	Dv5  *discovery.Discovery
-	Gs   *gossipsub.GossipSub
-	Info *info.InfoData
+	Host    *hosts.BasicLibp2pHost
+	Node    *enode.LocalNode
+	Dv5     *discovery.Discovery
+	Peering *peering.PeeringService
+	Gs      *gossipsub.GossipSub
+	Info    *info.InfoData
 }
 
 // variable to be used as a flag from command line
@@ -92,6 +94,9 @@ var crawlerCmd = &cobra.Command{
 		if err != nil {
 			log.Panic(err)
 		}
+		// TODO: generate a new DB
+
+		// Generate a Peering Service (so far with default peering strategy)
 
 		node_tmp := enode.NewLocalNode(b.Ctx(), info_tmp, stdOpts)
 		//node_tmp.AddEntries()
@@ -119,6 +124,7 @@ var crawlerCmd = &cobra.Command{
 		<-signal_channel
 		// End up app, finishing everything
 		crawler.Log.Info("SHUTDOWN DETECTED!")
+		// TODO: Shutdown all the services (manually to let them exit in a controled way)
 		crawler.Host.Stop()
 	},
 }

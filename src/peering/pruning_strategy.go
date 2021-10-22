@@ -1,76 +1,97 @@
-package peer
+package peering
 
 import (
 	"context"
+	"os"
+	"os/signal"
+	"os/syscall"
 	"strings"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/migalabs/armiarma/src/base"
 	"github.com/migalabs/armiarma/src/metrics"
 	ma "github.com/multiformats/go-multiaddr"
 
 	"github.com/protolambda/rumor/p2p/addrutil"
-	"github.com/protolambda/rumor/p2p/track"
-	"github.com/protolambda/zrnt/eth2/beacon"
 	log "github.com/sirupsen/logrus"
 )
 
 var (
-	DefaultDelay = 24 // hours of dealy after each negative attempt with delay
+	DefaultDelay = 24 * time.Hour // hours of dealy after each negative attempt with delay
 )
 
-type PeerPruneConncetCmd struct {
+type PruningOpts struct {
+	AggregatedDelay time.Duration
+	LogOpts         base.LogOpts
+}
+
+// Pruning Strategy is a Peering Strategy that applies penalties to peers that haven't show activity when attempting to connect them.
+// Combined with the Deprecated flag in the metrics.Peer struct, it produces more accourated metrics when exporting, pruning peers that are no longer active.
+type PruningStrategy struct {
 	*base.Base
-	Store      track.ExtendedPeerstore
-	PeerStore  *metrics.PeerStore
-	Timeout    time.Duration `ask:"--timeout" help:"connection timeout, 0 to disable"`
-	MaxRetries int           `ask:"--max-retries" help:"how many connection attempts until the peer is banned"`
+	strategyType string
+	PeerStore    *metrics.PeerStore
+	// Delay unit time that gets applied to those slashed peers when reporting inactivity errors when activly connecting
+	AggregatedDelay time.Duration
 
-	FilterDigest beacon.ForkDigest `ask:"--filter-digest" help:"Only connect when the peer is known to have the given fork digest in ENR. Or connect to any if not specified."`
-	FilterPort   int               `ask:"--filter-port" help:"Only connect to peers that has the given port advertised on the ENR."`
-	Filtering    bool              `changed:"filter-digest"`
+	/*
+		// TODO: Choose the necessary parameters for the pruning
+		FilterDigest beacon.ForkDigest `ask:"--filter-digest" help:"Only connect when the peer is known to have the given fork digest in ENR. Or connect to any if not specified."`
+		FilterPort   int               `ask:"--filter-port" help:"Only connect to peers that has the given port advertised on the ENR."`
+		Filtering    bool              `changed:"filter-digest"`
+	*/
 }
 
-func (c *PeerPruneConncetCmd) Default() {
-	c.Timeout = 10 * time.Second
-	c.MaxRetries = 1
-	c.FilterPort = -1
-}
-
-func (c *PeerPruneConncetCmd) Help() string {
-	return "Auto-connect to peers in the peerstore with a random-peering strategy."
-}
-
-func (c *PeerPruneConncetCmd) Run(ctx context.Context, args ...string) error {
-	c.Log.Infof("Randomly connecting peers")
-	h, err := c.Host()
+func NewPruningStrategy(ctx context.Context, peerstore metrics.PeerStore, opts PruningOpts) *PruningStrategy {
+	// TODO: cancel is still not implemented in the BaseCreation
+	pruningCtx, _ := context.WithCancel(ctx)
+	opts.LogOpts.logOpts.ModName = "pruning strategy"
+	b, err := base.NewBase(
+		base.WithContext(pruningCtx),
+		base.WithLogger(opts.LogOpts),
+	)
 	if err != nil {
-		return err
+		return nil, err
 	}
+	pr := &PruningStrategy{
+		Base:         b,
+		strategyType: "prunning",
+		PeerStore:    peerstore,
+	}
+	return pr
+}
+
+func (c *PruningStrategy) Type() string {
+	return c.strategyType
+}
+
+func (c *PruningStrategy) Start(ctx context.Context, args ...string) {
+	c.Log.Info("Setting up pruning peering strategy")
+	// Generate subcontext for the go-routine
 	bgCtx, bgCancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
+	// Launch the pruning strategy go-routine
 	go func() {
-		c.run(bgCtx, h, c.Store)
+		c.run(bgCtx, c.PeerStore)
 		close(done)
 	}()
 
-	c.Control.RegisterStop(func(ctx context.Context) error {
-		bgCancel()
+	cntC := make(chan os.Signal)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-cntC     // wait untill syscall.SIGTERM
+		bgCancel() // shut down the sub-context
+		<-done     // wait untill we track that the go routine was successfully closed
 		c.Log.Infof("Stopped auto-connecting")
-		<-done
-		return nil
-	})
-	return nil
+	}()
 }
 
 // main loop of the peering strategy.
 // every 3-4 minutes generate a local new copy of the peers in the peerstore.
 // It randomly selects one of the attempting to connect with it, recording the
 // results of the attempts. If the peer was already connected, just dropt it
-func (c *PeerPruneConncetCmd) run(ctx context.Context, h host.Host, store track.ExtendedPeerstore) {
-	c.Log.Info("started randomly peering")
+func (c *PruningStrategy) run(stop bool, store *metrics.Peerstore) {
 	quit := make(chan struct{})
 	// Set the defer function to cancel the go routine
 	defer close(quit)
@@ -115,7 +136,7 @@ func (c *PeerPruneConncetCmd) run(ctx context.Context, h host.Host, store track.
 				peercount++
 				// Set the correct address format to connect the peers
 				// libp2p complains if we put multi-addresses that include the peer ID into the Addrs list.
-				addrs := c.Store.Addrs(p)
+				addrs := c.peerstore.Addrs(p)
 				addrInfo := peer.AddrInfo{
 					ID:    p,
 					Addrs: make([]ma.Multiaddr, 0, len(addrs)),

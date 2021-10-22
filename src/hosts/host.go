@@ -3,7 +3,6 @@ package hosts
 import (
 	"context"
 	"fmt"
-	"log"
 
 	"github.com/migalabs/armiarma/src/base"
 	"github.com/migalabs/armiarma/src/info"
@@ -51,7 +50,7 @@ func NewBasicLibp2pHost(ctx context.Context, opts BasicLibp2pHostOpts) (*BasicLi
 		}),
 	)
 	if err != nil {
-		log.Panicf("couldn't create base for host module. %s", err)
+		return nil, fmt.Errorf("couldn't create base for host module. %s", err)
 	}
 	// check the parsed host options
 
@@ -87,7 +86,7 @@ func NewBasicLibp2pHost(ctx context.Context, opts BasicLibp2pHostOpts) (*BasicLi
 	// generate the identify service
 	ids, err := identify.NewIDService(host, identify.UserAgent(userAgent), identify.DisableSignedPeerRecord())
 	if err != nil {
-		b.Log.Error(err)
+		return nil, err
 	}
 	// Gererate the struct that contains all the configuration and structs surrounding the Libp2p Host
 	basicHost := &BasicLibp2pHost{
