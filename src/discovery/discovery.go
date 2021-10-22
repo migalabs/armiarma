@@ -45,7 +45,11 @@ func NewEmptyDiscovery() *Discovery {
 	return &Discovery{}
 }
 
-// constructor
+// NewDiscovery
+// * This method will create a Discovery object usign the given data
+// @param input_opts the logging options object
+// @return the modified logging options object
+
 func NewDiscovery(ctx context.Context, input_node *enode.LocalNode, info_obj *info.InfoData, input_port int, stdOpts base.LogOpts) *Discovery {
 
 	localLogger := dv5LoggerOpts(stdOpts)
@@ -69,7 +73,9 @@ func NewDiscovery(ctx context.Context, input_node *enode.LocalNode, info_obj *in
 	}
 }
 
-// start dv5 service and listening in given port
+// Start_dv5
+// * This method will initiate the discovery listener to receive new
+// * peers connections. This will allow other peers to discover us.
 func (d *Discovery) Start_dv5() {
 
 	// udp address to listen
@@ -113,11 +119,16 @@ func (d *Discovery) Start_dv5() {
 	}
 }
 
+// FindRandomNodes
+// * This method will initiate the randomNodes method, which
+// * will create an iterator over randomly generated peers.
+// * For each peer, we will try to connect to it.
+// @param h represents the host used to connect to newly discovered peers
 func (d *Discovery) FindRandomNodes(h hosts.BasicLibp2pHost) {
 	iterator := d.Dv5Listener.RandomNodes()
 
 	for iterator.Next() {
-		d.b.Log.Infof("new randon node:  %s\n", iterator.Node().ID().String())
+		d.b.Log.Infof("new random node:  %s\n", iterator.Node().ID().String())
 		node := iterator.Node()
 
 		ipScheme := "ip4"
@@ -143,23 +154,28 @@ func (d *Discovery) FindRandomNodes(h hosts.BasicLibp2pHost) {
 		}
 
 		h.Host().Connect(h.Ctx(), *new_addr_info)
-		// d.b.Log.Infof("%+v\n", h.Host().Network().Peerstore().Peers())
 
 	}
 }
 
-// function which will return the boot node array to initialize our discovery5 listener
-// Overrides the bootNodeList attribute inside the Discovery struct
+// ImportBootNodeList
+// * This method will read the bootnodes list in string format and create an
+// * enode array with the parsed ENRs of the bootnodes
+// @param import_json_file represents the file where to read the bootnodes from.
+// this file is configured in the config file
 func (d *Discovery) ImportBootNodeList(import_json_file string) {
 
+	// where we will store the result
 	var bootNodeList []*eth_enode.Node
 
+	// where we will unmarshal from file
 	bootNodeListString := BootNodeListString{}
 
+	// check if file exists
 	if _, err := os.Stat(import_json_file); os.IsNotExist(err) {
 		d.b.Log.Errorf("Bootnodes file does not exist")
 	} else {
-
+		// exists
 		file, err := ioutil.ReadFile(import_json_file)
 		if err == nil {
 			err := json.Unmarshal([]byte(file), &bootNodeListString)
@@ -170,11 +186,10 @@ func (d *Discovery) ImportBootNodeList(import_json_file string) {
 			d.b.Log.Errorf("Could not read BootNodes file: %s", err)
 		}
 	}
+
 	// parse bootnode strings into enodes
 	for _, element := range bootNodeListString.BootNodes {
-
 		bootNodeList = append(bootNodeList, eth_enode.MustParse(element))
-
 	}
 
 	//bootNodeList = append(bootNodeList, eth_enode.MustParse("enr:-Ku4QImhMc1z8yCiNJ1TyUxdcfNucje3BGwEHzodEZUan8PherEo4sF7pPHPSIB1NNuSg5fZy7qFsjmUKs2ea1Whi0EBh2F0dG5ldHOIAAAAAAAAAACEZXRoMpD1pf1CAAAAAP__________gmlkgnY0gmlwhBLf22SJc2VjcDI1NmsxoQOVphkDqal4QzPMksc5wnpuC3gvSC8AfbFOnZY_On34wIN1ZHCCIyg"))
@@ -183,6 +198,10 @@ func (d *Discovery) ImportBootNodeList(import_json_file string) {
 
 }
 
+// dv5LoggerOpts
+// * This method will add logging options for the Discovery object
+// @param input_opts: basic logging options
+// @return the modified logging options object for the Discovery object
 func dv5LoggerOpts(input_opts base.LogOpts) base.LogOpts {
 	input_opts.ModName = PKG_NAME
 

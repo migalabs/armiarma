@@ -33,7 +33,7 @@ func NewLocalNode(ctx context.Context, info_obj *info.InfoData, stdOpts base.Log
 	if err != nil {
 		log.Panicf("Could not create base object %s", err)
 	}
-
+	// db where to store the ENRs
 	new_db, err := enode.OpenDB("")
 	if err != nil {
 		log.Panicf("Could not create local DB %s", err)
@@ -53,7 +53,6 @@ func NewLocalNode(ctx context.Context, info_obj *info.InfoData, stdOpts base.Log
 // @return the modified logging options object
 func nodeLoggerOpts(input_opts base.LogOpts) base.LogOpts {
 	input_opts.ModName = PKG_NAME
-
 	return input_opts
 }
 

@@ -1,5 +1,7 @@
 package metrics
 
+const DEFAULT_DB_PATH string = "peerstore.db"
+
 var (
 	default_db_path = "peerstore.db"
 )
@@ -13,5 +15,6 @@ type PeerStoreStorage interface {
 	Delete(key string)
 	Range(f func(key string, value Peer) bool)
 	Close()
+	Peers() []string
 	// TODO: -Implement statistics directly from the PeerStoreStorage module?
 }
