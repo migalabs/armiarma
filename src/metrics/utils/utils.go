@@ -5,7 +5,7 @@ import (
 	"net"
 	"strings"
 
-	pgossip "github.com/protolambda/rumor/p2p/gossip"
+	"github.com/migalabs/armiarma/src/gossipsub"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -91,15 +91,15 @@ func FilterError(err string) string {
 func ShortToFullTopicName(topicName string) string {
 	switch topicName {
 	case "BeaconBlock":
-		return pgossip.BeaconBlock
+		return gossipsub.BeaconBlock
 	case "BeaconAggregateProof":
-		return pgossip.BeaconAggregateProof
+		return gossipsub.BeaconAggregateProof
 	case "VoluntaryExit":
-		return pgossip.VoluntaryExit
+		return gossipsub.VoluntaryExit
 	case "ProposerSlashing":
-		return pgossip.ProposerSlashing
+		return gossipsub.ProposerSlashing
 	case "AttesterSlashing":
-		return pgossip.AttesterSlashing
+		return gossipsub.AttesterSlashing
 	default:
 		return ""
 	}
