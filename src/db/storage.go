@@ -1,5 +1,7 @@
 package db
 
+import "github.com/libp2p/go-libp2p-core/peer"
+
 const DEFAULT_DB_PATH string = "peerstore.db"
 
 var (
@@ -15,6 +17,6 @@ type PeerStoreStorage interface {
 	Delete(key string)
 	Range(f func(key string, value Peer) bool)
 	Close()
-	Peers() []string
+	Peers() []peer.ID
 	// TODO: -Implement statistics directly from the PeerStoreStorage module?
 }
