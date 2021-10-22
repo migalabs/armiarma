@@ -1,5 +1,7 @@
 package metrics
 
+const DEFAULT_DB_PATH string = "peerstore.db"
+
 var (
 	default_db_path = "peerstore.db"
 )
