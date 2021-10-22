@@ -4,8 +4,8 @@ import (
 	"context"
 	"os"
 	"os/signal"
-	"os/syscall"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -13,7 +13,6 @@ import (
 	"github.com/migalabs/armiarma/src/metrics"
 	ma "github.com/multiformats/go-multiaddr"
 
-	"github.com/protolambda/rumor/p2p/addrutil"
 	log "github.com/sirupsen/logrus"
 )
 
