@@ -40,6 +40,8 @@ func WithContext(ctx context.Context) Option {
 	}
 }
 
+// TODO: Add OPtion method that incorporates cancel to the Base
+
 // Set specific Logger for the Base model
 func WithLogger(opts LogOpts) Option {
 	return func(b *Base) error {
