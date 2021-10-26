@@ -21,21 +21,27 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-const DEFAULT_IP string = "0.0.0.0"
-const DEFAULT_TCP_PORT int = 9000
-const DEFAULT_UDP_PORT int = 9001
-const DEFAULT_TOPIC_ARRAY string = "hola,adios" // parse and split by comma to obtain the array
-const DEFAULT_NETWORK string = "mainnet"
-const DEFAULT_FORK_DIGEST string = "0xffff"
-const DEFAULT_USER_AGENT string = "bsc_crawler"
-const DEFAULT_LOG_LEVEL string = "debug"
+// define constant variables
+var (
+	DEFAULT_IP          string = "0.0.0.0"
+	DEFAULT_TCP_PORT    int    = 9000
+	DEFAULT_UDP_PORT    int    = 9001
+	DEFAULT_TOPIC_ARRAY string = "hola,adios" // parse and split by comma to obtain the array
+	DEFAULT_NETWORK     string = "mainnet"
+	DEFAULT_FORK_DIGEST string = "0xffff"
+	DEFAULT_USER_AGENT  string = "bsc_crawler"
+	DEFAULT_LOG_LEVEL   string = "debug"
 
-const DEFAULT_EMPTY_INT int = 0
-const DEFAULT_EMPTY_STRING string = ""
-const DEFAULT_DB_PATH string = ""
-const DEFAULT_DB_TYPE string = ""
+	DEFAULT_EMPTY_INT    int    = 0
+	DEFAULT_EMPTY_STRING string = ""
+	DEFAULT_DB_PATH      string = ""
+	DEFAULT_DB_TYPE      string = ""
 
-const PKG_NAME string = "Config"
+	MIN_PORT int = 0
+	MAX_PORT int = 65000
+
+	PKG_NAME string = "Config"
+)
 
 type ConfigData struct {
 	localLogger   log.FieldLogger
