@@ -194,7 +194,7 @@ func (d *Discovery) HandleENR(node *eth_enode.Node) error {
 	pubBytes, _ := x509.MarshalPKIXPublicKey(pubkey)
 	peer.Pubkey = hex.EncodeToString(pubBytes)
 	peer.NodeId = node.ID().String()
-	peer.BlockchainNode = *node
+	peer.BlockchainNodeENR = node.String()
 	peer.Ip = node.IP().String()
 	peer.MAddrs = mAddrs
 
