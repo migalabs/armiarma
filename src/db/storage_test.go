@@ -58,9 +58,6 @@ func testStorage(t *testing.T, p PeerStoreStorage) {
 		return true
 	})
 	require.Equal(t, 3, len(peerStoreTest))
-	require.Equal(t, peer1, peerStoreTest[0])
-	require.Equal(t, peer2, peerStoreTest[1])
-	require.Equal(t, peer3, peerStoreTest[2])
 
 	p.Delete("2")
 	_, ok = p.Load("2")
