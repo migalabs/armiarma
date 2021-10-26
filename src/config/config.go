@@ -12,6 +12,7 @@ package config
 import (
 	"encoding/json"
 	"io/ioutil"
+	"net"
 	"os"
 	"strings"
 
@@ -122,17 +123,17 @@ func (c *ConfigData) ReadFromJSON(input_file string) {
 // * ConfigData object and check if any is empty.
 // *If so, apply the default
 func (c *ConfigData) checkEmptyFields() {
-	if c.GetIP() == "" {
+	if c.checkValidIP() {
 		c.SetIP(DEFAULT_IP)
 		c.localLogger.Debugf("Setting default IP: %s", DEFAULT_IP)
 	}
 
-	if c.GetTcpPort() == 0 {
+	if c.checkValidTcpPort() {
 		c.SetTcpPort(DEFAULT_TCP_PORT)
 		c.localLogger.Debugf("Setting default TcpPort: %d", DEFAULT_TCP_PORT)
 	}
 
-	if c.GetUdpPort() == 0 {
+	if c.checkValidUdpPort() {
 		c.SetUdpPort(DEFAULT_UDP_PORT)
 		c.localLogger.Debugf("Setting default UdpPort: %d", DEFAULT_UDP_PORT)
 	}
@@ -203,6 +204,9 @@ func (c *ConfigData) GetTcpPort() int {
 func (c *ConfigData) SetTcpPort(input_port int) {
 	c.TcpPort = input_port
 }
+func (c *ConfigData) checkValidTcpPort() bool {
+	return checkValidPort(c.GetTcpPort())
+}
 
 func (c *ConfigData) GetUdpPort() int {
 	return c.UdpPort
@@ -210,12 +214,32 @@ func (c *ConfigData) GetUdpPort() int {
 func (c *ConfigData) SetUdpPort(input_port int) {
 	c.UdpPort = input_port
 }
+func (c *ConfigData) checkValidUdpPort() bool {
+	return checkValidPort(c.GetUdpPort())
+}
+
+func checkValidPort(input_port int) bool {
+	// we put greater than min port, as 0 is default when no value was set
+	if input_port > utils.MIN_PORT_NUM && input_port <= utils.MAX_PORT_NUM {
+		return true
+	}
+	return false
+}
 
 func (c *ConfigData) GetIP() string {
 	return c.IP
 }
+
 func (c *ConfigData) SetIP(input_ip string) {
 	c.IP = input_ip
+}
+
+func (c *ConfigData) checkValidIP() bool {
+	input_IP := c.GetIP()
+	if input_IP != "" && utils.IsIPPublic(net.ParseIP(input_IP)) {
+		return true
+	}
+	return false
 }
 
 func (c *ConfigData) GetUserAgent() string {
