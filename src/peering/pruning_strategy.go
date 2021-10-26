@@ -10,7 +10,8 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/migalabs/armiarma/src/base"
-	"github.com/migalabs/armiarma/src/metrics"
+	"github.com/migalabs/armiarma/src/db"
+	"github.com/migalabs/armiarma/src/db/utils"
 	ma "github.com/multiformats/go-multiaddr"
 
 	log "github.com/sirupsen/logrus"
@@ -26,11 +27,11 @@ type PruningOpts struct {
 }
 
 // Pruning Strategy is a Peering Strategy that applies penalties to peers that haven't show activity when attempting to connect them.
-// Combined with the Deprecated flag in the metrics.Peer struct, it produces more accourated metrics when exporting, pruning peers that are no longer active.
+// Combined with the Deprecated flag in the db.Peer struct, it produces more accourated metrics when exporting, pruning peers that are no longer active.
 type PruningStrategy struct {
 	*base.Base
 	strategyType string
-	PeerStore    *metrics.PeerStore
+	PeerStore    *db.PeerStore
 	// Delay unit time that gets applied to those slashed peers when reporting inactivity errors when activly connecting
 	AggregatedDelay time.Duration
 
@@ -42,10 +43,10 @@ type PruningStrategy struct {
 	*/
 }
 
-func NewPruningStrategy(ctx context.Context, peerstore metrics.PeerStore, opts PruningOpts) *PruningStrategy {
+func NewPruningStrategy(ctx context.Context, peerstore *db.PeerStore, opts PruningOpts) (*PruningStrategy, error) {
 	// TODO: cancel is still not implemented in the BaseCreation
 	pruningCtx, _ := context.WithCancel(ctx)
-	opts.LogOpts.logOpts.ModName = "pruning strategy"
+	opts.LogOpts.ModName = "pruning strategy"
 	b, err := base.NewBase(
 		base.WithContext(pruningCtx),
 		base.WithLogger(opts.LogOpts),
@@ -58,10 +59,10 @@ func NewPruningStrategy(ctx context.Context, peerstore metrics.PeerStore, opts P
 		strategyType: "prunning",
 		PeerStore:    peerstore,
 	}
-	return pr
+	return pr, nil
 }
 
-func (c *PruningStrategy) Type() string {
+func (c PruningStrategy) Type() string {
 	return c.strategyType
 }
 
@@ -77,7 +78,7 @@ func (c *PruningStrategy) Start(ctx context.Context, args ...string) {
 	}()
 
 	cntC := make(chan os.Signal)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	signal.Notify(cntC, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-cntC     // wait untill syscall.SIGTERM
 		bgCancel() // shut down the sub-context
@@ -90,7 +91,7 @@ func (c *PruningStrategy) Start(ctx context.Context, args ...string) {
 // every 3-4 minutes generate a local new copy of the peers in the peerstore.
 // It randomly selects one of the attempting to connect with it, recording the
 // results of the attempts. If the peer was already connected, just dropt it
-func (c *PruningStrategy) run(stop bool, store *metrics.Peerstore) {
+func (c *PruningStrategy) run(bgCtx context.Context, store *db.PeerStore) {
 	quit := make(chan struct{})
 	// Set the defer function to cancel the go routine
 	defer close(quit)
@@ -99,22 +100,23 @@ func (c *PruningStrategy) run(stop bool, store *metrics.Peerstore) {
 		for quit != nil {
 			peercount := 0
 			// Make the copy of the peers from the peerstore
-			peerList := store.Peers()
+			peerList := store.GetPeerList()
 			log.Infof("the peerstore has been re-scanned")
 			peerstoreLen := len(peerList)
 			log.Infof("len peerlist: %d", peerstoreLen)
-			t := time.Now()
 			for _, p := range peerList {
 				// check if the peers is the crawler itself
+				/* TODO: Check from other source the ID of our host
 				if p == h.ID() {
 					log.Debug("Calling to self host")
 					continue
 				}
+				*/
 				// read info about the peer
 				pinfo, err := c.PeerStore.GetPeerData(p.String())
 				if err != nil {
 					log.Warn(err)
-					pinfo = metrics.NewPeer(p.String())
+					pinfo = db.NewPeer(p.String())
 				}
 				// check if peer has been already deprecated for being many hours without connected
 				wtime := pinfo.DaysToWait()
@@ -123,7 +125,7 @@ func (c *PruningStrategy) run(stop bool, store *metrics.Peerstore) {
 					if err != nil {
 						log.Warnf("ERROR, the peer should have a last connection attempt but list is empty")
 					}
-					lconnSecs := lconn.Add(time.Duration(wtime*DefaultDelay) * time.Hour).Unix()
+					lconnSecs := lconn.Add(time.Duration(wtime) * DefaultDelay).Unix()
 					tnow := time.Now().Unix()
 					// Compare time now with last connection plus waiting list
 					if (tnow - lconnSecs) <= 0 {
@@ -135,129 +137,76 @@ func (c *PruningStrategy) run(stop bool, store *metrics.Peerstore) {
 				peercount++
 				// Set the correct address format to connect the peers
 				// libp2p complains if we put multi-addresses that include the peer ID into the Addrs list.
-				addrs := c.peerstore.Addrs(p)
+				addrs := pinfo.ExtractPublicAddr()
 				addrInfo := peer.AddrInfo{
 					ID:    p,
-					Addrs: make([]ma.Multiaddr, 0, len(addrs)),
+					Addrs: make([]ma.Multiaddr, 0, 1),
 				}
-				for _, m := range addrs {
-					transport, _ := peer.SplitAddr(m)
-					if transport == nil {
-						continue
-					}
-					addrInfo.Addrs = append(addrInfo.Addrs, transport)
-				}
-				// compose all the detailed info for the given peer
-				peerEnr := c.Store.LatestENR(p)
-				// ensure the enr is not nil
-				if peerEnr == nil {
+
+				transport, _ := peer.SplitAddr(addrs)
+				if transport == nil {
 					continue
 				}
-				addr, err := addrutil.EnodeToMultiAddr(peerEnr)
-				if err != nil {
-					log.Error("failed to parse ENR address into multi-addr for libp2p: %s", err)
-				}
+				addrInfo.Addrs = append(addrInfo.Addrs, transport)
+
+				// compose all the detailed info for the given peer
+				// compose all the detailed info for the given peer
+				peerEnr := pinfo.GetBlockchainNode()
 
 				pinfo.Pubkey = p.String()
 				pinfo.NodeId = peerEnr.ID().String()
 				pinfo.Ip = peerEnr.IP().String()
-				pinfo.Addrs = addr.String()
-				/* Deprecated for now, too many request for the IP-Localization
-				country, city, err := utils.GetLocationFromIp(peer.Ip)
-				if err != nil {
-					log.Warn("could not get location from ip: ", peer.Ip, err)
-				} else {
-					peer.Country = country
-					peer.City = city
-				}
-				*/
-				c.PeerStore.StoreOrUpdatePeer(pinfo)
 
-				ctx, cancel := context.WithTimeout(ctx, c.Timeout)
-				defer cancel()
-				c.Log.Warnf("addrs %s attempting connection to peer", addrInfo.Addrs)
-				// try to connect the peer
-				attempts := 0
-				for attempts < c.MaxRetries {
-					if err := h.Connect(ctx, addrInfo); err != nil {
-						c.Log.WithError(err).Warnf("attempts %d failed connection attempt", attempts)
-						// the connetion failed
-						c.RecErrorHandler(p, err.Error())
-						attempts++
-						continue
-					} else { // connection successfuly made
-						c.Log.Infof("peer_id %s successful connection made", p)
-						c.PeerStore.AddNewPosConnectionAttempt(p.String())
-						// break the loop
-						break
-					}
-					if attempts >= c.MaxRetries {
-						c.Log.Warnf("attempts %d failed connection attempt, reached maximum, no retry", attempts)
-						break
-					}
-				}
-			}
-			tIter := time.Since(t)
-			// Measure all the PeerStore iteration times
-			c.PeerStore.NewPeerstoreIteration(tIter)
-			// Measure the time of the entire PeerStore loop
-			log.Infof("Time to ping the entire peerstore (except deprecated): %s", tIter)
-			log.Infof("Peer attempted from the last reset: %d", len(peerList))
-			/*
-				// Force Garbage collector
-				runtime.GC()
-				runtime.FreeOSMemory()
-			*/
+				store.StoreOrUpdatePeer(pinfo)
 
-			// Check if we have received any quit signal
-			if quit == nil {
-				log.Infof("Quit has been closed")
-				break
+				// Check if we have received any quit signal
+				if quit == nil {
+					log.Infof("Quit has been closed")
+					break
+				}
 			}
 		}
-		log.Infof("Go routine to randomly connect has been canceled")
 	}()
 }
 
 // Worker Implementations
-func peeringWorker(ctx context.Context, ps *metrics.PeerStore, peerChan chan string) {
+func peeringWorker(ctx context.Context, ps *db.PeerStore, peerChan chan string) {
 
 }
 
 // function that selects actuation method for each of the possible errors while actively dialing peers
-//
-func (c *PeerPruneConncetCmd) RecErrorHandler(pe peer.ID, rec_err string) {
-	var fn func(p *metrics.Peer)
+func (c *PruningStrategy) RecErrorHandler(pe peer.ID, rec_err string) {
+	var fn func(p *db.Peer)
 	switch utils.FilterError(rec_err) {
 	case "Connection reset by peer":
-		fn = func(p *metrics.Peer) {
+		fn = func(p *db.Peer) {
 			p.AddNegConnAtt()
 		}
 	case "i/o timeout":
-		fn = func(p *metrics.Peer) {
+		fn = func(p *db.Peer) {
 			p.AddNegConnAttWithPenalty()
 		}
 	case "dial to self attempted":
 		// we tried to peer ourselfs! deprecate the peer
-		fn = func(p *metrics.Peer) {
+		fn = func(p *db.Peer) {
 			p.AddNegConnAtt()
 			p.Deprecated = true
 		}
 	case "dial backoff":
-		fn = func(p *metrics.Peer) {
+		fn = func(p *db.Peer) {
 			p.AddNegConnAtt()
 		}
 	case "connection refused":
-		fn = func(p *metrics.Peer) {
+		fn = func(p *db.Peer) {
 			p.AddNegConnAtt()
 		}
 	case "no route to host":
-		fn = func(p *metrics.Peer) {
+		fn = func(p *db.Peer) {
 			p.AddNegConnAtt()
 			p.Deprecated = true
 		}
 	case "unreachable network":
-		fn = func(p *metrics.Peer) {
+		fn = func(p *db.Peer) {
 			p.AddNegConnAtt()
 			p.Deprecated = true
 		}
@@ -286,17 +235,17 @@ func (c *PeerPruneConncetCmd) RecErrorHandler(pe peer.ID, rec_err string) {
 			fmt.Println(rec_err)
 			// Info about the peer should be added to the metrics
 			// *** Carefull - problems with reading the pubkey ***
-			//newP := metrics.NewPeer(newPeerID.String())
+			//newP := db.NewPeer(newPeerID.String())
 			//c.PeerStore.Store(newPeerID.String(), newP)
 			_, _ = c.Store.UpdateENRMaybe(newPeerID, enr)
 			c.Store.AddAddrs(newPeerID, addrs, time.Duration(48)*time.Hour)
 		*/
-		fn = func(p *metrics.Peer) {
+		fn = func(p *db.Peer) {
 			p.AddNegConnAtt()
 			p.Deprecated = true
 		}
 	default:
-		fn = func(p *metrics.Peer) {
+		fn = func(p *db.Peer) {
 			p.AddNegConnAttWithPenalty()
 		}
 	}

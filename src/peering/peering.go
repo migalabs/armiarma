@@ -14,9 +14,10 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/migalabs/armiarma/src/base"
+	"github.com/migalabs/armiarma/src/db"
+	"github.com/migalabs/armiarma/src/db/utils"
 	"github.com/migalabs/armiarma/src/hosts"
 	"github.com/migalabs/armiarma/src/info"
-	"github.com/migalabs/armiarma/src/metrics"
 	ma "github.com/multiformats/go-multiaddr"
 	log "github.com/sirupsen/logrus"
 )
@@ -24,7 +25,7 @@ import (
 type PeeringOption func(*PeeringService) error
 
 type PeeringOpts struct {
-	InfoObj info.InfoData
+	InfoObj *info.InfoData
 	LogOpts base.LogOpts
 }
 
@@ -34,14 +35,14 @@ type PeeringService struct {
 	*base.Base
 	InfoObj   *info.InfoData
 	host      *hosts.BasicLibp2pHost
-	peerstore *metrics.PeerStore
+	PeerStore *db.PeerStore
 	strategy  *PeeringStrategy
 	//
 	Timeout    time.Duration
 	MaxRetries int
 }
 
-func NewPeeringService(ctx context.Context, h *hosts.BasicLibp2pHost, peerstore *metrics.PeerStore, peeringOpts PeeringOpts, opts ...PeeringOption) (*PeeringService, error) {
+func NewPeeringService(ctx context.Context, h *hosts.BasicLibp2pHost, peerstore *db.PeerStore, peeringOpts *PeeringOpts, opts ...PeeringOption) (*PeeringService, error) {
 	// TODO: cancel is still not implemented in the BaseCreation
 	peeringCtx, _ := context.WithCancel(ctx)
 	logOpts := peeringOpts.LogOpts
@@ -53,12 +54,11 @@ func NewPeeringService(ctx context.Context, h *hosts.BasicLibp2pHost, peerstore 
 	if err != nil {
 		return nil, err
 	}
-
 	pServ := &PeeringService{
 		Base:       b,
 		InfoObj:    peeringOpts.InfoObj,
 		host:       h,
-		peerstore:  peerstore,
+		PeerStore:  peerstore,
 		Timeout:    15 * time.Second, // TODO: Hardcoded to 15 seconds
 		MaxRetries: 1,                // TODO: Hardcoded to 1 retry, future retries are directly dismissed/dropped by dialing peer
 	}
@@ -89,7 +89,7 @@ func WithPeeringStrategy(strategy *PeeringStrategy) PeeringOption {
 		if strategy == nil {
 			return fmt.Errorf("given peering strategy is empty")
 		}
-		p.Log.Debugf("configuring peering with %s", strategy.Type())
+		p.Log.Debugf("configuring peering with %s", (*strategy).Type())
 		p.strategy = p.strategy
 		return nil
 	}
@@ -106,10 +106,9 @@ func (c *PeeringService) Start() {
 		for quit != nil {
 			peercount := 0
 			// Make the copy of the peers from the peerstore
-			peerList := c.peerstore.Peers()
-			c.Log.Infof("the peerstore has been re-scanned")
-			peerstoreLen := len(peerList)
-			c.Log.Infof("len peerlist: %d", peerstoreLen)
+			peerList := c.PeerStore.GetPeerList()
+			c.Log.Infof("the peerstore has been re-scanned with %d peer", len(peerList))
+
 			t := time.Now()
 			for _, p := range peerList {
 				// check if the peers is the crawler itself
@@ -118,10 +117,10 @@ func (c *PeeringService) Start() {
 					continue
 				}
 				// read info about the peer
-				pinfo, err := c.peerstore.GetPeerData(p.String())
+				pinfo, err := c.PeerStore.GetPeerData(p.String())
 				if err != nil {
-					c.Log.Warn(err)
-					pinfo = metrics.NewPeer(p.String())
+					c.Log.Debug(err)
+					pinfo = db.NewPeer(p.String())
 				}
 				// check if peer has been already deprecated for being many hours without connected
 				wtime := pinfo.DaysToWait()
@@ -142,31 +141,26 @@ func (c *PeeringService) Start() {
 				peercount++
 				// Set the correct address format to connect the peers
 				// libp2p complains if we put multi-addresses that include the peer ID into the Addrs list.
-				addrs := p.ExtractPublicAddr()
+				addrs := pinfo.ExtractPublicAddr()
 				addrInfo := peer.AddrInfo{
 					ID:    p,
-					Addrs: make([]ma.Multiaddr, 0, len(addrs)),
-				}
-				for _, m := range addrs {
-					transport, _ := peer.SplitAddr(m)
-					if transport == nil {
-						continue
-					}
-					addrInfo.Addrs = append(addrInfo.Addrs, transport)
+					Addrs: make([]ma.Multiaddr, 0, 1),
 				}
 
-				// compose all the detailed info for the given peer
-				peerEnr := pinfo.GetENR(p)
-				// ensure the enr is not nil
-				if peerEnr == nil {
+				transport, _ := peer.SplitAddr(addrs)
+				if transport == nil {
 					continue
 				}
+				addrInfo.Addrs = append(addrInfo.Addrs, transport)
+
+				// compose all the detailed info for the given peer
+				peerEnr := pinfo.GetBlockchainNode()
 
 				pinfo.Pubkey = p.String()
 				pinfo.NodeId = peerEnr.ID().String()
 				pinfo.Ip = peerEnr.IP().String()
 
-				c.peerstore.StoreOrUpdatePeer(pinfo)
+				c.PeerStore.StoreOrUpdatePeer(pinfo)
 
 				ctx, cancel := context.WithTimeout(c.Ctx(), c.Timeout)
 				defer cancel()
@@ -182,7 +176,7 @@ func (c *PeeringService) Start() {
 						continue
 					} else { // connection successfuly made
 						c.Log.Infof("peer_id %s successful connection made", p)
-						c.peerstore.AddNewPosConnectionAttempt(p.String())
+						c.PeerStore.AddNewPosConnectionAttempt(p.String())
 						// break the loop
 						break
 					}
@@ -194,7 +188,7 @@ func (c *PeeringService) Start() {
 			}
 			tIter := time.Since(t)
 			// Measure all the PeerStore iteration times
-			c.peerstore.NewPeerstoreIteration(tIter)
+			c.PeerStore.NewPeerstoreIteration(tIter)
 			// Measure the time of the entire PeerStore loop
 			c.Log.Infof("Time to ping the entire peerstore (except deprecated): %s", tIter)
 			c.Log.Infof("Peer attempted from the last reset: %d", len(peerList))
@@ -214,44 +208,43 @@ func (c *PeeringService) Start() {
 	}()
 }
 
-func (p *PeeringService) Stop() {
+func (c *PeeringService) Stop() {
 	c.Log.Debug("stopìng the peering service")
 }
 
 // function that selects actuation method for each of the possible errors while actively dialing peers
-//
 func (c *PeeringService) RecErrorHandler(pe peer.ID, rec_err string) {
-	var fn func(p *metrics.Peer)
+	var fn func(p *db.Peer)
 	switch utils.FilterError(rec_err) {
 	case "Connection reset by peer":
-		fn = func(p *metrics.Peer) {
+		fn = func(p *db.Peer) {
 			p.AddNegConnAtt()
 		}
 	case "i/o timeout":
-		fn = func(p *metrics.Peer) {
+		fn = func(p *db.Peer) {
 			p.AddNegConnAttWithPenalty()
 		}
 	case "dial to self attempted":
 		// we tried to peer ourselfs! deprecate the peer
-		fn = func(p *metrics.Peer) {
+		fn = func(p *db.Peer) {
 			p.AddNegConnAtt()
 			p.Deprecated = true
 		}
 	case "dial backoff":
-		fn = func(p *metrics.Peer) {
+		fn = func(p *db.Peer) {
 			p.AddNegConnAtt()
 		}
 	case "connection refused":
-		fn = func(p *metrics.Peer) {
+		fn = func(p *db.Peer) {
 			p.AddNegConnAtt()
 		}
 	case "no route to host":
-		fn = func(p *metrics.Peer) {
+		fn = func(p *db.Peer) {
 			p.AddNegConnAtt()
 			p.Deprecated = true
 		}
 	case "unreachable network":
-		fn = func(p *metrics.Peer) {
+		fn = func(p *db.Peer) {
 			p.AddNegConnAtt()
 			p.Deprecated = true
 		}
@@ -278,19 +271,19 @@ func (c *PeeringService) RecErrorHandler(pe peer.ID, rec_err string) {
 			enr := c.Store.LatestENR(pe)
 			fmt.Println("len old", len(pe.String()), "len new", len(newPeerID.String()))
 			fmt.Println(rec_err)
-			// Info about the peer should be added to the metrics
+			// Info about the peer should be added to the db
 			// *** Carefull - problems with reading the pubkey ***
-			//newP := metrics.NewPeer(newPeerID.String())
+			//newP := db.NewPeer(newPeerID.String())
 			//c.PeerStore.Store(newPeerID.String(), newP)
 			_, _ = c.Store.UpdateENRMaybe(newPeerID, enr)
 			c.Store.AddAddrs(newPeerID, addrs, time.Duration(48)*time.Hour)
 		*/
-		fn = func(p *metrics.Peer) {
+		fn = func(p *db.Peer) {
 			p.AddNegConnAtt()
 			p.Deprecated = true
 		}
 	default:
-		fn = func(p *metrics.Peer) {
+		fn = func(p *db.Peer) {
 			p.AddNegConnAttWithPenalty()
 		}
 	}
