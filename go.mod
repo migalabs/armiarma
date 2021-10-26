@@ -2,6 +2,8 @@ module github.com/migalabs/armiarma
 
 go 1.17
 
+// working version of amriarma
+
 require (
 	github.com/btcsuite/btcd v0.21.0-beta
 	github.com/ethereum/go-ethereum v1.10.8
