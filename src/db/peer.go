@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	m_utils "github.com/migalabs/armiarma/src/db/utils"
 	"github.com/migalabs/armiarma/src/utils"
 	ma "github.com/multiformats/go-multiaddr"
@@ -33,7 +34,7 @@ type Peer struct {
 	ClientVersion string
 	// TODO: Store Enr
 	// Latest ENR
-	//BlockchainNode enode.Node
+	BlockchainNodeENR string
 
 	// PeerNetwork
 	Ip              string
@@ -144,9 +145,9 @@ func (pm *Peer) FetchPeerInfoFromPeer(newPeer Peer) {
 // *						PEER_ETH2_NODE					*
 //***********************************************************
 
-/*func (pm *Peer) GetBlockchainNode() enode.Node {
-	return pm.BlockchainNode
-}*/
+func (pm *Peer) GetBlockchainNode() *enode.Node {
+	return enode.MustParse(pm.BlockchainNodeENR)
+}
 
 // **********************************************************
 // *						PEER_NETWORK					*
