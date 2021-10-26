@@ -1,6 +1,7 @@
 package db
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -68,15 +69,16 @@ func (p MemoryDB) Close() {
 // * These would be the keys of each entry in the map
 // @return the string array containisssng the PeerIDs
 func (p MemoryDB) Peers() []peer.ID {
-	cnt := 0
+	//cnt := 0
 	result := make([]peer.ID, 0)
-	p.m.Range(func(key string, value Peer) bool {
-		peerID_obj, err := peer.IDFromString(key.(string))
+	p.Range(func(key string, value Peer) bool {
+		fmt.Println(key)
+		peerID_obj, err := peer.Decode(key)
 		if err != nil {
 			return false
 		}
 		result = append(result, peerID_obj)
-		cnt++
+		//cnt++
 		return true
 	})
 	return result
