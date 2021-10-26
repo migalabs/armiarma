@@ -44,7 +44,5 @@ func ExtractIPFromMAddr(input_addr ma.Multiaddr) net.IP {
 
 	extracted_ip := string_addr_splitted[2] // the IP is in the third position
 
-	parsed_ip := net.ParseIP(extracted_ip)
-
-	return parsed_ip
+	return net.ParseIP(extracted_ip)
 }

@@ -9,7 +9,6 @@ import (
 
 	"github.com/migalabs/armiarma/src/db"
 	"github.com/migalabs/armiarma/src/db/utils"
-	"github.com/migalabs/armiarma/src/gossipsub"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
@@ -35,54 +34,55 @@ func NewPrometheusRunner(gm *db.PeerStore) PrometheusRunner {
 	}
 }
 
-func (c *PrometheusRunner) Run(ctx context.Context) error {
+func (c *PrometheusRunner) Start(ctx context.Context) error {
 	http.Handle("/metrics", promhttp.Handler())
 
-	prometheus.MustRegister(clientDistribution)
-	prometheus.MustRegister(connectedPeers)
-	prometheus.MustRegister(receivedTotalMessages)
-	prometheus.MustRegister(receivedMessages)
-	prometheus.MustRegister(peerstoreIterTime)
-	prometheus.MustRegister(deprecatedPeers)
-	prometheus.MustRegister(clientVersionDistribution)
-	prometheus.MustRegister(ipDistribution)
-	prometheus.MustRegister(totPeers)
-	prometheus.MustRegister(geoDistribution)
-	prometheus.MustRegister(rttDistribution)
-	prometheus.MustRegister(totcontimeDistribution)
+	prometheus.MustRegister(ClientDistribution)
+	prometheus.MustRegister(ConnectedPeers)
+	prometheus.MustRegister(ReceivedTotalMessages)
+	prometheus.MustRegister(ReceivedMessages)
+	prometheus.MustRegister(PeerstoreIterTime)
+	prometheus.MustRegister(DeprecatedPeers)
+	prometheus.MustRegister(ClientVersionDistribution)
+	prometheus.MustRegister(IpDistribution)
+	prometheus.MustRegister(TotPeers)
+	prometheus.MustRegister(GeoDistribution)
+	prometheus.MustRegister(RttDistribution)
+	prometheus.MustRegister(TotcontimeDistribution)
 
-	// launch the collector go routine
-	stopping := make(chan struct{})
+	/*
+		// launch the collector go routine
+		stopping := make(chan struct{})
 
-	// generate reset channel
-	resetChan := make(chan bool, 2)
-	// message counters
-	beacBlock := 0
-	beacAttestation := 0
-	totalMsg := 0
-	// go routine to keep track of the received messages
-	go func() {
-		for {
-			select { // TODO: change the constants
-			case <-c.PeerStore.MsgNotChannels[gossipsub.BeaconBlock]:
-				beacBlock += 1
-				totalMsg += 1 // TODO: change the constants
-			case <-c.PeerStore.MsgNotChannels[gossipsub.BeaconAggregateProof]:
-				beacAttestation += 1
-				totalMsg += 1
-			case <-resetChan:
-				// reset the counters
-				beacBlock = 0
-				beacAttestation = 0
-				totalMsg = 0
-			case <-stopping:
-				fmt.Println("Stopping the go prometheus go routine")
-				return
+		// generate reset channel
+		resetChan := make(chan bool, 2)
+		// message counters
+		beacBlock := 0
+		beacAttestation := 0
+		totalMsg := 0
+		// go routine to keep track of the received messages
+		go func() {
+			for {
+				select { // TODO: change the constants
+				case <-c.PeerStore.MsgNotChannels[gossipsub.BeaconBlock]:
+					beacBlock += 1
+					totalMsg += 1 // TODO: change the constants
+				case <-c.PeerStore.MsgNotChannels[gossipsub.BeaconAggregateProof]:
+					beacAttestation += 1
+					totalMsg += 1
+				case <-resetChan:
+					// reset the counters
+					beacBlock = 0
+					beacAttestation = 0
+					totalMsg = 0
+				case <-stopping:
+					fmt.Println("Stopping the go prometheus go routine")
+					return
+				}
 			}
-		}
-		log.Info("End Message tracker")
-	}()
-
+			log.Info("End Message tracker")
+		}()
+	*/
 	go func() {
 		for {
 			clients := db.NewClients()
@@ -170,22 +170,22 @@ func (c *PrometheusRunner) Run(ctx context.Context) error {
 				return true
 			})
 
-			totPeers.Set(float64(nOfDiscoveredPeers))
-			connectedPeers.Set(float64(nOfConnectedPeers))
-			deprecatedPeers.Set(float64(nOfDeprecatedPeers))
+			TotPeers.Set(float64(nOfDiscoveredPeers))
+			ConnectedPeers.Set(float64(nOfConnectedPeers))
+			DeprecatedPeers.Set(float64(nOfDeprecatedPeers))
 
 			for _, clientName := range clients.GetClientNames() {
 				count := clients.GetCountOfClient(clientName)
 				// TODO: Add also version and OS
-				clientDistribution.WithLabelValues(clientName).Set(float64(count))
+				ClientDistribution.WithLabelValues(clientName).Set(float64(count))
 			}
 			// Country distribution
 			for k, v := range geoDist {
-				geoDistribution.WithLabelValues(k).Set(v)
+				GeoDistribution.WithLabelValues(k).Set(v)
 			}
 			// Client Version distribution
 			for k, v := range clientVerDist {
-				clientVersionDistribution.WithLabelValues(k).Set(v)
+				ClientVersionDistribution.WithLabelValues(k).Set(v)
 			}
 			// IP distribution
 			// count how many ips host the same nodess
@@ -200,34 +200,34 @@ func (c *PrometheusRunner) Run(ctx context.Context) error {
 			}
 
 			// Reset previous distributions
-			ipDistribution.Reset()
-			rttDistribution.Reset()
-			totcontimeDistribution.Reset()
+			IpDistribution.Reset()
+			RttDistribution.Reset()
+			TotcontimeDistribution.Reset()
 			for k, v := range auxIpDist {
-				ipDistribution.WithLabelValues(fmt.Sprintf("%.0f", v)).Set(k)
+				IpDistribution.WithLabelValues(fmt.Sprintf("%.0f", v)).Set(k)
 			}
 			for k, v := range rttDis {
-				rttDistribution.WithLabelValues(k).Set(v)
+				RttDistribution.WithLabelValues(k).Set(v)
 			}
 			for k, v := range tctDis {
-				totcontimeDistribution.WithLabelValues(k).Set(v)
+				TotcontimeDistribution.WithLabelValues(k).Set(v)
 			}
 			allLastErrors := c.PeerStore.GetErrorCounter()
 
-			peerstoreIterTime.Set(float64(c.PeerStore.PeerstoreIterTime) / (60 * 1000000000))
+			PeerstoreIterTime.Set(float64(c.PeerStore.PeerstoreIterTime) / (60 * 1000000000))
+			/*
+				// get the message counter per minutes
+				secs := c.RefreshInterval.Seconds()
+				bb := (float64(beacBlock) / secs) * 60
+				ba := (float64(beacAttestation) / secs) * 60
+				tot := float64(totalMsg)
 
-			// get the message counter per minutes
-			secs := c.RefreshInterval.Seconds()
-			bb := (float64(beacBlock) / secs) * 60
-			ba := (float64(beacAttestation) / secs) * 60
-			tot := float64(totalMsg)
+				receivedMessages.WithLabelValues("beacon_blocks").Set(bb)
+				receivedMessages.WithLabelValues("beacon_aggregate_and_proof").Set(ba)
+				receivedTotalMessages.Set(tot)
 
-			receivedMessages.WithLabelValues("beacon_blocks").Set(bb)
-			receivedMessages.WithLabelValues("beacon_aggregate_and_proof").Set(ba)
-			receivedTotalMessages.Set(tot)
-
-			resetChan <- true
-
+				resetChan <- true
+			*/
 			log.WithFields(log.Fields{
 				"ClientsDist":        clients,
 				"GeoDist":            geoDist,
@@ -235,8 +235,8 @@ func (c *PrometheusRunner) Run(ctx context.Context) error {
 				"NOfConnectedPeers":  nOfConnectedPeers,
 				"NOfDeprecatedPeers": nOfDeprecatedPeers,
 				"LastErrors":         allLastErrors,
-				"BeaconBlocks":       bb,
-				"BeaconAttestations": ba,
+				//"BeaconBlocks":       bb,
+				//"BeaconAttestations": ba,
 			}).Info("Metrics summary")
 
 			time.Sleep(c.RefreshInterval)

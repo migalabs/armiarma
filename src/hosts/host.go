@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/migalabs/armiarma/src/base"
+	"github.com/migalabs/armiarma/src/db"
 	"github.com/migalabs/armiarma/src/info"
 
 	libp2p "github.com/libp2p/go-libp2p"
@@ -19,8 +20,9 @@ import (
 type BasicLibp2pHost struct {
 	*base.Base
 	// Basic sevices related with the libp2p host
-	host     host.Host
-	identify *identify.IDService
+	host      host.Host
+	identify  *identify.IDService
+	PeerStore *db.PeerStore
 
 	// Basic Host Metadata
 	info_obj      *info.InfoData
@@ -31,8 +33,9 @@ type BasicLibp2pHost struct {
 }
 
 type BasicLibp2pHostOpts struct {
-	Info_obj info.InfoData
-	LogOpts  base.LogOpts
+	Info_obj  info.InfoData
+	LogOpts   base.LogOpts
+	PeerStore *db.PeerStore
 	// TODO: -Add IdService for the libp2p host
 }
 
@@ -93,6 +96,7 @@ func NewBasicLibp2pHost(ctx context.Context, opts BasicLibp2pHostOpts) (*BasicLi
 		Base:          b,
 		host:          host,
 		identify:      ids,
+		PeerStore:     opts.PeerStore,
 		info_obj:      &opts.Info_obj,
 		multiAddr:     muladdr,
 		fullMultiAddr: localMultiaddr,

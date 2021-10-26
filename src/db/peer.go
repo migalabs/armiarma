@@ -7,6 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	m_utils "github.com/migalabs/armiarma/src/db/utils"
+	bc_topics "github.com/migalabs/armiarma/src/gossipsub/blockchaintopics"
 	"github.com/migalabs/armiarma/src/utils"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
@@ -417,7 +418,7 @@ func (pm *Peer) MessageEvent(topicName string, time time.Time) {
 // the topic name is the shortened name i.e. BeaconBlock
 // TODO: comment
 func (pm *Peer) GetNumOfMsgFromTopic(shortTopic string) uint64 {
-	msgMetric := pm.MessageMetrics[m_utils.ShortToFullTopicName(shortTopic)]
+	msgMetric := pm.MessageMetrics[bc_topics.ShortToFullTopicName(shortTopic)]
 	if msgMetric != nil {
 		return msgMetric.Count
 	}
