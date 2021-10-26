@@ -3,13 +3,16 @@ package hosts
 import (
 	"context"
 	"encoding/hex"
+	"fmt"
 	"time"
 
 	"github.com/pkg/errors"
 
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/migalabs/armiarma/src/db"
+	db_utils "github.com/migalabs/armiarma/src/db/utils"
 	"github.com/migalabs/armiarma/src/utils"
+	ma "github.com/multiformats/go-multiaddr"
 
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p/p2p/protocol/identify"
@@ -137,16 +140,25 @@ func ReqHostInfo(ctx context.Context, h host.Host, conn network.Conn, peer *db.P
 	// Update the values of the
 	peer.Latency = float64(rtt/time.Millisecond) / 1000
 	peer.PeerId = peerID.String()
-	peer.Addrs = conn.RemoteMultiaddr().String() + "/p2p/" + peerID.String()
 	peer.ConnectedDirection = conn.Stat().Direction.String()
-	peer.Ip, err = utils.GetIPfromMultiaddress(peer.Addrs)
+
+	multiAddrStr := conn.RemoteMultiaddr().String() + "/p2p/" + peerID.String()
+	multiAddr, err := ma.NewMultiaddr(multiAddrStr)
+	if err != nil {
+		return fmt.Errorf("error composing the maddrs from peer", err)
+	}
+	// generate array of MAddr to fit the db.Peer struct
+	mAddrs := make([]ma.Multiaddr, 0)
+	mAddrs = append(mAddrs, multiAddr)
+	peer.MAddrs = mAddrs
+	peer.Ip = utils.ExtractIPFromMAddr(multiAddr).String()
 	if err != nil {
 		// Almost impossible, when we are connected to a peer, we will always have a complete Multiaddrs after the Identify req
 		// leaving it emtpy to spot the problem, IP-Api request already makes a parse of the IP before making server petition
 		// TODO: think about a better idea to integrate a logger into this functions
 		//log.Error(err)
 	}
-	peer.Country, peer.City, peer.CountryCode, err = utils.GetLocationFromIp(peer.Ip)
+	peer.Country, peer.City, peer.CountryCode, err = db_utils.GetLocationFromIp(peer.Ip)
 	if err != nil {
 		// TODO: think about a better idea to integrate a logger into this functions
 		//log.Error("error when fetching country/city from ip", err)
@@ -156,7 +168,7 @@ func ReqHostInfo(ctx context.Context, h host.Host, conn network.Conn, peer *db.P
 	if err == nil {
 		peer.UserAgent = ua.(string)
 		// Extract Client type and version
-		peer.ClientName, peer.ClientVersion = utils.FilterClientType(peer.UserAgent)
+		peer.ClientName, peer.ClientVersion = db_utils.FilterClientType(peer.UserAgent)
 		peer.ClientOS = "TODO"
 	} else {
 		// EDGY CASE: when peers refuse the connection, the callback gets called and the identify protocol

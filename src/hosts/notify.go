@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	eth_node "github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/migalabs/armiarma/src/db"
 	ma "github.com/multiformats/go-multiaddr"
@@ -30,7 +29,7 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 	}).Debug("Peer: ", conn.RemotePeer().String())
 	// Generate new peer to aggregate new data
 	peer := db.NewPeer(conn.RemotePeer().String())
-	h, _ := c.Host()
+	h := c.Host()
 	// Request the Host Metadata
 	err := ReqHostInfo(context.Background(), h, conn, &peer)
 	if err != nil {
@@ -58,9 +57,9 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 	} else {
 		peer.UpdateBeaconStatus(bStatus)
 	}
-	*/
+
 	// Read ENR of the Peer from the generated enode
-	n := c.Store.LatestENR(conn.RemotePeer())
+	n := c.PeerStore.LatestENR(conn.RemotePeer())
 	if n != nil {
 		n.ID().String()
 		// We can only get the node.ID if the ENR of the peer was already in the PeerStore fromt dv5
@@ -74,6 +73,7 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 		}
 		peer.NodeId = eth_node.PubkeyToIDV4(edcsakey).String()
 	}
+	*/
 	// Add new connection event
 	peer.ConnectionEvent(conn.Stat().Direction.String(), time.Now())
 	// Add new peer or aggregate info to existing peer

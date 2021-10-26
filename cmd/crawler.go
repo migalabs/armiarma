@@ -28,6 +28,7 @@ import (
 	"github.com/migalabs/armiarma/src/hosts"
 	"github.com/migalabs/armiarma/src/info"
 	"github.com/migalabs/armiarma/src/peering"
+	"github.com/migalabs/armiarma/src/prometheus"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -35,13 +36,14 @@ import (
 // crawler status containing the main basemodule and info that the app will ConnectedF
 type CrawlerBase struct {
 	*base.Base
-	Host    *hosts.BasicLibp2pHost
-	Node    *enode.LocalNode
-	DB      *db.PeerStore
-	Dv5     *discovery.Discovery
-	Peering *peering.PeeringService
-	Gs      *gossipsub.GossipSub
-	Info    *info.InfoData
+	Host             *hosts.BasicLibp2pHost
+	Node             *enode.LocalNode
+	DB               *db.PeerStore
+	Dv5              *discovery.Discovery
+	Peering          *peering.PeeringService
+	Gs               *gossipsub.GossipSub
+	Info             *info.InfoData
+	PrometheusRunner *prometheus.PrometheusRunner
 }
 
 // variable to be used as a flag from command line
@@ -87,18 +89,21 @@ var crawlerCmd = &cobra.Command{
 			Level:     info_tmp.GetLogLevel(),
 		}
 
+		// TODO: generate a new DB
+		db := db.NewPeerStore("memory", "")
+		// Generate a Peering Service (so far with default peering strategy)
+
 		hostOpts := hosts.BasicLibp2pHostOpts{
-			Info_obj: *info_tmp,
-			LogOpts:  baseOpts,
+			Info_obj:  *info_tmp,
+			LogOpts:   baseOpts,
+			PeerStore: &db,
 		}
+
 		// generate libp2pHost
 		host, err := hosts.NewBasicLibp2pHost(b.Ctx(), hostOpts)
 		if err != nil {
 			log.Panic(err)
 		}
-		// TODO: generate a new DB
-		db := db.NewPeerStore("memory", "")
-		// Generate a Peering Service (so far with default peering strategy)
 
 		node_tmp := enode.NewLocalNode(b.Ctx(), info_tmp, stdOpts)
 		//node_tmp.AddEntries()
@@ -111,16 +116,20 @@ var crawlerCmd = &cobra.Command{
 		}
 		peeringServ, err := peering.NewPeeringService(b.Ctx(), host, &db, peeringOpts)
 
+		prometheusRunner := prometheus.NewPrometheusRunner(&db)
+		prometheusRunner.Start(b.Ctx())
+
 		// generate the CrawlerBase
 		crawler := CrawlerBase{
-			Base:    b,
-			Host:    host,
-			Info:    info_tmp,
-			DB:      &db,
-			Node:    node_tmp,
-			Dv5:     dv5_tmp,
-			Peering: peeringServ,
-			Gs:      gs_tmp,
+			Base:             b,
+			Host:             host,
+			Info:             info_tmp,
+			DB:               &db,
+			Node:             node_tmp,
+			Dv5:              dv5_tmp,
+			Peering:          peeringServ,
+			Gs:               gs_tmp,
+			PrometheusRunner: &prometheusRunner,
 		}
 
 		// Initialization Phase for the crawler
