@@ -5,7 +5,6 @@ import (
 	"net"
 	"strings"
 
-	"github.com/migalabs/armiarma/src/gossipsub"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -86,23 +85,6 @@ func FilterError(err string) string {
 	// 		 - no good address
 
 	return errorPretty
-}
-
-func ShortToFullTopicName(topicName string) string {
-	switch topicName {
-	case "BeaconBlock":
-		return gossipsub.BeaconBlock
-	case "BeaconAggregateProof":
-		return gossipsub.BeaconAggregateProof
-	case "VoluntaryExit":
-		return gossipsub.VoluntaryExit
-	case "ProposerSlashing":
-		return gossipsub.ProposerSlashing
-	case "AttesterSlashing":
-		return gossipsub.AttesterSlashing
-	default:
-		return ""
-	}
 }
 
 func GetIPfromMultiaddress(multiaddr string) (ip string, err error) {
