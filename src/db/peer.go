@@ -53,7 +53,7 @@ type Peer struct {
 	Succeed            bool   // If the connection attempt has been successful
 	Attempts           uint64 // Number of attempts done
 	Error              string // Type of error that we detected. TODO: We are just storing the last one
-	Deprecated         bool   // Flag to rummarize whether the peer is longer valid for statistics or not. If false, the peer is not exported in metrics.
+	Deprecated         bool   // Flag to rummarize whether the peer is longer valid for statistics or not. If false, the peer is not exported in db.
 
 	WaitingUnits int // number of days from last ping attempt that the crawler will wait to ping again
 
