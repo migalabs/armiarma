@@ -2,6 +2,8 @@ module github.com/migalabs/armiarma
 
 go 1.17
 
+// working version of amriarma
+
 require (
 	github.com/ethereum/go-ethereum v1.10.8
 	github.com/libp2p/go-libp2p v0.14.4
