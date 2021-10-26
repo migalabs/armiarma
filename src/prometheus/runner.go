@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/migalabs/armiarma/src/db"
+	"github.com/migalabs/armiarma/src/db/utils"
 	"github.com/migalabs/armiarma/src/gossipsub"
-	"github.com/migalabs/armiarma/src/metrics/utils"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"

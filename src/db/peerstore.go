@@ -25,7 +25,7 @@ type PeerStore struct {
 func NewPeerStore(dbtype string, path string) PeerStore {
 	var db PeerStoreStorage
 	// TODO: once the db works well and it is defined
-	/*switch dbtype {
+	switch dbtype {
 	case "bold":
 		if len(path) <= 0 {
 			path = default_db_path
@@ -38,7 +38,7 @@ func NewPeerStore(dbtype string, path string) PeerStore {
 			path = default_db_path
 		}
 		db = NewBoltPeerDB(path)
-	}*/
+	}
 	db = NewMemoryDB()
 	ps := PeerStore{
 		PeerStore:      db,
@@ -83,6 +83,7 @@ func (c *PeerStore) StoreOrUpdatePeer(peer Peer) {
 	// if a given client upgrated it version. Use oldData
 	// See: https://github.com/migalabs/armiarma/issues/17
 	// Currently just overwritting what was before
+	// TEMP
 	oldPeer, err := c.GetPeerData(peer.PeerId)
 	// if error means not found, just store it
 	if err != nil {
@@ -114,6 +115,7 @@ func (c *PeerStore) GetPeerData(peerId string) (Peer, error) {
 	if !ok {
 		return Peer{}, errors.New("could not find peer in peerstore: " + peerId)
 	}
+
 	return peerData, nil
 }
 

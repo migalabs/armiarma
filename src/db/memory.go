@@ -66,16 +66,17 @@ func (p MemoryDB) Close() {
 // * This method returns a string array with the list of PeerIDs
 // * existing in the DB.
 // * These would be the keys of each entry in the map
-// @return the string array containing the PeerIDs
+// @return the string array containisssng the PeerIDs
 func (p MemoryDB) Peers() []peer.ID {
+	cnt := 0
 	result := make([]peer.ID, 0)
-
-	p.m.Range(func(key, value interface{}) bool {
+	p.m.Range(func(key string, value Peer) bool {
 		peerID_obj, err := peer.IDFromString(key.(string))
 		if err != nil {
 			return false
 		}
 		result = append(result, peerID_obj)
+		cnt++
 		return true
 	})
 	return result
