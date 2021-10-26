@@ -35,4 +35,14 @@ func Test_StoreOrUpdatePeer(t *testing.T) {
 	// check that the new information was updated
 	require.Equal(t, p.ClientName, "NewClient")
 	require.Equal(t, p.MessageMetrics["topic1"].Count, uint64(2))
+
+}
+
+func Test_GetPeerList(t *testing.T) {
+	// stores a peer
+	peerStore := NewPeerStore("memory", "")
+	p1 := NewPeer("16Uiu2HAmCWwVV2qaLpEpPqkQHyX3ozazQs4sasXtFmVex8qzDqRG")
+	peerStore.StoreOrUpdatePeer(p1)
+	peerIDList := peerStore.GetPeerList()
+	require.Equal(t, peerIDList[0].String(), "16Uiu2HAmCWwVV2qaLpEpPqkQHyX3ozazQs4sasXtFmVex8qzDqRG")
 }

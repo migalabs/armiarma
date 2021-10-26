@@ -65,4 +65,5 @@ func testStorage(t *testing.T, p PeerStoreStorage) {
 	p.Delete("2")
 	_, ok = p.Load("2")
 	require.False(t, ok)
+
 }

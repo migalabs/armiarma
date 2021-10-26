@@ -116,7 +116,7 @@ func Test_FetchPeerInfoFromPeer(t *testing.T) {
 	require.Equal(t, peerBase.PeerId, "Peer1")
 	require.Equal(t, peerBase.NodeId, "Node1")
 	require.Equal(t, peerBase.UserAgent, "Prysm/v0.0.0")
-	require.Equal(t, peerBase.MAddrs, "/ip4/95.169.232.98/tcp/9000")
+	require.Equal(t, peerBase.ExtractPublicAddr().String(), "/ip4/95.169.232.98/tcp/9000")
 	require.Equal(t, peerBase.Ip, "95.169.232.98")
 	require.Equal(t, peerBase.Country, "Country1")
 	require.Equal(t, peerBase.City, "City1")
