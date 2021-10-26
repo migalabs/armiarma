@@ -8,6 +8,7 @@ import (
 // TODO:  -Still waiting to be defined to make it official
 type PeeringStrategy interface {
 	PeerStream() chan NextPeer
+	Type() string
 	//GetPeerBatch() []peer.ID
 	Start()
 	Stop()

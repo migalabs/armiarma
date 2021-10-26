@@ -9,6 +9,8 @@ With this implementation, you can create a Discovery5 Service and inititate the 
 import (
 	"context"
 	"crypto/ecdsa"
+	"crypto/x509"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -17,28 +19,33 @@ import (
 
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/migalabs/armiarma/src/base"
+	"github.com/migalabs/armiarma/src/db"
+	"github.com/migalabs/armiarma/src/db/utils"
 	"github.com/migalabs/armiarma/src/enode"
-	"github.com/migalabs/armiarma/src/hosts"
 	"github.com/migalabs/armiarma/src/info"
-
-	eth_enode "github.com/ethereum/go-ethereum/p2p/enode"
 
 	geth_log "github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/discover"
+	eth_enode "github.com/ethereum/go-ethereum/p2p/enode"
+	"github.com/protolambda/zrnt/eth2/beacon/common"
+
 	"github.com/libp2p/go-libp2p-core/crypto"
-	"github.com/libp2p/go-libp2p-core/peer"
+	lib_peer "github.com/libp2p/go-libp2p-core/peer"
 	ma "github.com/multiformats/go-multiaddr"
 )
 
 const PKG_NAME string = "DV5"
 
 type Discovery struct {
-	b            *base.Base
+	*base.Base
 	Node         *enode.LocalNode
+	PeerStore    *db.PeerStore
 	ListenPort   int
 	BootNodeList []*eth_enode.Node
 	info_data    *info.InfoData
 	Dv5Listener  *discover.UDPv5
+	// Filtering
+	FilterDigest common.ForkDigest
 }
 
 func NewEmptyDiscovery() *Discovery {
@@ -50,8 +57,7 @@ func NewEmptyDiscovery() *Discovery {
 // @param input_opts the logging options object
 // @return the modified logging options object
 
-func NewDiscovery(ctx context.Context, input_node *enode.LocalNode, info_obj *info.InfoData, input_port int, stdOpts base.LogOpts) *Discovery {
-
+func NewDiscovery(ctx context.Context, input_node *enode.LocalNode, db *db.PeerStore, info_obj *info.InfoData, input_port int, stdOpts base.LogOpts) *Discovery {
 	localLogger := dv5LoggerOpts(stdOpts)
 
 	// instance base
@@ -66,8 +72,9 @@ func NewDiscovery(ctx context.Context, input_node *enode.LocalNode, info_obj *in
 
 	// return the Discovery object
 	return &Discovery{
-		b:          new_base,
+		Base:       new_base,
 		Node:       input_node,
+		PeerStore:  db,
 		info_data:  info_obj,
 		ListenPort: input_port,
 	}
@@ -87,10 +94,10 @@ func (d *Discovery) Start_dv5() {
 	// start listening and create a connection object
 	conn, err := net.ListenUDP("udp", udpAddr)
 	if err != nil {
-		d.b.Log.Panicf(err.Error())
+		d.Log.Panicf(err.Error())
 	}
 
-	// logger for the discovery5 service
+	// Set custom logger for the discovery5 service (Debug)
 	gethLogger := geth_log.New()
 	gethLogger.SetHandler(geth_log.FuncHandler(func(r *geth_log.Record) error {
 
@@ -110,12 +117,12 @@ func (d *Discovery) Start_dv5() {
 		ValidSchemes: eth_enode.ValidSchemes,
 	}
 
-	d.b.Log.Infof("dv5 starting to listen: ")
+	d.Log.Infof("dv5 starting to listen: ")
 
 	// start the discovery5 service and listen using the given connection
 	d.Dv5Listener, err = discover.ListenV5(conn, &d.Node.LocalNode, cfg)
 	if err != nil {
-		d.b.Log.Panicf(err.Error())
+		d.Log.Panicf(err.Error())
 	}
 }
 
@@ -123,39 +130,84 @@ func (d *Discovery) Start_dv5() {
 // * This method will initiate the randomNodes method, which
 // * will create an iterator over randomly generated peers.
 // * For each peer, we will try to connect to it.
-// @param h represents the host used to connect to newly discovered peers
-func (d *Discovery) FindRandomNodes(h hosts.BasicLibp2pHost) {
+func (d *Discovery) FindRandomNodes() {
 	iterator := d.Dv5Listener.RandomNodes()
-
 	for iterator.Next() {
-		d.b.Log.Infof("new random node:  %s\n", iterator.Node().ID().String())
+		d.Log.Debugf("new random node: %s\n", iterator.Node().ID().String())
 		node := iterator.Node()
-
-		ipScheme := "ip4"
-		if len(node.IP()) == net.IPv6len {
-			ipScheme = "ip6"
-		}
-		pubkey := node.Pubkey()
-
-		peerID, _ := peer.IDFromPublicKey(crypto.PubKey((*crypto.Secp256k1PublicKey)((*btcec.PublicKey)(pubkey))))
-
-		multiAddrStr := fmt.Sprintf("/%s/%s/tcp/%d/p2p/%s", ipScheme, node.IP().String(), node.TCP(), peerID)
-		multiAddr, err := ma.NewMultiaddr(multiAddrStr)
+		err := d.HandleENR(node)
 		if err != nil {
-			fmt.Println(err)
-			continue
+			// fo far printing a simple warp of the function and the received err
+			// with the id of the enode
+			d.Log.Debugf("unable to handle ENR from node %s, error: %s\n", node.ID().String(), err)
 		}
-
-		new_addr_info, err := peer.AddrInfoFromP2pAddr(multiAddr)
-
-		if err != nil {
-			fmt.Println(err)
-			continue
-		}
-
-		h.Host().Connect(h.Ctx(), *new_addr_info)
-
 	}
+}
+
+// HandleENR
+// *
+// @param res represents the enode of the newly discovered peer
+func (d *Discovery) HandleENR(node *eth_enode.Node) error {
+	eth2Dat, ok, err := enode.ParseNodeEth2Data(*node)
+	if err != nil {
+		return fmt.Errorf("enr parse error: %v", err)
+	}
+	// check if the peerexists
+	if !ok {
+		return fmt.Errorf("peer doesn't exist")
+	}
+
+	// check if the peer matches the given ForkDigest
+	if eth2Dat.ForkDigest.String() != "0xb5303f2a" { // TODO: Hardcoded
+		return fmt.Errorf("got ENR with other fork digest: %s", eth2Dat.ForkDigest.String())
+	}
+
+	// Get the public key and the peer.ID of the discovered peer
+	pubkey := node.Pubkey()
+	peerID, err := lib_peer.IDFromPublicKey(crypto.PubKey((*crypto.Secp256k1PublicKey)((*btcec.PublicKey)(pubkey))))
+	if err != nil {
+		return fmt.Errorf("error extracting peer.ID from node %s", node.ID())
+	}
+	// Gerearte the Multiaddres of the New Peer taht will be Updated or Stored
+	peer := db.NewPeer(peerID.String())
+	ipScheme := "ip4"
+	if len(node.IP()) == net.IPv6len {
+		ipScheme = "ip6"
+	}
+
+	multiAddrStr := fmt.Sprintf("/%s/%s/tcp/%d/p2p/%s", ipScheme, node.IP().String(), node.TCP(), peerID)
+	multiAddr, err := ma.NewMultiaddr(multiAddrStr)
+	if err != nil {
+		return fmt.Errorf("error composing the maddrs from peer", err)
+	}
+	/* Unncesary here, peer.AddrInfo is only needed when connecting the peer
+	newAddrInfo, err := lib_peer.AddrInfoFromP2pAddr(multiAddr)
+	if err != nil {
+		return fmt.Errorf(err)
+	}
+	*/
+	// generate array of MAddr to fit the db.Peer struct
+	mAddrs := make([]ma.Multiaddr, 0)
+	mAddrs = append(mAddrs, multiAddr)
+
+	// Fill db.Peer with given info
+	pubBytes, _ := x509.MarshalPKIXPublicKey(pubkey)
+	peer.Pubkey = hex.EncodeToString(pubBytes)
+	peer.NodeId = node.ID().String()
+	peer.BlockchainNode = *node
+	peer.Ip = node.IP().String()
+	peer.MAddrs = mAddrs
+
+	country, city, countrycode, err := utils.GetLocationFromIp(node.IP().String())
+	if err != nil {
+		d.Log.Debugf("could not get location from ip: %s  error: %s", node.IP(), err)
+	} else {
+		peer.Country = country
+		peer.CountryCode = countrycode
+		peer.City = city
+	}
+	d.PeerStore.StoreOrUpdatePeer(peer)
+	return nil
 }
 
 // ImportBootNodeList
@@ -173,17 +225,17 @@ func (d *Discovery) ImportBootNodeList(import_json_file string) {
 
 	// check if file exists
 	if _, err := os.Stat(import_json_file); os.IsNotExist(err) {
-		d.b.Log.Errorf("Bootnodes file does not exist")
+		d.Log.Errorf("Bootnodes file does not exist")
 	} else {
 		// exists
 		file, err := ioutil.ReadFile(import_json_file)
 		if err == nil {
 			err := json.Unmarshal([]byte(file), &bootNodeListString)
 			if err != nil {
-				d.b.Log.Errorf("Could not Unmarshal BootNodes file: %s", err)
+				d.Log.Errorf("Could not Unmarshal BootNodes file: %s", err)
 			}
 		} else {
-			d.b.Log.Errorf("Could not read BootNodes file: %s", err)
+			d.Log.Errorf("Could not read BootNodes file: %s", err)
 		}
 	}
 
@@ -194,7 +246,7 @@ func (d *Discovery) ImportBootNodeList(import_json_file string) {
 
 	//bootNodeList = append(bootNodeList, eth_enode.MustParse("enr:-Ku4QImhMc1z8yCiNJ1TyUxdcfNucje3BGwEHzodEZUan8PherEo4sF7pPHPSIB1NNuSg5fZy7qFsjmUKs2ea1Whi0EBh2F0dG5ldHOIAAAAAAAAAACEZXRoMpD1pf1CAAAAAP__________gmlkgnY0gmlwhBLf22SJc2VjcDI1NmsxoQOVphkDqal4QzPMksc5wnpuC3gvSC8AfbFOnZY_On34wIN1ZHCCIyg"))
 	d.SetBootNodeList(bootNodeList)
-	d.b.Log.Debugf("Added %d bootNode/s", len(d.GetBootNodeList()))
+	d.Log.Debugf("Added %d bootNode/s", len(d.GetBootNodeList()))
 
 }
 
