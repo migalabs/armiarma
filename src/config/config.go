@@ -226,7 +226,7 @@ func (c *ConfigData) checkValidUdpPort() bool {
 
 func checkValidPort(input_port int) bool {
 	// we put greater than min port, as 0 is default when no value was set
-	if input_port > utils.MIN_PORT_NUM && input_port <= utils.MAX_PORT_NUM {
+	if input_port > MIN_PORT && input_port <= MAX_PORT {
 		return true
 	}
 	return false
