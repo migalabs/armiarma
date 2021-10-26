@@ -23,9 +23,9 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-const PKG_NAME string = "INFO"
-const MIN_PORT int = 0
-const MAX_PORT int = 65000
+var (
+	PKG_NAME string = "INFO"
+)
 
 type InfoData struct {
 	localLogger   log.FieldLogger
