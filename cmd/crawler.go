@@ -17,10 +17,13 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/signal"
+	"time"
 
 	"github.com/migalabs/armiarma/src/base"
+	"github.com/migalabs/armiarma/src/db"
 	"github.com/migalabs/armiarma/src/discovery"
 	"github.com/migalabs/armiarma/src/enode"
 	"github.com/migalabs/armiarma/src/gossipsub"
@@ -36,6 +39,7 @@ type CrawlerBase struct {
 	*base.Base
 	Host    *hosts.BasicLibp2pHost
 	Node    *enode.LocalNode
+	DB      *db.PeerStore
 	Dv5     *discovery.Discovery
 	Peering *peering.PeeringService
 	Gs      *gossipsub.GossipSub
@@ -95,21 +99,30 @@ var crawlerCmd = &cobra.Command{
 			log.Panic(err)
 		}
 		// TODO: generate a new DB
-
+		db := db.NewPeerStore("memory", "")
 		// Generate a Peering Service (so far with default peering strategy)
 
 		node_tmp := enode.NewLocalNode(b.Ctx(), info_tmp, stdOpts)
 		//node_tmp.AddEntries()
-		dv5_tmp := discovery.NewDiscovery(b.Ctx(), node_tmp, info_tmp, 9006, stdOpts)
+		dv5_tmp := discovery.NewDiscovery(b.Ctx(), node_tmp, &db, info_tmp, 9006, stdOpts)
 		gs_tmp := gossipsub.NewGossipSub(b.Ctx(), *host, stdOpts)
+		// Generate the PeeringService
+		peeringOpts := &peering.PeeringOpts{
+			InfoObj: info_tmp,
+			LogOpts: stdOpts,
+		}
+		peeringServ, err := peering.NewPeeringService(b.Ctx(), host, &db, peeringOpts)
+
 		// generate the CrawlerBase
 		crawler := CrawlerBase{
-			Base: b,
-			Host: host,
-			Info: info_tmp,
-			Node: node_tmp,
-			Dv5:  dv5_tmp,
-			Gs:   gs_tmp,
+			Base:    b,
+			Host:    host,
+			Info:    info_tmp,
+			DB:      db,
+			Node:    node_tmp,
+			Dv5:     dv5_tmp,
+			Peering: peeringServ,
+			Gs:      gs_tmp,
 		}
 
 		// Initialization Phase for the crawler
@@ -151,10 +164,25 @@ func (c *CrawlerBase) InitCrawler() error {
 
 	c.Host.Start()
 	c.Dv5.Start_dv5()
-	go c.Dv5.FindRandomNodes(*c.Host)
+	go c.Dv5.FindRandomNodes()
+	//time.Sleep(5 * time.Second)
+	//go c.Peering.Start()
+	// check number of peers that we have at the peerstore
+	for i := 0; i <= 100; i++ {
+		fmt.Println(c.DB.PeerStore)
+		time.Sleep(5 * time.Second)
+	}
 
 	c.Gs.JoinAndSubscribe("/eth2/b5303f2a/beacon_block/ssz_snappy")
 
 	select {}
 	// return nil
+}
+
+// generate new CrawlerBase
+func (c *CrawlerBase) StopCrawler() {
+	// initialization secuence for the crawler
+	c.Log.Info("stoping crawler client")
+	c.Host.Stop()
+	c.Peering.Stop()
 }
