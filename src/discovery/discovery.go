@@ -191,10 +191,10 @@ func (d *Discovery) HandleENR(node *eth_enode.Node) error {
 	mAddrs = append(mAddrs, multiAddr)
 
 	// Fill db.Peer with given info
-	pubBytes, _ := x509.MarshalPKIXPublicKey(pubkey)
+	pubBytes, _ := x509.MarshalPKIXPublicKey(pubkey) // get the []bytes of the pubkey
 	peer.Pubkey = hex.EncodeToString(pubBytes)
 	peer.NodeId = node.ID().String()
-	peer.BlockchainNodeENR = node.String()
+	peer.BlockchainNodeENR = (*node).String()
 	peer.Ip = node.IP().String()
 	peer.MAddrs = mAddrs
 

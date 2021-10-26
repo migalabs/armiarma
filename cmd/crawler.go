@@ -17,10 +17,8 @@ package cmd
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"os/signal"
-	"time"
 
 	"github.com/migalabs/armiarma/src/base"
 	"github.com/migalabs/armiarma/src/db"
@@ -118,7 +116,7 @@ var crawlerCmd = &cobra.Command{
 			Base:    b,
 			Host:    host,
 			Info:    info_tmp,
-			DB:      db,
+			DB:      &db,
 			Node:    node_tmp,
 			Dv5:     dv5_tmp,
 			Peering: peeringServ,
@@ -165,13 +163,7 @@ func (c *CrawlerBase) InitCrawler() error {
 	c.Host.Start()
 	c.Dv5.Start_dv5()
 	go c.Dv5.FindRandomNodes()
-	//time.Sleep(5 * time.Second)
-	//go c.Peering.Start()
-	// check number of peers that we have at the peerstore
-	for i := 0; i <= 100; i++ {
-		fmt.Println(c.DB.PeerStore)
-		time.Sleep(5 * time.Second)
-	}
+	go c.Peering.Start()
 
 	c.Gs.JoinAndSubscribe("/eth2/b5303f2a/beacon_block/ssz_snappy")
 
