@@ -16,6 +16,10 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 )
 
+var (
+	ConnNotChannSize = 50
+)
+
 // Struct that defines the Basic Struct asociated to the Libtp2p host
 type BasicLibp2pHost struct {
 	*base.Base
@@ -29,7 +33,9 @@ type BasicLibp2pHost struct {
 	multiAddr     ma.Multiaddr
 	fullMultiAddr ma.Multiaddr
 
-	peerID peer.ID
+	connNotChan    chan ConnectionStatus
+	disconnNotChan chan DisconnectionStatus
+	peerID         peer.ID
 }
 
 type BasicLibp2pHostOpts struct {
@@ -93,14 +99,16 @@ func NewBasicLibp2pHost(ctx context.Context, opts BasicLibp2pHostOpts) (*BasicLi
 	}
 	// Gererate the struct that contains all the configuration and structs surrounding the Libp2p Host
 	basicHost := &BasicLibp2pHost{
-		Base:          b,
-		host:          host,
-		identify:      ids,
-		PeerStore:     opts.PeerStore,
-		info_obj:      &opts.Info_obj,
-		multiAddr:     muladdr,
-		fullMultiAddr: localMultiaddr,
-		peerID:        peer.ID(peerId),
+		Base:           b,
+		host:           host,
+		identify:       ids,
+		PeerStore:      opts.PeerStore,
+		info_obj:       &opts.Info_obj,
+		multiAddr:      muladdr,
+		fullMultiAddr:  localMultiaddr,
+		peerID:         peer.ID(peerId),
+		connNotChan:    make(chan ConnectionStatus, ConnNotChannSize),
+		disconnNotChan: make(chan DisconnectionStatus, ConnNotChannSize),
 	}
 	b.Log.Debug("setting custom notification functions")
 	basicHost.SetCustomNotifications()
@@ -128,6 +136,22 @@ func (b *BasicLibp2pHost) Start() {
 func (b *BasicLibp2pHost) Stop() {
 	b.Log.Info("stopping Libp2p host")
 	b.Cancel()
+}
+
+func (b *BasicLibp2pHost) ConnNotChan() chan ConnectionStatus {
+	return b.connNotChan
+}
+
+func (b *BasicLibp2pHost) RecNewConn(connStat ConnectionStatus) {
+	b.connNotChan <- connStat
+}
+
+func (b *BasicLibp2pHost) DisconnNotChan() chan DisconnectionStatus {
+	return b.disconnNotChan
+}
+
+func (b *BasicLibp2pHost) RecNewDisconn(disconnStat DisconnectionStatus) {
+	b.disconnNotChan <- disconnStat
 }
 
 func (b *BasicLibp2pHost) GetInfoObj() *info.InfoData {
