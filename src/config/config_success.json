@@ -1,0 +1,14 @@
+{
+    "IP": "127.0.0.1",
+    "TcpPort": 100,
+    "UdpPort": 101,
+    "TopicArray": ["echo", "ohce"],
+    "Network": "testnet",
+    "ForkDigest": "0xdlskgfn",
+    "UserAgent": "bsc_test",
+    "LogLevel": "debug",
+    "PrivateKey": "026c60367b01fe3d7c7460bce1d585260ce465fa0abcb6e13619f88bf0dad54f",
+    "BootNodesFile": "./src/discovery/bootnodes_mainnet.json",
+    "DBPath": "",
+    "DBType": "memory"
+}
