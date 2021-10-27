@@ -12,35 +12,16 @@ package config
 import (
 	"encoding/json"
 	"io/ioutil"
-	"net"
 	"os"
 	"strings"
 
 	"github.com/migalabs/armiarma/src/base"
-	"github.com/migalabs/armiarma/src/utils"
 	log "github.com/sirupsen/logrus"
 )
 
 // define constant variables
 var (
-	DEFAULT_IP          string = "0.0.0.0"
-	DEFAULT_TCP_PORT    int    = 9000
-	DEFAULT_UDP_PORT    int    = 9001
-	DEFAULT_TOPIC_ARRAY string = "hola,adios" // parse and split by comma to obtain the array
-	DEFAULT_NETWORK     string = "mainnet"
-	DEFAULT_FORK_DIGEST string = "0xffff"
-	DEFAULT_USER_AGENT  string = "bsc_crawler"
-	DEFAULT_LOG_LEVEL   string = "debug"
-
-	DEFAULT_EMPTY_INT    int    = 0
-	DEFAULT_EMPTY_STRING string = ""
-	DEFAULT_DB_PATH      string = ""
-	DEFAULT_DB_TYPE      string = ""
-
-	MIN_PORT int = 0
-	MAX_PORT int = 65000
-
-	PKG_NAME string = "Config"
+	PkgName string = "Config"
 )
 
 type ConfigData struct {
@@ -63,38 +44,10 @@ type ConfigData struct {
 // * This method will create a ConfigData empty object
 // @param opts The parameter including the logging options
 // @return A ConfigData object
-func NewEmptyConfigData(opts base.LogOpts) *ConfigData {
+func NewEmptyConfigData(opts base.LogOpts) ConfigData {
 	opts = defaultConfigLoggerOpts(opts)
-	return &ConfigData{
+	return ConfigData{
 		localLogger: base.CreateLogger(opts),
-	}
-}
-
-// NewDefaultConfigData
-// * This method will create a ConfigData object using Default parameters
-// * hardoded in the code
-// @param opts The parameter including the logging options
-// @return A ConfigData object
-func NewDefaultConfigData(opts base.LogOpts) *ConfigData {
-
-	opts = defaultConfigLoggerOpts(opts)
-
-	return &ConfigData{
-		localLogger: base.CreateLogger(opts),
-		IP:          DEFAULT_IP,
-		TcpPort:     DEFAULT_TCP_PORT,
-		UdpPort:     DEFAULT_UDP_PORT,
-
-		UserAgent: DEFAULT_USER_AGENT,
-
-		TopicArray: strings.Split(DEFAULT_TOPIC_ARRAY, ","),
-		Network:    DEFAULT_NETWORK,
-		ForkDigest: DEFAULT_FORK_DIGEST,
-
-		LogLevel:   DEFAULT_LOG_LEVEL,
-		PrivateKey: "",
-		DBPath:     DEFAULT_DB_PATH,
-		DBType:     DEFAULT_DB_TYPE,
 	}
 }
 
@@ -103,91 +56,23 @@ func NewDefaultConfigData(opts base.LogOpts) *ConfigData {
 // * into the current ConfigData object
 // @param input_file where to read configuration from
 func (c *ConfigData) ReadFromJSON(input_file string) {
-	c.localLogger.Infof("Reading configuration from: ", input_file)
+	c.localLogger.Infof("Configuration file: ", input_file)
 
 	if _, err := os.Stat(input_file); os.IsNotExist(err) {
-		c.localLogger.Debugf("Could not read file")
+		c.localLogger.Warnf("File does not exist or is corrupted")
 	} else {
 
 		file, err := ioutil.ReadFile(input_file)
 		if err == nil {
 			err := json.Unmarshal([]byte(file), c)
 			if err != nil {
-				c.localLogger.Debugf("Could not Unmarshal Config file: %s", err)
+				c.localLogger.Warnf("Could not Unmarshal Config file content: %s", err)
 			}
 		} else {
-			c.localLogger.Debugf("Could not read Config file: %s", err)
+			c.localLogger.Warnf("Could not read Config file: %s", err)
 		}
 	}
-
-	c.checkEmptyFields() // this function will check any field that was not read and apply the default
-
-}
-
-// checkEmptyFields
-// * This method will iterate over all fields in the current
-// * ConfigData object and check if any is empty.
-// *If so, apply the default
-func (c *ConfigData) checkEmptyFields() {
-	if c.checkValidIP() {
-		c.SetIP(DEFAULT_IP)
-		c.localLogger.Debugf("Setting default IP: %s", DEFAULT_IP)
-	}
-
-	if c.checkValidTcpPort() {
-		c.SetTcpPort(DEFAULT_TCP_PORT)
-		c.localLogger.Debugf("Setting default TcpPort: %d", DEFAULT_TCP_PORT)
-	}
-
-	if c.checkValidUdpPort() {
-		c.SetUdpPort(DEFAULT_UDP_PORT)
-		c.localLogger.Debugf("Setting default UdpPort: %d", DEFAULT_UDP_PORT)
-	}
-
-	if c.GetUserAgent() == "" {
-		c.SetUserAgent(DEFAULT_USER_AGENT)
-		c.localLogger.Debugf("Setting default UserAgent: %s", DEFAULT_USER_AGENT)
-	}
-
-	if len(c.GetTopicArray()) == 0 {
-		c.SetTopicArrayFromString(DEFAULT_TOPIC_ARRAY)
-		c.localLogger.Debugf("Setting default TopicArray: %s", DEFAULT_TOPIC_ARRAY)
-	}
-
-	if c.GetNetwork() == "" {
-		c.SetNetwork(DEFAULT_NETWORK)
-		c.localLogger.Debugf("Setting default Network: %s", DEFAULT_NETWORK)
-	}
-
-	if c.GetForkDigest() == "" {
-		c.SetForkDigest(DEFAULT_FORK_DIGEST)
-		c.localLogger.Debugf("Setting default ForkDigest: %s", DEFAULT_FORK_DIGEST)
-	}
-
-	if c.GetPrivKey() == "" {
-		c.localLogger.Debugf("Could not read private key from config file")
-		c.SetPrivKey(utils.Generate_privKey())
-	}
-
-	if c.GetBootNodesFile() == "" {
-		c.localLogger.Debugf("Could not find bootnodes file")
-	}
-
-	if c.GetLogLevel() == "" {
-		c.SetLogLevel(DEFAULT_LOG_LEVEL)
-		c.localLogger.Debugf("Setting default LogLevel: %s", DEFAULT_LOG_LEVEL)
-	}
-
-	if c.GetDBPath() == "" {
-		c.SetDBPath(DEFAULT_DB_PATH)
-		c.localLogger.Debugf("Setting default DB Path: %s", DEFAULT_DB_PATH)
-	}
-
-	if c.GetDBType() == "" {
-		c.SetDBType(DEFAULT_DB_TYPE)
-		c.localLogger.Debugf("Setting default DB Type: %s", DEFAULT_DB_TYPE)
-	}
-
+	c.localLogger.Infof(c.GetPrivKey())
 }
 
 // defaultConfigLoggerOpts
@@ -196,9 +81,8 @@ func (c *ConfigData) checkEmptyFields() {
 // @param opts the base logging object
 // @return the modified logging object adjusted to ConfigData
 func defaultConfigLoggerOpts(input_opts base.LogOpts) base.LogOpts {
-	input_opts.ModName = PKG_NAME
-	input_opts.Level = DEFAULT_LOG_LEVEL
-
+	input_opts.ModName = PkgName
+	input_opts.Level = "info"
 	return input_opts
 }
 
@@ -210,26 +94,12 @@ func (c *ConfigData) GetTcpPort() int {
 func (c *ConfigData) SetTcpPort(input_port int) {
 	c.TcpPort = input_port
 }
-func (c *ConfigData) checkValidTcpPort() bool {
-	return checkValidPort(c.GetTcpPort())
-}
 
 func (c *ConfigData) GetUdpPort() int {
 	return c.UdpPort
 }
 func (c *ConfigData) SetUdpPort(input_port int) {
 	c.UdpPort = input_port
-}
-func (c *ConfigData) checkValidUdpPort() bool {
-	return checkValidPort(c.GetUdpPort())
-}
-
-func checkValidPort(input_port int) bool {
-	// we put greater than min port, as 0 is default when no value was set
-	if input_port > MIN_PORT && input_port <= MAX_PORT {
-		return true
-	}
-	return false
 }
 
 func (c *ConfigData) GetIP() string {
@@ -238,14 +108,6 @@ func (c *ConfigData) GetIP() string {
 
 func (c *ConfigData) SetIP(input_ip string) {
 	c.IP = input_ip
-}
-
-func (c *ConfigData) checkValidIP() bool {
-	input_IP := c.GetIP()
-	if input_IP != "" && utils.IsIPPublic(net.ParseIP(input_IP)) {
-		return true
-	}
-	return false
 }
 
 func (c *ConfigData) GetUserAgent() string {

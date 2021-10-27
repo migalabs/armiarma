@@ -15,6 +15,7 @@ package info
 import (
 	"fmt"
 	"net"
+	"strings"
 
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/migalabs/armiarma/src/base"
@@ -24,7 +25,25 @@ import (
 )
 
 var (
-	PKG_NAME string = "INFO"
+	PkgName string = "INFO"
+)
+
+// define constant variables
+var (
+	DefaultIP         string = "0.0.0.0"
+	DefaultTcpPort    int    = 9000
+	DefaultUdpPort    int    = 9001
+	DefaultTopicArray string = "hola,adios" // parse and split by comma to obtain the array
+	DefaultNetwork    string = "mainnet"
+	DefaultForkDigest string = "0xffff"
+	DefaultUserAgent  string = "bsc_crawler"
+	DefaultLogLevel   string = "debug"
+	DefaultDBPath     string = ""
+	DefaultDBType     string = ""
+
+	MinPort           int      = 0
+	MaxPort           int      = 65000
+	PossibleLogLevels []string = []string{"info", "debug"}
 )
 
 type InfoData struct {
@@ -39,6 +58,8 @@ type InfoData struct {
 	logLevel      string
 	privateKey    *crypto.Secp256k1PrivateKey
 	bootNodesFile string
+	dBPath        string
+	dBType        string
 }
 
 // NewDefaultInfoData
@@ -47,15 +68,15 @@ type InfoData struct {
 // * using default values from config
 // @param stdOpts (meaning, without the mod name and the level)
 // @return An InfoData object
-func NewDefaultInfoData(stdOpts base.LogOpts) *InfoData {
+func NewDefaultInfoData(stdOpts base.LogOpts) InfoData {
 
 	config_object := config.NewEmptyConfigData(stdOpts)
 
 	info_object := InfoData{}
 
-	info_object.importFromConfig(*config_object, stdOpts)
+	info_object.importFromConfig(config_object, stdOpts)
 
-	return &info_object
+	return info_object
 }
 
 // NewCustomInfoData
@@ -70,7 +91,7 @@ func NewCustomInfoData(input_file string, stdOpts base.LogOpts) *InfoData {
 	config_object.ReadFromJSON(input_file)
 
 	info_object := InfoData{}
-	info_object.importFromConfig(*config_object, stdOpts)
+	info_object.importFromConfig(config_object, stdOpts)
 
 	return &info_object
 }
@@ -83,32 +104,118 @@ func NewCustomInfoData(input_file string, stdOpts base.LogOpts) *InfoData {
 // @param stdOpts base logging options
 func (i *InfoData) importFromConfig(input_config config.ConfigData, stdOpts base.LogOpts) {
 
-	i.SetLogLevel(input_config.GetLogLevel())
-	//set the local logger usign the stadOpts and the custom info opts
+	// first of all import the log level
+	default_log_level := false
+	if !i.checkValidLogLevel(input_config.GetLogLevel()) {
+		i.SetLogLevel(DefaultLogLevel)
+		default_log_level = true
+	}
+
+	//set the local logger using the stadOpts and the custom info opts
 	infoLogOpts := i.infoLoggerOpts(stdOpts)
 	i.localLogger = base.CreateLogger(infoLogOpts)
-	i.localLogger.Infof("Importing from Config into Info...")
-	i.SetIPFromString(input_config.GetIP())
-	i.SetTcpPort(input_config.GetTcpPort())
-	i.SetUdpPort(input_config.GetUdpPort())
-	i.SetUserAgent(input_config.GetUserAgent())
-	i.SetTopicArray(input_config.GetTopicArray())
-	i.SetNetwork(input_config.GetNetwork())
-	i.SetForkDigest(input_config.GetForkDigest())
-	i.SetLogLevel(input_config.GetLogLevel())
+	if default_log_level {
+		i.localLogger.Warnf("Setting default LogLevel: %s", DefaultLogLevel)
+	}
 
-	i.SetPrivKeyFromString(input_config.GetPrivKey())
-	i.SetBootNodeFile(input_config.GetBootNodesFile())
+	// start full import
+	i.localLogger.Infof("Importing Configuration...")
+
+	//IP
+	if utils.CheckValidIP(input_config.GetIP()) {
+		i.SetIPFromString(input_config.GetIP())
+
+	} else {
+		i.SetIP(net.IP(DefaultIP))
+		i.localLogger.Warnf("Setting default IP: %s", DefaultIP)
+	}
+	// Ports
+
+	if !checkValidPort(input_config.GetTcpPort()) {
+		i.SetTcpPort(DefaultTcpPort)
+		i.localLogger.Debugf("Setting default TcpPort: %d", DefaultTcpPort)
+	} else {
+		i.SetTcpPort(input_config.GetTcpPort())
+	}
+
+	if !checkValidPort(input_config.GetUdpPort()) {
+		i.SetUdpPort(DefaultUdpPort)
+		i.localLogger.Debugf("Setting default UdpPort: %d", DefaultUdpPort)
+	} else {
+		i.SetUdpPort(input_config.GetUdpPort())
+	}
+
+	// UserAgent
+	if input_config.GetUserAgent() == "" {
+		i.SetUserAgent(DefaultUserAgent)
+		i.localLogger.Debugf("Setting default UserAgent: %s", DefaultUserAgent)
+	} else {
+		i.SetUserAgent(input_config.GetUserAgent())
+	}
+
+	//Topic
+	if len(input_config.GetTopicArray()) == 0 {
+		i.SetTopicArrayFromString(DefaultTopicArray)
+		i.localLogger.Debugf("Setting default TopicArray: %s", DefaultTopicArray)
+	} else {
+		i.SetTopicArray(input_config.GetTopicArray())
+	}
+
+	// Nework
+	if input_config.GetNetwork() == "" {
+		i.SetNetwork(DefaultNetwork)
+		i.localLogger.Debugf("Setting default Network: %s", DefaultNetwork)
+	} else {
+		i.SetNetwork(input_config.GetNetwork())
+	}
+
+	// Fork digest
+	if input_config.GetForkDigest() == "" {
+		i.SetForkDigest(DefaultForkDigest)
+		i.localLogger.Debugf("Setting default ForkDigest: %s", DefaultForkDigest)
+	} else {
+		i.SetForkDigest(input_config.GetForkDigest())
+	}
+
+	// Private Key
+	if input_config.GetPrivKey() == "" {
+		i.localLogger.Warnf("Private Key was not properly imported")
+		i.SetPrivKeyFromString(utils.Generate_privKey())
+	} else {
+		i.SetPrivKeyFromString(input_config.GetPrivKey())
+	}
+
+	// BootNodesFile
+	if input_config.GetBootNodesFile() == "" {
+		i.localLogger.Debugf("Could not find bootnodes file")
+	} else {
+		i.SetBootNodeFile(input_config.GetBootNodesFile())
+	}
+
+	// TODO: pending db type and path
+	if input_config.GetDBPath() == "" {
+		i.SetDBPath(DefaultDBPath)
+		i.localLogger.Debugf("Setting default DB Path: %s", DefaultDBPath)
+	} else {
+
+	}
+
+	if input_config.GetDBType() == "" {
+		i.SetDBType(DefaultDBType)
+		i.localLogger.Debugf("Setting default DB Type: %s", DefaultDBType)
+	} else {
+
+	}
+
 	i.localLogger.Infof("Imported!")
-
 }
 
 // infoLoggerOpts
-// * This methos will modify logging options accordingly for the InfoData object
+// * This method will modify logging options accordingly for the InfoData object
 // @param input_opts the base logging options
 // @return the mordified logging options from the input
-func (i *InfoData) infoLoggerOpts(input_opts base.LogOpts) base.LogOpts {
-	input_opts.ModName = PKG_NAME
+func (i InfoData) infoLoggerOpts(input_opts base.LogOpts) base.LogOpts {
+	input_opts.ModName = PkgName
 	input_opts.Level = i.GetLogLevel()
 
 	return input_opts
@@ -116,43 +223,49 @@ func (i *InfoData) infoLoggerOpts(input_opts base.LogOpts) base.LogOpts {
 
 // getters and setters
 
-func (i *InfoData) GetTcpPort() int {
+func (i InfoData) GetTcpPort() int {
 	return i.tcpPort
 }
-func (i *InfoData) GetTcpPortString() string {
+func (i InfoData) GetTcpPortString() string {
 
 	return fmt.Sprintf("%d", i.tcpPort)
 }
 func (i *InfoData) SetTcpPort(input_port int) {
-	if input_port > config.MAX_PORT || input_port < config.MIN_PORT {
-		i.localLogger.Debugf("TCP port not valid, applying default %d", config.DEFAULT_TCP_PORT)
-		i.tcpPort = config.DEFAULT_TCP_PORT
+	if !checkValidPort(input_port) {
+		i.localLogger.Debugf("TCP port not valid: %d", input_port)
 		return
 	}
 	i.tcpPort = input_port
 }
 
-func (i *InfoData) GetUdpPort() int {
+func (i InfoData) GetUdpPort() int {
 
 	return i.udpPort
 }
-func (i *InfoData) GetUdpPortString() string {
+func (i InfoData) GetUdpPortString() string {
 
 	return fmt.Sprintf("%d", i.udpPort)
 }
 func (i *InfoData) SetUdpPort(input_port int) {
-	if input_port > config.MAX_PORT || input_port < config.MIN_PORT {
-		i.localLogger.Debugf("UDP port not valid, applying default %d", config.DEFAULT_UDP_PORT)
-		i.udpPort = config.DEFAULT_UDP_PORT
+	if !checkValidPort(input_port) {
+		i.localLogger.Debugf("UDP port not valid: %d", input_port)
 		return
 	}
 	i.udpPort = input_port
 }
 
-func (i *InfoData) GetIP() net.IP {
+func checkValidPort(input_port int) bool {
+	// we put greater than min port, as 0 is default when no value was set
+	if input_port > MinPort && input_port <= MaxPort {
+		return true
+	}
+	return false
+}
+
+func (i InfoData) GetIP() net.IP {
 	return i.iP
 }
-func (i *InfoData) GetIPToString() string {
+func (i InfoData) GetIPToString() string {
 	return i.GetIP().String()
 }
 func (i *InfoData) SetIP(input_ip net.IP) {
@@ -160,47 +273,59 @@ func (i *InfoData) SetIP(input_ip net.IP) {
 }
 func (i *InfoData) SetIPFromString(input_ip string) {
 	i.iP = net.ParseIP(input_ip)
+
 }
 
-func (i *InfoData) GetUserAgent() string {
+func (i InfoData) GetUserAgent() string {
 	return i.userAgent
 }
 func (i *InfoData) SetUserAgent(input_string string) {
 	i.userAgent = input_string
 }
 
-func (i *InfoData) GetTopicArray() []string {
+func (i InfoData) GetTopicArray() []string {
 	return i.topicArray
 }
 func (i *InfoData) SetTopicArray(input_list []string) {
 	i.topicArray = input_list
 }
+func (i *InfoData) SetTopicArrayFromString(input_list string) {
+	i.topicArray = strings.Split(input_list, ",")
+}
 
-func (i *InfoData) GetNetwork() string {
+func (i InfoData) GetNetwork() string {
 	return i.network
 }
 func (i *InfoData) SetNetwork(input_string string) {
 	i.network = input_string
 }
 
-func (i *InfoData) GetForkDigest() string {
+func (i InfoData) GetForkDigest() string {
 	return i.forkDigest
 }
 func (i *InfoData) SetForkDigest(input_string string) {
 	i.forkDigest = input_string
 }
 
-func (i *InfoData) GetLogLevel() string {
+func (i InfoData) GetLogLevel() string {
 	return i.logLevel
 }
 func (i *InfoData) SetLogLevel(input_string string) {
 	i.logLevel = input_string
 }
+func (i InfoData) checkValidLogLevel(input_level string) bool {
+	for _, log_level := range PossibleLogLevels {
+		if strings.ToLower(input_level) == strings.ToLower(log_level) {
+			return true
+		}
+	}
+	return false
+}
 
-func (i *InfoData) GetPrivKey() *crypto.Secp256k1PrivateKey {
+func (i InfoData) GetPrivKey() *crypto.Secp256k1PrivateKey {
 	return i.privateKey
 }
-func (i *InfoData) GetPrivKeyString() string {
+func (i InfoData) GetPrivKeyString() string {
 	return utils.PrivKeyToString(i.GetPrivKey())
 }
 func (i *InfoData) SetPrivKey(input_key *crypto.Secp256k1PrivateKey) {
@@ -216,9 +341,23 @@ func (i *InfoData) SetPrivKeyFromString(input_key string) {
 	i.privateKey = parsed_key
 }
 
-func (i *InfoData) GetBootNodeFile() string {
+func (i InfoData) GetBootNodeFile() string {
 	return i.bootNodesFile
 }
 func (i *InfoData) SetBootNodeFile(input_string string) {
 	i.bootNodesFile = input_string
+}
+
+func (i InfoData) GetDBPath() string {
+	return i.dBPath
+}
+func (i *InfoData) SetDBPath(input_string string) {
+	i.dBPath = input_string
+}
+
+func (i InfoData) GetDBType() string {
+	return i.dBPath
+}
+func (i *InfoData) SetDBType(input_string string) {
+	i.dBType = input_string
 }
