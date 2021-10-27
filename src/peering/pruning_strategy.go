@@ -2,23 +2,21 @@ package peering
 
 import (
 	"context"
-	"os"
-	"os/signal"
+	"encoding/hex"
 	"strings"
-	"syscall"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/migalabs/armiarma/src/base"
 	"github.com/migalabs/armiarma/src/db"
 	"github.com/migalabs/armiarma/src/db/utils"
-	ma "github.com/multiformats/go-multiaddr"
 
 	log "github.com/sirupsen/logrus"
 )
 
 var (
-	DefaultDelay = 24 * time.Hour // hours of dealy after each negative attempt with delay
+	PruningStrategyName = "PRUNING"
+	DefaultDelay        = 24 * time.Hour   // hours of dealy after each negative attempt with delay
+	MinIterTime         = 10 * time.Second // Minimum time that has to pass before iterating again
 )
 
 type PruningOpts struct {
@@ -34,7 +32,13 @@ type PruningStrategy struct {
 	PeerStore    *db.PeerStore
 	// Delay unit time that gets applied to those slashed peers when reporting inactivity errors when activly connecting
 	AggregatedDelay time.Duration
+	// Peer Stream and Return ConnectionStatus channels (communication between modules)
+	// both empty by default (need for initialization)
 
+	PeerStreamChan chan db.Peer
+	nextPeerChan   chan struct{}
+	connNot        chan ConnectionStatus
+	disconnNot     chan DisconnectionStatus
 	/*
 		// TODO: Choose the necessary parameters for the pruning
 		FilterDigest beacon.ForkDigest `ask:"--filter-digest" help:"Only connect when the peer is known to have the given fork digest in ENR. Or connect to any if not specified."`
@@ -46,7 +50,7 @@ type PruningStrategy struct {
 func NewPruningStrategy(ctx context.Context, peerstore *db.PeerStore, opts PruningOpts) (*PruningStrategy, error) {
 	// TODO: cancel is still not implemented in the BaseCreation
 	pruningCtx, _ := context.WithCancel(ctx)
-	opts.LogOpts.ModName = "pruning strategy"
+	opts.LogOpts.ModName = PruningStrategyName
 	b, err := base.NewBase(
 		base.WithContext(pruningCtx),
 		base.WithLogger(opts.LogOpts),
@@ -54,10 +58,20 @@ func NewPruningStrategy(ctx context.Context, peerstore *db.PeerStore, opts Pruni
 	if err != nil {
 		return nil, err
 	}
+	// Generate the ConnStatus notification channel
+	// TODO: consider making the ConnStatus channel larger
+	pStreamChan := make(chan db.Peer)
+	nextPeerChan := make(chan struct{})
+	connStatusNot := make(chan ConnectionStatus, 10)
+	disconnStatusNot := make(chan DisconnectionStatus, 10)
 	pr := &PruningStrategy{
-		Base:         b,
-		strategyType: "prunning",
-		PeerStore:    peerstore,
+		Base:           b,
+		strategyType:   PruningStrategyName,
+		PeerStore:      peerstore,
+		PeerStreamChan: pStreamChan,
+		nextPeerChan:   nextPeerChan,
+		connNot:        connStatusNot,
+		disconnNot:     disconnStatusNot,
 	}
 	return pr, nil
 }
@@ -66,116 +80,177 @@ func (c PruningStrategy) Type() string {
 	return c.strategyType
 }
 
-func (c *PruningStrategy) Start(ctx context.Context, args ...string) {
-	c.Log.Info("Setting up pruning peering strategy")
-	// Generate subcontext for the go-routine
-	bgCtx, bgCancel := context.WithCancel(context.Background())
-	done := make(chan struct{})
-	// Launch the pruning strategy go-routine
-	go func() {
-		c.run(bgCtx, c.PeerStore)
-		close(done)
-	}()
-
-	cntC := make(chan os.Signal)
-	signal.Notify(cntC, os.Interrupt, syscall.SIGTERM)
-	go func() {
-		<-cntC     // wait untill syscall.SIGTERM
-		bgCancel() // shut down the sub-context
-		<-done     // wait untill we track that the go routine was successfully closed
-		c.Log.Infof("Stopped auto-connecting")
-	}()
+// NextPeer
+// * Is a function that returns an iterator of Peers received from the PeerStore
+// @return function that gives another peer to connect from the PeerStore (Filtered by the given strategy)
+func (c *PruningStrategy) Run() chan db.Peer {
+	// start go routine that will notify of the full peerstore iteration and notifies it to the main strategy loop
+	go c.peerstoreIterator()
+	return c.PeerStreamChan
 }
 
-// main loop of the peering strategy.
-// every 3-4 minutes generate a local new copy of the peers in the peerstore.
-// It randomly selects one of the attempting to connect with it, recording the
-// results of the attempts. If the peer was already connected, just dropt it
-func (c *PruningStrategy) run(bgCtx context.Context, store *db.PeerStore) {
-	quit := make(chan struct{})
-	// Set the defer function to cancel the go routine
-	defer close(quit)
-	// set up the loop where every given time we will stop it to refresh the peerstore
-	go func() {
-		for quit != nil {
-			peercount := 0
-			// Make the copy of the peers from the peerstore
-			peerList := store.GetPeerList()
-			log.Infof("the peerstore has been re-scanned")
-			peerstoreLen := len(peerList)
-			log.Infof("len peerlist: %d", peerstoreLen)
-			for _, p := range peerList {
-				// check if the peers is the crawler itself
-				/* TODO: Check from other source the ID of our host
-				if p == h.ID() {
-					log.Debug("Calling to self host")
-					continue
-				}
-				*/
-				// read info about the peer
-				pinfo, err := c.PeerStore.GetPeerData(p.String())
+// peerstoreIterator
+// * Private function that is in charge of iterating through the peerstore
+// * Main iteration logic checking if the peer is ready to be sent
+// @param
+// @return
+// TODO: 	Set this as a different module inside strategy
+// 			Implement some kind of sorting over the peer list, to reduce iteration time
+func (c *PruningStrategy) peerstoreIterator() {
+	// get Ctx of the pruning module
+	modCtx := c.Ctx()
+	// get the peer list from the peerstore
+	peerList := c.PeerStore.GetPeerList()
+	peerCounter := 0
+	peerListLen := len(peerList)
+	validIterTimer := time.NewTimer(MinIterTime)
+	iterStartTime := time.Now()
+	for {
+		select {
+		// Receive the notification of sending the next peer
+		case <-c.nextPeerChan:
+			c.Log.Debug("prepare next peer for pushing it into peer stream")
+			// read info about next peer
+			// TODO: So far just iterating the entire peerstore
+			peerID := peerList[peerCounter]
+			pinfo, err := c.PeerStore.GetPeerData(peerID.String())
+			if err != nil {
+				log.Warn(err)
+				pinfo = db.NewPeer(peerID.String())
+			}
+			// check if peer has been already deprecated for being many hours without connected
+			// TODO: resume this in a function
+			wtime := pinfo.DaysToWait()
+			if wtime != 0 {
+				lconn, err := pinfo.LastAttempt()
 				if err != nil {
-					log.Warn(err)
-					pinfo = db.NewPeer(p.String())
+					log.Warnf("ERROR, the peer should have a last connection attempt but list is empty")
 				}
-				// check if peer has been already deprecated for being many hours without connected
-				wtime := pinfo.DaysToWait()
-				if wtime != 0 {
-					lconn, err := pinfo.LastAttempt()
-					if err != nil {
-						log.Warnf("ERROR, the peer should have a last connection attempt but list is empty")
-					}
-					lconnSecs := lconn.Add(time.Duration(wtime) * DefaultDelay).Unix()
-					tnow := time.Now().Unix()
-					// Compare time now with last connection plus waiting list
-					if (tnow - lconnSecs) <= 0 {
-						// If result is lower than 0, still have time to wait
-						// continue to next peer
-						continue
-					}
-				}
-				peercount++
-				// Set the correct address format to connect the peers
-				// libp2p complains if we put multi-addresses that include the peer ID into the Addrs list.
-				addrs := pinfo.ExtractPublicAddr()
-				addrInfo := peer.AddrInfo{
-					ID:    p,
-					Addrs: make([]ma.Multiaddr, 0, 1),
-				}
-
-				transport, _ := peer.SplitAddr(addrs)
-				if transport == nil {
+				lconnSecs := lconn.Add(time.Duration(wtime) * DefaultDelay).Unix()
+				tnow := time.Now().Unix()
+				// Compare time now with last connection plus waiting list
+				if (tnow - lconnSecs) <= 0 {
+					// If result is lower than 0, still have time to wait
+					// continue to next peer
 					continue
-				}
-				addrInfo.Addrs = append(addrInfo.Addrs, transport)
-
-				// compose all the detailed info for the given peer
-				// compose all the detailed info for the given peer
-				peerEnr := pinfo.GetBlockchainNode()
-
-				pinfo.Pubkey = p.String()
-				pinfo.NodeId = peerEnr.ID().String()
-				pinfo.Ip = peerEnr.IP().String()
-
-				store.StoreOrUpdatePeer(pinfo)
-
-				// Check if we have received any quit signal
-				if quit == nil {
-					log.Infof("Quit has been closed")
-					break
 				}
 			}
+
+			// compose all the detailed info for the given peer
+			// Generating New peer to fetch info
+			peer := db.NewPeer(pinfo.PeerId)
+			peerEnr := pinfo.GetBlockchainNode()
+			if peerEnr != nil {
+				peer.NodeId = peerEnr.ID().String()
+				// TODO:
+				peer.Ip = peerEnr.IP().String()
+			}
+
+			peer.PeerId = peerID.String()
+			k, _ := peerID.ExtractPublicKey()
+			pubk, _ := k.Raw()
+			peer.Pubkey = hex.EncodeToString(pubk)
+			peer.MAddrs = pinfo.MAddrs
+			// Update metadata of peer
+			c.PeerStore.StoreOrUpdatePeer(peer)
+			// Send next peer to the peering service
+			c.Log.Debugf("pushing next peer %d into peer stream", pinfo.PeerId)
+			c.PeerStreamChan <- pinfo
+
+			/* TODO: Deprecated for now
+			// wait for the response of the ConnStatus (CAREFUL: I hope this doesn't block the strategy)
+			<-c.ConnStatusNot
+			*/
+			// increment peerCounter to see if we finished iterating the peerstore
+			peerCounter++
+			if peerCounter >= peerListLen {
+				// time to update the PeerList
+				iterTime := time.Since(iterStartTime)
+				c.Log.Debug("peerstore iteration done in", iterTime)
+				c.PeerStore.NewPeerstoreIteration(iterTime)
+				// check if the minIterTime has been
+				<-validIterTimer.C
+				// reset values
+				peerList = c.PeerStore.GetPeerList()
+				validIterTimer = time.NewTimer(MinIterTime)
+				peerCounter = 0
+			}
+
+		// Receive the status of the peer that got connected to the crawler
+		case connStatus := <-c.connNot:
+			c.Log.Debugf("new connection has been received from peer %d", connStatus.Peer.PeerId)
+			if connStatus.Successful {
+				c.Log.Debugf("adding success connection to peer %d", connStatus.Peer.PeerId)
+				c.PeerStore.StoreOrUpdatePeer(connStatus.Peer)
+				c.PeerStore.AddNewPosConnectionAttempt(connStatus.Peer.PeerId)
+			}
+			c.Log.Debugf("adding negative connection to peer %d", connStatus.Peer.PeerId)
+			c.RecErrorHandler(connStatus.Peer.PeerId, connStatus.RecError.Error())
+
+		// Receive the notification of a that got disconnected from the crawler
+		case disconStat := <-c.disconnNot:
+			c.Log.Debugf("new disconnection has been received from peer %d", disconStat.PeerID.String())
+			c.PeerStore.DisconnectionEvent(disconStat.PeerID.String())
+
+		// detect if the context has been shut down to end the go routine
+		case <-modCtx.Done():
+			c.Log.Debug("closing peerstore iterator")
 		}
-	}()
+	}
 }
 
-// Worker Implementations
+// ClosePeerStream
+// * Closes in a controled secuence the module related go routines and channels
+// * Ending with the Base.Ctx cancelation
+func (c *PruningStrategy) Close() {
+	c.Log.Infof("closing pruning strategy")
+	// close the involved channels
+	close(c.PeerStreamChan)
+	close(c.nextPeerChan)
+	close(c.connNot)
+	close(c.disconnNot)
+	// shutdown the base context of the pruning
+	c.Cancel()
+}
+
+// NextPeer
+// * Notifies the peerstore iterator that a new peer has been requested
+// * After it, the peerstore iteratow will put the new peer in the PeerStreamChan
+func (c *PruningStrategy) NextPeer() {
+	c.Log.Debug("next peer has been requested")
+	c.nextPeerChan <- struct{}{}
+}
+
+// ReturnConnectionStatus
+// * Notifies the peerstore iterator that a new ConnStatus has been received
+// * After it, the peerstore iteratow will aggregate the extra info
+func (c *PruningStrategy) NewConnection(connStat ConnectionStatus) {
+	c.Log.Debug("next connection has been received")
+	c.connNot <- connStat
+}
+
+// ReturnConnectionStatus
+// * Notifies the peerstore iterator that a new ConnStatus has been received
+// * After it, the peerstore iteratow will aggregate the extra info
+func (c *PruningStrategy) NewDisconnection(disconnStat DisconnectionStatus) {
+	c.Log.Debug("next connection has been received")
+	c.disconnNot <- disconnStat
+}
+
+// peeringWorker
+// *
+// *
+// @params
+// @return
+// TODO: Still not sure if we need workers for iterating the peerstore
 func peeringWorker(ctx context.Context, ps *db.PeerStore, peerChan chan string) {
 
 }
 
-// function that selects actuation method for each of the possible errors while actively dialing peers
-func (c *PruningStrategy) RecErrorHandler(pe peer.ID, rec_err string) {
+// RecErrorHandler
+// * function that selects actuation method for each of the possible errors while actively dialing peers
+// @params peerID in string format, recorded error in string format
+func (c *PruningStrategy) RecErrorHandler(pe string, rec_err string) {
 	var fn func(p *db.Peer)
 	switch utils.FilterError(rec_err) {
 	case "Connection reset by peer":
@@ -218,7 +293,7 @@ func (c *PruningStrategy) RecErrorHandler(pe peer.ID, rec_err string) {
 		//newPeerID := peer.ID(np)
 		//f.WriteString(fmt.Sprintf("%s shifted to %s\n", pe.String(), newPeerID))
 		// Generate a new Peer with the addrs of the previous one and the ID suggested at the
-		log.Infof("deprecating peer %s, but adding possible new peer %s", pe.String(), np)
+		log.Infof("deprecating peer %s, but adding possible new peer %s", pe, np)
 		/*
 			_, err := newPeerID.ExtractPublicKey()
 			if err != nil {
@@ -249,5 +324,5 @@ func (c *PruningStrategy) RecErrorHandler(pe peer.ID, rec_err string) {
 			p.AddNegConnAttWithPenalty()
 		}
 	}
-	c.PeerStore.AddNewNegConnectionAttempt(pe.String(), rec_err, fn)
+	c.PeerStore.AddNewNegConnectionAttempt(pe, rec_err, fn)
 }
