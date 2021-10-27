@@ -182,12 +182,12 @@ func (c *PeerStore) ConnectionEvent(peerId string, direction string) error {
 }
 
 // Add a connection Event to the given peer
-func (c *PeerStore) DisconnectionEvent(peerId string) error {
+func (c *PeerStore) DisconnectionEvent(peerId string, discTime time.Time) error {
 	peer, err := c.GetPeerData(peerId)
 	if err != nil {
 		return errors.New("could not add disconnection event, peer is not in the list: " + peerId)
 	}
-	peer.DisconnectionEvent(time.Now())
+	peer.DisconnectionEvent(discTime)
 	c.StorePeer(peer)
 	return nil
 }
