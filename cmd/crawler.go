@@ -133,7 +133,7 @@ var crawlerCmd = &cobra.Command{
 		}
 
 		// Initialization Phase for the crawler
-		err = crawler.InitCrawler()
+		err = crawler.Run()
 		if err != nil {
 			crawler.Log.Panic(err)
 		}
@@ -145,7 +145,7 @@ var crawlerCmd = &cobra.Command{
 		// End up app, finishing everything
 		crawler.Log.Info("SHUTDOWN DETECTED!")
 		// TODO: Shutdown all the services (manually to let them exit in a controled way)
-		crawler.Host.Stop()
+		crawler.Close()
 	},
 }
 
@@ -181,7 +181,7 @@ func (c *CrawlerBase) Run() error {
 }
 
 // generate new CrawlerBase
-func (c *CrawlerBase) Stop() {
+func (c *CrawlerBase) Close() {
 	// initialization secuence for the crawler
 	c.Log.Info("stoping crawler client")
 	c.Host.Stop()
