@@ -166,7 +166,7 @@ func init() {
 }
 
 // generate new CrawlerBase
-func (c *CrawlerBase) InitCrawler() error {
+func (c *CrawlerBase) Run() error {
 	// initialization secuence for the crawler
 
 	c.Host.Start()
@@ -181,7 +181,7 @@ func (c *CrawlerBase) InitCrawler() error {
 }
 
 // generate new CrawlerBase
-func (c *CrawlerBase) StopCrawler() {
+func (c *CrawlerBase) Stop() {
 	// initialization secuence for the crawler
 	c.Log.Info("stoping crawler client")
 	c.Host.Stop()
