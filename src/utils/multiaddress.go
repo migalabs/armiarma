@@ -46,3 +46,13 @@ func ExtractIPFromMAddr(input_addr ma.Multiaddr) net.IP {
 
 	return net.ParseIP(extracted_ip)
 }
+
+// checkvalidIP
+// * This method checks whether the IP can be parsed or not
+func CheckValidIP(input_IP string) bool {
+	parse_IP := net.ParseIP(input_IP)
+	if parse_IP != nil {
+		return true
+	}
+	return false
+}
