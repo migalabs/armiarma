@@ -81,7 +81,8 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 }
 
 func (c *BasicLibp2pHost) standardDisconnectF(net network.Network, conn network.Conn) {
-	c.Log.Debugf("Disconnect")
+	c.Log.Debugf("disconnected from peer %s", conn.RemotePeer().String())
+
 }
 
 func (c *BasicLibp2pHost) standardOpenedStreamF(net network.Network, str network.Stream) {
