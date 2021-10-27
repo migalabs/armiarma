@@ -14,6 +14,23 @@ import (
 	File that includes the methods to set the custom modification channels for the Libp2p host
 */
 
+// ConnectionStatus
+// * It is the struct that compiles the data of a received connection from the host
+// * The struct will be shared between peering and strategy.
+type ConnectionStatus struct {
+	Peer      db.Peer   // TODO: right now just sending the entire info about the peer, (recheck after Peer struct subdivision)
+	Timestamp time.Time // Timestamp of when was the attempt done
+	// TODO: More things to add in te future
+}
+
+// DisconnectionStatus
+// * It is the struct that compiles the data of a detected disconnection from the host
+// * The struct will be shared between peering and strategy.
+type DisconnectionStatus struct {
+	Peer      db.Peer
+	Timestamp time.Time // Timestamp of when was the attempt done
+}
+
 func (c *BasicLibp2pHost) standardListenF(net network.Network, addr ma.Multiaddr) {
 	c.Log.Debug("Listen")
 }
@@ -30,6 +47,7 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 	// Generate new peer to aggregate new data
 	peer := db.NewPeer(conn.RemotePeer().String())
 	h := c.Host()
+	t := time.Now()
 	// Request the Host Metadata
 	err := ReqHostInfo(context.Background(), h, conn, &peer)
 	if err != nil {
@@ -75,14 +93,26 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 	}
 	*/
 	// Add new connection event
-	peer.ConnectionEvent(conn.Stat().Direction.String(), time.Now())
-	// Add new peer or aggregate info to existing peer
-	c.PeerStore.StoreOrUpdatePeer(peer)
+	peer.ConnectionEvent(conn.Stat().Direction.String(), t)
+	connStat := ConnectionStatus{
+		Peer:      peer,
+		Timestamp: t,
+	}
+	// Send the new connection status
+	c.RecNewConn(connStat)
 }
 
 func (c *BasicLibp2pHost) standardDisconnectF(net network.Network, conn network.Conn) {
 	c.Log.Debugf("disconnected from peer %s", conn.RemotePeer().String())
-
+	peer := db.NewPeer(conn.RemotePeer().String())
+	t := time.Now()
+	peer.DisconnectionEvent(t)
+	disconnStat := ConnectionStatus{
+		Peer:      peer,
+		Timestamp: t,
+	}
+	// Send the new disconnection status
+	c.RecNewConn(disconnStat)
 }
 
 func (c *BasicLibp2pHost) standardOpenedStreamF(net network.Network, str network.Stream) {
