@@ -122,7 +122,7 @@ var crawlerCmd = &cobra.Command{
 		}
 		pStrategy, err := peering.NewPruningStrategy(b.Ctx(), &db, prunOpts)
 		peeringServ, err := peering.NewPeeringService(b.Ctx(), host, &db, peeringOpts,
-			peering.WithPeeringStrategy(pStrategy),
+			peering.WithPeeringStrategy(&pStrategy),
 		)
 
 		prometheusRunner := prometheus.NewPrometheusRunner(&db)
