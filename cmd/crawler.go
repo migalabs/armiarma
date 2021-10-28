@@ -19,6 +19,7 @@ import (
 	"context"
 	"os"
 	"os/signal"
+	"time"
 
 	"github.com/migalabs/armiarma/src/base"
 	"github.com/migalabs/armiarma/src/db"
@@ -40,7 +41,7 @@ type CrawlerBase struct {
 	Node             *enode.LocalNode
 	DB               *db.PeerStore
 	Dv5              *discovery.Discovery
-	Peering          *peering.PeeringService
+	Peering          peering.PeeringService
 	Gs               *gossipsub.GossipSub
 	Info             *info.InfoData
 	PrometheusRunner *prometheus.PrometheusRunner
@@ -114,7 +115,15 @@ var crawlerCmd = &cobra.Command{
 			InfoObj: info_tmp,
 			LogOpts: stdOpts,
 		}
-		peeringServ, err := peering.NewPeeringService(b.Ctx(), host, &db, peeringOpts)
+		// generate the peering strategy
+		prunOpts := peering.PruningOpts{
+			AggregatedDelay: 24 * time.Hour, // Hardcoded, still using the Default Delay
+			LogOpts:         stdOpts,
+		}
+		pStrategy, err := peering.NewPruningStrategy(b.Ctx(), &db, prunOpts)
+		peeringServ, err := peering.NewPeeringService(b.Ctx(), host, &db, peeringOpts,
+			peering.WithPeeringStrategy(pStrategy),
+		)
 
 		prometheusRunner := prometheus.NewPrometheusRunner(&db)
 		prometheusRunner.Start(b.Ctx())
@@ -172,7 +181,7 @@ func (c *CrawlerBase) Run() error {
 	c.Host.Start()
 	c.Dv5.Start_dv5()
 	go c.Dv5.FindRandomNodes()
-	go c.Peering.Start()
+	go c.Peering.Run()
 
 	c.Gs.JoinAndSubscribe("/eth2/b5303f2a/beacon_block/ssz_snappy")
 
@@ -185,5 +194,5 @@ func (c *CrawlerBase) Close() {
 	// initialization secuence for the crawler
 	c.Log.Info("stoping crawler client")
 	c.Host.Stop()
-	c.Peering.Stop()
+	c.Peering.Close()
 }

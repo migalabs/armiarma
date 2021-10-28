@@ -11,7 +11,7 @@ import (
 // TODO:  -Still waiting to be defined to make it official
 type PeeringStrategy interface {
 	// one channel to give the next peer, one to request the second one
-	Run() *chan db.Peer
+	Run() chan db.Peer
 	NextPeer()
 	NewConnectionAttempt(ConnectionAttemptStatus)
 	NewConnection(hosts.ConnectionStatus)
