@@ -21,7 +21,7 @@ import (
 
 // define constant variables
 var (
-	PkgName string = "Config"
+	PkgName string = "CONFIG"
 )
 
 type ConfigData struct {
@@ -56,7 +56,7 @@ func NewEmptyConfigData(opts base.LogOpts) ConfigData {
 // * into the current ConfigData object
 // @param input_file where to read configuration from
 func (c *ConfigData) ReadFromJSON(input_file string) {
-	c.localLogger.Infof("Configuration file: ", input_file)
+	c.localLogger.Infof("Reading configuration from file: %s", input_file)
 
 	if _, err := os.Stat(input_file); os.IsNotExist(err) {
 		c.localLogger.Warnf("File does not exist or is corrupted")
