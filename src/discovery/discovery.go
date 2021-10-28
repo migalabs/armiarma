@@ -117,7 +117,7 @@ func (d *Discovery) Start_dv5() {
 		ValidSchemes: eth_enode.ValidSchemes,
 	}
 
-	d.Log.Infof("dv5 starting to listen: ")
+	d.Log.Info("Starting dv5")
 
 	// start the discovery5 service and listen using the given connection
 	d.Dv5Listener, err = discover.ListenV5(conn, &d.Node.LocalNode, cfg)
@@ -256,7 +256,7 @@ func (d *Discovery) ImportBootNodeList(import_json_file string) {
 // @return the modified logging options object for the Discovery object
 func dv5LoggerOpts(input_opts base.LogOpts) base.LogOpts {
 	input_opts.ModName = PKG_NAME
-	input_opts.Level = "error" // HARDCODED
+	//input_opts.Level = "error" // HARDCODED
 
 	return input_opts
 }
