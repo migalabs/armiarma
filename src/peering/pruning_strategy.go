@@ -67,8 +67,8 @@ func NewPruningStrategy(ctx context.Context, peerstore *db.PeerStore, opts Pruni
 		Base:           b,
 		strategyType:   PruningStrategyName,
 		PeerStore:      peerstore,
-		peerStreamChan: make(chan db.Peer, 0),
-		nextPeerChan:   make(chan struct{}, 0),
+		peerStreamChan: make(chan db.Peer, ConnEventBuffSize),
+		nextPeerChan:   make(chan struct{}, ConnEventBuffSize),
 		connAttemptNot: make(chan ConnectionAttemptStatus, ConnEventBuffSize),
 		connNot:        make(chan hosts.ConnectionStatus, ConnEventBuffSize),
 		disconnNot:     make(chan hosts.DisconnectionStatus, ConnEventBuffSize),
@@ -126,14 +126,16 @@ func (c *PruningStrategy) peerstoreIterator() {
 				if wtime != 0 {
 					lconn, err := pinfo.LastAttempt()
 					if err != nil {
-						log.Warnf("ERROR, the peer should have a last connection attempt but list is empty")
+						log.Warn("the peer should have a last connection attempt but list is empty")
 					}
 					lconnSecs := lconn.Add(time.Duration(wtime) * DefaultDelay).Unix()
 					tnow := time.Now().Unix()
 					// Compare time now with last connection plus waiting list
-					if (tnow - lconnSecs) <= 0 {
+					if (tnow - lconnSecs) <= 0 { // TODO: should be replaced by a filtered list where the next peer is ready to be connected
 						// If result is lower than 0, still have time to wait
 						// continue to next peer
+						// Recreate the call of the nextPeer that the iterator just used
+						c.NextPeer()
 						continue
 					}
 				}
@@ -156,7 +158,7 @@ func (c *PruningStrategy) peerstoreIterator() {
 				// Update metadata of peer
 				c.PeerStore.StoreOrUpdatePeer(peer)
 				// Send next peer to the peering service
-				c.Log.Debugf("pushing next peer %d into peer stream", pinfo.PeerId)
+				c.Log.Debugf("pushing next peer %s into peer stream", pinfo.PeerId)
 				c.peerStreamChan <- pinfo
 
 				/* TODO: Deprecated for now
@@ -167,39 +169,55 @@ func (c *PruningStrategy) peerstoreIterator() {
 				peerCounter++
 			} else {
 				c.Log.Warn("empty peerstore")
+				// Recreate the call of the nextPeer that the iterator just used
+				c.NextPeer()
+				/*
+					// Just in case we dont enter the next if sentence
+					c.Log.Debug("waiting for min iter time")
+					<-validIterTimer.C
+					// reset values
+					peerList = c.PeerStore.GetPeerList()
+					peerListLen = len(peerList)
+					c.Log.Debug(" min iter time done, got new peer list with %d", len(peerList))
+					validIterTimer = time.NewTimer(MinIterTime)
+					peerCounter = 0
+				*/
 			}
 			if peerCounter >= peerListLen {
 				// time to update the PeerList
 				iterTime := time.Since(iterStartTime)
-				c.Log.Debug("peerstore iteration done in", iterTime)
+				c.Log.Debug("peerstore iteration done in ", iterTime)
 				c.PeerStore.NewPeerstoreIteration(iterTime)
 				// check if the minIterTime has been
 				<-validIterTimer.C
 				// reset values
 				peerList = c.PeerStore.GetPeerList()
+				peerListLen = len(peerList)
+				c.Log.Debugf("got new peer list with %d", len(peerList))
 				validIterTimer = time.NewTimer(MinIterTime)
 				peerCounter = 0
 			}
 
 		// Receive the status of the peer that got connected to the crawler
 		case connAttemtpStatus := <-c.connAttemptNot:
-			c.Log.Debugf("new connection attempt has been received from peer %d", connAttemtpStatus.Peer.PeerId)
+			c.Log.Debugf("new connection attempt has been received from peer %s", connAttemtpStatus.Peer.PeerId)
 			if connAttemtpStatus.Successful {
-				c.Log.Debugf("adding success connection to peer %d", connAttemtpStatus.Peer.PeerId)
+				c.Log.Debugf("adding success connection to peer %s", connAttemtpStatus.Peer.PeerId)
 				c.PeerStore.StoreOrUpdatePeer(connAttemtpStatus.Peer)
 				c.PeerStore.AddNewPosConnectionAttempt(connAttemtpStatus.Peer.PeerId)
+			} else {
+				c.Log.Debugf("adding negative connection to peer %s", connAttemtpStatus.Peer.PeerId)
+				c.RecErrorHandler(connAttemtpStatus.Peer.PeerId, connAttemtpStatus.RecError.Error())
 			}
-			c.Log.Debugf("adding negative connection to peer %d", connAttemtpStatus.Peer.PeerId)
-			c.RecErrorHandler(connAttemtpStatus.Peer.PeerId, connAttemtpStatus.RecError.Error())
 
 		// Receive the notification of a that got disconnected from the crawler
 		case connStat := <-c.connNot:
-			c.Log.Debugf("new connection has been received from peer %d", connStat.Peer.PeerId)
+			c.Log.Debugf("new connection has been received from peer %s", connStat.Peer.PeerId)
 			c.PeerStore.StoreOrUpdatePeer(connStat.Peer)
 
 		// Receive the notification of a that got disconnected from the crawler
 		case disconnStat := <-c.disconnNot:
-			c.Log.Debugf("new disconnection has been received from peer %d", disconnStat.Peer.PeerId)
+			c.Log.Debugf("new disconnection has been received from peer %s", disconnStat.Peer.PeerId)
 			c.PeerStore.StoreOrUpdatePeer(disconnStat.Peer)
 
 		// detect if the context has been shut down to end the go routine
