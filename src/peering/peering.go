@@ -37,13 +37,14 @@ type PeeringService struct {
 	InfoObj   *info.InfoData
 	host      *hosts.BasicLibp2pHost
 	PeerStore *db.PeerStore
-	strategy  *PeeringStrategy
+	strategy  PeeringStrategy
 	//
 	Timeout    time.Duration
 	MaxRetries int
 }
 
-func NewPeeringService(ctx context.Context, h *hosts.BasicLibp2pHost, peerstore *db.PeerStore, peeringOpts *PeeringOpts, opts ...PeeringOption) (*PeeringService, error) {
+func NewPeeringService(ctx context.Context, h *hosts.BasicLibp2pHost, peerstore *db.PeerStore,
+	peeringOpts *PeeringOpts, opts ...PeeringOption) (PeeringService, error) {
 	// TODO: cancel is still not implemented in the BaseCreation
 	peeringCtx, _ := context.WithCancel(ctx)
 	logOpts := peeringOpts.LogOpts
@@ -53,9 +54,9 @@ func NewPeeringService(ctx context.Context, h *hosts.BasicLibp2pHost, peerstore 
 		base.WithLogger(logOpts),
 	)
 	if err != nil {
-		return nil, err
+		return PeeringService{}, err
 	}
-	pServ := &PeeringService{
+	pServ := PeeringService{
 		Base:       b,
 		InfoObj:    peeringOpts.InfoObj,
 		host:       h,
@@ -65,9 +66,9 @@ func NewPeeringService(ctx context.Context, h *hosts.BasicLibp2pHost, peerstore 
 	}
 	// iterate through the Options given as args
 	for _, opt := range opts {
-		err := opt(pServ)
+		err := opt(&pServ)
 		if err != nil {
-			return nil, err
+			return pServ, err
 		}
 	}
 	/* -- Check Performance of the previous PeeringServ + Pruning
@@ -85,13 +86,13 @@ func NewPeeringService(ctx context.Context, h *hosts.BasicLibp2pHost, peerstore 
 	return pServ, nil
 }
 
-func WithPeeringStrategy(strategy *PeeringStrategy) PeeringOption {
+func WithPeeringStrategy(strategy PeeringStrategy) PeeringOption {
 	return func(p *PeeringService) error {
 		if strategy == nil {
 			return fmt.Errorf("given peering strategy is empty")
 		}
-		p.Log.Debugf("configuring peering with %s", (*strategy).Type())
-		p.strategy = p.strategy
+		p.Log.Debugf("configuring peering with %s", strategy.Type())
+		p.strategy = strategy
 		return nil
 	}
 }
@@ -106,7 +107,7 @@ func (c *PeeringService) Run() {
 	h := c.host.Host()
 	// get the connection and disconnection notification channels from the host
 	newConnChan := c.host.ConnNotChan()
-	newDisconnChan := c.host.DsconnNotChan()
+	newDisconnChan := c.host.DisconnNotChan()
 
 	// start the peering strategy
 	peerStreamChan := c.strategy.Run()
@@ -136,7 +137,7 @@ func (c *PeeringService) Run() {
 				addrInfo.Addrs = append(addrInfo.Addrs, transport)
 
 				connAttStat := ConnectionAttemptStatus{
-					PeerID: nextPeer.PeerId,
+					Peer: nextPeer,
 				}
 				c.Log.Debugf("addrs %s attempting connection to peer", addrInfo.Addrs)
 				// try to connect the peer
@@ -159,7 +160,7 @@ func (c *PeeringService) Run() {
 							}
 						*/
 						// fill the ConnectionStatus for the given peer connection
-						connAttStat.Timestamp(time.Now())
+						connAttStat.Timestamp = time.Now()
 						connAttStat.Successful = false
 						connAttStat.RecError = err
 						// increment the attempts
@@ -168,7 +169,7 @@ func (c *PeeringService) Run() {
 					} else { // connection successfuly made
 						c.Log.Debugf("peer_id %s successful connection made", peerID.String())
 						// fill the ConnectionStatus for the given peer connection
-						connAttStat.Timestamp(time.Now())
+						connAttStat.Timestamp = time.Now()
 						connAttStat.Successful = true
 						connAttStat.RecError = nil
 						// break the loop
@@ -186,7 +187,7 @@ func (c *PeeringService) Run() {
 			// New disconnection
 			case newDisconn := <-newDisconnChan:
 				c.Log.Debugf("new disconection from %d", newDisconn.Peer.PeerId)
-				c.strategy.NewConnection(newDisconn)
+				c.strategy.NewDisconnection(newDisconn)
 
 			// Stoping go routine
 			case <-peeringCtx.Done():

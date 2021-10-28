@@ -87,7 +87,8 @@ func (d *Discovery) Start_dv5() {
 
 	// udp address to listen
 	udpAddr := &net.UDPAddr{
-		IP:   net.ParseIP(d.GetInfoObj().GetIPToString()),
+		//IP:   net.ParseIP(d.GetInfoObj().GetIPToString()),
+		IP:   net.IPv4zero,
 		Port: int(d.GetListenPort()),
 	}
 
