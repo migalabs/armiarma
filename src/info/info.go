@@ -109,6 +109,8 @@ func (i *InfoData) importFromConfig(input_config config.ConfigData, stdOpts base
 	if !i.checkValidLogLevel(input_config.GetLogLevel()) {
 		i.SetLogLevel(DefaultLogLevel)
 		default_log_level = true
+	} else {
+		i.SetLogLevel(input_config.GetLogLevel())
 	}
 
 	//set the local logger using the stadOpts and the custom info opts
