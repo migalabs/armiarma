@@ -59,7 +59,6 @@ func NewEmptyDiscovery() *Discovery {
 
 func NewDiscovery(ctx context.Context, input_node *enode.LocalNode, db *db.PeerStore, info_obj *info.InfoData, input_port int, stdOpts base.LogOpts) *Discovery {
 	localLogger := dv5LoggerOpts(stdOpts)
-
 	// instance base
 	new_base, err := base.NewBase(
 		base.WithContext(ctx),
@@ -257,6 +256,7 @@ func (d *Discovery) ImportBootNodeList(import_json_file string) {
 // @return the modified logging options object for the Discovery object
 func dv5LoggerOpts(input_opts base.LogOpts) base.LogOpts {
 	input_opts.ModName = PKG_NAME
+	input_opts.Level = "error" // HARDCODED
 
 	return input_opts
 }

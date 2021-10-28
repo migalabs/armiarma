@@ -120,22 +120,28 @@ func (c *PeeringService) Run() {
 			select {
 			// Next peer arrives
 			case nextPeer := <-peerStreamChan:
-				c.Log.Debug("new peer %d to connect", nextPeer.PeerId)
-				peerID := peer.ID(nextPeer.PeerId)
+				c.Log.Debugf("new peer %s to connect", nextPeer.PeerId)
+				peerID, err := peer.Decode(nextPeer.PeerId)
+				if err != nil {
+					c.Log.Warnf("coulnd't extract peer.ID from peer %s", nextPeer.PeerId)
+					// Request the next peer when case is over
+					c.strategy.NextPeer()
+					continue
+				}
 				// Set the correct address format to connect the peers
 				// libp2p complains if we put multi-addresses that include the peer ID into the Addrs list.
 				addrs := nextPeer.ExtractPublicAddr()
+				transport, _ := peer.SplitAddr(addrs)
+				if transport == nil {
+					// Request the next peer when case is over
+					c.strategy.NextPeer()
+					continue
+				}
 				addrInfo := peer.AddrInfo{
 					ID:    peerID,
 					Addrs: make([]ma.Multiaddr, 0, 1),
 				}
-
-				transport, _ := peer.SplitAddr(addrs)
-				if transport == nil {
-					continue
-				}
 				addrInfo.Addrs = append(addrInfo.Addrs, transport)
-
 				connAttStat := ConnectionAttemptStatus{
 					Peer: nextPeer,
 				}
@@ -178,15 +184,17 @@ func (c *PeeringService) Run() {
 				}
 				// send it to the strategy
 				c.strategy.NewConnectionAttempt(connAttStat)
+				// Request the next peer when case is over
+				c.strategy.NextPeer()
 
 			// New connection
 			case newConn := <-newConnChan:
-				c.Log.Debugf("new conection from %d", newConn.Peer.PeerId)
+				c.Log.Debugf("new conection from %s", newConn.Peer.PeerId)
 				c.strategy.NewConnection(newConn)
 
 			// New disconnection
 			case newDisconn := <-newDisconnChan:
-				c.Log.Debugf("new disconection from %d", newDisconn.Peer.PeerId)
+				c.Log.Debugf("new disconection from %s", newDisconn.Peer.PeerId)
 				c.strategy.NewDisconnection(newDisconn)
 
 			// Stoping go routine
