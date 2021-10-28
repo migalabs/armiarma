@@ -17,6 +17,7 @@ import (
 )
 
 var (
+	ModuleName       = "LIBP2P_HOST"
 	ConnNotChannSize = 50
 )
 
@@ -64,7 +65,7 @@ func NewBasicLibp2pHost(ctx context.Context, opts BasicLibp2pHostOpts) (*BasicLi
 	// check the parsed host options
 
 	ip := opts.Info_obj.GetIPToString()
-	tcp := opts.Info_obj.GetIPToString()
+	tcp := opts.Info_obj.GetTcpPortString()
 	privkey := opts.Info_obj.GetPrivKey()
 	userAgent := opts.Info_obj.GetUserAgent()
 
