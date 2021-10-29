@@ -13,6 +13,7 @@ This way we make sure the information is only stored once.
 package info
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -20,6 +21,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/migalabs/armiarma/src/base"
 	"github.com/migalabs/armiarma/src/config"
+	"github.com/migalabs/armiarma/src/gossipsub/blockchaintopics"
 	"github.com/migalabs/armiarma/src/utils"
 	log "github.com/sirupsen/logrus"
 )
@@ -155,9 +157,20 @@ func (i *InfoData) importFromConfig(input_config config.ConfigData, stdOpts base
 		i.SetUserAgent(input_config.GetUserAgent())
 	}
 
+	// Fork digest
+	valid := i.SetForkDigest(input_config.GetForkDigest())
+	if !valid {
+		i.SetForkDigest(blockchaintopics.MainnetKey)
+		i.localLogger.Debugf("Setting default ForkDigest: %s", blockchaintopics.MainnetKey)
+	}
+
+	// make sure we have already configured the ForkDigest
+
 	//Topic
-	if len(input_config.GetTopicArray()) == 0 {
-		i.SetTopicArrayFromString(DefaultTopicArray)
+	i.SetTopicArray(input_config.GetTopicArray())
+
+	if len(i.GetTopicArray()) == 0 {
+		i.SetTopicArray(blockchaintopics.ReturnAllTopics(i.GetForkDigest()))
 		i.localLogger.Debugf("Setting default TopicArray: %s", DefaultTopicArray)
 	} else {
 		i.SetTopicArray(input_config.GetTopicArray())
@@ -171,42 +184,33 @@ func (i *InfoData) importFromConfig(input_config config.ConfigData, stdOpts base
 		i.SetNetwork(input_config.GetNetwork())
 	}
 
-	// Fork digest
-	if input_config.GetForkDigest() == "" {
-		i.SetForkDigest(DefaultForkDigest)
-		i.localLogger.Debugf("Setting default ForkDigest: %s", DefaultForkDigest)
-	} else {
-		i.SetForkDigest(input_config.GetForkDigest())
-	}
-
 	// Private Key
-	if input_config.GetPrivKey() == "" {
-		i.localLogger.Warnf("Private Key was not properly imported")
+	err := i.SetPrivKeyFromString(input_config.GetPrivKey())
+	if err != nil {
+		i.localLogger.Warnf(err.Error())
 		i.SetPrivKeyFromString(utils.Generate_privKey())
-	} else {
-		i.SetPrivKeyFromString(input_config.GetPrivKey())
 	}
 
 	// BootNodesFile
 	if input_config.GetBootNodesFile() == "" {
-		i.localLogger.Debugf("Could not find bootnodes file")
+		i.localLogger.Debugf("Could not find bootnodes file configuration")
 	} else {
 		i.SetBootNodeFile(input_config.GetBootNodesFile())
 	}
 
 	// TODO: pending db type and path
+
 	if input_config.GetDBPath() == "" {
 		i.SetDBPath(DefaultDBPath)
 		i.localLogger.Debugf("Setting default DB Path: %s", DefaultDBPath)
 	} else {
-
+		i.SetDBPath(input_config.GetDBPath())
 	}
-
 	if input_config.GetDBType() == "" {
 		i.SetDBType(DefaultDBType)
 		i.localLogger.Debugf("Setting default DB Type: %s", DefaultDBType)
 	} else {
-
+		i.SetDBType(input_config.GetDBType())
 	}
 
 	i.localLogger.Infof("Imported!")
@@ -289,10 +293,11 @@ func (i InfoData) GetTopicArray() []string {
 	return i.topicArray
 }
 func (i *InfoData) SetTopicArray(input_list []string) {
-	i.topicArray = input_list
+	i.topicArray = blockchaintopics.ReturnTopics(i.GetForkDigest(), input_list)
 }
 func (i *InfoData) SetTopicArrayFromString(input_list string) {
-	i.topicArray = strings.Split(input_list, ",")
+	topicStringArray := strings.Split(input_list, ",")
+	i.topicArray = blockchaintopics.ReturnTopics(i.GetForkDigest(), topicStringArray)
 }
 
 func (i InfoData) GetNetwork() string {
@@ -305,8 +310,14 @@ func (i *InfoData) SetNetwork(input_string string) {
 func (i InfoData) GetForkDigest() string {
 	return i.forkDigest
 }
-func (i *InfoData) SetForkDigest(input_string string) {
-	i.forkDigest = input_string
+func (i *InfoData) SetForkDigest(input_string string) bool {
+	new_fork_digest, valid := blockchaintopics.CheckValidForkDigest(input_string)
+	if valid {
+		i.forkDigest = new_fork_digest
+		return true
+	}
+	return false
+
 }
 
 func (i InfoData) GetLogLevel() string {
@@ -333,14 +344,15 @@ func (i InfoData) GetPrivKeyString() string {
 func (i *InfoData) SetPrivKey(input_key *crypto.Secp256k1PrivateKey) {
 	i.privateKey = input_key
 }
-func (i *InfoData) SetPrivKeyFromString(input_key string) {
+func (i *InfoData) SetPrivKeyFromString(input_key string) error {
 	parsed_key, err := utils.ParsePrivateKey(input_key)
 
 	if err != nil {
-		i.localLogger.Panicf("Could not parse Private Key %s", input_key)
-		return
+		error_string := "Could not parse Private Key"
+		return errors.New(error_string)
 	}
 	i.privateKey = parsed_key
+	return nil
 }
 
 func (i InfoData) GetBootNodeFile() string {
@@ -358,7 +370,7 @@ func (i *InfoData) SetDBPath(input_string string) {
 }
 
 func (i InfoData) GetDBType() string {
-	return i.dBPath
+	return i.dBType
 }
 func (i *InfoData) SetDBType(input_string string) {
 	i.dBType = input_string

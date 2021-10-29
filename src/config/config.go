@@ -170,7 +170,7 @@ func (c *ConfigData) SetDBPath(input_string string) {
 }
 
 func (c *ConfigData) GetDBType() string {
-	return c.DBPath
+	return c.DBType
 }
 func (c *ConfigData) SetDBType(input_string string) {
 	c.DBType = input_string
