@@ -418,7 +418,7 @@ func (pm *Peer) MessageEvent(topicName string, time time.Time) {
 // the topic name is the shortened name i.e. BeaconBlock
 // TODO: comment
 func (pm *Peer) GetNumOfMsgFromTopic(shortTopic string) uint64 {
-	msgMetric := pm.MessageMetrics[bc_topics.ShortToFullTopicName(shortTopic)]
+	msgMetric := pm.MessageMetrics[bc_topics.GenerateEth2Topics(bc_topics.MainnetKey, shortTopic)]
 	if msgMetric != nil {
 		return msgMetric.Count
 	}
