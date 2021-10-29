@@ -4,7 +4,7 @@
     "UdpPort": 101,
     "/TopicArray": ["echo", "ohce"],
     "Network": "testnet",
-    "/ForkDigest": "0xdlskgfn",
+    "/ForkDigest": "Altair",
     "UserAgent": "bsc_test",
     "LogLevel": "debug",
     "PrivateKey": "026c60367b01fe3d7c7460bce1d585260ce465fa0abcb6e13619f88bf0dad54f",
