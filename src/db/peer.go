@@ -15,9 +15,9 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-const DEFAULT_DELAY = 24 // hours of delay after each negative attempt with delay
 var (
-	DeprecationTime = 24 * time.Hour
+	DeprecationTime  = 24
+	DeprecationUnits = time.Hour
 )
 
 // Stores all the information related to a peer
@@ -222,7 +222,7 @@ func (pm Peer) DaysToWait() int {
 func (pm Peer) ReadyToConnect() bool {
 
 	lastConnectionAttempt := pm.ConnectionTimes[len(pm.ConnectionTimes)-1]
-	delayTime := time.Duration(pm.DaysToWait()*DEFAULT_DELAY) * time.Hour
+	delayTime := time.Duration(pm.DaysToWait()*DeprecationTime) * DeprecationUnits
 
 	// add both things to get the next time we would have to connect
 	nextConnectionTime := lastConnectionAttempt.Add(delayTime).Unix()
@@ -243,7 +243,7 @@ func (pm Peer) ReadyToConnect() bool {
 }
 
 // return the time of the last connection with this peer
-func (pm Peer) LastAttempt() (t time.Time, err error) {
+func (pm Peer) LastNegAttempt() (t time.Time, err error) {
 	if len(pm.NegativeConnAttempts) == 0 {
 		err = errors.New("no negative connections for the peer")
 		return
@@ -254,7 +254,7 @@ func (pm Peer) LastAttempt() (t time.Time, err error) {
 }
 
 // return the time of the last connection with this peer
-func (pm Peer) FirstAttempt() (t time.Time, err error) {
+func (pm Peer) FirstNegAttempt() (t time.Time, err error) {
 	if len(pm.NegativeConnAttempts) == 0 {
 		err = errors.New("no negative connections for the peer")
 		return
@@ -270,7 +270,7 @@ func (pm *Peer) AddNegConnAtt() {
 		// check if the last Negative connection attempt is in the range to consider the peer deprecated
 		tfirst := pm.NegativeConnAttempts[len(pm.NegativeConnAttempts)-1]
 		diff := t.Unix() - tfirst.Unix()
-		if time.Duration(diff)*time.Second >= DeprecationTime {
+		if time.Duration(diff)*time.Second >= time.Duration(DeprecationTime)*DeprecationUnits {
 			pm.Deprecated = true
 		}
 	}
@@ -284,7 +284,7 @@ func (pm *Peer) AddNegConnAttWithPenalty() {
 		// check if the last Negative connection attempt is in the range to consider the peer deprecated
 		tfirst := pm.NegativeConnAttempts[len(pm.NegativeConnAttempts)-1]
 		diff := t.Unix() - tfirst.Unix()
-		if time.Duration(diff)*time.Second >= DeprecationTime {
+		if time.Duration(diff)*time.Second >= time.Duration(DeprecationTime)*DeprecationUnits {
 			pm.Deprecated = true
 		}
 	}
