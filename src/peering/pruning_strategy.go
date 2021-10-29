@@ -191,7 +191,8 @@ func (c *PruningStrategy) peerstoreIterator() {
 				// check if the minIterTime has been
 				<-validIterTimer.C
 				// reset values
-
+				// get the peer list from the peerstore
+				peerList = c.PeerStore.GetPeerList()
 				peerListLen = len(peerList)
 				c.Log.Debugf("got new peer list with %d", len(peerList))
 				validIterTimer = time.NewTimer(MinIterTime)
