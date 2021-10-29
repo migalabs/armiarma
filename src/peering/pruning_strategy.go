@@ -124,7 +124,7 @@ func (c *PruningStrategy) peerstoreIterator() {
 				// TODO: resume this in a function
 				wtime := pinfo.DaysToWait()
 				if wtime != 0 {
-					lconn, err := pinfo.LastAttempt()
+					lconn, err := pinfo.LastNegAttempt()
 					if err != nil {
 						log.Warn("the peer should have a last connection attempt but list is empty")
 					}
@@ -191,7 +191,7 @@ func (c *PruningStrategy) peerstoreIterator() {
 				// check if the minIterTime has been
 				<-validIterTimer.C
 				// reset values
-				peerList = c.PeerStore.GetPeerList()
+
 				peerListLen = len(peerList)
 				c.Log.Debugf("got new peer list with %d", len(peerList))
 				validIterTimer = time.NewTimer(MinIterTime)
