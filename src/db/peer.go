@@ -545,7 +545,6 @@ func PeerUnMarshal(m map[string]interface{}) Peer {
 		Attempts:             uint64(m["Attempts"].(float64)),
 		Error:                m["Error"].(string),
 		Deprecated:           m["Deprecated"].(bool),
-		WaitingUnits:         int(m["WaitingUnits"].(float64)),
 		NegativeConnAttempts: negConns,
 		ConnectionTimes:      connTimes,
 		DisconnectionTimes:   disconnTimes,
