@@ -15,11 +15,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var (
-	DeprecationTime  = 24
-	DeprecationUnits = time.Hour
-)
-
 // Stores all the information related to a peer
 type Peer struct {
 
@@ -55,8 +50,6 @@ type Peer struct {
 	Attempts           uint64 // Number of attempts done
 	Error              string // Type of error that we detected. TODO: We are just storing the last one
 	Deprecated         bool   // Flag to rummarize whether the peer is longer valid for statistics or not. If false, the peer is not exported in db.
-
-	WaitingUnits int // number of days from last ping attempt that the crawler will wait to ping again
 
 	NegativeConnAttempts []time.Time // List of dates when the peer retreived a negative connection attempt (if there is a possitive one, clean the struct)
 	ConnectionTimes      []time.Time
@@ -193,7 +186,6 @@ func (pm *Peer) ExtractPublicAddr() ma.Multiaddr {
 //***********************************************************
 
 func (pm *Peer) ResetDynamicMetrics() {
-	pm.Attempts = 0
 	pm.MessageMetrics = make(map[string]*MessageMetric)
 }
 
@@ -202,44 +194,6 @@ func (pm *Peer) ResetDynamicMetrics() {
 // @return true or false
 func (pm Peer) IsDeprecated() bool {
 	return pm.Deprecated
-}
-
-// return waiting days that this peer has to wait untill next ping
-// TODO: this will be WaitUnits in the future, so each peering
-// TODO: strategy can implement their own waiting times with a formula
-// TODO: or scale. For now, leave the same name, pending move.
-func (pm Peer) DaysToWait() int {
-	return pm.WaitingUnits
-}
-
-// ReadyToConnect
-// * This method evaluates if the given peer pm is ready to be connectd.
-// * This means that the current time has exceeded the
-// * lastAttempt + waiting time, so we have already waited enough
-// @return True of False if we are in position to connect or not
-// TODO: each strategy should implement their own
-// TODO: move this to the strategy struct
-func (pm Peer) ReadyToConnect() bool {
-
-	lastConnectionAttempt := pm.ConnectionTimes[len(pm.ConnectionTimes)-1]
-	delayTime := time.Duration(pm.DaysToWait()*DeprecationTime) * DeprecationUnits
-
-	// add both things to get the next time we would have to connect
-	nextConnectionTime := lastConnectionAttempt.Add(delayTime).Unix()
-
-	current_time := time.Now().Unix()
-
-	// Compare time now with last connection plus waiting list
-	if (current_time - nextConnectionTime) <= 0 {
-		// If the current time is greater than the next connection time
-		// it means connection time is in the past, so we can already connect
-
-		// If both times are the same, then next connection time is the current time
-		// so we are ready to connect again
-		return true
-	}
-	return false // otherwise
-
 }
 
 // return the time of the last connection with this peer
@@ -264,43 +218,17 @@ func (pm Peer) FirstNegAttempt() (t time.Time, err error) {
 	return
 }
 
-func (pm *Peer) AddNegConnAtt() {
+func (pm *Peer) AddNegConnAtt(deprecated bool) {
 	t := time.Now()
-	if len(pm.NegativeConnAttempts) > 0 {
-		// check if the last Negative connection attempt is in the range to consider the peer deprecated
-		tfirst := pm.NegativeConnAttempts[len(pm.NegativeConnAttempts)-1]
-		diff := t.Unix() - tfirst.Unix()
-		if time.Duration(diff)*time.Second >= time.Duration(DeprecationTime)*DeprecationUnits {
-			pm.Deprecated = true
-		}
-	}
-	pm.WaitingUnits = 0
 	pm.NegativeConnAttempts = append(pm.NegativeConnAttempts, t)
-}
-
-func (pm *Peer) AddNegConnAttWithPenalty() {
-	t := time.Now()
-	if len(pm.NegativeConnAttempts) > 0 {
-		// check if the last Negative connection attempt is in the range to consider the peer deprecated
-		tfirst := pm.NegativeConnAttempts[len(pm.NegativeConnAttempts)-1]
-		diff := t.Unix() - tfirst.Unix()
-		if time.Duration(diff)*time.Second >= time.Duration(DeprecationTime)*DeprecationUnits {
-			pm.Deprecated = true
-		}
+	if deprecated {
+		pm.Deprecated = true
 	}
-	// Update waiting days to the pruning process
-	if pm.WaitingUnits == 0 {
-		pm.WaitingUnits = 1
-	} else {
-		pm.WaitingUnits = pm.WaitingUnits * 2
-	}
-	pm.NegativeConnAttempts = append(pm.NegativeConnAttempts, t)
 }
 
 func (pm *Peer) AddPositiveConnAttempt() {
 	pm.NegativeConnAttempts = make([]time.Time, 0)
 	pm.Deprecated = false
-	pm.WaitingUnits = 0
 }
 
 // Register when a new connection was detected
