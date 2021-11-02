@@ -24,6 +24,16 @@ var PrivateIPNetworks = []net.IPNet{
 	},
 }
 
+func UnmarshalMaddr(inputAddr string) (ma.Multiaddr, error) {
+	new_ma, err := ma.NewMultiaddr(inputAddr)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return new_ma, nil
+}
+
 func IsIPPublic(ip net.IP) bool {
 	for _, ipNet := range PrivateIPNetworks {
 		if ipNet.Contains(ip) || ip.IsLoopback() || ip.IsUnspecified() {

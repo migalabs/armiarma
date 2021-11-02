@@ -12,6 +12,15 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+var (
+	BoltDBKey string            = "BoltDB"
+	MemoryKey string            = "Memory"
+	DBTypes   map[string]string = map[string]string{
+		BoltDBKey: "bolt",
+		MemoryKey: "memory",
+	}
+)
+
 type ErrorHandling func(*Peer)
 
 type PeerStore struct {
@@ -26,12 +35,12 @@ func NewPeerStore(dbtype string, path string) PeerStore {
 	var db PeerStoreStorage
 	// TODO: once the db works well and it is defined
 	switch dbtype {
-	case "bold":
+	case DBTypes[BoltDBKey]:
 		if len(path) <= 0 {
 			path = default_db_path
 		}
 		db = NewBoltPeerDB(path)
-	case "memory":
+	case DBTypes[MemoryKey]:
 		db = NewMemoryDB()
 	default:
 		if len(path) <= 0 {
@@ -39,7 +48,7 @@ func NewPeerStore(dbtype string, path string) PeerStore {
 		}
 		db = NewBoltPeerDB(path)
 	}
-	db = NewMemoryDB()
+	//db = NewMemoryDB()
 	ps := PeerStore{
 		PeerStore:      db,
 		StartTime:      time.Now(),
@@ -84,7 +93,9 @@ func (c *PeerStore) StoreOrUpdatePeer(peer Peer) {
 	// See: https://github.com/migalabs/armiarma/issues/17
 	// Currently just overwritting what was before
 	// TEMP
+
 	oldPeer, err := c.GetPeerData(peer.PeerId)
+
 	// if error means not found, just store it
 	if err != nil {
 		c.PeerStore.Store(peer.PeerId, peer)
