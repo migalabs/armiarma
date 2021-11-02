@@ -91,7 +91,7 @@ var crawlerCmd = &cobra.Command{
 		}
 
 		// TODO: generate a new DB
-		db := db.NewPeerStore("memory", "")
+		db := db.NewPeerStore(info_tmp.GetDBType(), info_tmp.GetDBPath())
 		// Generate a Peering Service (so far with default peering strategy)
 
 		hostOpts := hosts.BasicLibp2pHostOpts{
@@ -120,6 +120,7 @@ var crawlerCmd = &cobra.Command{
 			AggregatedDelay: 24 * time.Hour, // Hardcoded, still using the Default Delay
 			LogOpts:         stdOpts,
 		}
+
 		pStrategy, err := peering.NewPruningStrategy(b.Ctx(), &db, prunOpts)
 		peeringServ, err := peering.NewPeeringService(b.Ctx(), host, &db, peeringOpts,
 			peering.WithPeeringStrategy(&pStrategy),

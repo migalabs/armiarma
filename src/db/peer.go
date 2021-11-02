@@ -245,6 +245,29 @@ func (pm *Peer) DisconnectionEvent(time time.Time) {
 	pm.ConnectedDirection = ""
 }
 
+func (pm Peer) GetLastActivityTime() time.Time {
+	// check len before
+
+	last_negative_activity := time.Time{}
+	last_connection_activity := time.Time{}
+	last_disconnection_activity := time.Time{}
+
+	if len(pm.NegativeConnAttempts) > 0 {
+		last_negative_activity = pm.NegativeConnAttempts[len(pm.NegativeConnAttempts)-1]
+	}
+
+	if len(pm.ConnectionTimes) > 0 {
+		last_connection_activity = pm.ConnectionTimes[len(pm.ConnectionTimes)-1]
+	}
+	if len(pm.DisconnectionTimes) > 0 {
+		last_disconnection_activity = pm.DisconnectionTimes[len(pm.DisconnectionTimes)-1]
+	}
+
+	return utils.ReturnGreatestTime([]time.Time{last_negative_activity,
+		last_connection_activity, last_disconnection_activity})
+
+}
+
 // ConnectionAttemptEvent
 // TODO: comment
 // Register when a connection attempt was made. Note that there is some
@@ -454,4 +477,82 @@ func (pm *Peer) LogPeer() {
 		"City":          pm.City,
 		"Latency":       pm.Latency,
 	}).Info("Peer Info")
+}
+
+// PeerUnMarshal
+// * This method will create a Peer object reading a map of string -> interface
+// @return the resulting Peer
+func PeerUnMarshal(m map[string]interface{}) Peer {
+
+	// for some fields we need to perform a check and parsing
+	m_addrs := make([]ma.Multiaddr, 0) // where to store the unmarshalled
+	err := errors.New("")
+	if m["MAddrs"] != nil {
+		m_addrs, err = utils.ParseInterfaceAddrArray(m["MAddrs"].([]interface{}))
+		if err != nil {
+			log.Errorf(err.Error())
+		}
+	}
+
+	negConns := make([]time.Time, 0)
+	if m["NegativeConnAttempts"] != nil {
+		negConns, err = utils.ParseInterfaceTimeArray(m["NegativeConnAttempts"].([]interface{}))
+
+	}
+
+	connTimes := make([]time.Time, 0)
+	if m["ConnectionTimes"] != nil {
+		connTimes, err = utils.ParseInterfaceTimeArray(m["ConnectionTimes"].([]interface{}))
+	}
+
+	disconnTimes := make([]time.Time, 0)
+	if m["DisconnectionTimes"] != nil {
+		disconnTimes, err = utils.ParseInterfaceTimeArray(m["DisconnectionTimes"].([]interface{}))
+	}
+
+	protocolList := make([]string, 0)
+	if m["Protocols"] != nil {
+		protocolList = utils.ParseInterfaceStringArray(m["Protocols"].([]interface{}))
+	}
+
+	protocolVersionNew := ""
+	if m["ProtocolVersion"] != nil {
+		protocolVersionNew = m["ProtocolVersion"].(string)
+	}
+
+	// TODO: use constants for names
+	return Peer{
+		PeerId:               m["PeerId"].(string),
+		Pubkey:               m["Pubkey"].(string),
+		NodeId:               m["NodeId"].(string),
+		UserAgent:            m["UserAgent"].(string),
+		ClientName:           m["ClientName"].(string),
+		ClientOS:             m["ClientOS"].(string),
+		ClientVersion:        m["ClientVersion"].(string),
+		BlockchainNodeENR:    m["BlockchainNodeENR"].(string),
+		Ip:                   m["Ip"].(string),
+		Country:              m["Country"].(string),
+		CountryCode:          m["CountryCode"].(string),
+		City:                 m["City"].(string),
+		Latency:              m["Latency"].(float64),
+		MAddrs:               m_addrs, // correct
+		Protocols:            protocolList,
+		ProtocolVersion:      protocolVersionNew,
+		ConnectedDirection:   m["ConnectedDirection"].(string),
+		IsConnected:          m["IsConnected"].(bool),
+		Attempted:            m["Attempted"].(bool),
+		Succeed:              m["Succeed"].(bool),
+		Attempts:             uint64(m["Attempts"].(float64)),
+		Error:                m["Error"].(string),
+		Deprecated:           m["Deprecated"].(bool),
+		WaitingUnits:         int(m["WaitingUnits"].(float64)),
+		NegativeConnAttempts: negConns,
+		ConnectionTimes:      connTimes,
+		DisconnectionTimes:   disconnTimes,
+		MetadataRequest:      m["MetadataRequest"].(bool),
+		MetadataSucceed:      m["MetadataSucceed"].(bool),
+		LastExport:           int64(m["LastExport"].(float64)),
+		// BeaconStatus:         m["BeaconStatus"].(BeaconStatusStamped),
+		// BeaconMetadata:       m["BeaconMetadata"].(BeaconMetadataStamped),
+	}
 }
