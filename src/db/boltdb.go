@@ -26,25 +26,48 @@ func NewBoltPeerDB(path string) BoltPeerDB {
 	// Generate a new one
 	db, err := OpenBoltDB(path, "peerstore", 0600, nil)
 	if err != nil {
-		log.Error(err)
-		db = nil
+		log.Panicf(err.Error())
 	}
-	pbdb := BoltPeerDB{
+	db_obj := BoltPeerDB{
 		db:        db,
 		startTime: time.Now(),
 	}
+
 	// check if there is something inside the bolt database
+	// if so, fill the disconnectin for these peers that were connected
+	// when the crawler was shutdown
+	connectedPeers := make([]Peer, 0) // store the Peers that were connected, so Disconnection was not registered.
+	// so they remain connected
 	peercnt := 0
-	pbdb.Range(func(key string, value Peer) bool {
+	lastCrawlerActivity := time.Time{} // representation of least possible time
+	db_obj.Range(func(key string, value Peer) bool {
+		// check if there was an Open connection
+		if value.IsConnected {
+			// it remains connected
+			connectedPeers = append(connectedPeers, value)
+		}
+
+		// we also need to figure out the last activity of the crawler
+		// this way we can set the disconnection time for the remained connected
+		peerLastActivity := value.GetLastActivityTime()
+		if peerLastActivity.After(lastCrawlerActivity) {
+			lastCrawlerActivity = peerLastActivity
+		}
 		peercnt++
 		return true
 	})
 	if peercnt > 0 {
-		log.Infof("loaded BoltDB with %d peer on it", peercnt)
+		log.Infof("loaded BoltDB with %d peer on it (%d connected)", peercnt, len(connectedPeers))
 	} else {
 		log.Infof("generated new BoltDB")
 	}
-	return pbdb
+
+	// last, lets add the disconnection event to those peers that remained connected
+	for _, connectedPeerTmp := range connectedPeers {
+		connectedPeerTmp.DisconnectionEvent(lastCrawlerActivity)
+	}
+
+	return db_obj
 }
 
 func (p BoltPeerDB) Store(key string, value Peer) {
@@ -54,19 +77,23 @@ func (p BoltPeerDB) Store(key string, value Peer) {
 		return
 	}
 	p.db.Store([]byte(key), value_marshalled)
+
 }
 
 func (p BoltPeerDB) Load(key string) (value Peer, ok bool) {
+
 	value_marshalled, ok := p.db.Load([]byte(key))
 	if !ok {
 		return Peer{}, false
 	}
-	err := json.Unmarshal(value_marshalled, &value)
+	var obj map[string]interface{}
+	err := json.Unmarshal(value_marshalled, &obj)
+
 	if err != nil {
 		log.Error(err)
 		return Peer{}, false
 	}
-	return value, true
+	return PeerUnMarshal(obj), true
 }
 
 func (p BoltPeerDB) Delete(key string) {
@@ -74,28 +101,38 @@ func (p BoltPeerDB) Delete(key string) {
 }
 
 func (p BoltPeerDB) Range(f func(key string, value Peer) bool) {
+
 	p.db.Range(func(key, value []byte) bool {
-		var value_unmarshalled Peer
-		err := json.Unmarshal(value, &value_unmarshalled)
+
+		var obj map[string]interface{}
+
+		err := json.Unmarshal(value, &obj)
 		if err != nil {
 			log.Error(err)
+
 			return false
 		}
+		value_unmarshalled := PeerUnMarshal(obj)
+
 		ok := f(string(key), value_unmarshalled)
 		return ok
 	})
+
 }
 
+// TODO: pending return / print some kind of error if it was the case
 func (p BoltPeerDB) Peers() []peer.ID {
 	peers := make([]peer.ID, 0)
-	p.db.Range(func(key, value []byte) bool {
-		peerID_obj, err := peer.IDFromString(string(key))
+	p.Range(func(key string, value Peer) bool {
+		peerID_obj, err := peer.Decode(string(key))
+
 		if err != nil {
 			return false
 		}
 		peers = append(peers, peerID_obj)
 		return true
 	})
+
 	return peers
 }
 
@@ -116,6 +153,7 @@ func OpenBoltDB(path string, bucketName string, mode fs.FileMode, options *bolt.
 	}
 
 	err = boltDB.Update(func(tx *bolt.Tx) error {
+
 		_, err := tx.CreateBucketIfNotExists([]byte(bucketName))
 		return err
 	})
@@ -130,6 +168,7 @@ func (db *BoltDB) Close() {
 }
 
 func (db *BoltDB) Load(key []byte) ([]byte, bool) {
+
 	var got []byte
 	err := db.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(db.bucket))
@@ -148,6 +187,7 @@ func (db *BoltDB) Load(key []byte) ([]byte, bool) {
 }
 
 func (db *BoltDB) Store(key, value []byte) {
+
 	db.db.Update(func(t *bolt.Tx) error {
 		b := t.Bucket([]byte(db.bucket))
 		err := b.Put(key, value)
@@ -156,6 +196,7 @@ func (db *BoltDB) Store(key, value []byte) {
 }
 
 func (db *BoltDB) Delete(key []byte) {
+
 	db.db.Update(func(t *bolt.Tx) error {
 		b := t.Bucket([]byte(db.bucket))
 		err := b.Delete(key)
@@ -164,6 +205,7 @@ func (db *BoltDB) Delete(key []byte) {
 }
 
 func (db *BoltDB) Range(f func(key, value []byte) bool) {
+
 	db.db.View(func(t *bolt.Tx) error {
 		b := t.Bucket([]byte(db.bucket))
 		err := b.ForEach(func(k, v []byte) error {
