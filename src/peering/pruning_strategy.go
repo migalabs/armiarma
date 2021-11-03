@@ -194,9 +194,9 @@ func (c *PruningStrategy) peerstoreIterator() {
 		// Receive the status of the peer that got connected to the crawler
 		case connAttemtpStatus := <-c.connAttemptNot:
 			c.Log.Debugf("new connection attempt has been received from peer %s", connAttemtpStatus.Peer.PeerId)
+			c.PeerStore.StoreOrUpdatePeer(connAttemtpStatus.Peer)
 			if connAttemtpStatus.Successful {
 				c.Log.Debugf("adding success connection to peer %s", connAttemtpStatus.Peer.PeerId)
-				c.PeerStore.StoreOrUpdatePeer(connAttemtpStatus.Peer)
 				c.PeerStore.AddNewPosConnectionAttempt(connAttemtpStatus.Peer.PeerId)
 				// Update Pruning Metadata
 				var p *PrunedPeer
@@ -443,9 +443,13 @@ func (c PeerQueue) Len() int {
 func (c *PeerQueue) UpdatePeerListFromPeerStore(peerstore *db.PeerStore) error {
 	// Get the list of peers from the peerstore
 	peerList := peerstore.GetPeerList()
+	totcnt := 0
+	new := 0
 	// Fill the PeerQueue.PeerList with the missing peers from the
 	for _, peerID := range peerList {
+		totcnt++
 		if !c.IsPeerAlready(peerID.String()) {
+			new++
 			// Peer was not in the list of peers
 			pInfo, err := peerstore.GetPeerData(peerID.String())
 			if err != nil {

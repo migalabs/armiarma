@@ -126,6 +126,12 @@ func (pm *Peer) FetchPeerInfoFromPeer(newPeer Peer) {
 	if newPeer.BeaconStatus != (BeaconStatusStamped{}) {
 		pm.BeaconStatus = newPeer.BeaconStatus
 	}
+	// Check that we dont fetch old peer into old Peer
+	// Edgy case that makes the memory increase exponentially after several hours of run
+	if len(newPeer.ConnectionTimes) > 1 {
+		log.Warnf("careful! peer with %d connections is getting fetched into peer with %d ones. This might end up in an exponential Heap-Memory increase.", len(newPeer.ConnectionTimes), len(pm.ConnectionTimes))
+	}
+
 	// Aggregate connections and disconnections
 	for _, time := range newPeer.ConnectionTimes {
 		pm.ConnectionEvent(newPeer.ConnectedDirection, time)
