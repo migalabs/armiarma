@@ -142,8 +142,9 @@ func (c *PeeringService) Run() {
 					Addrs: make([]ma.Multiaddr, 0, 1),
 				}
 				addrInfo.Addrs = append(addrInfo.Addrs, transport)
+				nPeer := db.NewPeer(nextPeer.PeerId)
 				connAttStat := ConnectionAttemptStatus{
-					Peer: nextPeer,
+					Peer: nPeer,
 				}
 				c.Log.Debugf("addrs %s attempting connection to peer", addrInfo.Addrs)
 				// try to connect the peer
