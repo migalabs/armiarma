@@ -4,6 +4,7 @@
     "UdpPort": 101,
     "/TopicArray": ["echo", "ohce"],
     "Network": "testnet",
+    "Eth2Endpoint": "https://infura.test.endpoint",
     "/ForkDigest": "Altair",
     "UserAgent": "bsc_test",
     "LogLevel": "debug",

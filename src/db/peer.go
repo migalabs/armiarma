@@ -65,7 +65,7 @@ type Peer struct {
 
 	// Message
 	// Counters for the different topics
-	MessageMetrics map[string]*MessageMetric
+	MessageMetrics map[string]MessageMetric
 }
 
 // **********************************************************
@@ -79,7 +79,7 @@ func NewPeer(peerId string) Peer {
 		NegativeConnAttempts: make([]time.Time, 0),
 		ConnectionTimes:      make([]time.Time, 0),
 		DisconnectionTimes:   make([]time.Time, 0),
-		MessageMetrics:       make(map[string]*MessageMetric),
+		MessageMetrics:       make(map[string]MessageMetric),
 	}
 	return pm
 }
@@ -192,7 +192,7 @@ func (pm *Peer) ExtractPublicAddr() ma.Multiaddr {
 //***********************************************************
 
 func (pm *Peer) ResetDynamicMetrics() {
-	pm.MessageMetrics = make(map[string]*MessageMetric)
+	pm.MessageMetrics = make(map[string]MessageMetric)
 }
 
 // IsDeprecated
@@ -363,20 +363,23 @@ type MessageMetric struct {
 // Count the messages we get per topis and its first/last timestamps
 // TODO: comment
 func (pm *Peer) MessageEvent(topicName string, time time.Time) {
-	if pm.MessageMetrics[topicName] == nil {
-		pm.MessageMetrics[topicName] = &MessageMetric{}
-		pm.MessageMetrics[topicName].FirstMessageTime = time
+	m, ok := pm.MessageMetrics[topicName]
+	if !ok {
+		m = MessageMetric{
+			FirstMessageTime: time,
+		}
 	}
-	pm.MessageMetrics[topicName].LastMessageTime = time
-	pm.MessageMetrics[topicName].Count++
+	m.LastMessageTime = time
+	m.Count++
+	pm.MessageMetrics[topicName] = m
 }
 
 // Get the number of messages that we got for a given topic. Note that
 // the topic name is the shortened name i.e. BeaconBlock
 // TODO: comment
 func (pm *Peer) GetNumOfMsgFromTopic(shortTopic string) uint64 {
-	msgMetric := pm.MessageMetrics[bc_topics.GenerateEth2Topics(bc_topics.MainnetKey, shortTopic)]
-	if msgMetric != nil {
+	msgMetric, ok := pm.MessageMetrics[bc_topics.GenerateEth2Topics(bc_topics.MainnetKey, shortTopic)]
+	if ok {
 		return msgMetric.Count
 	}
 	return uint64(0)
@@ -526,6 +529,14 @@ func PeerUnMarshal(m map[string]interface{}) Peer {
 		protocolVersionNew = m["ProtocolVersion"].(string)
 	}
 
+	msgMetrics := make(map[string]MessageMetric)
+	if m["MessageMetrics"] != nil {
+		msgMetrics, err = ParseInterfaceMapMessageMetrics(m["MessageMetrics"].(map[string]interface{}))
+		if err != nil {
+			log.Warnf("unable to cast full gossip msg metrics while unmarshaling. %s", err.Error())
+		}
+	}
+
 	// TODO: use constants for names
 	return Peer{
 		PeerId:               m["PeerId"].(string),
@@ -557,7 +568,32 @@ func PeerUnMarshal(m map[string]interface{}) Peer {
 		MetadataRequest:      m["MetadataRequest"].(bool),
 		MetadataSucceed:      m["MetadataSucceed"].(bool),
 		LastExport:           int64(m["LastExport"].(float64)),
+		MessageMetrics:       msgMetrics,
 		// BeaconStatus:         m["BeaconStatus"].(BeaconStatusStamped),
 		// BeaconMetadata:       m["BeaconMetadata"].(BeaconMetadataStamped),
 	}
+}
+
+func ParseInterfaceMapMessageMetrics(inputMap map[string]interface{}) (map[string]MessageMetric, error) {
+	result := make(map[string]MessageMetric)
+	// we will range over a slice of interfaces
+	for k, v := range inputMap {
+		vaux := v.(map[string]interface{})
+		ft, err := time.Parse(time.RFC3339, vaux["FirstMessageTime"].(string))
+		if err != nil {
+			return result, err
+		}
+		lt, err := time.Parse(time.RFC3339, vaux["LastMessageTime"].(string))
+		if err != nil {
+			return result, err
+		}
+		mm := MessageMetric{
+			Count:            uint64(vaux["Count"].(float64)),
+			FirstMessageTime: ft,
+			LastMessageTime:  lt,
+		}
+		result[k] = mm
+	}
+	return result, nil
+
 }

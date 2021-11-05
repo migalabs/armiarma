@@ -13,6 +13,7 @@ This way we make sure the information is only stored once.
 package info
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -24,6 +25,9 @@ import (
 	"github.com/migalabs/armiarma/src/gossipsub/blockchaintopics"
 	"github.com/migalabs/armiarma/src/utils"
 	log "github.com/sirupsen/logrus"
+
+	"github.com/migalabs/armiarma/src/onchaindata/eth2"
+	"github.com/migalabs/armiarma/src/onchaindata/eth2/endpoint"
 )
 
 var (
@@ -57,6 +61,7 @@ type InfoData struct {
 	topicArray    []string
 	network       string
 	forkDigest    string
+	eth2endpoint  string
 	logLevel      string
 	privateKey    *crypto.Secp256k1PrivateKey
 	bootNodesFile string
@@ -157,12 +162,57 @@ func (i *InfoData) importFromConfig(input_config config.ConfigData, stdOpts base
 		i.SetUserAgent(input_config.GetUserAgent())
 	}
 
+	// Nework
+	if input_config.GetNetwork() == "" {
+		i.SetNetwork(DefaultNetwork)
+		i.localLogger.Debugf("Setting default Network: %s", DefaultNetwork)
+	} else {
+		i.SetNetwork(input_config.GetNetwork())
+	}
+
+	// Eth2 Endpoint
+	// Check if any Eth2Endpoint was given to get the ForkDigest
+	if input_config.GetEth2Endpoint() == "" {
+		// some endpoint was given
+		i.localLogger.Debugf("No Eth2 Endpoint was given")
+	} else {
+		i.SetEth2Endpoint(input_config.GetEth2Endpoint())
+	}
+
 	// Fork digest
 	valid := i.SetForkDigest(input_config.GetForkDigest())
 	if !valid {
-		i.SetForkDigest(blockchaintopics.MainnetKey)
-		i.localLogger.Debugf("Setting default ForkDigest: %s", blockchaintopics.MainnetKey)
+		// Check if any Eth2Endpoint was given to get the ForkDigest
+		if i.GetEth2Endpoint() != "" {
+			infuraCli, err := endpoint.NewInfuraClient(i.GetEth2Endpoint())
+			if err != nil {
+				i.localLogger.Warnf("unable to genereate the eth2 endpoint from the given one. %s", err.Error())
+				_ = i.SetForkDigest(blockchaintopics.MainnetKey)
+				i.localLogger.Warnf("Setting default ForkDigest to latest in mainnet: %s", blockchaintopics.MainnetKey)
+			} else {
+				ctx, _ := context.WithCancel(context.Background())
+				//defer cancel()
+				forkdigest, err := eth2.GetForkDigetsOfEth2Head(ctx, &infuraCli)
+				if err != nil {
+					i.localLogger.Warnf("unable to compute the fork digest from the eth2 endpoint. %s", err.Error())
+					_ = i.SetForkDigest(blockchaintopics.MainnetKey)
+					i.localLogger.Warnf("Setting default ForkDigest to latest in mainnet: %s", blockchaintopics.MainnetKey)
+				} else {
+					valid = i.SetForkDigest(forkdigest.String())
+					if !valid {
+						i.localLogger.Warnf("unable to set the computed fork digest. %s", forkdigest.String())
+						_ = i.SetForkDigest(blockchaintopics.MainnetKey)
+						i.localLogger.Warnf("Setting default ForkDigest to latest in mainnet: %s", blockchaintopics.MainnetKey)
+					}
+				}
+			}
+		} else {
+			i.localLogger.Warnf("invalid fork digest and no endpoint given")
+			_ = i.SetForkDigest(blockchaintopics.MainnetKey)
+			i.localLogger.Warnf("Setting default ForkDigest to latest in mainnet: %s", blockchaintopics.MainnetKey)
+		}
 	}
+	i.localLogger.Info("fork digest:", i.GetForkDigest())
 
 	// make sure we have already configured the ForkDigest
 
@@ -174,14 +224,6 @@ func (i *InfoData) importFromConfig(input_config config.ConfigData, stdOpts base
 		i.localLogger.Debugf("Setting default TopicArray: %s", DefaultTopicArray)
 	} else {
 		i.SetTopicArray(input_config.GetTopicArray())
-	}
-
-	// Nework
-	if input_config.GetNetwork() == "" {
-		i.SetNetwork(DefaultNetwork)
-		i.localLogger.Debugf("Setting default Network: %s", DefaultNetwork)
-	} else {
-		i.SetNetwork(input_config.GetNetwork())
 	}
 
 	// Private Key
@@ -305,6 +347,13 @@ func (i InfoData) GetNetwork() string {
 }
 func (i *InfoData) SetNetwork(input_string string) {
 	i.network = input_string
+}
+
+func (i InfoData) GetEth2Endpoint() string {
+	return i.eth2endpoint
+}
+func (i *InfoData) SetEth2Endpoint(input_string string) {
+	i.eth2endpoint = input_string
 }
 
 func (i InfoData) GetForkDigest() string {

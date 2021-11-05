@@ -16,6 +16,7 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/migalabs/armiarma/src/base"
+	"github.com/migalabs/armiarma/src/db"
 	"github.com/migalabs/armiarma/src/hosts"
 	"github.com/migalabs/armiarma/src/info"
 	"github.com/minio/sha256-simd"
@@ -25,10 +26,12 @@ const PKG_NAME string = "GOSSIP_SUB"
 
 type GossipSub struct {
 	*base.Base
+	InfoObj       *info.InfoData
+	BasicHost     *hosts.BasicLibp2pHost
+	PeerStore     *db.PeerStore
 	PubsubService *pubsub.PubSub
-
-	TopicArray []*TopicHandler
-	InfoObj    *info.InfoData
+	// map where the key are the topic names in string, and the values are the TopicSubscription
+	TopicArray map[string]*TopicSubscription
 }
 
 func NewEmptyGossipSub() *GossipSub {
@@ -36,7 +39,7 @@ func NewEmptyGossipSub() *GossipSub {
 }
 
 // constructor
-func NewGossipSub(ctx context.Context, i_host hosts.BasicLibp2pHost, stdOpts base.LogOpts) *GossipSub {
+func NewGossipSub(ctx context.Context, h *hosts.BasicLibp2pHost, peerstore *db.PeerStore, stdOpts base.LogOpts) *GossipSub {
 
 	localLogger := gossipsubLoggerOpts(stdOpts)
 
@@ -59,13 +62,16 @@ func NewGossipSub(ctx context.Context, i_host hosts.BasicLibp2pHost, stdOpts bas
 		pubsub.WithStrictSignatureVerification(false),
 		pubsub.WithMessageIdFn(MsgIDFunction),
 	}
-	ps, err := pubsub.NewGossipSub(ctx, i_host.Host(), psOptions...)
+	ps, err := pubsub.NewGossipSub(ctx, h.Host(), psOptions...)
 
 	// return the GossipSub object
 	return &GossipSub{
 		Base:          new_base,
+		InfoObj:       h.GetInfoObj(),
+		BasicHost:     h,
+		PeerStore:     peerstore,
 		PubsubService: ps,
-		InfoObj:       i_host.GetInfoObj(),
+		TopicArray:    make(map[string]*TopicSubscription),
 	}
 }
 
@@ -81,19 +87,19 @@ func MsgIDFunction(pmsg *pubsub_pb.Message) string {
 
 // this method allows the GossipSub service to join and
 // subscribe to a topic
-func (gs *GossipSub) JoinAndSubscribe(i_topic string) {
+func (gs *GossipSub) JoinAndSubscribe(topicName string) {
 
-	topic, err := gs.PubsubService.Join(i_topic)
+	topic, err := gs.PubsubService.Join(topicName)
 
 	if err != nil {
-		gs.Log.Errorf("Could not join topic: %s", i_topic)
+		gs.Log.Errorf("Could not join topic: %s", topicName)
 		gs.Log.Errorf(err.Error())
 	}
 
 	sub, err := topic.Subscribe()
 
 	if err != nil {
-		gs.Log.Errorf("Could not subscribe to topic: %s", i_topic)
+		gs.Log.Errorf("Could not subscribe to topic: %s", topicName)
 		gs.Log.Errorf(err.Error())
 	}
 
@@ -103,11 +109,11 @@ func (gs *GossipSub) JoinAndSubscribe(i_topic string) {
 		Level:     gs.InfoObj.GetLogLevel(),
 	}
 
-	new_topic_handler := NewTopicHandler(gs.Ctx(), topic, *sub, topicLogOpts)
+	new_topic_handler := NewTopicSubscription(gs.Ctx(), topic, *sub, topicLogOpts)
+	// Add the new Topic to the list of supported/subscribed topics in GossipSub
+	gs.TopicArray[topicName] = new_topic_handler
 
-	gs.TopicArray = append(gs.TopicArray, new_topic_handler)
-
-	go gs.TopicArray[len(gs.TopicArray)-1].readLoop()
+	go gs.TopicArray[topicName].MessageReadingLoop(gs.BasicHost.Host(), gs.PeerStore)
 
 }
 
