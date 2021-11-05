@@ -32,6 +32,7 @@ type ConfigData struct {
 	UserAgent     string   `json:"UserAgent"`
 	TopicArray    []string `json:"TopicArray"`
 	Network       string   `json:"Network"`
+	Eth2Endpoint  string   `json:"Eth2Endpoint`
 	ForkDigest    string   `json:"ForkDigest"`
 	LogLevel      string   `json:"LogLevel"`
 	PrivateKey    string   `json:"PrivateKey"`
@@ -132,6 +133,13 @@ func (c *ConfigData) GetNetwork() string {
 }
 func (c *ConfigData) SetNetwork(input_string string) {
 	c.Network = input_string
+}
+
+func (c *ConfigData) GetEth2Endpoint() string {
+	return c.Eth2Endpoint
+}
+func (c *ConfigData) SetEth2Endpoint(input_string string) {
+	c.Eth2Endpoint = input_string
 }
 
 func (c *ConfigData) GetForkDigest() string {

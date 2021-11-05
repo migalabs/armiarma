@@ -26,6 +26,7 @@ import (
 	"github.com/migalabs/armiarma/src/discovery"
 	"github.com/migalabs/armiarma/src/enode"
 	"github.com/migalabs/armiarma/src/gossipsub"
+	"github.com/migalabs/armiarma/src/gossipsub/blockchaintopics"
 	"github.com/migalabs/armiarma/src/hosts"
 	"github.com/migalabs/armiarma/src/info"
 	"github.com/migalabs/armiarma/src/peering"
@@ -109,7 +110,7 @@ var crawlerCmd = &cobra.Command{
 		node_tmp := enode.NewLocalNode(b.Ctx(), info_tmp, stdOpts)
 		//node_tmp.AddEntries()
 		dv5_tmp := discovery.NewDiscovery(b.Ctx(), node_tmp, &db, info_tmp, 9006, stdOpts)
-		gs_tmp := gossipsub.NewGossipSub(b.Ctx(), *host, stdOpts)
+		gs_tmp := gossipsub.NewGossipSub(b.Ctx(), host, &db, stdOpts)
 		// Generate the PeeringService
 		peeringOpts := &peering.PeeringOpts{
 			InfoObj: info_tmp,
@@ -184,7 +185,10 @@ func (c *CrawlerBase) Run() error {
 	go c.Dv5.FindRandomNodes()
 	go c.Peering.Run()
 
-	c.Gs.JoinAndSubscribe("/eth2/b5303f2a/beacon_block/ssz_snappy")
+	topics := blockchaintopics.ReturnAllTopics(c.Info.GetForkDigest())
+	for _, topic := range topics {
+		c.Gs.JoinAndSubscribe(topic)
+	}
 
 	select {}
 	// return nil
