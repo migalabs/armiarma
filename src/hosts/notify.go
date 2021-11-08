@@ -4,8 +4,10 @@ import (
 	"context"
 	"time"
 
+	eth_node "github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/migalabs/armiarma/src/db"
+	"github.com/migalabs/armiarma/src/utils"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/sirupsen/logrus"
 )
@@ -56,7 +58,6 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 			"ERROR": err,
 		}).Warn("Peer: ", conn.RemotePeer().String())
 	}
-	/* ---- TODO: Generate/Import the RPC calls for Eth2 to support the given RPC call methods
 	// Request the BeaconMetadata
 	bMetadata, err := ReqBeaconMetadata(context.Background(), h, conn.RemotePeer())
 	if err != nil {
@@ -77,13 +78,13 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 	}
 
 	// Read ENR of the Peer from the generated enode
-	n := c.PeerStore.LatestENR(conn.RemotePeer())
-	if n != nil {
+	n, err := c.PeerStore.GetENR(conn.RemotePeer().String())
+	if err != nil {
 		n.ID().String()
 		// We can only get the node.ID if the ENR of the peer was already in the PeerStore fromt dv5
 		peer.NodeId = n.ID().String()
 	} else {
-		edcsakey, err := eth_node.ParsePubkey(peer.Pubkey)
+		edcsakey, err := utils.ParsePubkey(peer.Pubkey)
 		if err != nil {
 			c.Log.WithFields(logrus.Fields{
 				"ERROR": "parsing pubkey",
@@ -91,7 +92,7 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 		}
 		peer.NodeId = eth_node.PubkeyToIDV4(edcsakey).String()
 	}
-	*/
+
 	// Add new connection event
 	peer.ConnectionEvent(conn.Stat().Direction.String(), t)
 	connStat := ConnectionStatus{

@@ -5,11 +5,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/protolambda/ztyp/codec"
-	"io"
 )
 
 type Request interface {

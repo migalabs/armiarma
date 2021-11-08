@@ -9,10 +9,14 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/libp2p/go-libp2p-core/host"
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/migalabs/armiarma/src/db"
 	db_utils "github.com/migalabs/armiarma/src/db/utils"
+	"github.com/migalabs/armiarma/src/rpc/methods"
+	"github.com/migalabs/armiarma/src/rpc/reqresp"
 	"github.com/migalabs/armiarma/src/utils"
 	ma "github.com/multiformats/go-multiaddr"
+	"github.com/protolambda/zrnt/eth2/beacon/common"
 
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p/p2p/protocol/identify"
@@ -22,10 +26,9 @@ var (
 	timeout time.Duration = 7 * time.Second
 )
 
-/*
 // Function that opens a new Stream from the given host to send a RPC requesting the BeaconStatus of the given peer.ID
 // Returns the BeaconStatus of the given peer if succeed, error if failed
-func ReqBeaconStatus(ctx context.Context, h host.Host, peerID peer.ID) (data beacon.Status, err error) {
+func ReqBeaconStatus(ctx context.Context, h host.Host, peerID peer.ID) (data common.Status, err error) {
 	// Generate the compression
 	comp := reqresp.SnappyCompression{}
 	// Generate the Server Error Code
@@ -45,7 +48,7 @@ func ReqBeaconStatus(ctx context.Context, h host.Host, peerID peer.ID) (data bea
 				}
 				return errors.Errorf("error requesting BeaconStatus RPC: %s", msg)
 			case reqresp.SuccessCode:
-				var stat beacon.Status
+				var stat common.Status
 				if err := chunk.ReadObj(&stat); err != nil {
 					return errors.Wrap(err, "from requesting BeaconMetadata RPC")
 				}
@@ -58,7 +61,7 @@ func ReqBeaconStatus(ctx context.Context, h host.Host, peerID peer.ID) (data bea
 	return
 }
 
-func ReqBeaconMetadata(ctx context.Context, h host.Host, peerID peer.ID) (data beacon.MetaData, err error) {
+func ReqBeaconMetadata(ctx context.Context, h host.Host, peerID peer.ID) (data common.MetaData, err error) {
 	// Generate the compression
 	comp := reqresp.SnappyCompression{}
 	// Generate the Server Error Code
@@ -76,7 +79,7 @@ func ReqBeaconMetadata(ctx context.Context, h host.Host, peerID peer.ID) (data b
 					return errors.Errorf("error requesting BeaconMetadata RPC: %s", msg)
 				}
 			case reqresp.SuccessCode:
-				var meta beacon.MetaData
+				var meta common.MetaData
 				if err := chunk.ReadObj(&meta); err != nil {
 					return errors.Wrap(err, "from requesting BeaconMetadata RPC")
 				}
@@ -88,7 +91,7 @@ func ReqBeaconMetadata(ctx context.Context, h host.Host, peerID peer.ID) (data b
 		})
 	return
 }
-*/
+
 // Identify the peer from the Libp2p Identify Service
 
 type HostWithIDService interface {
