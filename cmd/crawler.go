@@ -185,7 +185,7 @@ func (c *CrawlerBase) Run() error {
 	go c.Dv5.FindRandomNodes()
 	go c.Peering.Run()
 
-	topics := blockchaintopics.ReturnAllTopics(c.Info.GetForkDigest())
+	topics := blockchaintopics.ReturnTopics(c.Info.GetForkDigest(), c.Info.GetTopicArray())
 	for _, topic := range topics {
 		c.Gs.JoinAndSubscribe(topic)
 	}
