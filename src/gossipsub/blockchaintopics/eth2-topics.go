@@ -3,6 +3,8 @@ package blockchaintopics
 import (
 	"encoding/hex"
 	"strings"
+
+	"github.com/migalabs/armiarma/src/utils"
 )
 
 var (
@@ -29,7 +31,7 @@ var (
 		AltairKey:  "afcaaba0",
 	}
 
-	BeaconBlockKey          string = "BeaconBlock"
+	/*BeaconBlockKey          string = "BeaconBlock"
 	BeaconAggregateProofKey string = "BeaconAggregateProof"
 	VoluntaryExitKey        string = "VoluntaryExit"
 	ProposerSlashingKey     string = "ProposerSlashing"
@@ -41,6 +43,14 @@ var (
 		VoluntaryExitKey:        "voluntary_exit",
 		ProposerSlashingKey:     "proposer_slashing",
 		AttesterSlashingKey:     "attester_slashing",
+	}*/
+
+	MessageTypes = []string{
+		"beacon_block",
+		"beacon_aggregate_and_proof",
+		"voluntary_exit",
+		"proposer_slashing",
+		"attester_slashing",
 	}
 
 	Encoding string = "ssz_snappy"
@@ -52,15 +62,19 @@ var (
 // @param forkDigest: the forDigest key in the map. You may use the Key constants.
 // @param topic: the message type we want to use in the topic. You may use the Key constants.
 // @param encoding: TODO: to be removed as it is always the same
-func GenerateEth2Topics(forkDigest string, messageTypeKey string) string {
-	messageType, ok := MessageTypes[messageTypeKey]
-	if !ok {
+func GenerateEth2Topics(forkDigest string, messageTypeName string) string {
+	// check valid messagetype
+	if !utils.ExistsInArray(MessageTypes, messageTypeName) {
+		return ""
+	}
+	// check valid fork digest
+	if !utils.ExistsInMapValue(ForkDigests, forkDigest) {
 		return ""
 	}
 	// if we reach here, inputs were okay
 	return "/" + BlockchainName +
 		"/" + forkDigest +
-		"/" + messageType +
+		"/" + messageTypeName +
 		"/" + Encoding
 }
 
@@ -70,17 +84,17 @@ func GenerateEth2Topics(forkDigest string, messageTypeKey string) string {
 // @return the array of topics
 func ReturnAllTopics(inputForkDigest string) []string {
 	result_array := make([]string, 0)
-	for messageValue, _ := range MessageTypes {
+	for _, messageValue := range MessageTypes {
 		result_array = append(result_array, GenerateEth2Topics(inputForkDigest, messageValue))
 	}
 	return result_array
 }
 
-func ReturnTopics(forkDigestKey string, messageTypesKeys []string) []string {
+func ReturnTopics(forkDigest string, messageTypeName []string) []string {
 	result_array := make([]string, 0)
 
-	for _, messageTypeKeyTmp := range messageTypesKeys {
-		result_array = append(result_array, GenerateEth2Topics(forkDigestKey, messageTypeKeyTmp))
+	for _, messageTypeTmp := range messageTypeName {
+		result_array = append(result_array, GenerateEth2Topics(forkDigest, messageTypeTmp))
 	}
 	return result_array
 }

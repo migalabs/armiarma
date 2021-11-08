@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"strings"
 	"time"
 
 	ma "github.com/multiformats/go-multiaddr"
@@ -76,4 +77,23 @@ func ParseInterfaceAddrArray(input_arr []interface{}) ([]ma.Multiaddr, error) {
 	}
 	return result, nil
 
+}
+
+func ExistsInArray(inputList []string, inputValue string) bool {
+	for _, value := range inputList {
+		if strings.ToLower(inputValue) == strings.ToLower(value) {
+			return true
+		}
+	}
+	return false
+}
+
+func ExistsInMapValue(inputMap map[string]string, inputValue string) bool {
+	for _, value := range inputMap {
+
+		if strings.ToLower(inputValue) == strings.ToLower(value) {
+			return true
+		}
+	}
+	return false
 }

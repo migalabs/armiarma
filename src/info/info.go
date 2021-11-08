@@ -39,7 +39,6 @@ var (
 	DefaultIP         string = "0.0.0.0"
 	DefaultTcpPort    int    = 9000
 	DefaultUdpPort    int    = 9001
-	DefaultTopicArray string = "hola,adios" // parse and split by comma to obtain the array
 	DefaultNetwork    string = "mainnet"
 	DefaultForkDigest string = "0xffff"
 	DefaultUserAgent  string = "bsc_crawler"
@@ -142,14 +141,14 @@ func (i *InfoData) importFromConfig(input_config config.ConfigData, stdOpts base
 
 	if !checkValidPort(input_config.GetTcpPort()) {
 		i.SetTcpPort(DefaultTcpPort)
-		i.localLogger.Debugf("Setting default TcpPort: %d", DefaultTcpPort)
+		i.localLogger.Warnf("Setting default TcpPort: %d", DefaultTcpPort)
 	} else {
 		i.SetTcpPort(input_config.GetTcpPort())
 	}
 
 	if !checkValidPort(input_config.GetUdpPort()) {
 		i.SetUdpPort(DefaultUdpPort)
-		i.localLogger.Debugf("Setting default UdpPort: %d", DefaultUdpPort)
+		i.localLogger.Warnf("Setting default UdpPort: %d", DefaultUdpPort)
 	} else {
 		i.SetUdpPort(input_config.GetUdpPort())
 	}
@@ -157,7 +156,7 @@ func (i *InfoData) importFromConfig(input_config config.ConfigData, stdOpts base
 	// UserAgent
 	if input_config.GetUserAgent() == "" {
 		i.SetUserAgent(DefaultUserAgent)
-		i.localLogger.Debugf("Setting default UserAgent: %s", DefaultUserAgent)
+		i.localLogger.Warnf("Setting default UserAgent: %s", DefaultUserAgent)
 	} else {
 		i.SetUserAgent(input_config.GetUserAgent())
 	}
@@ -165,7 +164,7 @@ func (i *InfoData) importFromConfig(input_config config.ConfigData, stdOpts base
 	// Nework
 	if input_config.GetNetwork() == "" {
 		i.SetNetwork(DefaultNetwork)
-		i.localLogger.Debugf("Setting default Network: %s", DefaultNetwork)
+		i.localLogger.Warnf("Setting default Network: %s", DefaultNetwork)
 	} else {
 		i.SetNetwork(input_config.GetNetwork())
 	}
@@ -174,7 +173,7 @@ func (i *InfoData) importFromConfig(input_config config.ConfigData, stdOpts base
 	// Check if any Eth2Endpoint was given to get the ForkDigest
 	if input_config.GetEth2Endpoint() == "" {
 		// some endpoint was given
-		i.localLogger.Debugf("No Eth2 Endpoint was given")
+		i.localLogger.Warnf("No Eth2 Endpoint was given")
 	} else {
 		i.SetEth2Endpoint(input_config.GetEth2Endpoint())
 	}
@@ -217,13 +216,11 @@ func (i *InfoData) importFromConfig(input_config config.ConfigData, stdOpts base
 	// make sure we have already configured the ForkDigest
 
 	//Topic
-	i.SetTopicArray(input_config.GetTopicArray())
-
-	if len(i.GetTopicArray()) == 0 {
-		i.SetTopicArray(blockchaintopics.ReturnAllTopics(i.GetForkDigest()))
-		i.localLogger.Debugf("Setting default TopicArray: %s", DefaultTopicArray)
-	} else {
-		i.SetTopicArray(input_config.GetTopicArray())
+	valid = i.SetTopicArray(input_config.GetTopicArray())
+	if !valid {
+		defaultTopicList := blockchaintopics.MessageTypes
+		i.SetTopicArray(defaultTopicList)
+		i.localLogger.Warnf("Setting default TopicArray: %s", defaultTopicList)
 	}
 
 	// Private Key
@@ -235,7 +232,7 @@ func (i *InfoData) importFromConfig(input_config config.ConfigData, stdOpts base
 
 	// BootNodesFile
 	if input_config.GetBootNodesFile() == "" {
-		i.localLogger.Debugf("Could not find bootnodes file configuration")
+		i.localLogger.Warnf("Could not find bootnodes file configuration")
 	} else {
 		i.SetBootNodeFile(input_config.GetBootNodesFile())
 	}
@@ -244,13 +241,13 @@ func (i *InfoData) importFromConfig(input_config config.ConfigData, stdOpts base
 
 	if input_config.GetDBPath() == "" {
 		i.SetDBPath(DefaultDBPath)
-		i.localLogger.Debugf("Setting default DB Path: %s", DefaultDBPath)
+		i.localLogger.Warnf("Setting default DB Path: %s", DefaultDBPath)
 	} else {
 		i.SetDBPath(input_config.GetDBPath())
 	}
 	if input_config.GetDBType() == "" {
 		i.SetDBType(DefaultDBType)
-		i.localLogger.Debugf("Setting default DB Type: %s", DefaultDBType)
+		i.localLogger.Warnf("Setting default DB Type: %s", DefaultDBType)
 	} else {
 		i.SetDBType(input_config.GetDBType())
 	}
@@ -316,30 +313,56 @@ func (i InfoData) GetIP() net.IP {
 func (i InfoData) GetIPToString() string {
 	return i.GetIP().String()
 }
-func (i *InfoData) SetIP(input_ip net.IP) {
-	i.iP = input_ip
+func (i *InfoData) SetIP(inputIp net.IP) {
+	i.iP = inputIp
 }
-func (i *InfoData) SetIPFromString(input_ip string) {
-	i.iP = net.ParseIP(input_ip)
+func (i *InfoData) SetIPFromString(inputIp string) {
+	i.iP = net.ParseIP(inputIp)
 
 }
 
 func (i InfoData) GetUserAgent() string {
 	return i.userAgent
 }
-func (i *InfoData) SetUserAgent(input_string string) {
-	i.userAgent = input_string
+func (i *InfoData) SetUserAgent(inputString string) {
+	i.userAgent = inputString
 }
 
 func (i InfoData) GetTopicArray() []string {
 	return i.topicArray
 }
-func (i *InfoData) SetTopicArray(input_list []string) {
-	i.topicArray = blockchaintopics.ReturnTopics(i.GetForkDigest(), input_list)
+
+// SetTopicArray
+// * This method loops over the given array and validate that topics exist before setting the array.
+// * We need at least one valid
+// @return boolean in case any topic in the list was applied (true) or none was applied (false)
+func (i *InfoData) SetTopicArray(inputList []string) bool {
+	resultTopicList := make([]string, 0)
+	if len(inputList) > 0 {
+		for _, inputTopic := range inputList {
+			if utils.ExistsInArray(blockchaintopics.MessageTypes, inputTopic) {
+				// topic exists
+				resultTopicList = append(resultTopicList, inputTopic)
+				continue // go to next inputTopic
+			}
+			i.localLogger.Warnf("Could not validate topic: %s", inputTopic)
+		}
+
+		if len(resultTopicList) > 0 {
+			i.topicArray = resultTopicList
+			return true
+		}
+		return false // no topic was applied
+
+	} else {
+		i.localLogger.Warnf("Empty topic list")
+		return false
+	}
+
 }
-func (i *InfoData) SetTopicArrayFromString(input_list string) {
+func (i *InfoData) SetTopicArrayFromString(input_list string) bool {
 	topicStringArray := strings.Split(input_list, ",")
-	i.topicArray = blockchaintopics.ReturnTopics(i.GetForkDigest(), topicStringArray)
+	return i.SetTopicArray(topicStringArray)
 }
 
 func (i InfoData) GetNetwork() string {
