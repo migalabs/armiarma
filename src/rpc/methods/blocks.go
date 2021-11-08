@@ -3,8 +3,10 @@ package methods
 import (
 	"encoding/hex"
 	"fmt"
-	"github.com/protolambda/rumor/p2p/rpc/reqresp"
+
+	"github.com/migalabs/armiarma/src/rpc/reqresp"
 	"github.com/protolambda/zrnt/eth2/beacon"
+	"github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/protolambda/ztyp/codec"
 	"github.com/protolambda/ztyp/tree"
 	"github.com/protolambda/ztyp/view"
@@ -71,11 +73,11 @@ func (r *BlocksByRangeReqV1) String() string {
 	return fmt.Sprintf("%v", *r)
 }
 
-func BlocksByRangeRPCv1(spec *beacon.Spec) *reqresp.RPCMethod {
+func BlocksByRangeRPCv1(spec *common.Spec, opcBlock beacon.OpaqueBlock) *reqresp.RPCMethod {
 	return &reqresp.RPCMethod{
 		Protocol:                  "/eth2/beacon_chain/req/beacon_blocks_by_range/1/ssz",
 		RequestCodec:              reqresp.NewSSZCodec(func() reqresp.SerDes { return new(BlocksByRangeReqV1) }, blocksByRangeReqByteLen, blocksByRangeReqByteLen),
-		ResponseChunkCodec:        reqresp.NewSSZCodec(func() reqresp.SerDes { return spec.Wrap(new(beacon.SignedBeaconBlock)) }, 0, spec.SignedBeaconBlock().MaxByteLength()),
+		ResponseChunkCodec:        reqresp.NewSSZCodec(func() reqresp.SerDes { return spec.Wrap(opcBlock) }, 0, opcBlock.ByteLength(spec)),
 		DefaultResponseChunkCount: 20,
 	}
 }
@@ -121,11 +123,11 @@ func (r BlocksByRootReq) String() string {
 	return "blocks-by-root requested: " + string(out[:len(out)-1])
 }
 
-func BlocksByRootRPCv1(spec *beacon.Spec) *reqresp.RPCMethod {
+func BlocksByRootRPCv1(spec *common.Spec, opcBlock beacon.OpaqueBlock) *reqresp.RPCMethod {
 	return &reqresp.RPCMethod{
 		Protocol:                  "/eth2/beacon_chain/req/beacon_blocks_by_root/1/ssz",
 		RequestCodec:              reqresp.NewSSZCodec(func() reqresp.SerDes { return new(BlocksByRootReq) }, 0, 32*MAX_REQUEST_BLOCKS_BY_ROOT),
-		ResponseChunkCodec:        reqresp.NewSSZCodec(func() reqresp.SerDes { return spec.Wrap(new(beacon.SignedBeaconBlock)) }, 0, spec.SignedBeaconBlock().MaxByteLength()),
+		ResponseChunkCodec:        reqresp.NewSSZCodec(func() reqresp.SerDes { return spec.Wrap(opcBlock) }, 0, opcBlock.ByteLength(spec)),
 		DefaultResponseChunkCount: 20,
 	}
 }

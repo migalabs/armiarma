@@ -1,11 +1,11 @@
 package methods
 
-import "github.com/protolambda/zrnt/eth2/beacon"
+import "github.com/protolambda/zrnt/eth2/beacon/common"
 
-type BLSSignature = beacon.BLSSignature
-type ForkVersion = beacon.Version
-type ForkDigest = beacon.ForkDigest
-type Root = beacon.Root
-type Epoch = beacon.Epoch
-type Slot = beacon.Slot
-type ValidatorIndex = beacon.ValidatorIndex
+type BLSSignature = common.BLSSignature
+type ForkVersion = common.Version
+type ForkDigest = common.ForkDigest
+type Root = common.Root
+type Epoch = common.Epoch
+type Slot = common.Slot
+type ValidatorIndex = common.ValidatorIndex
