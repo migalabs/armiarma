@@ -6,6 +6,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/migalabs/armiarma/src/db/utils"
 	"github.com/pkg/errors"
@@ -135,6 +136,15 @@ func (c *PeerStore) GetPeerData(peerId string) (Peer, error) {
 // @return the list of PeerIDs in string format
 func (c *PeerStore) GetPeerList() []peer.ID {
 	return c.PeerStore.Peers()
+}
+
+//
+func (c *PeerStore) GetENR(peerID string) (*enode.Node, error) {
+	p, err := c.GetPeerData(peerID)
+	if err != nil {
+		return nil, err
+	}
+	return p.GetBlockchainNode(), nil
 }
 
 /// AddNewAttempts adds the resuts of a negative new attempt over an existing peer

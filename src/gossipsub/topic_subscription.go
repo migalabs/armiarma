@@ -37,15 +37,15 @@ func NewTopicSubscription(ctx context.Context, topic *pubsub.Topic, sub pubsub.S
 		Base:     new_base,
 		Topic:    topic,
 		Sub:      &sub,
-		Messages: make(chan []byte),
+		Messages: make(chan []byte, 10),
 	}
 }
 
 // readLoop pulls messages from the pubsub topic and pushes them onto the Messages channel.
 func (c *TopicSubscription) MessageReadingLoop(h host.Host, peerstore *db.PeerStore) {
+	c.Log.Infof("topic subscription %s reading loop", c.Sub.Topic())
+	subsCtx := c.Ctx()
 	for {
-		c.Log.Infof("topic subscription %s reading loop", c.Sub.Topic())
-		subsCtx := c.Ctx()
 		msg, err := c.Sub.Next(subsCtx)
 		if err != nil {
 			if err == subsCtx.Err() {
@@ -83,9 +83,8 @@ func (c *TopicSubscription) MessageReadingLoop(h host.Host, peerstore *db.PeerSt
 				c.Log.Debugf("message sent by ourselfs received on %s", c.Sub.Topic())
 			}
 		}
-		// th.Log.Infof(msg.String())
-
 	}
+	<-subsCtx.Done()
 	c.Log.Debugf("ending %s reading loop", c.Sub.Topic())
 }
 
