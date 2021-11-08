@@ -1,9 +1,13 @@
 package utils
 
 import (
+	"crypto/ecdsa"
+	"encoding/hex"
+	"fmt"
 	"net"
 	"strings"
 
+	"github.com/libp2p/go-libp2p-core/crypto"
 	ma "github.com/multiformats/go-multiaddr"
 )
 
@@ -65,4 +69,20 @@ func CheckValidIP(input_IP string) bool {
 		return true
 	}
 	return false
+}
+
+func ParsePubkey(v string) (*ecdsa.PublicKey, error) {
+	if strings.HasPrefix(v, "0x") {
+		v = v[2:]
+	}
+	pubKeyBytes, err := hex.DecodeString(v)
+	if err != nil {
+		return nil, fmt.Errorf("cannot parse public key, expected hex string: %v", err)
+	}
+	var pub crypto.PubKey
+	pub, err = crypto.UnmarshalSecp256k1PublicKey(pubKeyBytes)
+	if err != nil {
+		return nil, fmt.Errorf("cannot parse public key, invalid public key (Secp256k1): %v", err)
+	}
+	return (*ecdsa.PublicKey)((pub).(*crypto.Secp256k1PublicKey)), nil
 }
