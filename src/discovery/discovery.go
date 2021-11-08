@@ -22,6 +22,7 @@ import (
 	"github.com/migalabs/armiarma/src/db"
 	"github.com/migalabs/armiarma/src/db/utils"
 	"github.com/migalabs/armiarma/src/enode"
+	"github.com/migalabs/armiarma/src/gossipsub/blockchaintopics"
 	"github.com/migalabs/armiarma/src/info"
 
 	geth_log "github.com/ethereum/go-ethereum/log"
@@ -158,7 +159,7 @@ func (d *Discovery) HandleENR(node *eth_enode.Node) error {
 	}
 
 	// check if the peer matches the given ForkDigest
-	if eth2Dat.ForkDigest.String() != "0xb5303f2a" { // TODO: Hardcoded
+	if eth2Dat.ForkDigest.String() != (blockchaintopics.ForkDigestPrefix + d.info_data.GetForkDigest()) {
 		return fmt.Errorf("got ENR with other fork digest: %s", eth2Dat.ForkDigest.String())
 	}
 
