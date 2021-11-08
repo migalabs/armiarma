@@ -2,7 +2,7 @@
     "IP": "0.0.0.0",
     "TcpPort": 9006,
     "UdpPort": 9007,
-    "TopicArray": [],
+    "TopicArray": ["beacon_block", "beacon_aggregate_and_proof"],
     "Network": "mainnet",
     "Eth2Endpoint": "",
     "ForkDigest": "afcaaba0",
