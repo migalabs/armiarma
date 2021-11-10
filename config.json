@@ -1,5 +1,5 @@
 {
-    "IP": "0.0.0.0",
+    "IP": "0.0.0.0", 
     "TcpPort": 9006,
     "UdpPort": 9007,
     "TopicArray": ["beacon_block", "beacon_aggregate_and_proof"],
