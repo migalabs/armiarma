@@ -52,7 +52,7 @@ var (
 		Name:      "observed_ip_distribution",
 		Help:      "Number of Ips hosting number of nodes",
 	},
-		[]string{"numberips"},
+		[]string{"numbernodes"},
 	)
 	ReceivedTotalMessages = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: "crawler",
