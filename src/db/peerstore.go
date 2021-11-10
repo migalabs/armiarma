@@ -55,6 +55,7 @@ func NewPeerStore(dbtype string, path string) PeerStore {
 		StartTime:      time.Now(),
 		MsgNotChannels: make(map[string](chan bool)),
 	}
+	ps.ServeMetrics()
 	return ps
 }
 
