@@ -127,7 +127,7 @@ var crawlerCmd = &cobra.Command{
 			peering.WithPeeringStrategy(&pStrategy),
 		)
 
-		prometheusRunner := prometheus.NewPrometheusRunner(&db)
+		prometheusRunner := prometheus.NewPrometheusRunner()
 		prometheusRunner.Start(b.Ctx())
 
 		// generate the CrawlerBase
