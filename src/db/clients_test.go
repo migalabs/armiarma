@@ -7,7 +7,7 @@ import (
 )
 
 func Test_Clients(t *testing.T) {
-	clients := NewClients()
+	clients := NewClientDist()
 
 	clients.AddClientVersion("prysm", "v1.0.0")
 	clients.AddClientVersion("prysm", "v1.0.0")
@@ -29,6 +29,6 @@ func Test_Clients(t *testing.T) {
 	require.Equal(t, clients.GetCountOfClient("lighthouse"), 8)
 	require.Equal(t, len(clients.GetClientNames()), 2)
 
-	require.Equal(t, len(clients.Clients["prysm"]), 2)
-	require.Equal(t, len(clients.Clients["lighthouse"]), 3)
+	require.Equal(t, len(clients.Clients["prysm"].Versions), 2)
+	require.Equal(t, len(clients.Clients["lighthouse"].Versions), 3)
 }
