@@ -22,6 +22,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/migalabs/armiarma/src/base"
 	"github.com/migalabs/armiarma/src/config"
+	"github.com/migalabs/armiarma/src/db"
 	"github.com/migalabs/armiarma/src/gossipsub/blockchaintopics"
 	"github.com/migalabs/armiarma/src/utils"
 	log "github.com/sirupsen/logrus"
@@ -36,15 +37,16 @@ var (
 
 // define constant variables
 var (
-	DefaultIP         string = "0.0.0.0"
-	DefaultTcpPort    int    = 9000
-	DefaultUdpPort    int    = 9001
-	DefaultNetwork    string = "mainnet"
-	DefaultForkDigest string = "0xffff"
-	DefaultUserAgent  string = "bsc_crawler"
-	DefaultLogLevel   string = "debug"
-	DefaultDBPath     string = ""
-	DefaultDBType     string = ""
+	DefaultIP            string = "0.0.0.0"
+	DefaultTcpPort       int    = 9000
+	DefaultUdpPort       int    = 9001
+	DefaultNetwork       string = "mainnet"
+	DefaultForkDigest    string = "0xffff"
+	DefaultUserAgent     string = "bsc_crawler"
+	DefaultLogLevel      string = "debug"
+	DefaultDBPath        string = "./peerstore,db"
+	DefaultDBType        string = "boltdb"
+	DefaultBootNodesFile string = "./src/discovery/bootnodes_mainnet.json"
 
 	MinPort           int      = 0
 	MaxPort           int      = 65000
@@ -231,21 +233,26 @@ func (i *InfoData) importFromConfig(input_config config.ConfigData, stdOpts base
 	}
 
 	// BootNodesFile
-	if input_config.GetBootNodesFile() == "" {
-		i.localLogger.Warnf("Could not find bootnodes file configuration")
+	if !utils.CheckFileExists(input_config.GetBootNodesFile()) {
+		// file does not exist
+		i.SetBootNodeFile(DefaultBootNodesFile)
+		i.localLogger.Warnf("Could not find bootnodes file, applying default...")
+
 	} else {
 		i.SetBootNodeFile(input_config.GetBootNodesFile())
 	}
 
 	// TODO: pending db type and path
 
-	if input_config.GetDBPath() == "" {
+	if !utils.CheckFileExists(input_config.GetDBPath()) {
+		// file does not exist
 		i.SetDBPath(DefaultDBPath)
 		i.localLogger.Warnf("Setting default DB Path: %s", DefaultDBPath)
 	} else {
 		i.SetDBPath(input_config.GetDBPath())
 	}
-	if input_config.GetDBType() == "" {
+	if _, ok := db.DBTypes[input_config.GetDBType()]; !ok {
+		// type not okay, does not exist in our local hasmap
 		i.SetDBType(DefaultDBType)
 		i.localLogger.Warnf("Setting default DB Type: %s", DefaultDBType)
 	} else {
