@@ -6,13 +6,15 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/migalabs/armiarma/src/gossipsub/blockchaintopics"
 	promth "github.com/migalabs/armiarma/src/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
+	log "github.com/sirupsen/logrus"
 )
 
 // MessageMetrics
-// *
-// *
+// * Summarizes all the metrics that could be obtained from the received msgs
+// * Right now divided by topic and containing only the local counter between server ticker
 type MessageMetrics struct {
 	mutex     sync.RWMutex
 	topicList map[string]*int32
@@ -82,6 +84,7 @@ func (c *MessageMetrics) ResetAllTopics() error {
 }
 
 // GetTopicMsgs
+// * Obtain the counter of messages from last ticker of given topic
 // @return curren message counter, or -1 if there was an error (non-existing topic)
 func (c *MessageMetrics) GetTopicMsgs(topic string) int32 {
 	c.mutex.RLock()
@@ -93,6 +96,9 @@ func (c *MessageMetrics) GetTopicMsgs(topic string) int32 {
 	return *v
 }
 
+// GetTotalMessages
+// * Obtain the total of messages received from last ticker from all the topics
+// @return total message counter, or -1 if there was an error (non-existing topic)
 func (c *MessageMetrics) GetTotalMessages() int64 {
 	var total int64
 	for k, _ := range c.topicList {
@@ -122,6 +128,7 @@ func (gs *GossipSub) ServeMetrics() {
 			select {
 			case <-ticker.C:
 				var totMsg int64
+				msgPerMin := make(map[string]float64, 0)
 				// get the total of the messages
 				for k, _ := range gs.MessageMetrics.topicList {
 					r := gs.MessageMetrics.GetTopicMsgs(k)
@@ -131,7 +138,8 @@ func (gs *GossipSub) ServeMetrics() {
 					}
 					msgC := (float64(r) / (promth.MetricLoopInterval.Seconds())) * 60 // messages per minute
 					totMsg += int64(r)
-					ReceivedMessages.WithLabelValues(k).Set(msgC)
+					ReceivedMessages.WithLabelValues(blockchaintopics.Eth2TopicPretty(k)).Set(msgC)
+					msgPerMin[blockchaintopics.Eth2TopicPretty(k)] = msgC
 				}
 				// get total of msgs
 				tot := (float64(totMsg) / (promth.MetricLoopInterval.Seconds())) * 60 // messages per minute
@@ -141,6 +149,10 @@ func (gs *GossipSub) ServeMetrics() {
 				if err != nil {
 					gs.Log.Warnf("Unable to reset the gossip topic metrics. ", err.Error())
 				}
+				log.WithFields(log.Fields{
+					"TopicMsg/min": msgPerMin,
+					"TotalMsg/min": tot,
+				}).Info("Metrics summary")
 
 			case <-gsCtx.Done():
 				// closing the routine in a ordened way
