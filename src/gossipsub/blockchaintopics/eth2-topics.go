@@ -9,17 +9,16 @@ import (
 
 var (
 	// Eth2 Mainnet topics
-	/*
-		MainnetForkDigest string = "b5303f2a"
-		BeaconBlock          string = "/eth2/b5303f2a/beacon_block/ssz_snappy"
-		BeaconAggregateProof string = "/eth2/b5303f2a/beacon_aggregate_and_proof/ssz_snappy"
-		VoluntaryExit        string = "/eth2/b5303f2a/voluntary_exit/ssz_snappy"
-		ProposerSlashing     string = "/eth2/b5303f2a/proposer_slashing/ssz_snappy"
-		AttesterSlashing     string = "/eth2/b5303f2a/attester_slashing/ssz_snappy"
+	/* Deprecated for dynamic Eth2 topic construction see bellow
+	MainnetForkDigest string = "b5303f2a"
+	BeaconBlock          string = "/eth2/b5303f2a/beacon_block/ssz_snappy"
+	BeaconAggregateProof string = "/eth2/b5303f2a/beacon_aggregate_and_proof/ssz_snappy"
+	VoluntaryExit        string = "/eth2/b5303f2a/voluntary_exit/ssz_snappy"
+	ProposerSlashing     string = "/eth2/b5303f2a/proposer_slashing/ssz_snappy"
+	AttesterSlashing     string = "/eth2/b5303f2a/attester_slashing/ssz_snappy"
 	*/
 
 	// new
-
 	ForkDigestPrefix string = "0x"
 	ForkDigestSize   int    = 8 // without the ForkDigestPrefix
 	BlockchainName   string = "eth2"
@@ -77,6 +76,16 @@ func GenerateEth2Topics(forkDigest string, messageTypeName string) string {
 		"/" + forkDigest +
 		"/" + messageTypeName +
 		"/" + Encoding
+}
+
+// Eth2TopicPretty
+// * This method returns the topic based on it's message type
+// * in a pretty version of it
+// * would return "beacon_block" out of the given "/eth2/b5303f2a/beacon_block/ssz_snappy" topic
+// @param eth2topic:the entire composed eth2 topic with fork digest and compression
+// @return topic pretty
+func Eth2TopicPretty(eth2topic string) string {
+	return strings.Split(eth2topic, "/")[3]
 }
 
 // ReturnAllTopics
