@@ -41,11 +41,10 @@ var (
 	DefaultTcpPort       int    = 9000
 	DefaultUdpPort       int    = 9001
 	DefaultNetwork       string = "mainnet"
-	DefaultForkDigest    string = "0xffff"
 	DefaultUserAgent     string = "bsc_crawler"
-	DefaultLogLevel      string = "debug"
-	DefaultDBPath        string = "./peerstore,db"
-	DefaultDBType        string = "boltdb"
+	DefaultLogLevel      string = "info"
+	DefaultDBPath        string = "./peerstore.db"
+	DefaultDBType        string = "bolt"
 	DefaultBootNodesFile string = "./src/discovery/bootnodes_mainnet.json"
 
 	MinPort           int      = 0
@@ -136,7 +135,7 @@ func (i *InfoData) importFromConfig(input_config config.ConfigData, stdOpts base
 		i.SetIPFromString(input_config.GetIP())
 
 	} else {
-		i.SetIP(net.IP(DefaultIP))
+		i.SetIPFromString(DefaultIP)
 		i.localLogger.Warnf("Setting default IP: %s", DefaultIP)
 	}
 	// Ports
@@ -188,29 +187,29 @@ func (i *InfoData) importFromConfig(input_config config.ConfigData, stdOpts base
 			infuraCli, err := endpoint.NewInfuraClient(i.GetEth2Endpoint())
 			if err != nil {
 				i.localLogger.Warnf("unable to genereate the eth2 endpoint from the given one. %s", err.Error())
-				_ = i.SetForkDigest(blockchaintopics.MainnetKey)
-				i.localLogger.Warnf("Setting default ForkDigest to latest in mainnet: %s", blockchaintopics.MainnetKey)
+				_ = i.SetForkDigest(blockchaintopics.DefaultForkDigest)
+				i.localLogger.Warnf("Setting default ForkDigest to latest in mainnet: %s", blockchaintopics.DefaultForkDigest)
 			} else {
 				ctx, _ := context.WithCancel(context.Background())
 				//defer cancel()
 				forkdigest, err := eth2.GetForkDigetsOfEth2Head(ctx, &infuraCli)
 				if err != nil {
 					i.localLogger.Warnf("unable to compute the fork digest from the eth2 endpoint. %s", err.Error())
-					_ = i.SetForkDigest(blockchaintopics.MainnetKey)
-					i.localLogger.Warnf("Setting default ForkDigest to latest in mainnet: %s", blockchaintopics.MainnetKey)
+					_ = i.SetForkDigest(blockchaintopics.DefaultForkDigest)
+					i.localLogger.Warnf("Setting default ForkDigest to latest in mainnet: %s", blockchaintopics.DefaultForkDigest)
 				} else {
 					valid = i.SetForkDigest(forkdigest.String())
 					if !valid {
 						i.localLogger.Warnf("unable to set the computed fork digest. %s", forkdigest.String())
-						_ = i.SetForkDigest(blockchaintopics.MainnetKey)
-						i.localLogger.Warnf("Setting default ForkDigest to latest in mainnet: %s", blockchaintopics.MainnetKey)
+						_ = i.SetForkDigest(blockchaintopics.DefaultForkDigest)
+						i.localLogger.Warnf("Setting default ForkDigest to latest in mainnet: %s", blockchaintopics.DefaultForkDigest)
 					}
 				}
 			}
 		} else {
 			i.localLogger.Warnf("invalid fork digest and no endpoint given")
-			_ = i.SetForkDigest(blockchaintopics.MainnetKey)
-			i.localLogger.Warnf("Setting default ForkDigest to latest in mainnet: %s", blockchaintopics.MainnetKey)
+			_ = i.SetForkDigest(blockchaintopics.DefaultForkDigest)
+			i.localLogger.Warnf("Setting default ForkDigest to latest in mainnet: %s", blockchaintopics.DefaultForkDigest)
 		}
 	}
 	i.localLogger.Info("fork digest:", i.GetForkDigest())
