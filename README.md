@@ -61,7 +61,7 @@ The package is intended to configure and start the discovery5 service in order t
 This package will have all needed methods to interact with the discovery5 library for our specific scenarios.
 
 
-![alt text](https://github.com/Cortze/armiarma/blob/integral-refactor/Armiarma_packages.drawio.png)
+![alt text](https://github.com/Cortze/armiarma/blob/integral-refactor/doc/modules/Armiarma_packages.drawio.png)
 
 ## NOTES
 Please, note that the tool is currently on a developing stage, any bugs reports or suggestions will be accepted.
