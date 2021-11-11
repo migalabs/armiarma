@@ -30,7 +30,7 @@ In order to execute it, download the repository and build the project
 ```
 
 EXECUTION:
-    ./armiarma [comand] [options]
+    ./armiarma [command] [options]
 
 COMMANDS
     crawler -   Crawls around the network looking for peers and their status
