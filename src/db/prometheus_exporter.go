@@ -22,8 +22,6 @@ func (ps *PeerStore) ServeMetrics() {
 
 	prometheus.MustRegister(ClientDistribution)
 	prometheus.MustRegister(ConnectedPeers)
-	prometheus.MustRegister(ReceivedTotalMessages)
-	prometheus.MustRegister(ReceivedMessages)
 	prometheus.MustRegister(PeerstoreIterTime)
 	prometheus.MustRegister(DeprecatedPeers)
 	prometheus.MustRegister(ClientVersionDistribution)
@@ -120,6 +118,8 @@ func (ps *PeerStore) ServeMetrics() {
 
 			PeerstoreIterTime.Set(float64(ps.PeerstoreIterTime) / (60 * 1000000000))
 
+			// TODO: this just prints a summary of the metrics,
+			// Move it to a Summary/status logger?
 			log.WithFields(log.Fields{
 				"ClientsDist":        clients.GetClientDistribution(),
 				"GeoDist":            geoDist,
@@ -128,8 +128,6 @@ func (ps *PeerStore) ServeMetrics() {
 				"NOfDeprecatedPeers": nOfDeprecatedPeers,
 				"ClientVersionDist":  clients.GetClientVersionDistribution(),
 				//"LastErrors":         allLastErrors,
-				//"BeaconBlocks":       bb,
-				//"BeaconAttestations": ba,
 			}).Info("Metrics summary")
 
 			time.Sleep(MetricLoopInterval * time.Second)

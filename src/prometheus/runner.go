@@ -11,8 +11,9 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-const GOSSIP_BEACON_BLOCK string = "32"
-const GOSSIP_AGGREGATION_PROOF string = "32"
+var (
+	MetricLoopInterval time.Duration = 15 * time.Second
+)
 
 type PrometheusRunner struct {
 	PeerStore *db.PeerStore

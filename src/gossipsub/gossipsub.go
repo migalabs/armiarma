@@ -31,7 +31,8 @@ type GossipSub struct {
 	PeerStore     *db.PeerStore
 	PubsubService *pubsub.PubSub
 	// map where the key are the topic names in string, and the values are the TopicSubscription
-	TopicArray map[string]*TopicSubscription
+	TopicArray     map[string]*TopicSubscription
+	MessageMetrics *MessageMetrics
 }
 
 func NewEmptyGossipSub() *GossipSub {
@@ -63,15 +64,16 @@ func NewGossipSub(ctx context.Context, h *hosts.BasicLibp2pHost, peerstore *db.P
 		pubsub.WithMessageIdFn(MsgIDFunction),
 	}
 	ps, err := pubsub.NewGossipSub(ctx, h.Host(), psOptions...)
-
+	msgMetrics := NewMessageMetrics()
 	// return the GossipSub object
 	return &GossipSub{
-		Base:          new_base,
-		InfoObj:       h.GetInfoObj(),
-		BasicHost:     h,
-		PeerStore:     peerstore,
-		PubsubService: ps,
-		TopicArray:    make(map[string]*TopicSubscription),
+		Base:           new_base,
+		InfoObj:        h.GetInfoObj(),
+		BasicHost:      h,
+		PeerStore:      peerstore,
+		PubsubService:  ps,
+		TopicArray:     make(map[string]*TopicSubscription),
+		MessageMetrics: &msgMetrics,
 	}
 }
 
@@ -88,20 +90,20 @@ func MsgIDFunction(pmsg *pubsub_pb.Message) string {
 // this method allows the GossipSub service to join and
 // subscribe to a topic
 func (gs *GossipSub) JoinAndSubscribe(topicName string) {
-
+	// Join topic
 	topic, err := gs.PubsubService.Join(topicName)
-
 	if err != nil {
 		gs.Log.Errorf("Could not join topic: %s", topicName)
 		gs.Log.Errorf(err.Error())
 	}
-
+	// Subscribe to the topic
 	sub, err := topic.Subscribe()
-
 	if err != nil {
 		gs.Log.Errorf("Could not subscribe to topic: %s", topicName)
 		gs.Log.Errorf(err.Error())
 	}
+	// Add the topic to the metrics list
+	_ = gs.MessageMetrics.NewTopic(topicName)
 
 	topicLogOpts := base.LogOpts{
 		Output:    "terminal",
@@ -109,7 +111,7 @@ func (gs *GossipSub) JoinAndSubscribe(topicName string) {
 		Level:     gs.InfoObj.GetLogLevel(),
 	}
 
-	new_topic_handler := NewTopicSubscription(gs.Ctx(), topic, *sub, topicLogOpts)
+	new_topic_handler := NewTopicSubscription(gs.Ctx(), topic, *sub, gs.MessageMetrics, topicLogOpts)
 	// Add the new Topic to the list of supported/subscribed topics in GossipSub
 	gs.TopicArray[topicName] = new_topic_handler
 
