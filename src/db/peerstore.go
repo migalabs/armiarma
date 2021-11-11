@@ -300,3 +300,11 @@ func (c *PeerStore) ExportToCSV(filePath string) error {
 	runtime.GC()
 	return nil
 }
+
+func (p *PeerStore) ExportLoop() {
+	for {
+		p.ExportToCSV("./metrics.csv")
+		time.Sleep(30 * time.Minute)
+
+	}
+}
