@@ -30,6 +30,7 @@ var (
 		MainnetKey: "b5303f2a",
 		AltairKey:  "afcaaba0",
 	}
+	DefaultForkDigest string = ForkDigests[AltairKey]
 
 	/*BeaconBlockKey          string = "BeaconBlock"
 	BeaconAggregateProofKey string = "BeaconAggregateProof"
