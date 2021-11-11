@@ -15,12 +15,13 @@ type TopicSubscription struct {
 	*base.Base
 
 	// Messages is a channel of messages received from other peers in the chat room
-	Messages chan []byte
-	Topic    *pubsub.Topic
-	Sub      *pubsub.Subscription
+	Messages       chan []byte
+	Topic          *pubsub.Topic
+	Sub            *pubsub.Subscription
+	MessageMetrics *MessageMetrics
 }
 
-func NewTopicSubscription(ctx context.Context, topic *pubsub.Topic, sub pubsub.Subscription, stdOpts base.LogOpts) *TopicSubscription {
+func NewTopicSubscription(ctx context.Context, topic *pubsub.Topic, sub pubsub.Subscription, msgMetrics *MessageMetrics, stdOpts base.LogOpts) *TopicSubscription {
 	localLogger := createTopicLoggerOpts(stdOpts)
 
 	// instance base
@@ -34,10 +35,11 @@ func NewTopicSubscription(ctx context.Context, topic *pubsub.Topic, sub pubsub.S
 	}
 
 	return &TopicSubscription{
-		Base:     new_base,
-		Topic:    topic,
-		Sub:      &sub,
-		Messages: make(chan []byte, 10),
+		Base:           new_base,
+		Topic:          topic,
+		Sub:            &sub,
+		MessageMetrics: msgMetrics,
+		Messages:       make(chan []byte, 10),
 	}
 }
 
@@ -68,6 +70,9 @@ func (c *TopicSubscription) MessageReadingLoop(h host.Host, peerstore *db.PeerSt
 				peerstore.MessageEvent(msg.ReceivedFrom.String(), c.Sub.Topic())
 				// Add notification on the notification channel
 				c.Messages <- msgData
+				// Add message to msg metrics counter
+				_ = c.MessageMetrics.AddMessgeToTopic(c.Sub.Topic())
+
 				// Deserialize the message depending on the topic name
 				// generate a new ReceivedMessage on the Temp Database
 				// check if the topic has a db asiciated

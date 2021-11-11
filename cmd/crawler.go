@@ -192,6 +192,7 @@ func (c *CrawlerBase) Run() error {
 	for _, topic := range topics {
 		c.Gs.JoinAndSubscribe(topic)
 	}
+	c.Gs.ServeMetrics()
 
 	select {}
 	// return nil
