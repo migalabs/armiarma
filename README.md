@@ -29,10 +29,18 @@ go build
 In order to execute it, download the repository and build the project
 ```
 
-./armiarma crawler --log-lvl=debug
+EXECUTION:
+    ./armiarma [comand] [options]
+
+COMMANDS
+    crawler -   Crawls around the network looking for peers and their status
+
+OPTIONS:
+    --config-file=config.json - Load the configuration from the file into the executable
 
 In order to execute it, download the repository and build the project
 ```
+
 
 ## The project
 
