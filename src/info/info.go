@@ -22,6 +22,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/migalabs/armiarma/src/base"
 	"github.com/migalabs/armiarma/src/config"
+	"github.com/migalabs/armiarma/src/db"
 	"github.com/migalabs/armiarma/src/gossipsub/blockchaintopics"
 	"github.com/migalabs/armiarma/src/utils"
 	log "github.com/sirupsen/logrus"
@@ -36,15 +37,15 @@ var (
 
 // define constant variables
 var (
-	DefaultIP         string = "0.0.0.0"
-	DefaultTcpPort    int    = 9000
-	DefaultUdpPort    int    = 9001
-	DefaultNetwork    string = "mainnet"
-	DefaultForkDigest string = "0xffff"
-	DefaultUserAgent  string = "bsc_crawler"
-	DefaultLogLevel   string = "debug"
-	DefaultDBPath     string = ""
-	DefaultDBType     string = ""
+	DefaultIP            string = "0.0.0.0"
+	DefaultTcpPort       int    = 9000
+	DefaultUdpPort       int    = 9001
+	DefaultNetwork       string = "mainnet"
+	DefaultUserAgent     string = "bsc_crawler"
+	DefaultLogLevel      string = "info"
+	DefaultDBPath        string = "./peerstore.db"
+	DefaultDBType        string = "bolt"
+	DefaultBootNodesFile string = "./src/discovery/bootnodes_mainnet.json"
 
 	MinPort           int      = 0
 	MaxPort           int      = 65000
@@ -134,7 +135,7 @@ func (i *InfoData) importFromConfig(input_config config.ConfigData, stdOpts base
 		i.SetIPFromString(input_config.GetIP())
 
 	} else {
-		i.SetIP(net.IP(DefaultIP))
+		i.SetIPFromString(DefaultIP)
 		i.localLogger.Warnf("Setting default IP: %s", DefaultIP)
 	}
 	// Ports
@@ -186,29 +187,29 @@ func (i *InfoData) importFromConfig(input_config config.ConfigData, stdOpts base
 			infuraCli, err := endpoint.NewInfuraClient(i.GetEth2Endpoint())
 			if err != nil {
 				i.localLogger.Warnf("unable to genereate the eth2 endpoint from the given one. %s", err.Error())
-				_ = i.SetForkDigest(blockchaintopics.MainnetKey)
-				i.localLogger.Warnf("Setting default ForkDigest to latest in mainnet: %s", blockchaintopics.MainnetKey)
+				_ = i.SetForkDigest(blockchaintopics.DefaultForkDigest)
+				i.localLogger.Warnf("Setting default ForkDigest to latest in mainnet: %s", blockchaintopics.DefaultForkDigest)
 			} else {
 				ctx, _ := context.WithCancel(context.Background())
 				//defer cancel()
 				forkdigest, err := eth2.GetForkDigetsOfEth2Head(ctx, &infuraCli)
 				if err != nil {
 					i.localLogger.Warnf("unable to compute the fork digest from the eth2 endpoint. %s", err.Error())
-					_ = i.SetForkDigest(blockchaintopics.MainnetKey)
-					i.localLogger.Warnf("Setting default ForkDigest to latest in mainnet: %s", blockchaintopics.MainnetKey)
+					_ = i.SetForkDigest(blockchaintopics.DefaultForkDigest)
+					i.localLogger.Warnf("Setting default ForkDigest to latest in mainnet: %s", blockchaintopics.DefaultForkDigest)
 				} else {
 					valid = i.SetForkDigest(forkdigest.String())
 					if !valid {
 						i.localLogger.Warnf("unable to set the computed fork digest. %s", forkdigest.String())
-						_ = i.SetForkDigest(blockchaintopics.MainnetKey)
-						i.localLogger.Warnf("Setting default ForkDigest to latest in mainnet: %s", blockchaintopics.MainnetKey)
+						_ = i.SetForkDigest(blockchaintopics.DefaultForkDigest)
+						i.localLogger.Warnf("Setting default ForkDigest to latest in mainnet: %s", blockchaintopics.DefaultForkDigest)
 					}
 				}
 			}
 		} else {
 			i.localLogger.Warnf("invalid fork digest and no endpoint given")
-			_ = i.SetForkDigest(blockchaintopics.MainnetKey)
-			i.localLogger.Warnf("Setting default ForkDigest to latest in mainnet: %s", blockchaintopics.MainnetKey)
+			_ = i.SetForkDigest(blockchaintopics.DefaultForkDigest)
+			i.localLogger.Warnf("Setting default ForkDigest to latest in mainnet: %s", blockchaintopics.DefaultForkDigest)
 		}
 	}
 	i.localLogger.Info("fork digest:", i.GetForkDigest())
@@ -231,21 +232,26 @@ func (i *InfoData) importFromConfig(input_config config.ConfigData, stdOpts base
 	}
 
 	// BootNodesFile
-	if input_config.GetBootNodesFile() == "" {
-		i.localLogger.Warnf("Could not find bootnodes file configuration")
+	if !utils.CheckFileExists(input_config.GetBootNodesFile()) {
+		// file does not exist
+		i.SetBootNodeFile(DefaultBootNodesFile)
+		i.localLogger.Warnf("Could not find bootnodes file, applying default...")
+
 	} else {
 		i.SetBootNodeFile(input_config.GetBootNodesFile())
 	}
 
 	// TODO: pending db type and path
 
-	if input_config.GetDBPath() == "" {
+	if !utils.CheckFileExists(input_config.GetDBPath()) {
+		// file does not exist
 		i.SetDBPath(DefaultDBPath)
 		i.localLogger.Warnf("Setting default DB Path: %s", DefaultDBPath)
 	} else {
 		i.SetDBPath(input_config.GetDBPath())
 	}
-	if input_config.GetDBType() == "" {
+	if _, ok := db.DBTypes[input_config.GetDBType()]; !ok {
+		// type not okay, does not exist in our local hasmap
 		i.SetDBType(DefaultDBType)
 		i.localLogger.Warnf("Setting default DB Type: %s", DefaultDBType)
 	} else {
