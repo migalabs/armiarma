@@ -228,9 +228,10 @@ func (i *InfoData) importFromConfig(input_config config.ConfigData, stdOpts base
 	// Private Key
 	err := i.SetPrivKeyFromString(input_config.GetPrivKey())
 	if err != nil {
-		i.localLogger.Warnf(err.Error())
+		i.localLogger.Warnf("%s. Generating a new one", err.Error())
 		i.SetPrivKeyFromString(utils.Generate_privKey())
 	}
+	i.localLogger.Infof("Private Key of the host: %s", i.GetPrivKeyString())
 
 	// BootNodesFile
 	if !utils.CheckFileExists(input_config.GetBootNodesFile()) {
