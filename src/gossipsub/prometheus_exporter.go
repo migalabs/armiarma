@@ -152,7 +152,7 @@ func (gs *GossipSub) ServeMetrics() {
 				log.WithFields(log.Fields{
 					"TopicMsg/min": msgPerMin,
 					"TotalMsg/min": tot,
-				}).Info("Metrics summary")
+				}).Info("gossip metrics summary")
 
 			case <-gsCtx.Done():
 				// closing the routine in a ordened way
