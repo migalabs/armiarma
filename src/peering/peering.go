@@ -155,17 +155,6 @@ func (c *PeeringService) Run() {
 					if err := h.Connect(timeoutctx, addrInfo); err != nil {
 						c.Log.WithError(err).Debugf("attempts %d failed connection attempt", attempts)
 						// the connetion failed
-						/*
-							// TODO: think about edgy case for when the connection gets refused by peer but connection handler notifies
-							timeoutctx, cancel := context.WithTimeout(peeringCtx, ConnectionRefuseTimeout)
-							select {
-							case newConn := <-newConnChan:
-								// edgy case, connection refused
-								cancel()
-							case <- timeoutctx.Done():
-								// There was no not from the peer
-							}
-						*/
 						// fill the ConnectionStatus for the given peer connection
 						connAttStat.Timestamp = time.Now()
 						connAttStat.Successful = false
@@ -210,6 +199,8 @@ func (c *PeeringService) peeringRoutine() {
 
 }
 
+// Close
+// * Stops the Peering Service, closing with it the peering strategy and their context
 func (c *PeeringService) Close() {
 	c.Log.Info("stoping the peering service")
 	// Stop the strategy
