@@ -94,8 +94,7 @@ var crawlerCmd = &cobra.Command{
 		// TODO: generate a new DB
 		db := db.NewPeerStore(info_tmp.GetDBType(), info_tmp.GetDBPath())
 		// Generate a Peering Service (so far with default peering strategy)
-		db.ServeMetrics()
-
+		db.ServeMetrics(mainCtx)
 		go db.ExportLoop()
 
 		hostOpts := hosts.BasicLibp2pHostOpts{
