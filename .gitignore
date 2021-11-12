@@ -1,3 +1,9 @@
-./armiarma
-./*.txt
-./*.db
+# do not include the binary
+**/armiarma
+# do not include unnecesary files such as:
+# log .txt s
+**/*.txt
+# database files
+**/*.db
+# csv metric files
+**/*.csv
