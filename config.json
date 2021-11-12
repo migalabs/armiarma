@@ -1,15 +1,15 @@
 {
     "IP": "0.0.0.0", 
-    "TcpPort": 9006,
-    "UdpPort": 9007,
+    "TcpPort": 9020,
+    "UdpPort": 9020,
     "TopicArray": ["beacon_block", "beacon_aggregate_and_proof"],
     "Network": "mainnet",
     "Eth2Endpoint": "",
     "ForkDigest": "afcaaba0",
-    "UserAgent": "bsc_test",
+    "UserAgent": "BSC-Eth2-Crawler",
     "LogLevel": "info",
-    "PrivateKey": "026c60367b01fe3d7c7460bce1d585260ce465fa0abcb6e13619f88bf0dad54f",
+    "PrivateKey": "",
     "BootNodesFile": "./src/discovery/bootnodes_mainnet.json",
-    "DBPath": "./test.db",
+    "OutputPath": "./peerstore",
     "DBType": "BoltDB"
 }

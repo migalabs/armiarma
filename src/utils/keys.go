@@ -73,7 +73,7 @@ func Generate_privKey() string {
 		localLogger.Panicf("failed to serialize key: %v", err)
 	}
 
-	localLogger.Debugf("Generated Key!: ", hex.EncodeToString(keyBytes))
+	localLogger.Debugf("Generated Key!: %s", hex.EncodeToString(keyBytes))
 	return hex.EncodeToString(keyBytes)
 }
 
