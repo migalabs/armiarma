@@ -112,8 +112,8 @@ func (c *MessageMetrics) GetTotalMessages() int64 {
 }
 
 // ServeMetrics
-// * This method will Set Metric values to the
-// *local prometheus instance
+// * This method will generate the metrics from GossipSub msg Metrics
+// * and serve the values to the local prometheus instance
 func (gs *GossipSub) ServeMetrics() {
 	gsCtx := gs.Ctx()
 	// tenerate a ticker
