@@ -11,6 +11,11 @@ import (
 	"github.com/migalabs/armiarma/src/db"
 )
 
+// TopicSubscription
+// * Sumarizes the control fields necesary to manage and
+// * govern over a joined and subscribed topic like
+// * message logging or record
+// * Serves as a server for a singe topic subscription
 type TopicSubscription struct {
 	*base.Base
 
@@ -21,6 +26,15 @@ type TopicSubscription struct {
 	MessageMetrics *MessageMetrics
 }
 
+// NewTopicSubscription
+// * Sumarizes the control fields necesary to manage and
+// * govern over a joined and subscribed topic like
+// * @param ctx: parent context of the topic subscription, generaly gossipsub context
+// * @param topic: the libp2p.PubSub topic of the joined topic
+// * @param sub: the libp2p.PubSub subscription of the subscribed topic
+// * @param msgMetrics: underlaying message metrics regarding each of the joined topics
+// * @param stdOpts: list of options to generate the base of the topic subscription service
+// * @return: pointer to TopicSubscription
 func NewTopicSubscription(ctx context.Context, topic *pubsub.Topic, sub pubsub.Subscription, msgMetrics *MessageMetrics, stdOpts base.LogOpts) *TopicSubscription {
 	localLogger := createTopicLoggerOpts(stdOpts)
 
@@ -43,7 +57,11 @@ func NewTopicSubscription(ctx context.Context, topic *pubsub.Topic, sub pubsub.S
 	}
 }
 
-// readLoop pulls messages from the pubsub topic and pushes them onto the Messages channel.
+// MessageReadingLoop
+// * pulls messages from the pubsub topic and pushes them onto the Messages channel
+// * and the underlaying msg metrics
+// * @param h: libp2p host
+// * @param peerstore: peerstore of the crawler app
 func (c *TopicSubscription) MessageReadingLoop(h host.Host, peerstore *db.PeerStore) {
 	c.Log.Infof("topic subscription %s reading loop", c.Sub.Topic())
 	subsCtx := c.Ctx()

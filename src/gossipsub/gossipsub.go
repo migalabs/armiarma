@@ -24,6 +24,9 @@ import (
 
 const PKG_NAME string = "GOSSIP_SUB"
 
+// GossipSub
+// * Sumarizes the control fields necesary to manage and
+// * govern the GossipSub internal service
 type GossipSub struct {
 	*base.Base
 	InfoObj       *info.InfoData
@@ -35,13 +38,23 @@ type GossipSub struct {
 	MessageMetrics *MessageMetrics
 }
 
+// NewEmptyGossipSub
+// * Sumarizes the control fields necesary to manage and
+// * govern over a joined and subscribed topic like
+// * @return: gossipsub struct
 func NewEmptyGossipSub() *GossipSub {
 	return &GossipSub{}
 }
 
-// constructor
+// NewGossipSub
+// * Sumarizes the control fields necesary to manage and
+// * govern over a joined and subscribed topic like
+// * @param ctx: parent context for the gossip service
+// * @param h: the libp2p.PubSub topic of the joined topic
+// * @param peerstore: the peerstore of the
+// * @param stdOpts: list of options to generate the base of the gossipsub service
+// * @return: pointer to GossipSub struct
 func NewGossipSub(ctx context.Context, h *hosts.BasicLibp2pHost, peerstore *db.PeerStore, stdOpts base.LogOpts) *GossipSub {
-
 	localLogger := gossipsubLoggerOpts(stdOpts)
 
 	// instance base
@@ -87,8 +100,11 @@ func MsgIDFunction(pmsg *pubsub_pb.Message) string {
 	return base64.URLEncoding.EncodeToString(id)
 }
 
-// this method allows the GossipSub service to join and
-// subscribe to a topic
+// JoinAndSubscribe
+// * this method allows the GossipSub service to join and
+// * subscribe to a topic
+// * @param topicName: name of the topic to subscribe
+// * @return: pointer to GossipSub struct
 func (gs *GossipSub) JoinAndSubscribe(topicName string) {
 	// Join topic
 	topic, err := gs.PubsubService.Join(topicName)
