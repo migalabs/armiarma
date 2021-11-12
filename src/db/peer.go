@@ -438,6 +438,7 @@ func (pm *Peer) ToCsvLine() string {
 	}
 	csvRow := pm.PeerId + "," +
 		pm.NodeId + "," +
+		pm.BeaconStatus.Status.ForkDigest.String() + "," +
 		pm.UserAgent + "," +
 		pm.ClientName + "," +
 		pm.ClientVersion + "," +
@@ -450,6 +451,7 @@ func (pm *Peer) ToCsvLine() string {
 		strconv.FormatBool(pm.MetadataSucceed) + "," +
 		strconv.FormatBool(pm.Attempted) + "," +
 		strconv.FormatBool(pm.Succeed) + "," +
+		strconv.FormatBool(pm.Deprecated) + "," +
 		// right now we would just write TRUE if the peer was connected when exporting the metrics
 		// However, we want to know if the peer established a connection with us
 		// Measure it, as we said from the length of the connection times
