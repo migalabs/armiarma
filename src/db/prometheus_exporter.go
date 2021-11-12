@@ -108,7 +108,7 @@ func (ps *PeerStore) ServeMetrics(ctx context.Context) {
 					"NOfConnectedPeers":  nOfConnectedPeers,
 					"NOfDeprecatedPeers": nOfDeprecatedPeers,
 					//"LastErrors":         allLastErrors,
-				}).Info("Metrics summary")
+				}).Info("peerstore metrics summary")
 
 			case <-ctx.Done():
 				// closing the routine in a ordened way
