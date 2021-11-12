@@ -73,7 +73,6 @@ func (c *ConfigData) ReadFromJSON(input_file string) {
 			c.localLogger.Warnf("Could not read Config file: %s", err)
 		}
 	}
-	c.localLogger.Infof(c.GetPrivKey())
 }
 
 // defaultConfigLoggerOpts
