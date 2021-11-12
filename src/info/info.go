@@ -17,6 +17,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"strings"
 
 	"github.com/libp2p/go-libp2p-core/crypto"
@@ -38,12 +39,12 @@ var (
 // define constant variables
 var (
 	DefaultIP            string = "0.0.0.0"
-	DefaultTcpPort       int    = 9000
-	DefaultUdpPort       int    = 9001
+	DefaultTcpPort       int    = 9020
+	DefaultUdpPort       int    = 9020
 	DefaultNetwork       string = "mainnet"
 	DefaultUserAgent     string = "bsc_crawler"
 	DefaultLogLevel      string = "info"
-	DefaultDBPath        string = "./peerstore.db"
+	DefaultOutputPath    string = "./peerstore"
 	DefaultDBType        string = "bolt"
 	DefaultBootNodesFile string = "./src/discovery/bootnodes_mainnet.json"
 
@@ -65,7 +66,7 @@ type InfoData struct {
 	logLevel      string
 	privateKey    *crypto.Secp256k1PrivateKey
 	bootNodesFile string
-	dBPath        string
+	OutputPath    string
 	dBType        string
 }
 
@@ -242,14 +243,24 @@ func (i *InfoData) importFromConfig(input_config config.ConfigData, stdOpts base
 	}
 
 	// TODO: pending db type and path
-
-	if !utils.CheckFileExists(input_config.GetDBPath()) {
-		// file does not exist
-		i.SetDBPath(DefaultDBPath)
-		i.localLogger.Warnf("Setting default DB Path: %s", DefaultDBPath)
+	if input_config.GetOutputPath() == "" {
+		i.localLogger.Warnf("Setting default Output Path: %s", DefaultOutputPath)
+		i.SetOutputPath(DefaultOutputPath)
 	} else {
-		i.SetDBPath(input_config.GetDBPath())
+		i.localLogger.Infof("Setting the database folder in path %s", input_config.GetOutputPath())
+		i.SetOutputPath(input_config.GetOutputPath())
 	}
+
+	// Check if the folder already exists, or generate one
+	if !utils.CheckFileExists(i.GetOutputPath()) {
+		// folder does not exist, generate a new one
+		i.localLogger.Infof("Generating new folder in path %s", i.GetOutputPath())
+		err := os.Mkdir(i.GetOutputPath(), 0755)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
 	if _, ok := db.DBTypes[input_config.GetDBType()]; !ok {
 		// type not okay, does not exist in our local hasmap
 		i.SetDBType(DefaultDBType)
@@ -440,11 +451,11 @@ func (i *InfoData) SetBootNodeFile(input_string string) {
 	i.bootNodesFile = input_string
 }
 
-func (i InfoData) GetDBPath() string {
-	return i.dBPath
+func (i InfoData) GetOutputPath() string {
+	return i.OutputPath
 }
-func (i *InfoData) SetDBPath(input_string string) {
-	i.dBPath = input_string
+func (i *InfoData) SetOutputPath(input_string string) {
+	i.OutputPath = input_string
 }
 
 func (i InfoData) GetDBType() string {

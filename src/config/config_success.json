@@ -10,6 +10,6 @@
     "LogLevel": "debug",
     "PrivateKey": "026c60367b01fe3d7c7460bce1d585260ce465fa0abcb6e13619f88bf0dad54f",
     "BootNodesFile": "./src/discovery/bootnodes_mainnet.json",
-    "DBPath": "/etc",
+    "OutputPath": "./peerstore",
     "DBType": "Memory"
 }

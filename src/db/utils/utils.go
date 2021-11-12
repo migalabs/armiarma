@@ -32,8 +32,8 @@ func FilterClientType(userAgent string) (string, string) {
 		return "Grandine", cleanVersion(getVersionIfAny(fields, 1))
 	} else if strings.Contains(userAgentLower, "eth2-crawler") {
 		return "NodeWatch", ""
-	} else if strings.Contains(userAgentLower, "armiarma-crawler") {
-		return "BSC-Armiarma", ""
+	} else if strings.Contains(userAgentLower, "BSC-Eth2-Crawler") {
+		return "BSC-Eth2-Crawler", ""
 	} else {
 		log.Debugf("Could not get client from userAgent: %s", userAgent)
 		return "Unknown", "Unknown"

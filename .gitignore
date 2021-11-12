@@ -7,3 +7,4 @@
 **/*.db
 # csv metric files
 **/*.csv
+**/peerstore/

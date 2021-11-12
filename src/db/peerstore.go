@@ -301,9 +301,9 @@ func (c *PeerStore) ExportToCSV(filePath string) error {
 	return nil
 }
 
-func (p *PeerStore) ExportLoop() {
+func (p *PeerStore) ExportLoop(folderpath string) {
 	for {
-		p.ExportToCSV("./metrics.csv")
+		p.ExportToCSV(folderpath + "/metrics.csv")
 		time.Sleep(30 * time.Minute)
 
 	}
