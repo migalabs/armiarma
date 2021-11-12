@@ -251,9 +251,11 @@ func (pm *Peer) DisconnectionEvent(time time.Time) {
 	pm.ConnectedDirection = ""
 }
 
+// GetLastActivityTime
+// * Calculates the last activity recorded for the peer
+// @return last activity recorded for the peer
 func (pm Peer) GetLastActivityTime() time.Time {
 	// check len before
-
 	last_negative_activity := time.Time{}
 	last_connection_activity := time.Time{}
 	last_disconnection_activity := time.Time{}
