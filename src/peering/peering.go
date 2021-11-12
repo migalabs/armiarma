@@ -20,7 +20,8 @@ import (
 )
 
 var (
-	ConnectionRefuseTimeout = 3 * time.Second
+	ConnectionRefuseTimeout = 15 * time.Second
+	MaxRetries              = 1
 )
 
 type PeeringOption func(*PeeringService) error
@@ -61,8 +62,8 @@ func NewPeeringService(ctx context.Context, h *hosts.BasicLibp2pHost, peerstore 
 		InfoObj:    peeringOpts.InfoObj,
 		host:       h,
 		PeerStore:  peerstore,
-		Timeout:    15 * time.Second, // TODO: Hardcoded to 15 seconds
-		MaxRetries: 1,                // TODO: Hardcoded to 1 retry, future retries are directly dismissed/dropped by dialing peer
+		Timeout:    ConnectionRefuseTimeout,
+		MaxRetries: MaxRetries, // TODO: Hardcoded to 1 retry, future retries are directly dismissed/dropped by dialing peer
 	}
 	// iterate through the Options given as args
 	for _, opt := range opts {
