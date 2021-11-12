@@ -56,6 +56,14 @@ type PruningStrategy struct {
 	*/
 }
 
+// NewPruningStrategy
+// * Pruning strategy constructor, that will offer a db.Peer stream for the
+// * peering service. The povided db.Peer stream are ready to connect.
+// @param ctx: parent context
+// @param peerstore: db.PeerStore
+// @param opts: base and logging option
+// @return peering strategy interface with the prunning service:
+// @return error:
 func NewPruningStrategy(ctx context.Context, peerstore *db.PeerStore, opts PruningOpts) (PruningStrategy, error) {
 	// TODO: cancel is still not implemented in the BaseCreation
 	pruningCtx, _ := context.WithCancel(ctx)
@@ -83,13 +91,18 @@ func NewPruningStrategy(ctx context.Context, peerstore *db.PeerStore, opts Pruni
 	return pr, nil
 }
 
+// Type
+// * Returns the strategy type that has been set
+// @return string with the name of the pruning strategy
 func (c PruningStrategy) Type() string {
 	return c.strategyType
 }
 
-// NextPeer
-// * Is a function that returns an iterator of Peers received from the PeerStore
-// @return function that gives another peer to connect from the PeerStore (Filtered by the given strategy)
+// Run
+// * initializes the db.Peer stream on the returning db.Peer chan
+// * stores locally an auxiliary map wuth an array that will keep
+// * track of the next connection time.
+// @return db.Peer channel with the next peer to connect
 func (c *PruningStrategy) Run() chan db.Peer {
 	// start go routine that will notify of the full peerstore iteration and notifies it to the main strategy loop
 	go c.peerstoreIterator()
@@ -100,10 +113,6 @@ func (c *PruningStrategy) Run() chan db.Peer {
 // * Private function that is in charge of iterating through the peerstore,
 // * receive connections/disconnectios, and fetch info comming from the peering service into the db
 // * Main interaction of the Peering Service with the DB
-// @param
-// @return
-// TODO: 	Set this as a different module inside strategy
-// 			Implement some kind of sorting over the peer list, to reduce iteration time
 func (c *PruningStrategy) peerstoreIterator() {
 	// get Ctx of the pruning module
 	modCtx := c.Ctx()
@@ -258,7 +267,7 @@ func (c *PruningStrategy) NextPeer() {
 	c.nextPeerChan <- struct{}{}
 }
 
-// NewConnectionAttemptStatus
+// NewConnectionAttempt
 // * Notifies the peerstore iterator that a new ConnStatus has been received
 // * After it, the peerstore iteratow will aggregate the extra info
 func (c *PruningStrategy) NewConnectionAttempt(connAttStat ConnectionAttemptStatus) {
@@ -266,25 +275,25 @@ func (c *PruningStrategy) NewConnectionAttempt(connAttStat ConnectionAttemptStat
 	c.connAttemptNot <- connAttStat
 }
 
-// NewConnectionStatus
-// * Notifies the peerstore iterator that a new ConnStatus has been received
-// * After it, the peerstore iteratow will aggregate the extra info
+// NewConnection
+// * Notifies the peerstore iterator that a new Connection has been received
+// * I puts the connection metadata in the connNot channel to let the select
+// * loop all the metadata of the received connection
 func (c *PruningStrategy) NewConnection(connStat hosts.ConnectionStatus) {
 	c.Log.Debug("next connection has been received")
 	c.connNot <- connStat
 }
 
-// NewConnectionStatus
-// * Notifies the peerstore iterator that a new ConnStatus has been received
-// * After it, the peerstore iteratow will aggregate the extra info
+// NewDisconnection
+// * Notifies the peerstore iterator that a new disconnection has been received
+// * I puts the disconnection metadata in the disconnNot channel to let the select
+// * loop all the metadata of the received disconnection
 func (c *PruningStrategy) NewDisconnection(disconnStat hosts.DisconnectionStatus) {
 	c.Log.Debug("next connection has been received")
 	c.disconnNot <- disconnStat
 }
 
 // peeringWorker
-// *
-// *
 // @params
 // @return
 // TODO: Still not sure if we need workers for iterating the peerstore
@@ -295,7 +304,6 @@ func peeringWorker(ctx context.Context, ps *db.PeerStore, peerChan chan string) 
 // RecErrorHandler
 // * function that selects actuation method for each of the possible errors while actively dialing peers
 // @params peerID in string format, recorded error in string format
-// @return
 func (c *PruningStrategy) RecErrorHandler(pe *PrunedPeer, rec_err string) {
 	var fn func(p *db.Peer)
 	// current time
@@ -346,12 +354,12 @@ func (c *PruningStrategy) RecErrorHandler(pe *PrunedPeer, rec_err string) {
 		// trim new peerID from error message
 		np := strings.Split(rec_err, "key matches ")[1]
 		np = strings.Replace(np, ")", "", -1)
-		//newPeerID := peer.ID(np)
+		//newPeerID := peer.Decode(np)
 		//f.WriteString(fmt.Sprintf("%s shifted to %s\n", pe.String(), newPeerID))
 		// Generate a new Peer with the addrs of the previous one and the ID suggested at the
 		log.Infof("deprecating peer %s, but adding possible new peer %s", pe, np)
 		/*
-			_, err := newPeerID.ExtractPublicKey()
+			pubkey, err := newPeerID.ExtractPublicKey()
 			if err != nil {
 				fmt.Println("error obtainign pubkey from peerid", err)
 			} else {
@@ -389,12 +397,20 @@ func (c *PruningStrategy) RecErrorHandler(pe *PrunedPeer, rec_err string) {
 	c.PeerStore.AddNewNegConnectionAttempt(pe.PeerID, rec_err, fn)
 }
 
-//
+// Extra Prunning methods
+
+// PeerQueue
+// * Auxiliar peer array and map list to keep the list of peers sorted
+// * by cooner connection time, and still able to modify in a short time
+// * the values of each peer
 type PeerQueue struct {
 	PeerList []*PrunedPeer
 	PeerMap  map[string]*PrunedPeer
 }
 
+// NewPeerQueue
+// * Constructor of a NewPeerQueue
+// @return new PeerQueue
 func NewPeerQueue() PeerQueue {
 	pq := PeerQueue{
 		PeerList: make([]*PrunedPeer, 0),
@@ -403,22 +419,37 @@ func NewPeerQueue() PeerQueue {
 	return pq
 }
 
+// IsPeerAlready
+// * Check whether a peer is already in the Queue
+// @params peerID: string of the peerID that we want to find
+// @return true is peer is already, false if not
 func (c *PeerQueue) IsPeerAlready(peerID string) bool {
 	_, ok := c.PeerMap[peerID]
 	return ok
 }
 
+// IsPeerAlready
+// * Check whether a peer is already in the Queue
+// @params peerID: string of the peerID that we want to find
+// @return true is peer is already, false if not
 func (c *PeerQueue) AddPeer(pPeer *PrunedPeer) {
 	// append new item at the begining of the array
 	c.PeerList = append([]*PrunedPeer{pPeer}, c.PeerList...)
 	c.PeerMap[pPeer.PeerID] = pPeer
 }
 
+// GetPeer
+// * retrieves the info of the peer requested from args
+// @params peerID: string of the peerID that we want to find
+// @return pointer to prunned peer, bool, true if exists, false if doesn't
 func (c *PeerQueue) GetPeer(peerID string) (*PrunedPeer, bool) {
 	p, ok := c.PeerMap[peerID]
 	return p, ok
 }
 
+// SortPeerList
+// * Sort the PeerQueue array leaving at the begining the peers
+// * with the shorter next peer connection
 func (c *PeerQueue) SortPeerList() {
 	sort.Sort(c)
 }
@@ -440,6 +471,7 @@ func (c PeerQueue) Len() int {
 	return len(c.PeerList)
 }
 
+//
 func (c *PeerQueue) UpdatePeerListFromPeerStore(peerstore *db.PeerStore) error {
 	// Get the list of peers from the peerstore
 	peerList := peerstore.GetPeerList()
