@@ -79,7 +79,7 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 
 	// Read ENR of the Peer from the generated enode
 	n, err := c.PeerStore.GetENR(conn.RemotePeer().String())
-	if err != nil {
+	if err != nil && n != nil {
 		n.ID().String()
 		// We can only get the node.ID if the ENR of the peer was already in the PeerStore fromt dv5
 		peer.NodeId = n.ID().String()

@@ -144,8 +144,8 @@ func (c *PruningStrategy) peerstoreIterator() {
 					// compose all the detailed info for the given peer
 					// Generating New peer to fetch info
 					npeer := db.NewPeer(nextPeer.PeerID)
-					peerEnr, _ := pinfo.GetBlockchainNode()
-					if peerEnr != nil {
+					peerEnr, err := pinfo.GetBlockchainNode()
+					if err == nil && peerEnr != nil {
 						npeer.NodeId = peerEnr.ID().String()
 						// TODO:
 						npeer.Ip = peerEnr.IP().String()
