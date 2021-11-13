@@ -145,8 +145,12 @@ func (pm *Peer) FetchPeerInfoFromPeer(newPeer Peer) {
 // *						PEER_ETH2_NODE					*
 //***********************************************************
 
-func (pm *Peer) GetBlockchainNode() *enode.Node {
-	return enode.MustParse(pm.BlockchainNodeENR)
+func (pm *Peer) GetBlockchainNode() (*enode.Node, error) {
+	pointer := enode.MustParse(pm.BlockchainNodeENR)
+	if pointer == nil {
+		return nil, fmt.Errorf("pointer to ENR was nil")
+	}
+	return pointer, nil
 }
 
 // **********************************************************

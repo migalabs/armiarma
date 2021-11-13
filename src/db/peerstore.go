@@ -144,7 +144,7 @@ func (c *PeerStore) GetENR(peerID string) (*enode.Node, error) {
 	if err != nil {
 		return nil, err
 	}
-	return p.GetBlockchainNode(), nil
+	return p.GetBlockchainNode()
 }
 
 /// AddNewAttempts adds the resuts of a negative new attempt over an existing peer
