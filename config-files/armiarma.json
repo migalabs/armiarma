@@ -1,0 +1,15 @@
+{
+    "IP": "0.0.0.0",
+    "TcpPort": 9020,
+    "UdpPort": 9020,
+    "TopicArray": [],
+    "Network": "mainnet",
+    "Eth2Endpoint": "https://20PdJoS82pnejJJ9joDMnbjsQ32:0c9b868d8621332ea91c7fc24c5fc34f@eth2-beacon-mainnet.infura.io",
+    "ForkDigest": "",
+    "UserAgent": "BSC-Eth2-Crawler",
+    "LogLevel": "info",
+    "PrivateKey": "026c60367b01fe3d7c7460bce1d585260ce465fa0abcb6e13619f88bf0dad54f",
+    "BootNodesFile": "./src/discovery/official-eth2-bootnodes.json",
+    "OutputPath": "./peerstore",
+    "DBType": "bolt"
+}
