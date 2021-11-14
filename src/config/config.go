@@ -37,7 +37,7 @@ type ConfigData struct {
 	LogLevel      string   `json:"LogLevel"`
 	PrivateKey    string   `json:"PrivateKey"`
 	BootNodesFile string   `json:"BootNodesFile"`
-	DBPath        string   `json:"DBPath"`
+	OutputPath    string   `json:"OutputPath"`
 	DBType        string   `json:"DBType"`
 }
 
@@ -73,7 +73,6 @@ func (c *ConfigData) ReadFromJSON(input_file string) {
 			c.localLogger.Warnf("Could not read Config file: %s", err)
 		}
 	}
-	c.localLogger.Infof(c.GetPrivKey())
 }
 
 // defaultConfigLoggerOpts
@@ -170,11 +169,11 @@ func (c *ConfigData) SetBootNodesFile(input_string string) {
 	c.BootNodesFile = input_string
 }
 
-func (c *ConfigData) GetDBPath() string {
-	return c.DBPath
+func (c *ConfigData) GetOutputPath() string {
+	return c.OutputPath
 }
-func (c *ConfigData) SetDBPath(input_string string) {
-	c.DBPath = input_string
+func (c *ConfigData) SetOutputPath(input_string string) {
+	c.OutputPath = input_string
 }
 
 func (c *ConfigData) GetDBType() string {

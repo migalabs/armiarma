@@ -144,7 +144,7 @@ func (c *PeerStore) GetENR(peerID string) (*enode.Node, error) {
 	if err != nil {
 		return nil, err
 	}
-	return p.GetBlockchainNode(), nil
+	return p.GetBlockchainNode()
 }
 
 /// AddNewAttempts adds the resuts of a negative new attempt over an existing peer
@@ -301,9 +301,9 @@ func (c *PeerStore) ExportToCSV(filePath string) error {
 	return nil
 }
 
-func (p *PeerStore) ExportLoop() {
+func (p *PeerStore) ExportLoop(folderpath string) {
 	for {
-		p.ExportToCSV("./metrics.csv")
+		p.ExportToCSV(folderpath + "/metrics.csv")
 		time.Sleep(30 * time.Minute)
 
 	}

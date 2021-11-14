@@ -22,9 +22,9 @@ type BoltPeerDB struct {
 
 // New BoltPeerDB creates an new MemoryDB ready to accept new peers
 // fulfills PeerStoreStorage interface
-func NewBoltPeerDB(path string) BoltPeerDB {
+func NewBoltPeerDB(folderpath string) BoltPeerDB {
 	// Generate a new one
-	db, err := OpenBoltDB(path, "peerstore", 0600, nil)
+	db, err := OpenBoltDB(folderpath+"/peerstore.db", "peerstore", 0600, nil)
 	if err != nil {
 		log.Panicf(err.Error())
 	}

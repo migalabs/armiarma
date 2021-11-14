@@ -1,0 +1,15 @@
+{
+    "IP": "0.0.0.0", 
+    "TcpPort": 9020,
+    "UdpPort": 9020,
+    "TopicArray": [],
+    "Network": "mainnet",
+    "Eth2Endpoint": "",
+    "ForkDigest": "afcaaba0",
+    "UserAgent": "BSC-Eth2-Crawler",
+    "LogLevel": "info",
+    "PrivateKey": "",
+    "BootNodesFile": "./src/discovery/official-eth2-bootnodes.json",
+    "OutputPath": "./peerstore",
+    "DBType": "BoltDB"
+}

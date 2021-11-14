@@ -1,25 +1,30 @@
-## --- GOLANG ---
-# To make the applicaion compatible with the dv5.1, go version needs to be 1.15 or higher
-FROM golang:1.15.6-buster AS builder
+# syntax=docker/dockerfile:1
 
-COPY . /armiarma
+# chosen buster image for
+FROM golang:1.17.3-buster AS builder
 
-WORKDIR /armiarma/src
-RUN go build -o ./bin/armiarma
+COPY ./ /armiarma
 
-# FINAL STAGE -> copy the binary
+WORKDIR /armiarma 
+RUN go get
+RUN go build -o ./armiarma-client
+
+# FINAL STAGE -> copy the binary and few config files
 FROM debian:buster-slim
 
-# --- Install python 3.7 or + in the go image ---
-COPY --from=builder /armiarma /armiarma
+RUN mkdir /armiarma
+# Generate the peerstore folder where the peerstore and the metrics will be stored
+RUN mkdir /armiarma/peerstore
+RUN mkdir /armiarma/config-file
+
+COPY --from=builder /armiarma/src /armiarma/src
+COPY --from=builder /armiarma/armiarma-client /armiarma/armiarma-client
+
 
 WORKDIR /armiarma
-RUN apt update && apt install -y python3 python3-dev python3-pip
-RUN apt install -y curl
-RUN apt install -y iputils-ping
-RUN pip3 install -r ./src/analyzer/requirements.txt
-
-WORKDIR /armiarma
-EXPOSE 9020
-# Arguments coming from the docker call: (1)->Network (2)->Project Name (3)->Time Duration 
-ENTRYPOINT ["./armiarma.sh"]
+# Crawler exposed Port
+EXPOSE 9020 
+# Crawler exposed Port for Prometheus data export
+EXPOSE 9080
+# Arguments coming from the docker call: (1)->armiarma-client (2)->flags
+ENTRYPOINT ["./armiarma-client"]
