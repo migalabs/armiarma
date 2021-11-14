@@ -146,6 +146,9 @@ func (pm *Peer) FetchPeerInfoFromPeer(newPeer Peer) {
 //***********************************************************
 
 func (pm *Peer) GetBlockchainNode() (*enode.Node, error) {
+	if pm.BlockchainNodeENR == "" {
+		return nil, fmt.Errorf("unable to get ENODE for peer, no ENR was recorded")
+	}
 	pointer := enode.MustParse(pm.BlockchainNodeENR)
 	if pointer == nil {
 		return nil, fmt.Errorf("pointer to ENR was nil")
