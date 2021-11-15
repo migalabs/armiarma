@@ -241,7 +241,6 @@ func (pm Peer) FirstNegAttempt() (t time.Time, err error) {
 func (pm *Peer) AddNegConnAtt(deprecated bool) {
 	t := time.Now()
 	pm.NegativeConnAttempts = append(pm.NegativeConnAttempts, t)
-	fmt.Println(deprecated)
 	if deprecated {
 		pm.Deprecated = true
 	}
