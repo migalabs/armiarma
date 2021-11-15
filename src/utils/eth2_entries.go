@@ -1,4 +1,4 @@
-package enode
+package utils
 
 import (
 	"bytes"
