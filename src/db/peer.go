@@ -460,10 +460,12 @@ func (pm *Peer) ToCsvLine() string {
 	node, err := pm.GetBlockchainNode()
 	forkDigest := ""
 	if err != nil {
-		fmt.Errorf("Could not parse ENR to CSV")
+		log.Errorf("Could not parse ENR to CSV")
+
+	} else {
 		eth2Dat, _, err := all_utils.ParseNodeEth2Data(*node)
 
-		if err != nil {
+		if err == nil {
 			forkDigest = eth2Dat.ForkDigest.String()
 		}
 	}
