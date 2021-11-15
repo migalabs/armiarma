@@ -20,6 +20,8 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p/p2p/protocol/identify"
+
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -128,18 +130,18 @@ func ReqHostInfo(ctx context.Context, h host.Host, conn network.Conn, peer *db.P
 	case <-tout:
 		err_ident = errors.Errorf("identification error caused by timed out")
 	}
-	var err error
-	/* Not defined yet on the Peer struct
+
+	// Fill the the metrics
+	// Into the new peer to fetch
 	pv, err := h.Peerstore().Get(peerID, "ProtocolVersion")
 	if err == nil {
-		hInfo.ProtocolVersion = pv.(string)
+		peer.ProtocolVersion = pv.(string)
 	}
+
 	prot, err := h.Peerstore().GetProtocols(peerID)
 	if err == nil {
-		//hInfo.Protocols = prot
-		log.Infof("peer on protocol %s", prot)
+		peer.Protocols = prot
 	}
-	*/
 	// Update the values of the
 	peer.Latency = float64(rtt/time.Millisecond) / 1000
 	peer.PeerId = peerID.String()
@@ -148,23 +150,21 @@ func ReqHostInfo(ctx context.Context, h host.Host, conn network.Conn, peer *db.P
 	multiAddrStr := conn.RemoteMultiaddr().String() + "/p2p/" + peerID.String()
 	multiAddr, err := ma.NewMultiaddr(multiAddrStr)
 	if err != nil {
-		return fmt.Errorf("error composing the maddrs from peer", err)
+		return fmt.Errorf("error composing the maddrs from peer %s", err)
 	}
 	// generate array of MAddr to fit the db.Peer struct
 	mAddrs := make([]ma.Multiaddr, 0)
 	mAddrs = append(mAddrs, multiAddr)
 	peer.MAddrs = mAddrs
 	peer.Ip = utils.ExtractIPFromMAddr(multiAddr).String()
-	if err != nil {
-		// Almost impossible, when we are connected to a peer, we will always have a complete Multiaddrs after the Identify req
-		// leaving it emtpy to spot the problem, IP-Api request already makes a parse of the IP before making server petition
-		// TODO: think about a better idea to integrate a logger into this functions
-		//log.Error(err)
-	}
-	peer.Country, peer.City, peer.CountryCode, err = db_utils.GetLocationFromIp(peer.Ip)
+	country, city, countryCode, err := db_utils.GetLocationFromIp(peer.Ip)
 	if err != nil {
 		// TODO: think about a better idea to integrate a logger into this functions
-		//log.Error("error when fetching country/city from ip", err)
+		log.Warnf("error when fetching country/city from ip", err)
+	} else {
+		peer.Country = country
+		peer.City = city
+		peer.CountryCode = countryCode
 	}
 	// Fulfill the hInfo struct
 	ua, err := h.Peerstore().Get(peerID, "AgentVersion")

@@ -130,7 +130,7 @@ func (i *InfoData) importFromConfig(input_config config.ConfigData, stdOpts base
 
 	// start full import
 	i.localLogger.Infof("Importing Configuration...")
-
+	i.localLogger.Infof("setting logs to %s", i.GetLogLevel())
 	//IP
 	if utils.CheckValidIP(input_config.GetIP()) {
 		i.SetIPFromString(input_config.GetIP())
@@ -248,7 +248,6 @@ func (i *InfoData) importFromConfig(input_config config.ConfigData, stdOpts base
 		i.localLogger.Warnf("Setting default Output Path: %s", DefaultOutputPath)
 		i.SetOutputPath(DefaultOutputPath)
 	} else {
-		i.localLogger.Infof("Setting the database folder in path %s", input_config.GetOutputPath())
 		i.SetOutputPath(input_config.GetOutputPath())
 	}
 
