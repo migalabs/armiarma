@@ -49,7 +49,6 @@ func NewPeerStore(dbtype string, path string) PeerStore {
 		}
 		db = NewBoltPeerDB(path)
 	}
-	//db = NewMemoryDB()
 	ps := PeerStore{
 		PeerStore:      db,
 		StartTime:      time.Now(),

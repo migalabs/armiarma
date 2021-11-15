@@ -76,6 +76,8 @@ func NewPeer(peerId string) Peer {
 	pm := Peer{
 		PeerId:               peerId,
 		Error:                "None",
+		MAddrs:               make([]ma.Multiaddr, 0),
+		Protocols:            make([]string, 0),
 		NegativeConnAttempts: make([]time.Time, 0),
 		ConnectionTimes:      make([]time.Time, 0),
 		DisconnectionTimes:   make([]time.Time, 0),
@@ -104,6 +106,10 @@ func (pm *Peer) FetchPeerInfoFromPeer(newPeer Peer) {
 	}
 	pm.Pubkey = getNonEmpty(pm.Pubkey, newPeer.Pubkey)
 	pm.MAddrs = getNonEmptyMAddrArray(pm.MAddrs, newPeer.MAddrs)
+	pm.ProtocolVersion = getNonEmpty(pm.ProtocolVersion, newPeer.ProtocolVersion)
+	if len(newPeer.Protocols) != 0 {
+		pm.Protocols = newPeer.Protocols
+	}
 	pm.Ip = getNonEmpty(pm.Ip, newPeer.Ip)
 	if pm.City == "" || newPeer.City != "" {
 		pm.City = newPeer.City
@@ -443,6 +449,11 @@ func (pm *Peer) ToCsvLine() string {
 	if len(pm.ConnectionTimes) > 0 {
 		connStablished = "true"
 	}
+	// get the multiaddress of the peers
+	mAddrss := ""
+	if len(pm.MAddrs) != 0 {
+		mAddrss = pm.ExtractPublicAddr().String()
+	}
 	csvRow := pm.PeerId + "," +
 		pm.NodeId + "," +
 		pm.BeaconStatus.Status.ForkDigest.String() + "," +
@@ -450,7 +461,7 @@ func (pm *Peer) ToCsvLine() string {
 		pm.ClientName + "," +
 		pm.ClientVersion + "," +
 		pm.Pubkey + "," +
-		pm.ExtractPublicAddr().String() + "," +
+		mAddrss + "," +
 		pm.Ip + "," +
 		pm.Country + "," +
 		pm.City + "," +

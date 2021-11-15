@@ -106,7 +106,7 @@ var crawlerCmd = &cobra.Command{
 		// generate libp2pHost
 		host, err := hosts.NewBasicLibp2pHost(b.Ctx(), hostOpts)
 		if err != nil {
-			log.Panic(err)
+			panic(err)
 		}
 
 		node_tmp := enode.NewLocalNode(b.Ctx(), info_tmp, stdOpts)

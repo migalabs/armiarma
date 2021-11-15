@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/peer"
+	log "github.com/sirupsen/logrus"
 )
 
 // PeerStoreMemory save the peer's data in RAM.
@@ -22,6 +23,7 @@ func NewMemoryDB() MemoryDB {
 		m:         &m,
 		startTime: time.Now(),
 	}
+	log.Infof("generated new MemoryDB")
 	return mdb
 }
 
