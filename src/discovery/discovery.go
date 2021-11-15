@@ -24,6 +24,7 @@ import (
 	"github.com/migalabs/armiarma/src/enode"
 	"github.com/migalabs/armiarma/src/gossipsub/blockchaintopics"
 	"github.com/migalabs/armiarma/src/info"
+	all_utils "github.com/migalabs/armiarma/src/utils"
 
 	geth_log "github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/discover"
@@ -149,7 +150,7 @@ func (d *Discovery) FindRandomNodes() {
 // *
 // @param res represents the enode of the newly discovered peer
 func (d *Discovery) HandleENR(node *eth_enode.Node) error {
-	eth2Dat, ok, err := enode.ParseNodeEth2Data(*node)
+	eth2Dat, ok, err := all_utils.ParseNodeEth2Data(*node)
 	if err != nil {
 		return fmt.Errorf("enr parse error: %v", err)
 	}

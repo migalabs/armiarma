@@ -9,6 +9,7 @@ import (
 	m_utils "github.com/migalabs/armiarma/src/db/utils"
 	bc_topics "github.com/migalabs/armiarma/src/gossipsub/blockchaintopics"
 	"github.com/migalabs/armiarma/src/utils"
+	all_utils "github.com/migalabs/armiarma/src/utils"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	beacon "github.com/protolambda/zrnt/eth2/beacon/common"
@@ -454,9 +455,22 @@ func (pm *Peer) ToCsvLine() string {
 	if len(pm.MAddrs) != 0 {
 		mAddrss = pm.ExtractPublicAddr().String()
 	}
+
+	node, err := pm.GetBlockchainNode()
+
+	if err != nil {
+		fmt.Errorf("Could not parse ENR to CSV")
+	}
+
+	eth2Dat, ok, err := all_utils.ParseNodeEth2Data(*node)
+	forkDigest := ""
+	if ok {
+		forkDigest = eth2Dat.ForkDigest.String()
+	}
+
 	csvRow := pm.PeerId + "," +
 		pm.NodeId + "," +
-		pm.BeaconStatus.Status.ForkDigest.String() + "," +
+		forkDigest + "," +
 		pm.UserAgent + "," +
 		pm.ClientName + "," +
 		pm.ClientVersion + "," +
@@ -591,8 +605,8 @@ func PeerUnMarshal(m map[string]interface{}) Peer {
 		MetadataSucceed:      m["MetadataSucceed"].(bool),
 		LastExport:           int64(m["LastExport"].(float64)),
 		MessageMetrics:       msgMetrics,
-		// BeaconStatus:         m["BeaconStatus"].(BeaconStatusStamped),
-		// BeaconMetadata:       m["BeaconMetadata"].(BeaconMetadataStamped),
+		//BeaconStatus:         beaconStt,
+		//BeaconMetadata:       m["BeaconMetadata"].(BeaconMetadataStamped),
 	}
 }
 

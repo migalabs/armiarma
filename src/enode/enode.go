@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/migalabs/armiarma/src/base"
 	"github.com/migalabs/armiarma/src/info"
+	all_utils "github.com/migalabs/armiarma/src/utils"
 )
 
 const PKG_NAME = "ENODE"
@@ -60,8 +61,8 @@ func nodeLoggerOpts(input_opts base.LogOpts) base.LogOpts {
 // * This method will add specific Eth2 Key Value entries to the created Node
 // TODO: confirm which data to add and structure appropiately
 func (l *LocalNode) AddEntries() {
-	l.LocalNode.Set(NewAttnetsENREntry("ffffffffffffffff"))
-	l.LocalNode.Set(NewEth2DataEntry("b5303f2a"))
+	l.LocalNode.Set(all_utils.NewAttnetsENREntry("ffffffffffffffff"))
+	l.LocalNode.Set(all_utils.NewEth2DataEntry("b5303f2a"))
 }
 
 // getters and setters
