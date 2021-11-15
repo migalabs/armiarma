@@ -241,6 +241,7 @@ func (pm Peer) FirstNegAttempt() (t time.Time, err error) {
 func (pm *Peer) AddNegConnAtt(deprecated bool) {
 	t := time.Now()
 	pm.NegativeConnAttempts = append(pm.NegativeConnAttempts, t)
+	fmt.Println(deprecated)
 	if deprecated {
 		pm.Deprecated = true
 	}
@@ -457,15 +458,14 @@ func (pm *Peer) ToCsvLine() string {
 	}
 
 	node, err := pm.GetBlockchainNode()
-
+	forkDigest := ""
 	if err != nil {
 		fmt.Errorf("Could not parse ENR to CSV")
-	}
+		eth2Dat, _, err := all_utils.ParseNodeEth2Data(*node)
 
-	eth2Dat, ok, err := all_utils.ParseNodeEth2Data(*node)
-	forkDigest := ""
-	if ok {
-		forkDigest = eth2Dat.ForkDigest.String()
+		if err != nil {
+			forkDigest = eth2Dat.ForkDigest.String()
+		}
 	}
 
 	csvRow := pm.PeerId + "," +
