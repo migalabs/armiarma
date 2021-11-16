@@ -46,6 +46,9 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 		"EVENT":     "Connection detected",
 		"DIRECTION": conn.Stat().Direction.String(),
 	}).Debug("Peer: ", conn.RemotePeer().String())
+	// TEMP
+	c.ConnCounter++
+
 	// Generate new peer to aggregate new data
 	peer := db.NewPeer(conn.RemotePeer().String())
 	h := c.Host()
@@ -56,7 +59,7 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 		peer.MetadataSucceed = false
 		c.Log.WithFields(logrus.Fields{
 			"ERROR": err,
-		}).Warn("Peer: ", conn.RemotePeer().String())
+		}).Debug("Peer: ", conn.RemotePeer().String())
 	}
 	// Request the BeaconMetadata
 	bMetadata, err := ReqBeaconMetadata(context.Background(), h, conn.RemotePeer())
@@ -105,15 +108,18 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 
 func (c *BasicLibp2pHost) standardDisconnectF(net network.Network, conn network.Conn) {
 	c.Log.Debugf("disconnected from peer %s", conn.RemotePeer().String())
+	// TEMP
+	c.DisconnCounter++
+
 	peer := db.NewPeer(conn.RemotePeer().String())
 	t := time.Now()
 	peer.DisconnectionEvent(t)
-	disconnStat := ConnectionStatus{
+	disconnStat := DisconnectionStatus{
 		Peer:      peer,
 		Timestamp: t,
 	}
 	// Send the new disconnection status
-	c.RecNewConn(disconnStat)
+	c.RecNewDisconn(disconnStat)
 }
 
 func (c *BasicLibp2pHost) standardOpenedStreamF(net network.Network, str network.Stream) {

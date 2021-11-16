@@ -146,6 +146,14 @@ func (pm *Peer) FetchPeerInfoFromPeer(newPeer Peer) {
 	for _, time := range newPeer.DisconnectionTimes {
 		pm.DisconnectionEvent(time)
 	}
+	/* REMOVABLE
+	if len(newPeer.ConnectionTimes) > 0 {
+		fmt.Println("ConnCase")
+	} else if len(newPeer.DisconnectionTimes) > 0 {
+		fmt.Println("DisconnCase")
+	}
+	fmt.Println("flag Is connectable:", pm.IsConnected)
+	*/
 }
 
 // **********************************************************

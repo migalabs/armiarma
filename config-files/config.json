@@ -11,5 +11,5 @@
     "PrivateKey": "",
     "BootNodesFile": "./src/discovery/official-eth2-bootnodes.json",
     "OutputPath": "./peerstore",
-    "DBType": "BoltDB"
+    "DBType": "Memory"
 }

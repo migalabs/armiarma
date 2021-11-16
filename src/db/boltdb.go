@@ -65,6 +65,7 @@ func NewBoltPeerDB(folderpath string) BoltPeerDB {
 	// last, lets add the disconnection event to those peers that remained connected
 	for _, connectedPeerTmp := range connectedPeers {
 		connectedPeerTmp.DisconnectionEvent(lastCrawlerActivity)
+		db_obj.Store(connectedPeerTmp.PeerId, connectedPeerTmp)
 	}
 
 	return db_obj
