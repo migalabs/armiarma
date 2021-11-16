@@ -20,7 +20,8 @@ import (
 )
 
 var (
-	ConnectionRefuseTimeout = 15 * time.Second
+	MOD_NAME                = "PEERING"
+	ConnectionRefuseTimeout = 10 * time.Second
 	MaxRetries              = 1
 )
 
@@ -49,7 +50,8 @@ func NewPeeringService(ctx context.Context, h *hosts.BasicLibp2pHost, peerstore 
 	// TODO: cancel is still not implemented in the BaseCreation
 	peeringCtx, _ := context.WithCancel(ctx)
 	logOpts := peeringOpts.LogOpts
-	logOpts.ModName = "peering service"
+	//logOpts.Level = "debug"
+	logOpts.ModName = MOD_NAME
 	b, err := base.NewBase(
 		base.WithContext(peeringCtx),
 		base.WithLogger(logOpts),
@@ -151,7 +153,6 @@ func (c *PeeringService) Run() {
 				// try to connect the peer
 				attempts := 1
 				timeoutctx, cancel := context.WithTimeout(peeringCtx, c.Timeout)
-				defer cancel()
 				for attempts <= c.MaxRetries {
 					if err := h.Connect(timeoutctx, addrInfo); err != nil {
 						c.Log.WithError(err).Debugf("attempts %d failed connection attempt", attempts)
@@ -173,6 +174,7 @@ func (c *PeeringService) Run() {
 						break
 					}
 				}
+				cancel()
 				// send it to the strategy
 				c.strategy.NewConnectionAttempt(connAttStat)
 				// Request the next peer when case is over

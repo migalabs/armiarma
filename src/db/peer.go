@@ -12,7 +12,7 @@ import (
 	all_utils "github.com/migalabs/armiarma/src/utils"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
-	beacon "github.com/protolambda/zrnt/eth2/beacon/common"
+	"github.com/protolambda/zrnt/eth2/beacon/common"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -330,6 +330,22 @@ func (pm *Peer) GetConnectedTime() float64 {
 	return float64(totalConnectedTime) / 60000000000
 }
 
+// Update beacon Metadata of the peer
+func (pm *Peer) UpdateBeaconMetadata(bMetadata common.MetaData) {
+	pm.BeaconMetadata = BeaconMetadataStamped{
+		Timestamp: time.Now(),
+		Metadata:  bMetadata,
+	}
+}
+
+// Update beacon Status of the peer
+func (pm *Peer) UpdateBeaconStatus(bStatus common.Status) {
+	pm.BeaconStatus = BeaconStatusStamped{
+		Timestamp: time.Now(),
+		Status:    bStatus,
+	}
+}
+
 // **********************************************************
 // *						BEACON							*
 //***********************************************************
@@ -337,23 +353,7 @@ func (pm *Peer) GetConnectedTime() float64 {
 // TODO: comment
 type BeaconMetadataStamped struct {
 	Timestamp time.Time
-	Metadata  beacon.MetaData
-}
-
-// Update beacon Status of the peer
-func (pm *Peer) UpdateBeaconStatus(bStatus beacon.Status) {
-	pm.BeaconStatus = BeaconStatusStamped{
-		Timestamp: time.Now(),
-		Status:    bStatus,
-	}
-}
-
-// Update beacon Metadata of the peer
-func (pm *Peer) UpdateBeaconMetadata(bMetadata beacon.MetaData) {
-	pm.BeaconMetadata = BeaconMetadataStamped{
-		Timestamp: time.Now(),
-		Metadata:  bMetadata,
-	}
+	Metadata  common.MetaData
 }
 
 // BEACON STATUS
@@ -362,7 +362,7 @@ func (pm *Peer) UpdateBeaconMetadata(bMetadata beacon.MetaData) {
 // TODO: comment
 type BeaconStatusStamped struct {
 	Timestamp time.Time
-	Status    beacon.Status
+	Status    common.Status
 }
 
 // **********************************************************
@@ -579,6 +579,14 @@ func PeerUnMarshal(m map[string]interface{}) Peer {
 		}
 	}
 
+	beaconStatus := BeaconStatusStamped{}
+	if m["BeaconStatus"] != nil {
+		beaconStatus, err = ParseBeaconStatusFromInterface(m["BeaconStatus"])
+		if err != nil {
+			log.Warnf("unable to cast beaconStatus while unmarshaling. %s", err.Error())
+		}
+	}
+
 	// TODO: use constants for names
 	return Peer{
 		PeerId:               m["PeerId"].(string),
@@ -611,8 +619,8 @@ func PeerUnMarshal(m map[string]interface{}) Peer {
 		MetadataSucceed:      m["MetadataSucceed"].(bool),
 		LastExport:           int64(m["LastExport"].(float64)),
 		MessageMetrics:       msgMetrics,
-		//BeaconStatus:         beaconStt,
-		//BeaconMetadata:       m["BeaconMetadata"].(BeaconMetadataStamped),
+		BeaconStatus:         beaconStatus,
+		// BeaconMetadata:       m["BeaconMetadata"].(BeaconMetadataStamped),
 	}
 }
 
@@ -636,6 +644,51 @@ func ParseInterfaceMapMessageMetrics(inputMap map[string]interface{}) (map[strin
 		}
 		result[k] = mm
 	}
+	return result, nil
+
+}
+
+func ParseBeaconStatusFromInterface(input interface{}) (BeaconStatusStamped, error) {
+	var result BeaconStatusStamped
+	var err error
+
+	inputMap := input.(map[string]interface{})
+
+	// timestamp
+	result.Timestamp, err = time.Parse(time.RFC3339, inputMap["Timestamp"].(string))
+	if err != nil {
+		return result, errors.Wrap(err, "unable to compose BeaconStatus.Timestamp from readed interface")
+	}
+	// BeaconStatus
+	status := inputMap["Status"].(map[string]interface{})
+	// if the forkdigest field is empty, return empty BeaconStatus
+	fd, _ := status["ForkDigest"].(string)
+	if len(fd) == 0 {
+		return result, nil
+	}
+	// otherwise, compose the readed beaconStatus
+	err = result.Status.ForkDigest.UnmarshalText([]byte(fd))
+	if err != nil {
+		return result, errors.Wrap(err, "unable to compose BeaconStatus.ForkDigest from readed interface")
+	}
+	fr, _ := status["FinalizedRoot"].(string)
+	var frByte [32]byte
+	copy(frByte[:], fr[:32])
+	result.Status.FinalizedRoot = common.Root(frByte)
+	e, err := strconv.ParseUint(status["Epoch"].(string), 0, 64)
+	if err != nil {
+		return result, errors.Wrap(err, "unable to compose BeaconStatus.Epoch from readed interface")
+	}
+	result.Status.FinalizedEpoch = common.Epoch(uint64(e))
+	hr, _ := status["HeadRoot"].(string)
+	var hrBytes [32]byte
+	copy(hrBytes[:], hr[:32])
+	result.Status.HeadRoot = common.Root(hrBytes)
+	s, err := strconv.ParseUint(status["HeadSlot"].(string), 0, 64)
+	if err != nil {
+		return result, errors.Wrap(err, "unable to compose BeaconStatus.HeadSlot from readed interface")
+	}
+	result.Status.HeadSlot = common.Slot(uint64(s))
 	return result, nil
 
 }

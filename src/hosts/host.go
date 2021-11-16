@@ -18,7 +18,7 @@ import (
 
 var (
 	ModuleName       = "LIBP2P_HOST"
-	ConnNotChannSize = 50
+	ConnNotChannSize = 100
 )
 
 // Struct that defines the Basic Struct asociated to the Libtp2p host
