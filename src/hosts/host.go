@@ -37,6 +37,11 @@ type BasicLibp2pHost struct {
 	connNotChan    chan ConnectionStatus
 	disconnNotChan chan DisconnectionStatus
 	peerID         peer.ID
+
+	// TEMP
+
+	ConnCounter    int
+	DisconnCounter int
 }
 
 type BasicLibp2pHostOpts struct {

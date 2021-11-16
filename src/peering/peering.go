@@ -131,6 +131,23 @@ func (c *PeeringService) Run() {
 					c.strategy.NextPeer()
 					continue
 				}
+				// Check if the peer is already connected by the host
+				peerList := h.Network().Peers()
+				fmt.Println("connected peers from host:", len(peerList))
+				fmt.Println("recorded conn:", c.host.ConnCounter, "| disconn:", c.host.DisconnCounter)
+				connected := false
+				for _, p := range peerList {
+					if p.String() == peerID.String() {
+						connected = true
+						break
+					}
+				}
+				if connected {
+					c.Log.Info("Peer", peerID.String, "was already connected")
+					c.strategy.NextPeer()
+					continue
+				}
+
 				// Set the correct address format to connect the peers
 				// libp2p complains if we put multi-addresses that include the peer ID into the Addrs list.
 				addrs := nextPeer.ExtractPublicAddr()
@@ -154,6 +171,7 @@ func (c *PeeringService) Run() {
 				attempts := 1
 				timeoutctx, cancel := context.WithTimeout(peeringCtx, c.Timeout)
 				for attempts <= c.MaxRetries {
+					fmt.Println("Attempting Peer", peerID.String())
 					if err := h.Connect(timeoutctx, addrInfo); err != nil {
 						c.Log.WithError(err).Debugf("attempts %d failed connection attempt", attempts)
 						// the connetion failed
@@ -182,11 +200,13 @@ func (c *PeeringService) Run() {
 
 			// New connection
 			case newConn := <-newConnChan:
+				fmt.Println("disconn peer %s | HOST", newConn.Peer.PeerId)
 				c.Log.Debugf("new conection from %s", newConn.Peer.PeerId)
 				c.strategy.NewConnection(newConn)
 
 			// New disconnection
 			case newDisconn := <-newDisconnChan:
+				fmt.Println("disconn peer %s | HOST", newDisconn.Peer.PeerId)
 				c.Log.Debugf("new disconection from %s", newDisconn.Peer.PeerId)
 				c.strategy.NewDisconnection(newDisconn)
 
