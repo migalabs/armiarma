@@ -468,6 +468,10 @@ func (pm *Peer) ToCsvLine() string {
 			forkDigest = eth2Dat.ForkDigest.String()
 		}
 	}
+	lastConnectionTime := ""
+	if len(pm.ConnectionTimes) > 0 {
+		lastConnectionTime = pm.ConnectionTimes[len(pm.ConnectionTimes)-1].String()
+	}
 
 	csvRow := pm.PeerId + "," +
 		pm.NodeId + "," +
@@ -495,6 +499,7 @@ func (pm *Peer) ToCsvLine() string {
 		fmt.Sprintf("%.6f", pm.Latency) + "," +
 		fmt.Sprintf("%d", len(pm.ConnectionTimes)) + "," +
 		fmt.Sprintf("%d", len(pm.DisconnectionTimes)) + "," +
+		lastConnectionTime + "," +
 		fmt.Sprintf("%.6f", pm.GetConnectedTime()) + "," +
 		strconv.FormatUint(pm.GetNumOfMsgFromTopic("BeaconBlock"), 10) + "," +
 		strconv.FormatUint(pm.GetNumOfMsgFromTopic("BeaconAggregateProof"), 10) + "," +
