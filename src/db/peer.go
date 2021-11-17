@@ -262,15 +262,28 @@ func (pm *Peer) AddPositiveConnAttempt() {
 // Register when a new connection was detected
 func (pm *Peer) ConnectionEvent(direction string, time time.Time) {
 	pm.ConnectionTimes = append(pm.ConnectionTimes, time)
-	pm.IsConnected = true
 	pm.ConnectedDirection = direction
+	pm.IsConnected = pm.CheckIfPeerRealConnect()
 }
 
 // Register when a disconnection was detected
 func (pm *Peer) DisconnectionEvent(time time.Time) {
 	pm.DisconnectionTimes = append(pm.DisconnectionTimes, time)
-	pm.IsConnected = false
 	pm.ConnectedDirection = ""
+	pm.IsConnected = pm.CheckIfPeerRealConnect()
+}
+
+func (pm *Peer) CheckIfPeerRealConnect() bool {
+	if len(pm.ConnectionTimes) == 0 {
+		return false
+	}
+	lastConn := pm.ConnectionTimes[len(pm.ConnectionTimes)-1]
+
+	if len(pm.DisconnectionTimes) == 0 {
+		return true
+	}
+	lastDisconn := pm.DisconnectionTimes[len(pm.DisconnectionTimes)-1]
+	return lastDisconn.Before(lastConn)
 }
 
 // GetLastActivityTime
@@ -508,6 +521,7 @@ func (pm *Peer) ToCsvLine() string {
 		fmt.Sprintf("%d", len(pm.ConnectionTimes)) + "," +
 		fmt.Sprintf("%d", len(pm.DisconnectionTimes)) + "," +
 		lastConnectionTime + "," +
+		pm.ConnectedDirection + "," +
 		fmt.Sprintf("%.6f", pm.GetConnectedTime()) + "," +
 		strconv.FormatUint(pm.GetNumOfMsgFromTopic("BeaconBlock"), 10) + "," +
 		strconv.FormatUint(pm.GetNumOfMsgFromTopic("BeaconAggregateProof"), 10) + "," +

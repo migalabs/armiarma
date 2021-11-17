@@ -3,7 +3,6 @@ package hosts
 import (
 	"context"
 	"encoding/hex"
-	"fmt"
 	"time"
 
 	"github.com/pkg/errors"
@@ -104,10 +103,7 @@ type HostWithIDService interface {
 // it aggregates the info from the libp2p Identify protocol adding some extra info such as RTT between local host and remote peer
 // return empty struct and error if failure on the identify process
 func ReqHostInfo(ctx context.Context, h host.Host, conn network.Conn, peer *db.Peer) (err_ident error) {
-	// time out for ping
-	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
-	tout := timeoutCtx.Done()
-	defer cancel()
+
 	peerID := conn.RemotePeer()
 
 	// Identify Peer to access main data
@@ -127,8 +123,9 @@ func ReqHostInfo(ctx context.Context, h host.Host, conn network.Conn, peer *db.P
 	case <-idService.IdentifyWait(conn):
 		peer.MetadataSucceed = true
 		rtt = time.Since(t)
-	case <-tout:
+	case <-ctx.Done():
 		err_ident = errors.Errorf("identification error caused by timed out")
+		return err_ident
 	}
 
 	// Fill the the metrics
@@ -150,7 +147,7 @@ func ReqHostInfo(ctx context.Context, h host.Host, conn network.Conn, peer *db.P
 	multiAddrStr := conn.RemoteMultiaddr().String() + "/p2p/" + peerID.String()
 	multiAddr, err := ma.NewMultiaddr(multiAddrStr)
 	if err != nil {
-		return fmt.Errorf("error composing the maddrs from peer %s", err)
+		return errors.Wrap(err, "unable to compose the maddrs")
 	}
 	// generate array of MAddr to fit the db.Peer struct
 	mAddrs := make([]ma.Multiaddr, 0)
@@ -176,7 +173,7 @@ func ReqHostInfo(ctx context.Context, h host.Host, conn network.Conn, peer *db.P
 	} else {
 		// EDGY CASE: when peers refuse the connection, the callback gets called and the identify protocol
 		// returns an empty struct (we are unable to identify them)
-		err_ident = errors.Errorf("identification error caused by connection refuse")
+		err_ident = errors.Errorf("unable to identify peer")
 	}
 	pubk, err := conn.RemotePublicKey().Raw()
 	if err == nil {
