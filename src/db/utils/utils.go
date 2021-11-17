@@ -69,6 +69,8 @@ func FilterError(err string) string {
 		errorPretty = "dial backoff"
 	} else if strings.Contains(err, "connection refused") {
 		errorPretty = "connection refused"
+	} else if strings.Contains(err, "context deadline exceeded") {
+		errorPretty = "connection droped by peer"
 	} else if strings.Contains(err, "no route to host") {
 		errorPretty = "no route to host"
 	} else if strings.Contains(err, "network is unreachable") {

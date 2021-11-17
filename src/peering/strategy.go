@@ -14,8 +14,7 @@ type PeeringStrategy interface {
 	Run() chan db.Peer
 	NextPeer()
 	NewConnectionAttempt(ConnectionAttemptStatus)
-	NewConnection(hosts.ConnectionStatus)
-	NewDisconnection(hosts.DisconnectionStatus)
+	NewConnectionEvent(hosts.ConnectionEvent)
 	Type() string
 	//GetPeerBatch() []peer.ID
 	Close()

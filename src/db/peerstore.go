@@ -1,6 +1,7 @@
 package db
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"runtime"
@@ -14,6 +15,8 @@ import (
 )
 
 var (
+	ExportLoopTime time.Duration = 1 * time.Minute
+
 	BoltDBKey string            = "BoltDB"
 	MemoryKey string            = "Memory"
 	DBTypes   map[string]string = map[string]string{
@@ -281,7 +284,7 @@ func (c *PeerStore) ExportToCSV(filePath string) error {
 	defer csvFile.Close()
 
 	// First raw of the file will be the Titles of the columns
-	_, err = csvFile.WriteString("Peer Id,Node Id,Fork Digest,User Agent,Client,Version,Pubkey,Address,Ip,Country,City,Request Metadata,Success Metadata,Attempted,Succeed,Deprecated,ConnStablished,IsConnected,Attempts,Error,Latency,Connections,Disconnections,Last Connection,Connected Time,Beacon Blocks,Beacon Aggregations,Voluntary Exits,Proposer Slashings,Attester Slashings,Total Messages\n")
+	_, err = csvFile.WriteString("Peer Id,Node Id,Fork Digest,User Agent,Client,Version,Pubkey,Address,Ip,Country,City,Request Metadata,Success Metadata,Attempted,Succeed,Deprecated,ConnStablished,IsConnected,Attempts,Error,Latency,Connections,Disconnections,Last Connection,Last Conn Direction,Connected Time,Beacon Blocks,Beacon Aggregations,Voluntary Exits,Proposer Slashings,Attester Slashings,Total Messages\n")
 	if err != nil {
 		errors.Wrap(err, "error while writing the titles on the csv "+filePath)
 	}
@@ -300,10 +303,15 @@ func (c *PeerStore) ExportToCSV(filePath string) error {
 	return nil
 }
 
-func (p *PeerStore) ExportLoop(folderpath string) {
+func (p *PeerStore) ExportLoop(ctx context.Context, folderpath string) {
+	ticker := time.NewTicker(ExportLoopTime)
 	for {
-		p.ExportToCSV(folderpath + "/metrics.csv")
-		time.Sleep(30 * time.Minute)
-
+		select {
+		case <-ticker.C:
+			p.ExportToCSV(folderpath + "/metrics.csv")
+		case <-ctx.Done():
+			ticker.Stop()
+			return
+		}
 	}
 }

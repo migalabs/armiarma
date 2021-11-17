@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	noise "github.com/libp2p/go-libp2p-noise"
+	tcp_transport "github.com/libp2p/go-tcp-transport"
 	"github.com/migalabs/armiarma/src/base"
 	"github.com/migalabs/armiarma/src/db"
 	"github.com/migalabs/armiarma/src/info"
@@ -18,7 +20,7 @@ import (
 
 var (
 	ModuleName       = "LIBP2P_HOST"
-	ConnNotChannSize = 100
+	ConnNotChannSize = 200
 )
 
 // Struct that defines the Basic Struct asociated to the Libtp2p host
@@ -34,9 +36,8 @@ type BasicLibp2pHost struct {
 	multiAddr     ma.Multiaddr
 	fullMultiAddr ma.Multiaddr
 
-	connNotChan    chan ConnectionStatus
-	disconnNotChan chan DisconnectionStatus
-	peerID         peer.ID
+	connEventNotChannel chan ConnectionEvent
+	peerID              peer.ID
 
 	// TEMP
 
@@ -55,6 +56,7 @@ type BasicLibp2pHostOpts struct {
 // TODO: missing argument for app info (givin Privkeys, IPs, ports, userAgents)
 func NewBasicLibp2pHost(ctx context.Context, opts BasicLibp2pHostOpts) (*BasicLibp2pHost, error) {
 	// Generate Base module struct with basic funtioning
+	opts.LogOpts.Level = "debug"
 	b, err := base.NewBase(
 		base.WithContext(ctx),
 		base.WithLogger(base.LogOpts{
@@ -90,6 +92,9 @@ func NewBasicLibp2pHost(ctx context.Context, opts BasicLibp2pHostOpts) (*BasicLi
 		libp2p.ListenAddrs(muladdr),
 		libp2p.Identity(privkey),
 		libp2p.UserAgent(opts.Info_obj.GetUserAgent()),
+		libp2p.Transport(tcp_transport.NewTCPTransport),
+		libp2p.Security(noise.ID, noise.New),
+		libp2p.NATPortMap(),
 	)
 	if err != nil {
 		return nil, err
@@ -105,16 +110,15 @@ func NewBasicLibp2pHost(ctx context.Context, opts BasicLibp2pHostOpts) (*BasicLi
 	}
 	// Gererate the struct that contains all the configuration and structs surrounding the Libp2p Host
 	basicHost := &BasicLibp2pHost{
-		Base:           b,
-		host:           host,
-		identify:       ids,
-		PeerStore:      opts.PeerStore,
-		info_obj:       &opts.Info_obj,
-		multiAddr:      muladdr,
-		fullMultiAddr:  localMultiaddr,
-		peerID:         peer.ID(peerId),
-		connNotChan:    make(chan ConnectionStatus, ConnNotChannSize),
-		disconnNotChan: make(chan DisconnectionStatus, ConnNotChannSize),
+		Base:                b,
+		host:                host,
+		identify:            ids,
+		PeerStore:           opts.PeerStore,
+		info_obj:            &opts.Info_obj,
+		multiAddr:           muladdr,
+		fullMultiAddr:       localMultiaddr,
+		peerID:              peer.ID(peerId),
+		connEventNotChannel: make(chan ConnectionEvent, ConnNotChannSize),
 	}
 	b.Log.Debug("setting custom notification functions")
 	basicHost.SetCustomNotifications()
@@ -144,20 +148,12 @@ func (b *BasicLibp2pHost) Stop() {
 	b.Cancel()
 }
 
-func (b *BasicLibp2pHost) ConnNotChan() chan ConnectionStatus {
-	return b.connNotChan
+func (b *BasicLibp2pHost) RecConnEvent(connEvent ConnectionEvent) {
+	b.connEventNotChannel <- connEvent
 }
 
-func (b *BasicLibp2pHost) RecNewConn(connStat ConnectionStatus) {
-	b.connNotChan <- connStat
-}
-
-func (b *BasicLibp2pHost) DisconnNotChan() chan DisconnectionStatus {
-	return b.disconnNotChan
-}
-
-func (b *BasicLibp2pHost) RecNewDisconn(disconnStat DisconnectionStatus) {
-	b.disconnNotChan <- disconnStat
+func (b *BasicLibp2pHost) ConnEventNotChannel() chan ConnectionEvent {
+	return b.connEventNotChannel
 }
 
 func (b *BasicLibp2pHost) GetInfoObj() *info.InfoData {

@@ -93,9 +93,6 @@ var crawlerCmd = &cobra.Command{
 
 		// TODO: generate a new DB
 		db := db.NewPeerStore(info_tmp.GetDBType(), info_tmp.GetOutputPath())
-		// Generate a Peering Service (so far with default peering strategy)
-		db.ServeMetrics(mainCtx)
-		go db.ExportLoop(info_tmp.GetOutputPath())
 
 		hostOpts := hosts.BasicLibp2pHostOpts{
 			Info_obj:  *info_tmp,
@@ -181,6 +178,7 @@ func init() {
 // generate new CrawlerBase
 func (c *CrawlerBase) Run() error {
 	// initialization secuence for the crawler
+	mainctx := c.Ctx()
 
 	c.Host.Start()
 	c.Dv5.Start_dv5()
@@ -192,6 +190,9 @@ func (c *CrawlerBase) Run() error {
 		c.Gs.JoinAndSubscribe(topic)
 	}
 	c.Gs.ServeMetrics()
+	// Generate a Peering Service (so far with default peering strategy)
+	c.DB.ServeMetrics(mainctx)
+	go c.DB.ExportLoop(mainctx, c.Info.GetOutputPath())
 
 	select {}
 	// return nil

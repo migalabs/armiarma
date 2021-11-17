@@ -21,7 +21,7 @@ import (
 
 var (
 	MOD_NAME                = "PEERING"
-	ConnectionRefuseTimeout = 10 * time.Second
+	ConnectionRefuseTimeout = 15 * time.Second
 	MaxRetries              = 1
 )
 
@@ -50,7 +50,7 @@ func NewPeeringService(ctx context.Context, h *hosts.BasicLibp2pHost, peerstore 
 	// TODO: cancel is still not implemented in the BaseCreation
 	peeringCtx, _ := context.WithCancel(ctx)
 	logOpts := peeringOpts.LogOpts
-	//logOpts.Level = "debug"
+	logOpts.Level = "debug"
 	logOpts.ModName = MOD_NAME
 	b, err := base.NewBase(
 		base.WithContext(peeringCtx),
@@ -106,120 +106,140 @@ func WithPeeringStrategy(strategy PeeringStrategy) PeeringOption {
 // * Notify the strategy of any conn/disconn recorded
 func (c *PeeringService) Run() {
 	c.Log.Debug("starting the peering service")
+	// set up the routines that will peer and record connections
+	go c.peeringRoutine()
+	go c.eventRecorderRoutine()
+}
+
+func (c *PeeringService) peeringRoutine() {
+	c.Log.Debug("starting the peering service")
 	peeringCtx := c.Ctx()
 	h := c.host.Host()
-	// get the connection and disconnection notification channels from the host
-	newConnChan := c.host.ConnNotChan()
-	newDisconnChan := c.host.DisconnNotChan()
 
 	// start the peering strategy
 	peerStreamChan := c.strategy.Run()
 	// Request new peer from the peering strategy
 	c.strategy.NextPeer()
 
-	// set up the loop where every given time we will stop it to refresh the peerstore
-	go func() {
-		for {
-			select {
-			// Next peer arrives
-			case nextPeer := <-peerStreamChan:
-				c.Log.Debugf("new peer %s to connect", nextPeer.PeerId)
-				peerID, err := peer.Decode(nextPeer.PeerId)
-				if err != nil {
-					c.Log.Warnf("coulnd't extract peer.ID from peer %s", nextPeer.PeerId)
-					// Request the next peer when case is over
-					c.strategy.NextPeer()
-					continue
-				}
-				// Check if the peer is already connected by the host
-				peerList := h.Network().Peers()
-				fmt.Println("connected peers from host:", len(peerList))
-				fmt.Println("recorded conn:", c.host.ConnCounter, "| disconn:", c.host.DisconnCounter)
-				connected := false
-				for _, p := range peerList {
-					if p.String() == peerID.String() {
-						connected = true
-						break
-					}
-				}
-				if connected {
-					c.Log.Info("Peer", peerID.String, "was already connected")
-					c.strategy.NextPeer()
-					continue
-				}
-
-				// Set the correct address format to connect the peers
-				// libp2p complains if we put multi-addresses that include the peer ID into the Addrs list.
-				addrs := nextPeer.ExtractPublicAddr()
-				transport, _ := peer.SplitAddr(addrs)
-				if transport == nil {
-					// Request the next peer when case is over
-					c.strategy.NextPeer()
-					continue
-				}
-				addrInfo := peer.AddrInfo{
-					ID:    peerID,
-					Addrs: make([]ma.Multiaddr, 0, 1),
-				}
-				addrInfo.Addrs = append(addrInfo.Addrs, transport)
-				nPeer := db.NewPeer(nextPeer.PeerId)
-				connAttStat := ConnectionAttemptStatus{
-					Peer: nPeer,
-				}
-				c.Log.Debugf("addrs %s attempting connection to peer", addrInfo.Addrs)
-				// try to connect the peer
-				attempts := 1
-				timeoutctx, cancel := context.WithTimeout(peeringCtx, c.Timeout)
-				for attempts <= c.MaxRetries {
-					fmt.Println("Attempting Peer", peerID.String())
-					if err := h.Connect(timeoutctx, addrInfo); err != nil {
-						c.Log.WithError(err).Debugf("attempts %d failed connection attempt", attempts)
-						// the connetion failed
-						// fill the ConnectionStatus for the given peer connection
-						connAttStat.Timestamp = time.Now()
-						connAttStat.Successful = false
-						connAttStat.RecError = err
-						// increment the attempts
-						attempts++
-						continue
-					} else { // connection successfuly made
-						c.Log.Debugf("peer_id %s successful connection made", peerID.String())
-						// fill the ConnectionStatus for the given peer connection
-						connAttStat.Timestamp = time.Now()
-						connAttStat.Successful = true
-						connAttStat.RecError = nil
-						// break the loop
-						break
-					}
-				}
-				cancel()
-				// send it to the strategy
-				c.strategy.NewConnectionAttempt(connAttStat)
+	// set up the loop that will receive peers to connect
+	for {
+		select {
+		// Next peer arrives
+		case nextPeer := <-peerStreamChan:
+			c.Log.Debugf("new peer %s to connect", nextPeer.PeerId)
+			peerID, err := peer.Decode(nextPeer.PeerId)
+			if err != nil {
+				c.Log.Warnf("coulnd't extract peer.ID from peer %s", nextPeer.PeerId)
 				// Request the next peer when case is over
 				c.strategy.NextPeer()
-
-			// New connection
-			case newConn := <-newConnChan:
-				fmt.Println("disconn peer %s | HOST", newConn.Peer.PeerId)
-				c.Log.Debugf("new conection from %s", newConn.Peer.PeerId)
-				c.strategy.NewConnection(newConn)
-
-			// New disconnection
-			case newDisconn := <-newDisconnChan:
-				fmt.Println("disconn peer %s | HOST", newDisconn.Peer.PeerId)
-				c.Log.Debugf("new disconection from %s", newDisconn.Peer.PeerId)
-				c.strategy.NewDisconnection(newDisconn)
-
-			// Stoping go routine
-			case <-peeringCtx.Done():
-				c.Log.Debug("closing peering go routine")
+				continue
 			}
+			// Check if the peer is already connected by the host
+			peerList := h.Network().Peers()
+			fmt.Println("connected peers from host: \n", peerList)
+			fmt.Println("recorded conn:", c.host.ConnCounter, "| disconn:", c.host.DisconnCounter)
+			connected := false
+			for _, p := range peerList {
+				if p.String() == peerID.String() {
+					connected = true
+					break
+				}
+			}
+			if connected {
+				c.Log.Info("Peer", peerID.String, "was already connected")
+				c.strategy.NextPeer()
+				continue
+			}
+
+			// Set the correct address format to connect the peers
+			// libp2p complains if we put multi-addresses that include the peer ID into the Addrs list.
+			addrs := nextPeer.ExtractPublicAddr()
+			transport, _ := peer.SplitAddr(addrs)
+			if transport == nil {
+				// Request the next peer when case is over
+				c.strategy.NextPeer()
+				continue
+			}
+			addrInfo := peer.AddrInfo{
+				ID:    peerID,
+				Addrs: make([]ma.Multiaddr, 0, 1),
+			}
+			addrInfo.Addrs = append(addrInfo.Addrs, transport)
+			nPeer := db.NewPeer(nextPeer.PeerId)
+			connAttStat := ConnectionAttemptStatus{
+				Peer: nPeer,
+			}
+			c.Log.Debugf("addrs %s attempting connection to peer", addrInfo.Addrs)
+			// try to connect the peer
+			attempts := 0
+			timeoutctx, cancel := context.WithTimeout(peeringCtx, c.Timeout)
+			for attempts < c.MaxRetries {
+				fmt.Println("Attempting Peer", peerID.String())
+				if err := h.Connect(timeoutctx, addrInfo); err != nil {
+					c.Log.WithError(err).Debugf("attempts %d failed connection attempt", attempts+1)
+					// the connetion failed
+					// fill the ConnectionStatus for the given peer connection
+					connAttStat.Timestamp = time.Now()
+					connAttStat.Successful = false
+					connAttStat.RecError = err
+					// increment the attempts
+					attempts++
+					continue
+				} else { // connection successfuly made
+					c.Log.Debugf("peer_id %s successful connection made", peerID.String())
+					// fill the ConnectionStatus for the given peer connection
+					connAttStat.Timestamp = time.Now()
+					connAttStat.Successful = true
+					connAttStat.RecError = nil
+					// break the loop
+					break
+				}
+			}
+			cancel()
+			// send it to the strategy
+			c.strategy.NewConnectionAttempt(connAttStat)
+			// Request the next peer when case is over
+			c.strategy.NextPeer()
+
+		// Stoping go routine
+		case <-peeringCtx.Done():
+			c.Log.Debug("closing peering go routine")
 		}
-	}()
+	}
+
 }
 
-func (c *PeeringService) peeringRoutine() {
+// eventRecorderRoutine
+// * Connection and Disconnection event recorder,
+// * the event selector records the status of any incoming connection and disconnection
+// * Notify the strategy of any conn/disconn recorded
+func (c *PeeringService) eventRecorderRoutine() {
+	c.Log.Debug("starting the event recorder service")
+	peeringCtx := c.Ctx()
+	// get the connection and disconnection notification channels from the host
+	newConnEventChan := c.host.ConnEventNotChannel()
 
+	for {
+		select {
+		// New connection event
+		case newConn := <-newConnEventChan:
+			switch newConn.ConnType {
+			case int8(0):
+				c.Log.Debugf("not type assigned to event from %s", newConn.Peer.PeerId)
+			case int8(1):
+				c.Log.Debugf("new conection from %s", newConn.Peer.PeerId)
+			case int8(2):
+				c.Log.Debugf("new disconnection from %s", newConn.Peer.PeerId)
+			default:
+				c.Log.Debugf("unrecognized event from peer %s", newConn.Peer.PeerId)
+			}
+			c.strategy.NewConnectionEvent(newConn)
+
+		// Stoping go routine
+		case <-peeringCtx.Done():
+			c.Log.Debug("closing peering go routine")
+		}
+	}
 }
 
 // Close
