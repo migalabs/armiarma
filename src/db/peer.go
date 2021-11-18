@@ -269,7 +269,6 @@ func (pm *Peer) ConnectionEvent(direction string, time time.Time) {
 // Register when a disconnection was detected
 func (pm *Peer) DisconnectionEvent(time time.Time) {
 	pm.DisconnectionTimes = append(pm.DisconnectionTimes, time)
-	pm.ConnectedDirection = ""
 	pm.IsConnected = pm.CheckIfPeerRealConnect()
 }
 

@@ -24,7 +24,8 @@ type PeeringStrategy interface {
 // * It is the struct that compiles the data of an active connection attempt done by the host
 // * The struct will be shared between peering and strategy.
 type ConnectionAttemptStatus struct {
-	Peer       db.Peer   // TODO: right now just sending the entire info about the peer, (recheck after Peer struct subdivision)
+	Peer       db.Peer // TODO: right now just sending the entire info about the peer, (recheck after Peer struct subdivision)
+	Attempts   int32
 	Timestamp  time.Time // Timestamp of when was the attempt done
 	Successful bool      // Whether the connection attempt was successfully done or not
 	RecError   error     // if the connection attempt reported any error, nil otherwise
