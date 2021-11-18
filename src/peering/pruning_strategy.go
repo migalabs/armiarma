@@ -221,6 +221,7 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 				peerListLen = c.PeerQueue.Len()
 				c.Log.Infof("got new peer list with %d", peerListLen)
 				validIterTimer = time.NewTimer(MinIterTime)
+				iterStartTime = time.Now()
 				peerCounter = 0
 				nextIterFlag = false
 			}

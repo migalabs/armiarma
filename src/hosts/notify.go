@@ -33,10 +33,20 @@ func (c *BasicLibp2pHost) standardListenCloseF(net network.Network, addr ma.Mult
 }
 
 func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Conn) {
-	t := time.Now()
+	// TODO: -Generate new channel for the peer HostInfo, Metadata, Status
+	// 		 currently using same channel for connections, desconnections and Identifications
+	// 		 -Make synchronous routines to request HostInfo, Metadata, and Status at the same time
+	// 		 with a given timeout for all of them (3-4 secs?)
+	//
+
 	// Add new connection event
-	c.Log.Debugf("stamping connection to peer %s", conn.RemotePeer().String())
+	// NOTE: Moved to the beginning of the notification to track the event as soon as it happens
+	// cause: disconnections where getting tracked sooner that the connectios.
+	// (it still happens that we record the disconnection of a peer sooner than the conection)
+	// ConnectionEvent and Disconnection
+	t := time.Now()
 	p := db.NewPeer(conn.RemotePeer().String())
+	// TODO: Add the connection ID to the connection and disconnection events
 	p.ConnectionEvent(conn.Stat().Direction.String(), t)
 	cs := ConnectionEvent{
 		ConnType:  int8(1),
