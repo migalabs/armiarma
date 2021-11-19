@@ -7,4 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func Test()
+func Test(t testing.T) {
+
+}

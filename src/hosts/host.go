@@ -20,7 +20,7 @@ import (
 
 var (
 	ModuleName       = "LIBP2P_HOST"
-	ConnNotChannSize = 200
+	ConnNotChannSize = 400
 )
 
 // Struct that defines the Basic Struct asociated to the Libtp2p host
@@ -38,11 +38,6 @@ type BasicLibp2pHost struct {
 
 	connEventNotChannel chan ConnectionEvent
 	peerID              peer.ID
-
-	// TEMP
-
-	ConnCounter    int
-	DisconnCounter int
 }
 
 type BasicLibp2pHostOpts struct {
@@ -56,7 +51,7 @@ type BasicLibp2pHostOpts struct {
 // TODO: missing argument for app info (givin Privkeys, IPs, ports, userAgents)
 func NewBasicLibp2pHost(ctx context.Context, opts BasicLibp2pHostOpts) (*BasicLibp2pHost, error) {
 	// Generate Base module struct with basic funtioning
-	opts.LogOpts.Level = "debug"
+	//opts.LogOpts.Level = "debug"
 	b, err := base.NewBase(
 		base.WithContext(ctx),
 		base.WithLogger(base.LogOpts{

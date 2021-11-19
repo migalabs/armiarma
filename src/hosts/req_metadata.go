@@ -124,8 +124,7 @@ func ReqHostInfo(ctx context.Context, h host.Host, conn network.Conn, peer *db.P
 		peer.MetadataSucceed = true
 		rtt = time.Since(t)
 	case <-ctx.Done():
-		err_ident = errors.Errorf("identification error caused by timed out")
-		return err_ident
+		return errors.Errorf("identification error caused by timed out")
 	}
 
 	// Fill the the metrics
@@ -142,7 +141,6 @@ func ReqHostInfo(ctx context.Context, h host.Host, conn network.Conn, peer *db.P
 	// Update the values of the
 	peer.Latency = float64(rtt/time.Millisecond) / 1000
 	peer.PeerId = peerID.String()
-	peer.ConnectedDirection = conn.Stat().Direction.String()
 
 	multiAddrStr := conn.RemoteMultiaddr().String() + "/p2p/" + peerID.String()
 	multiAddr, err := ma.NewMultiaddr(multiAddrStr)
@@ -157,7 +155,7 @@ func ReqHostInfo(ctx context.Context, h host.Host, conn network.Conn, peer *db.P
 	country, city, countryCode, err := db_utils.GetLocationFromIp(peer.Ip)
 	if err != nil {
 		// TODO: think about a better idea to integrate a logger into this functions
-		log.Warnf("error when fetching country/city from ip", err)
+		log.Warnf("error when fetching country/city from ip %s. %s", peer.Ip, err.Error())
 	} else {
 		peer.Country = country
 		peer.City = city
@@ -174,6 +172,7 @@ func ReqHostInfo(ctx context.Context, h host.Host, conn network.Conn, peer *db.P
 		// EDGY CASE: when peers refuse the connection, the callback gets called and the identify protocol
 		// returns an empty struct (we are unable to identify them)
 		err_ident = errors.Errorf("unable to identify peer")
+		peer.MetadataSucceed = false
 	}
 	pubk, err := conn.RemotePublicKey().Raw()
 	if err == nil {

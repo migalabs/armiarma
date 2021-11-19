@@ -32,11 +32,13 @@ func FilterClientType(userAgent string) (string, string) {
 		return "Grandine", cleanVersion(getVersionIfAny(fields, 1))
 	} else if strings.Contains(userAgentLower, "eth2-crawler") {
 		return "NodeWatch", ""
-	} else if strings.Contains(userAgentLower, "BSC-Eth2-Crawler") {
+	} else if strings.Contains(userAgentLower, "BSC-Eth2-Crawler") || strings.Contains(userAgentLower, "BSC-Armiarma") {
 		return "BSC-Eth2-Crawler", ""
+	} else if userAgentLower == "" {
+		return "NotIdentified", ""
 	} else {
 		log.Debugf("Could not get client from userAgent: %s", userAgent)
-		return "Unknown", "Unknown"
+		return "Others", ""
 	}
 }
 
@@ -60,24 +62,34 @@ func FilterError(err string) string {
 	errorPretty := "Uncertain"
 	// filter the error type
 	if strings.Contains(err, "connection reset by peer") {
+		// The peer that we tried to connect resets/drops the connection
 		errorPretty = "Connection reset by peer"
-	} else if strings.Contains(err, "i/o timeout") || strings.Contains(err, "context deadline exceeded") {
+	} else if strings.Contains(err, "i/o timeout") {
+		// When trying to connect a peer, the timeout waiting for stablishing the connection was triggered
 		errorPretty = "i/o timeout"
 	} else if strings.Contains(err, "dial to self attempted") {
+		// When the host tries to connect to itself
 		errorPretty = "dial to self attempted"
 	} else if strings.Contains(err, "dial backoff") {
 		errorPretty = "dial backoff"
 	} else if strings.Contains(err, "connection refused") {
+		// The peer that we tried to connect refuses/drops the connection
 		errorPretty = "connection refused"
 	} else if strings.Contains(err, "context deadline exceeded") {
-		errorPretty = "connection droped by peer"
+		// When the crawler is able to stablish the connection, but we are unable to identify it
+		// h.Connect() internally calls/identifies the peer which reports the error
+		errorPretty = "context deadline exceeded"
 	} else if strings.Contains(err, "no route to host") {
+		// Unable to find a host in that IP
 		errorPretty = "no route to host"
 	} else if strings.Contains(err, "network is unreachable") {
 		errorPretty = "unreachable network"
 	} else if strings.Contains(err, "peer id mismatch") {
+		// Dialing a peer that does not longer exist
+		// Hoever there is a new one with another peerID
 		errorPretty = "peer id mismatch"
 	} else {
+		// Uncertain (not tracked one)
 		log.Errorf("uncertain error: %s", err)
 	}
 	// TODO: Further encountered errors:

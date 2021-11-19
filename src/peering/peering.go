@@ -21,8 +21,9 @@ import (
 
 var (
 	MOD_NAME                = "PEERING"
-	ConnectionRefuseTimeout = 15 * time.Second
+	ConnectionRefuseTimeout = 10 * time.Second
 	MaxRetries              = 1
+	DefaultWorkers          = 10
 )
 
 type PeeringOption func(*PeeringService) error
@@ -50,7 +51,7 @@ func NewPeeringService(ctx context.Context, h *hosts.BasicLibp2pHost, peerstore 
 	// TODO: cancel is still not implemented in the BaseCreation
 	peeringCtx, _ := context.WithCancel(ctx)
 	logOpts := peeringOpts.LogOpts
-	logOpts.Level = "debug"
+	//logOpts.Level = "debug"
 	logOpts.ModName = MOD_NAME
 	b, err := base.NewBase(
 		base.WithContext(peeringCtx),
@@ -106,18 +107,23 @@ func WithPeeringStrategy(strategy PeeringStrategy) PeeringOption {
 // * Notify the strategy of any conn/disconn recorded
 func (c *PeeringService) Run() {
 	c.Log.Debug("starting the peering service")
-	// set up the routines that will peer and record connections
-	go c.peeringRoutine()
-	go c.eventRecorderRoutine()
-}
-
-func (c *PeeringService) peeringRoutine() {
-	c.Log.Debug("starting the peering service")
-	peeringCtx := c.Ctx()
-	h := c.host.Host()
 
 	// start the peering strategy
 	peerStreamChan := c.strategy.Run()
+
+	// set up the routines that will peer and record connections
+	for worker := 1; worker <= DefaultWorkers; worker++ {
+		workerName := fmt.Sprintf("Peering Worker %d", worker)
+		go c.peeringWorker(workerName, peerStreamChan)
+	}
+	go c.eventRecorderRoutine()
+}
+
+func (c *PeeringService) peeringWorker(workerID string, peerStreamChan chan db.Peer) {
+	c.Log.Infof("launching %s", workerID)
+	peeringCtx := c.Ctx()
+	h := c.host.Host()
+
 	// Request new peer from the peering strategy
 	c.strategy.NextPeer()
 
@@ -126,18 +132,16 @@ func (c *PeeringService) peeringRoutine() {
 		select {
 		// Next peer arrives
 		case nextPeer := <-peerStreamChan:
-			c.Log.Debugf("new peer %s to connect", nextPeer.PeerId)
+			c.Log.Debugf("%s -> new peer %s to connect", workerID, nextPeer.PeerId)
 			peerID, err := peer.Decode(nextPeer.PeerId)
 			if err != nil {
-				c.Log.Warnf("coulnd't extract peer.ID from peer %s", nextPeer.PeerId)
+				c.Log.Warnf("%s -> coulnd't extract peer.ID from peer %s", workerID, nextPeer.PeerId)
 				// Request the next peer when case is over
 				c.strategy.NextPeer()
 				continue
 			}
 			// Check if the peer is already connected by the host
 			peerList := h.Network().Peers()
-			fmt.Println("connected peers from host: \n", peerList)
-			fmt.Println("recorded conn:", c.host.ConnCounter, "| disconn:", c.host.DisconnCounter)
 			connected := false
 			for _, p := range peerList {
 				if p.String() == peerID.String() {
@@ -146,7 +150,7 @@ func (c *PeeringService) peeringRoutine() {
 				}
 			}
 			if connected {
-				c.Log.Info("Peer", peerID.String, "was already connected")
+				c.Log.Infof("%s -> Peer %s was already connected", workerID, peerID.String)
 				c.strategy.NextPeer()
 				continue
 			}
@@ -169,14 +173,13 @@ func (c *PeeringService) peeringRoutine() {
 			connAttStat := ConnectionAttemptStatus{
 				Peer: nPeer,
 			}
-			c.Log.Debugf("addrs %s attempting connection to peer", addrInfo.Addrs)
+			c.Log.Debugf("%s addrs %s attempting connection to peer", workerID, addrInfo.Addrs)
 			// try to connect the peer
 			attempts := 0
 			timeoutctx, cancel := context.WithTimeout(peeringCtx, c.Timeout)
 			for attempts < c.MaxRetries {
-				fmt.Println("Attempting Peer", peerID.String())
 				if err := h.Connect(timeoutctx, addrInfo); err != nil {
-					c.Log.WithError(err).Debugf("attempts %d failed connection attempt", attempts+1)
+					c.Log.WithError(err).Debugf("%s attempts %d failed connection attempt", workerID, attempts+1)
 					// the connetion failed
 					// fill the ConnectionStatus for the given peer connection
 					connAttStat.Timestamp = time.Now()
@@ -184,9 +187,10 @@ func (c *PeeringService) peeringRoutine() {
 					connAttStat.RecError = err
 					// increment the attempts
 					attempts++
+					//time.Sleep(5 * time.Second)
 					continue
 				} else { // connection successfuly made
-					c.Log.Debugf("peer_id %s successful connection made", peerID.String())
+					c.Log.Debugf("%s peer_id %s successful connection made", workerID, peerID.String())
 					// fill the ConnectionStatus for the given peer connection
 					connAttStat.Timestamp = time.Now()
 					connAttStat.Successful = true
@@ -203,7 +207,7 @@ func (c *PeeringService) peeringRoutine() {
 
 		// Stoping go routine
 		case <-peeringCtx.Done():
-			c.Log.Debug("closing peering go routine")
+			c.Log.Debugf("closing %s", workerID)
 		}
 	}
 
