@@ -183,12 +183,14 @@ func (c *CrawlerBase) Run() error {
 	c.Host.Start()
 	c.Dv5.Start_dv5()
 	go c.Dv5.FindRandomNodes()
-	go c.Peering.Run()
 
 	topics := blockchaintopics.ReturnTopics(c.Info.GetForkDigest(), c.Info.GetTopicArray())
 	for _, topic := range topics {
 		c.Gs.JoinAndSubscribe(topic)
 	}
+
+	go c.Peering.Run()
+
 	c.Gs.ServeMetrics()
 	// Generate a Peering Service (so far with default peering strategy)
 	c.DB.ServeMetrics(mainctx)

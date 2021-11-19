@@ -55,7 +55,7 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 	}
 	c.RecConnEvent(cs)
 
-	// identify
+	// identify everything that we can about the peer
 	// not adding the connection 2 times
 	peer := db.NewPeer(conn.RemotePeer().String())
 	c.Log.WithFields(logrus.Fields{
@@ -63,7 +63,6 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 		"DIRECTION": conn.Stat().Direction.String(),
 	}).Debug("Peer: ", conn.RemotePeer().String())
 	// TEMP
-	c.ConnCounter++
 	mainCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	// Generate new peer to aggregate new data
@@ -74,7 +73,6 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 	// Request the Host Metadata
 	err := ReqHostInfo(mainCtx, h, conn, &peer)
 	if err != nil {
-		peer.MetadataSucceed = false
 		c.Log.WithFields(logrus.Fields{
 			"ERROR": err,
 		}).Debug("ReqHostInfo Peer: ", conn.RemotePeer().String())
@@ -130,7 +128,6 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 func (c *BasicLibp2pHost) standardDisconnectF(net network.Network, conn network.Conn) {
 	c.Log.Debugf("disconnected from peer %s", conn.RemotePeer().String())
 	// TEMP
-	c.DisconnCounter++
 
 	peer := db.NewPeer(conn.RemotePeer().String())
 	t := time.Now()
