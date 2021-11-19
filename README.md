@@ -7,7 +7,7 @@ Armiarma is a Eth2 network Analyzer based on the [Rumor](https://github.com/prot
 To use the tool the following tools needs to be installed on the machine:
 - Go on its 1.15 version or above. Go needs to be executable from the terminal and despite previous versions might work, we recomend ussing the 1.15 for a better preformance of the crawler. The current [dv5.1](https://github.com/ethereum/devp2p/blob/master/discv5/discv5.md) version will not work with lower versions than the 1.15.
 - Python3 and pip3 needs to be installed and executable from the shell.
-- The viertualenv tool needs to be installed for the metrics analyzer.
+- The virtualenv tool needs to be installed for the metrics analyzer.
 
 ### Usage
 
@@ -44,7 +44,7 @@ To perform the analysis of a given `[project-name]`, it can be done calling:
 
 
 ### NOTES
-Please, note that the tool is currently on a developing stage, any bugs reports or suggestions will be accepted.
+Please, note that the tool is currently on a developing stage, any bugs reports and/or suggestions are very welcome.
 
 ### LICENSE
 
