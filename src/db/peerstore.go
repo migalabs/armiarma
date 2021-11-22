@@ -160,9 +160,10 @@ func (c *PeerStore) AddNewNegConnectionAttempt(id string, rec_err string, fn Err
 	p.Attempts += 1
 	if !p.Attempted {
 		p.Attempted = true
-		p.Error = utils.FilterError(rec_err)
-
 	}
+
+	p.Error = append(p.Error, utils.FilterError(rec_err))
+	p.LastErrorTimestamp = time.Now()
 	// Handle each of the different error types as defined currently at pruneconnect.go
 	fn(&p)
 
@@ -185,7 +186,7 @@ func (c *PeerStore) AddNewPosConnectionAttempt(id string) error {
 
 	}
 	p.Succeed = true
-	p.Error = "None"
+	p.Error = append(p.Error, "None")
 	// clean the Negative connection Attempt list
 	p.AddPositiveConnAttempt()
 	// Store the new struct in the sync.Map
@@ -257,7 +258,10 @@ func (c *PeerStore) MessageEvent(peerId string, topicName string) error {
 func (gm *PeerStore) GetErrorCounter() map[string]uint64 {
 	errorsAndAmount := make(map[string]uint64)
 	gm.PeerStore.Range(func(key string, value Peer) bool {
-		errorsAndAmount[value.Error]++
+		for _, errTmp := range value.Error {
+			errorsAndAmount[errTmp]++
+		}
+
 		return true
 	})
 
@@ -284,7 +288,7 @@ func (c *PeerStore) ExportToCSV(filePath string) error {
 	defer csvFile.Close()
 
 	// First raw of the file will be the Titles of the columns
-	_, err = csvFile.WriteString("Peer Id,Node Id,Fork Digest,User Agent,Client,Version,Pubkey,Address,Ip,Country,City,Request Metadata,Success Metadata,Attempted,Succeed,Deprecated,ConnStablished,IsConnected,Attempts,Error,Latency,Connections,Disconnections,Last Connection,Last Conn Direction,Connected Time,Beacon Blocks,Beacon Aggregations,Voluntary Exits,Proposer Slashings,Attester Slashings,Total Messages\n")
+	_, err = csvFile.WriteString("Peer Id,Node Id,Fork Digest,User Agent,Client,Version,Pubkey,Address,Ip,Country,City,Request Metadata,Success Metadata,Attempted,Succeed,Deprecated,ConnStablished,IsConnected,Attempts,Error,Last Error Timestamp,Latency,Connections,Disconnections,Last Connection,Last Conn Direction,Connected Time,Beacon Blocks,Beacon Aggregations,Voluntary Exits,Proposer Slashings,Attester Slashings,Total Messages\n")
 	if err != nil {
 		errors.Wrap(err, "error while writing the titles on the csv "+filePath)
 	}

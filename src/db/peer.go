@@ -3,6 +3,7 @@ package db
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
@@ -44,13 +45,14 @@ type Peer struct {
 	ProtocolVersion string
 
 	// PeerMetrics
-	ConnectedDirection string
+	ConnectedDirection []string
 	IsConnected        bool
-	Attempted          bool   // If the peer has been attempted to stablish a connection
-	Succeed            bool   // If the connection attempt has been successful
-	Attempts           uint64 // Number of attempts done
-	Error              string // Type of error that we detected. TODO: We are just storing the last one
-	Deprecated         bool   // Flag to rummarize whether the peer is longer valid for statistics or not. If false, the peer is not exported in db.
+	Attempted          bool      // If the peer has been attempted to stablish a connection
+	Succeed            bool      // If the connection attempt has been successful
+	Attempts           uint64    // Number of attempts done
+	Error              []string  // Type of error that we detected. TODO: We are just storing the last one
+	LastErrorTimestamp time.Time // timestamp of the last error reported for this peer
+	Deprecated         bool      // Flag to rummarize whether the peer is longer valid for statistics or not. If false, the peer is not exported in db.
 
 	NegativeConnAttempts []time.Time // List of dates when the peer retreived a negative connection attempt (if there is a possitive one, clean the struct)
 	ConnectionTimes      []time.Time
@@ -76,9 +78,10 @@ type Peer struct {
 func NewPeer(peerId string) Peer {
 	pm := Peer{
 		PeerId:               peerId,
-		Error:                "None",
+		Error:                make([]string, 0),
 		MAddrs:               make([]ma.Multiaddr, 0),
 		Protocols:            make([]string, 0),
+		ConnectedDirection:   make([]string, 0),
 		NegativeConnAttempts: make([]time.Time, 0),
 		ConnectionTimes:      make([]time.Time, 0),
 		DisconnectionTimes:   make([]time.Time, 0),
@@ -139,13 +142,34 @@ func (pm *Peer) FetchPeerInfoFromPeer(newPeer Peer) {
 		log.Warnf("careful! peer with %d connections is getting fetched into peer with %d ones. This might end up in an exponential Heap-Memory increase.", len(newPeer.ConnectionTimes), len(pm.ConnectionTimes))
 	}
 
+	if len(newPeer.ConnectionTimes) != len(newPeer.ConnectedDirection) {
+		log.Warnf("Attention, fetching peer with different number of directions and connections")
+		log.Warnf("ConnectionTimes: %s, ConnectedDirection: %s", len(newPeer.ConnectionTimes), len(newPeer.ConnectedDirection))
+	}
+
+	connectedDirectionindex := 0
 	// Aggregate connections and disconnections
 	for _, time := range newPeer.ConnectionTimes {
-		pm.ConnectionEvent(newPeer.ConnectedDirection, time)
+
+		// check if the connection has an associated direction
+		newConnectedDirection := ""
+		// if we have exceeded the length of the array, default
+		if connectedDirectionindex >= len(newPeer.ConnectedDirection) {
+			newConnectedDirection = "unknown"
+		} else {
+			newConnectedDirection = newPeer.ConnectedDirection[connectedDirectionindex]
+			connectedDirectionindex++
+		}
+
+		pm.ConnectionEvent(newConnectedDirection, time)
 	}
 	for _, time := range newPeer.DisconnectionTimes {
 		pm.DisconnectionEvent(time)
 	}
+
+	/*for _, errorTmp := range newPeer.DisconnectionTimes {
+		pm.DisconnectionEvent(time)
+	}*/
 	/* REMOVABLE
 	if len(newPeer.ConnectionTimes) > 0 {
 		fmt.Println("ConnCase")
@@ -262,7 +286,7 @@ func (pm *Peer) AddPositiveConnAttempt() {
 // Register when a new connection was detected
 func (pm *Peer) ConnectionEvent(direction string, time time.Time) {
 	pm.ConnectionTimes = append(pm.ConnectionTimes, time)
-	pm.ConnectedDirection = direction
+	pm.ConnectedDirection = append(pm.ConnectedDirection, direction)
 	pm.IsConnected = pm.CheckIfPeerRealConnect()
 }
 
@@ -321,9 +345,10 @@ func (pm *Peer) ConnectionAttemptEvent(succeed bool, err string) {
 	}
 	if succeed {
 		pm.Succeed = true
-		pm.Error = "None"
+		pm.Error = append(pm.Error, "None")
 	} else {
-		pm.Error = m_utils.FilterError(err)
+		pm.Error = append(pm.Error, m_utils.FilterError(err))
+		pm.LastErrorTimestamp = time.Now()
 	}
 }
 
@@ -515,12 +540,13 @@ func (pm *Peer) ToCsvLine() string {
 		connStablished + "," +
 		strconv.FormatBool(pm.IsConnected) + "," +
 		strconv.FormatUint(pm.Attempts, 10) + "," +
-		pm.Error + "," +
+		strings.Join(pm.Error, "|") + "," +
+		pm.LastErrorTimestamp.String() + "," +
 		fmt.Sprintf("%.6f", pm.Latency) + "," +
 		fmt.Sprintf("%d", len(pm.ConnectionTimes)) + "," +
 		fmt.Sprintf("%d", len(pm.DisconnectionTimes)) + "," +
 		lastConnectionTime + "," +
-		pm.ConnectedDirection + "," +
+		strings.Join(pm.ConnectedDirection, "|") + "," +
 		fmt.Sprintf("%.6f", pm.GetConnectedTime()) + "," +
 		strconv.FormatUint(pm.GetNumOfMsgFromTopic("BeaconBlock"), 10) + "," +
 		strconv.FormatUint(pm.GetNumOfMsgFromTopic("BeaconAggregateProof"), 10) + "," +
@@ -587,6 +613,16 @@ func PeerUnMarshal(m map[string]interface{}) Peer {
 		protocolList = utils.ParseInterfaceStringArray(m["Protocols"].([]interface{}))
 	}
 
+	directionList := make([]string, 0)
+	if m["ConnectedDirection"] != nil {
+		directionList = utils.ParseInterfaceStringArray(m["ConnectedDirection"].([]interface{}))
+	}
+
+	errorList := make([]string, 0)
+	if m["Error"] != nil {
+		errorList = utils.ParseInterfaceStringArray(m["Error"].([]interface{}))
+	}
+
 	protocolVersionNew := ""
 	if m["ProtocolVersion"] != nil {
 		protocolVersionNew = m["ProtocolVersion"].(string)
@@ -608,6 +644,11 @@ func PeerUnMarshal(m map[string]interface{}) Peer {
 		}
 	}
 
+	lastError, err := time.Parse(time.RFC3339, m["LastErrorTimestamp"].(string))
+	if err != nil {
+		lastError = time.Time{}
+	}
+
 	// TODO: use constants for names
 	return Peer{
 		PeerId:               m["PeerId"].(string),
@@ -626,12 +667,13 @@ func PeerUnMarshal(m map[string]interface{}) Peer {
 		MAddrs:               m_addrs, // correct
 		Protocols:            protocolList,
 		ProtocolVersion:      protocolVersionNew,
-		ConnectedDirection:   m["ConnectedDirection"].(string),
+		ConnectedDirection:   directionList,
 		IsConnected:          m["IsConnected"].(bool),
 		Attempted:            m["Attempted"].(bool),
 		Succeed:              m["Succeed"].(bool),
 		Attempts:             uint64(m["Attempts"].(float64)),
-		Error:                m["Error"].(string),
+		Error:                errorList,
+		LastErrorTimestamp:   lastError,
 		Deprecated:           m["Deprecated"].(bool),
 		NegativeConnAttempts: negConns,
 		ConnectionTimes:      connTimes,
