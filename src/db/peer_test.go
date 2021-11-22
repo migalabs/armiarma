@@ -89,7 +89,7 @@ func parseTime(strTime string, t *testing.T) time.Time {
 	return parsedTime
 }
 
-func Test_FetchPeerInfoFromPeer(t *testing.T) {
+func Test_FetchPeerInfoFromNewPeer(t *testing.T) {
 	// generate base peer
 	peerBase := NewPeer("Peer1")
 
@@ -110,7 +110,9 @@ func Test_FetchPeerInfoFromPeer(t *testing.T) {
 	// Connected for 5 secs
 	peer2.ConnectionEvent("inbound", parseTime("2021-08-23T01:00:00.000Z", t))
 	peer2.DisconnectionEvent(parseTime("2021-08-23T01:00:05.000Z", t))
-	peerBase.FetchPeerInfoFromPeer(peer2)
+	peer2.AddNegConnAtt(false, "Try")
+	peer2.AddPositiveConnAttempt()
+	peerBase.FetchPeerInfoFromNewPeer(peer2)
 
 	// Peer Host/Node Info
 	require.Equal(t, peerBase.PeerId, "Peer1")
@@ -124,6 +126,9 @@ func Test_FetchPeerInfoFromPeer(t *testing.T) {
 	require.Equal(t, float64(2)/1000, peerBase.Latency)
 	require.Equal(t, peerBase.MetadataRequest, true)
 	require.Equal(t, peerBase.MetadataSucceed, true)
+	require.Equal(t, peerBase.Error[0], "Try")
+	require.Equal(t, peerBase.Error[1], "None")
+	require.Equal(t, len(peerBase.Error), 2)
 	require.Equal(t, len(peerBase.ConnectionTimes), 1)
 	require.Equal(t, len(peerBase.DisconnectionTimes), 1)
 	conTime1 := peerBase.GetConnectedTime()
@@ -137,7 +142,7 @@ func Test_FetchPeerInfoFromPeer(t *testing.T) {
 	// Connected for 5 secs
 	peerMod.ConnectionEvent("inbound", parseTime("2021-08-23T01:00:10.000Z", t))
 	peerMod.DisconnectionEvent(parseTime("2021-08-23T01:00:15.000Z", t))
-	peerBase.FetchPeerInfoFromPeer(peerMod)
+	peerBase.FetchPeerInfoFromNewPeer(peerMod)
 
 	// Peer Host/Node Info
 	require.Equal(t, peerBase.PeerId, "Peer1")
@@ -156,7 +161,7 @@ func Test_GetEnodeFromENR(t *testing.T) {
 	peerBase := NewPeer("test")
 	peerBase.BlockchainNodeENR = "enr:-Ku4QP2xDnEtUXIjzJ_DhlCRN9SN99RYQPJL92TMlSv7U5C1YnYLjwOQHgZIUXw6c-BvRg2Yc2QsZxxoS_pPRVe0yK8Bh2F0dG5ldHOIAAAAAAAAAACEZXRoMpD1pf1CAAAAAP__________gmlkgnY0gmlwhBLf22SJc2VjcDI1NmsxoQMeFF5GrS7UZpAH2Ly84aLK-TyvH-dRo0JM1i8yygH50YN1ZHCCJxA"
 
-	test_node := peerBase.GetBlockchainNode()
+	test_node, _ := peerBase.GetBlockchainNode()
 	require.Equal(t, test_node.String(), "enr:-Ku4QP2xDnEtUXIjzJ_DhlCRN9SN99RYQPJL92TMlSv7U5C1YnYLjwOQHgZIUXw6c-BvRg2Yc2QsZxxoS_pPRVe0yK8Bh2F0dG5ldHOIAAAAAAAAAACEZXRoMpD1pf1CAAAAAP__________gmlkgnY0gmlwhBLf22SJc2VjcDI1NmsxoQMeFF5GrS7UZpAH2Ly84aLK-TyvH-dRo0JM1i8yygH50YN1ZHCCJxA")
 	require.NotEqual(t, test_node.String(), "enr:-Ku4QP2xDnEtUXIjzJ_DhlCRN9SN99RYQPJL92TMlSv7U5C1YnYLjwOQHgZIUXw6c-BvRg2Yc2QsZxxoS_pPRVe0yK8Bh2F0dG5ldHOIAAAAAAAAAACEZXRoMpD1pf1CAAAAAP__________gmlkgnY0gmlwhBLf22SJc2VjcDI1NmsxoQMeFF5GrS7UZpAH2Ly84aLK-TyvH-dRo0JM1i8yygH50YN1ZHCCJxB")
 }

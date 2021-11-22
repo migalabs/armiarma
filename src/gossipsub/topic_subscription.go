@@ -3,6 +3,7 @@ package gossipsub
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/golang/snappy"
 	"github.com/libp2p/go-libp2p-core/host"
@@ -85,7 +86,10 @@ func (c *TopicSubscription) MessageReadingLoop(h host.Host, peerstore *db.PeerSt
 			// To avoid getting track of our own messages, check if we are the senders
 			if msg.ReceivedFrom != h.ID() {
 				c.Log.Debugf("new message on %s from %s", c.Sub.Topic(), msg.ReceivedFrom)
-				peerstore.MessageEvent(msg.ReceivedFrom.String(), c.Sub.Topic())
+				newPeer := db.NewPeer(msg.ReceivedFrom.String())
+				newPeer.MessageEvent(c.Sub.Topic(), time.Now())
+				peerstore.StoreOrUpdatePeer(newPeer)
+				// peerstore.MessageEvent(msg.ReceivedFrom.String(), c.Sub.Topic())
 				// Add notification on the notification channel
 				c.Messages <- msgData
 				// Add message to msg metrics counter
