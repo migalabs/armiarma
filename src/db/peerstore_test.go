@@ -2,6 +2,7 @@ package db
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -14,10 +15,8 @@ func Test_StoreOrUpdatePeer(t *testing.T) {
 	peerStore.StoreOrUpdatePeer(p1)
 
 	// rx some messages of topic1
-	err := peerStore.MessageEvent("Peer1", "topic1")
-	require.NoError(t, err)
-	err = peerStore.MessageEvent("Peer1", "topic1")
-	require.NoError(t, err)
+	p1.MessageEvent("topic1", time.Now())
+	peerStore.StoreOrUpdatePeer(p1)
 
 	// check that its data is correct
 	p, err := peerStore.GetPeerData("Peer1")

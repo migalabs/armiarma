@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
-	m_utils "github.com/migalabs/armiarma/src/db/utils"
 	bc_topics "github.com/migalabs/armiarma/src/gossipsub/blockchaintopics"
 	"github.com/migalabs/armiarma/src/utils"
 	all_utils "github.com/migalabs/armiarma/src/utils"
@@ -45,20 +44,20 @@ type Peer struct {
 	ProtocolVersion string
 
 	// PeerMetrics
-	ConnectedDirection []string
-	IsConnected        bool
+	ConnectedDirection []string  // the directions of each connection event
+	IsConnected        bool      // If the peer is connected (CheckIfRealConnect)
 	Attempted          bool      // If the peer has been attempted to stablish a connection
-	Succeed            bool      // If the connection attempt has been successful
+	Succeed            bool      // If the connection attempt (outbound) has been successful
 	Attempts           uint64    // Number of attempts done
-	Error              []string  // Type of error that we detected. TODO: We are just storing the last one
-	LastErrorTimestamp time.Time // timestamp of the last error reported for this peer
-	Deprecated         bool      // Flag to rummarize whether the peer is longer valid for statistics or not. If false, the peer is not exported in db.
+	Error              []string  // List of errors (also adding "None" errors), aligned with connection events
+	LastErrorTimestamp time.Time // Timestamp of the last error reported for this peer
+	Deprecated         bool      // Flag to rummarize whether the peer is longer valid for statistics or not. If false, the peer is not exported CSV / metrics.
 
-	NegativeConnAttempts []time.Time // List of dates when the peer retreived a negative connection attempt (if there is a possitive one, clean the struct)
-	ConnectionTimes      []time.Time
-	DisconnectionTimes   []time.Time
-	MetadataRequest      bool // If the peer has been attempted to request its metadata
-	MetadataSucceed      bool // If the peer has been successfully requested its metadata
+	NegativeConnAttempts []time.Time // List of dates when the peer retreived a negative connection attempt (outbound) (if there is a possitive one, clean the struct)
+	ConnectionTimes      []time.Time // List of registered connections events
+	DisconnectionTimes   []time.Time // List of Disconnection Events
+	MetadataRequest      bool        // If the peer has been attempted to request its metadata
+	MetadataSucceed      bool        // If the peer has been successfully requested its metadata
 
 	LastExport int64 //(timestamp in seconds of the last exported time (backup for when we are loading the Peer)
 
@@ -97,17 +96,22 @@ func NewPeer(peerId string) Peer {
 // * will be overwriten in the old peer.
 // @param newPeer: the peer from where to get new information and update
 // the old one.
-func (pm *Peer) FetchPeerInfoFromPeer(newPeer Peer) {
+func (pm *Peer) FetchPeerInfoFromNewPeer(newPeer Peer) {
+
+	pm.FetchBasicHostInfoFromNewPeer(newPeer)
+	pm.FetchConnectionsFromNewPeer(newPeer)
+	pm.FetchChainNodeFromNewPeer(newPeer)
+
+}
+
+// FetchBasicHostInfoFromNewPeer
+// * This method will read basic host info from the new peer and import it
+// * into our peer (pm)
+// @param newPeer: the peer where to extract new information
+func (pm *Peer) FetchBasicHostInfoFromNewPeer(newPeer Peer) {
+
 	// Somehow weird to update the peerID, since it is going to be the same one
 	pm.PeerId = getNonEmpty(pm.PeerId, newPeer.PeerId)
-	pm.NodeId = getNonEmpty(pm.NodeId, newPeer.NodeId)
-	// Check User Agent and derivated client type/version/OS
-	pm.UserAgent = getNonEmpty(pm.UserAgent, newPeer.UserAgent)
-	pm.ClientOS = getNonEmpty(pm.ClientOS, newPeer.ClientOS)
-	if newPeer.ClientName != "" || pm.ClientName == "" {
-		pm.ClientName = newPeer.ClientName
-		pm.ClientVersion = newPeer.ClientVersion
-	}
 	pm.Pubkey = getNonEmpty(pm.Pubkey, newPeer.Pubkey)
 	pm.MAddrs = getNonEmptyMAddrArray(pm.MAddrs, newPeer.MAddrs)
 	pm.ProtocolVersion = getNonEmpty(pm.ProtocolVersion, newPeer.ProtocolVersion)
@@ -122,6 +126,24 @@ func (pm *Peer) FetchPeerInfoFromPeer(newPeer Peer) {
 	if newPeer.Latency > 0 {
 		pm.Latency = newPeer.Latency
 	}
+
+	// Check User Agent and derivated client type/version/OS
+	pm.UserAgent = getNonEmpty(pm.UserAgent, newPeer.UserAgent)
+	pm.ClientOS = getNonEmpty(pm.ClientOS, newPeer.ClientOS)
+	if newPeer.ClientName != "" || pm.ClientName == "" {
+		pm.ClientName = newPeer.ClientName
+		pm.ClientVersion = newPeer.ClientVersion
+	}
+
+}
+
+// FetchConnectionsFromNewPeer
+// * This method will read connections from the new peer and import it
+// * into our peer (pm)
+// @param newPeer: the peer where to extract new information
+
+func (pm *Peer) FetchConnectionsFromNewPeer(newPeer Peer) {
+
 	// Metadata requested
 	if !pm.MetadataRequest {
 		pm.MetadataRequest = newPeer.MetadataRequest
@@ -129,13 +151,9 @@ func (pm *Peer) FetchPeerInfoFromPeer(newPeer Peer) {
 	if !pm.MetadataSucceed {
 		pm.MetadataSucceed = newPeer.MetadataSucceed
 	}
-	// Beacon Metadata and Status
-	if newPeer.BeaconMetadata != (BeaconMetadataStamped{}) {
-		pm.BeaconMetadata = newPeer.BeaconMetadata
-	}
-	if newPeer.BeaconStatus != (BeaconStatusStamped{}) {
-		pm.BeaconStatus = newPeer.BeaconStatus
-	}
+
+	pm.Attempts += newPeer.Attempts
+
 	// Check that we dont fetch old peer into old Peer
 	// Edgy case that makes the memory increase exponentially after several hours of run
 	if len(newPeer.ConnectionTimes) > 1 {
@@ -144,11 +162,11 @@ func (pm *Peer) FetchPeerInfoFromPeer(newPeer Peer) {
 
 	if len(newPeer.ConnectionTimes) != len(newPeer.ConnectedDirection) {
 		log.Warnf("Attention, fetching peer with different number of directions and connections")
-		log.Warnf("ConnectionTimes: %s, ConnectedDirection: %s", len(newPeer.ConnectionTimes), len(newPeer.ConnectedDirection))
+		log.Warnf("ConnectionTimes: %d, ConnectedDirection: %d", len(newPeer.ConnectionTimes), len(newPeer.ConnectedDirection))
 	}
 
 	connectedDirectionindex := 0
-	// Aggregate connections and disconnections
+	// Aggregate connections with directions and disconnections
 	for _, time := range newPeer.ConnectionTimes {
 
 		// check if the connection has an associated direction
@@ -167,17 +185,30 @@ func (pm *Peer) FetchPeerInfoFromPeer(newPeer Peer) {
 		pm.DisconnectionEvent(time)
 	}
 
-	/*for _, errorTmp := range newPeer.DisconnectionTimes {
-		pm.DisconnectionEvent(time)
-	}*/
-	/* REMOVABLE
-	if len(newPeer.ConnectionTimes) > 0 {
-		fmt.Println("ConnCase")
-	} else if len(newPeer.DisconnectionTimes) > 0 {
-		fmt.Println("DisconnCase")
+	for _, errorTmp := range newPeer.Error {
+		pm.Error = append(pm.Error, errorTmp)
 	}
-	fmt.Println("flag Is connectable:", pm.IsConnected)
-	*/
+
+	if newPeer.LastErrorTimestamp.After(pm.LastErrorTimestamp) {
+		pm.LastErrorTimestamp = newPeer.LastErrorTimestamp
+	}
+}
+
+// FetchChainNodeFromNewPeer
+// * This method will read chain node information from the new peer and import it
+// * into our peer (pm)
+// @param newPeer: the peer where to extract new information
+
+func (pm *Peer) FetchChainNodeFromNewPeer(newPeer Peer) {
+	pm.NodeId = getNonEmpty(pm.NodeId, newPeer.NodeId)
+
+	// Beacon Metadata and Status
+	if newPeer.BeaconMetadata != (BeaconMetadataStamped{}) {
+		pm.BeaconMetadata = newPeer.BeaconMetadata
+	}
+	if newPeer.BeaconStatus != (BeaconStatusStamped{}) {
+		pm.BeaconStatus = newPeer.BeaconStatus
+	}
 }
 
 // **********************************************************
@@ -248,7 +279,9 @@ func (pm Peer) IsDeprecated() bool {
 	return pm.Deprecated
 }
 
-// return the time of the last connection with this peer
+// LastNegAttempt
+// * This method will calculate the last negative attempt time
+// @return the time of the last negative connection attempt with this peer and and error if applicable
 func (pm Peer) LastNegAttempt() (t time.Time, err error) {
 	if len(pm.NegativeConnAttempts) == 0 {
 		err = errors.New("no negative connections for the peer")
@@ -259,7 +292,9 @@ func (pm Peer) LastNegAttempt() (t time.Time, err error) {
 	return
 }
 
-// return the time of the last connection with this peer
+// FirstNegAttempt
+// * This method will calculate the last negative attempt time
+// @return the time of the first negative connection attempt with this peer and and error if applicable
 func (pm Peer) FirstNegAttempt() (t time.Time, err error) {
 	if len(pm.NegativeConnAttempts) == 0 {
 		err = errors.New("no negative connections for the peer")
@@ -270,32 +305,58 @@ func (pm Peer) FirstNegAttempt() (t time.Time, err error) {
 	return
 }
 
-func (pm *Peer) AddNegConnAtt(deprecated bool) {
+// AddNegConnAtt
+// * This method will register a new negative connection attempt in the peer (outbound)
+// @param deprecated: in case we want to activate the deprecation flag
+// @param err: error string to add to the peer error list
+func (pm *Peer) AddNegConnAtt(deprecated bool, err string) {
+
 	t := time.Now()
+	// add a new time to the array of negative attempts
 	pm.NegativeConnAttempts = append(pm.NegativeConnAttempts, t)
-	if deprecated {
-		pm.Deprecated = true
-	}
+	pm.Deprecated = deprecated // set deprecated to the indicated by the param
+	pm.Attempts += 1
+	pm.Attempted = true
+	pm.Error = append(pm.Error, err)
+	pm.LastErrorTimestamp = t
+
 }
 
+// TODO: these two methods could possibly be merged with parameters
+
+// AddPositiveConnAttempt
+// * This method will register a new positive connection attempt in the peer (outbound)
 func (pm *Peer) AddPositiveConnAttempt() {
+	// as we have a positive attempt, flush the negative attempts
 	pm.NegativeConnAttempts = make([]time.Time, 0)
-	pm.Deprecated = false
+	pm.Deprecated = false // not deprecated anymore
+	pm.Attempted = true
+	pm.Attempts += 1
+	pm.Succeed = true                   // this peer counts now as succeeded
+	pm.Error = append(pm.Error, "None") // append the no error
+
 }
 
-// Register when a new connection was detected
+// ConnectionEvent
+// * Register when a new connection was detected and the direction
 func (pm *Peer) ConnectionEvent(direction string, time time.Time) {
 	pm.ConnectionTimes = append(pm.ConnectionTimes, time)
 	pm.ConnectedDirection = append(pm.ConnectedDirection, direction)
+	// update isconnected flag based on the last connection / disconnection
 	pm.IsConnected = pm.CheckIfPeerRealConnect()
 }
 
-// Register when a disconnection was detected
+// DisconnectionEvent
+// * Register when a new disconnection was detected
 func (pm *Peer) DisconnectionEvent(time time.Time) {
 	pm.DisconnectionTimes = append(pm.DisconnectionTimes, time)
+	// update isconnected flag based on the last connection / disconnection
 	pm.IsConnected = pm.CheckIfPeerRealConnect()
 }
 
+// CheckIfPeerRealConnect
+// * This method will return whether the peer is currently connected or not.
+// * @return true if connected, false if not.
 func (pm *Peer) CheckIfPeerRealConnect() bool {
 	if len(pm.ConnectionTimes) == 0 {
 		return false
@@ -306,6 +367,8 @@ func (pm *Peer) CheckIfPeerRealConnect() bool {
 		return true
 	}
 	lastDisconn := pm.DisconnectionTimes[len(pm.DisconnectionTimes)-1]
+	// if the last disconnection is before the last connection,
+	// then the connection is not closed, therefore still connected
 	return lastDisconn.Before(lastConn)
 }
 
@@ -334,24 +397,6 @@ func (pm Peer) GetLastActivityTime() time.Time {
 
 }
 
-// ConnectionAttemptEvent
-// TODO: comment
-// Register when a connection attempt was made. Note that there is some
-// overlap with ConnectionEvent
-func (pm *Peer) ConnectionAttemptEvent(succeed bool, err string) {
-	pm.Attempts += 1
-	if !pm.Attempted {
-		pm.Attempted = true
-	}
-	if succeed {
-		pm.Succeed = true
-		pm.Error = append(pm.Error, "None")
-	} else {
-		pm.Error = append(pm.Error, m_utils.FilterError(err))
-		pm.LastErrorTimestamp = time.Now()
-	}
-}
-
 // GetConnectedTime
 // * This method will calculate the total connected time
 // * based on con/disc timestamps. This means the total time that
@@ -375,7 +420,16 @@ func (pm *Peer) GetConnectedTime() float64 {
 	return float64(totalConnectedTime) / 60000000000
 }
 
-// Update beacon Metadata of the peer
+// MetadataEvent
+// * Add a Metadata Event to the given peer (successful or not)
+// @param success: whether successful or not.
+func (pm *Peer) MetadataEvent(success bool) {
+	pm.MetadataRequest = true
+	pm.MetadataSucceed = success
+}
+
+// UpdateBeaconMetadata
+// * Update beacon Metadata of the peer
 func (pm *Peer) UpdateBeaconMetadata(bMetadata common.MetaData) {
 	pm.BeaconMetadata = BeaconMetadataStamped{
 		Timestamp: time.Now(),

@@ -2,14 +2,12 @@ package db
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"runtime"
 	"time"
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/migalabs/armiarma/src/db/utils"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
@@ -104,7 +102,7 @@ func (c *PeerStore) StoreOrUpdatePeer(peer Peer) {
 		c.PeerStore.Store(peer.PeerId, peer)
 	} else {
 		// Fetch the new info of a peer directly from the new peer struct
-		oldPeer.FetchPeerInfoFromPeer(peer)
+		oldPeer.FetchPeerInfoFromNewPeer(peer)
 		c.PeerStore.Store(peer.PeerId, oldPeer)
 	}
 	// Force Garbage collector
@@ -151,7 +149,7 @@ func (c *PeerStore) GetENR(peerID string) (*enode.Node, error) {
 
 /// AddNewAttempts adds the resuts of a negative new attempt over an existing peer
 // increasing the attempt counter and the respective fields
-func (c *PeerStore) AddNewNegConnectionAttempt(id string, rec_err string, fn ErrorHandling) error {
+/*func (c *PeerStore) AddNewNegConnectionAttempt(id string, rec_err string, fn ErrorHandling) error {
 	p, err := c.GetPeerData(id)
 	if err != nil { // the peer was already in the sync.Map return true
 		return fmt.Errorf("Not peer found with that ID %s", id)
@@ -170,11 +168,11 @@ func (c *PeerStore) AddNewNegConnectionAttempt(id string, rec_err string, fn Err
 	// Store the new struct in the sync.Map
 	c.StorePeer(p)
 	return nil
-}
+}*/
 
 // AddNewPosConnectionAttempt adds the resuts of a possitive new attempt over an existing peer
 // increasing the attempt counter and the respective fields
-func (c *PeerStore) AddNewPosConnectionAttempt(id string) error {
+/*func (c *PeerStore) AddNewPosConnectionAttempt(id string) error {
 	p, err := c.GetPeerData(id)
 	if err != nil { // the peer was already in the sync.Map return true
 		return fmt.Errorf("Not peer found with that ID %s", id)
@@ -192,10 +190,10 @@ func (c *PeerStore) AddNewPosConnectionAttempt(id string) error {
 	// Store the new struct in the sync.Map
 	c.StorePeer(p)
 	return nil
-}
+}*/
 
 // Add a connection Event to the given peer
-func (c *PeerStore) ConnectionEvent(peerId string, direction string) error {
+/*func (c *PeerStore) ConnectionEvent(peerId string, direction string) error {
 	peer, err := c.GetPeerData(peerId)
 	if err != nil {
 		return errors.New("could not add connection event, peer is not in the list: " + peerId)
@@ -203,10 +201,10 @@ func (c *PeerStore) ConnectionEvent(peerId string, direction string) error {
 	peer.ConnectionEvent(direction, time.Now())
 	c.StorePeer(peer)
 	return nil
-}
+}*/
 
 // Add a connection Event to the given peer
-func (c *PeerStore) DisconnectionEvent(peerId string, discTime time.Time) error {
+/*func (c *PeerStore) DisconnectionEvent(peerId string, discTime time.Time) error {
 	peer, err := c.GetPeerData(peerId)
 	if err != nil {
 		return errors.New("could not add disconnection event, peer is not in the list: " + peerId)
@@ -214,10 +212,10 @@ func (c *PeerStore) DisconnectionEvent(peerId string, discTime time.Time) error 
 	peer.DisconnectionEvent(discTime)
 	c.StorePeer(peer)
 	return nil
-}
+}*/
 
 // Add a connection Event to the given peer
-func (c *PeerStore) MetadataEvent(peerId string, success bool) error {
+/*func (c *PeerStore) MetadataEvent(peerId string, success bool) error {
 	peer, err := c.GetPeerData(peerId)
 	if err != nil {
 		return errors.New("could not add metadata event, peer is not in the list: " + peerId)
@@ -228,11 +226,11 @@ func (c *PeerStore) MetadataEvent(peerId string, success bool) error {
 	}
 	c.StorePeer(peer)
 	return nil
-}
+}*/
 
 // AddNewAttempts adds the resuts of a new attempt over an existing peer
 // increasing the attempt counter and the respective fields
-func (c *PeerStore) ConnectionAttemptEvent(peerId string, succeed bool, conErr string) error {
+/*func (c *PeerStore) ConnectionAttemptEvent(peerId string, succeed bool, conErr string) error {
 	peer, err := c.GetPeerData(peerId)
 	if err != nil {
 		return errors.New("could not add connection attempt, peer is not in the list: " + peerId)
@@ -240,11 +238,11 @@ func (c *PeerStore) ConnectionAttemptEvent(peerId string, succeed bool, conErr s
 	peer.ConnectionAttemptEvent(succeed, conErr)
 	c.StorePeer(peer)
 	return nil
-}
+}*/
 
 // Function that Manages the metrics updates for the incoming messages
 // TODO: Rename to AddNewMessageEvent or something like that
-func (c *PeerStore) MessageEvent(peerId string, topicName string) error {
+/*func (c *PeerStore) MessageEvent(peerId string, topicName string) error {
 	peer, err := c.GetPeerData(peerId)
 	if err != nil {
 		return errors.New("could not add message event, peer is not in the list: " + peerId)
@@ -252,7 +250,7 @@ func (c *PeerStore) MessageEvent(peerId string, topicName string) error {
 	peer.MessageEvent(topicName, time.Now())
 	c.StorePeer(peer)
 	return nil
-}
+}*/
 
 // Get a map with the errors we got when connecting and their amount
 func (gm *PeerStore) GetErrorCounter() map[string]uint64 {

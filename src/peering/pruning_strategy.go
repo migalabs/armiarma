@@ -231,10 +231,11 @@ func (c *PruningStrategy) eventRecorderRoutine() {
 		// Receive the status of the peer that got connected to the crawler
 		case connAttemtpStatus := <-c.connAttemptNot:
 			c.Log.Debugf("new connection attempt has been received from peer %s", connAttemtpStatus.Peer.PeerId)
-			c.PeerStore.StoreOrUpdatePeer(connAttemtpStatus.Peer)
+
 			if connAttemtpStatus.Successful {
 				c.Log.Debugf("adding success connection to peer %s", connAttemtpStatus.Peer.PeerId)
-				c.PeerStore.AddNewPosConnectionAttempt(connAttemtpStatus.Peer.PeerId)
+				//c.PeerStore.AddNewPosConnectionAttempt(connAttemtpStatus.Peer.PeerId)
+				connAttemtpStatus.Peer.AddPositiveConnAttempt()
 				// Update Pruning Metadata
 				var p *PrunedPeer
 				p, ok := c.PeerQueue.GetPeer(connAttemtpStatus.Peer.PeerId)
@@ -258,8 +259,11 @@ func (c *PruningStrategy) eventRecorderRoutine() {
 					p = NewPrunedPeer(connAttemtpStatus.Peer.PeerId)
 					c.PeerQueue.AddPeer(p)
 				}
-				c.RecErrorHandler(p, connAttemtpStatus.RecError.Error())
+				deprecable, errString := c.RecErrorHandler(p, connAttemtpStatus.RecError.Error())
+				connAttemtpStatus.Peer.AddNegConnAtt(deprecable, errString)
+
 			}
+			c.PeerStore.StoreOrUpdatePeer(connAttemtpStatus.Peer)
 
 		// Receive the notification of a that got disconnected from the crawler
 		case connEvent := <-c.connEventNot:
@@ -332,40 +336,50 @@ func (c *PruningStrategy) NewConnectionEvent(connEvent hosts.ConnectionEvent) {
 // RecErrorHandler
 // * function that selects actuation method for each of the possible errors while actively dialing peers
 // @params peerID in string format, recorded error in string format
-func (c *PruningStrategy) RecErrorHandler(pe *PrunedPeer, rec_err string) {
-	var fn func(p *db.Peer)
+func (c *PruningStrategy) RecErrorHandler(pe *PrunedPeer, rec_err string) (bool, string) {
+	//var fn func(p *db.Peer)
 	// current time
 	t := time.Now()
+	deprecate := false // we will only change it case of wanting to deprecate the peer (true)
 	var depTime time.Time
-	switch utils.FilterError(rec_err) {
+	prettyErr := utils.FilterError(rec_err)
+	switch prettyErr {
 	case "Connection reset by peer", "context deadline exceeded", "dial backoff", "connection refused":
 		// Wait a bit more to try next connection
 		pe.AggregatePositiveDelay(t.Add(c.lastIterTime))
 		// Add the deprecation time for the Puned Peer
 		pe.SetDeprecationDate(depTime)
-		fn = func(p *db.Peer) {
+
+		/*fn = func(p *db.Peer) {
 			p.AddNegConnAtt(false) // hardcoded to no Peer is still there, alive
-		}
+		}*/
 	case "no route to host", "unreachable network", "dial to self attempted":
 		pe.AggregateNegativeDelay()
-		fn = func(p *db.Peer) {
+		deprecate = true
+		/*fn = func(p *db.Peer) {
 			p.AddNegConnAtt(true) // Deprecate directly
-		}
+		}*/
 	case "i/o timeout":
 		deprecable := pe.Deprecable(t)
+		// only enter here if DeprecationTime is {} (origin of times)
+		// this would mean that we come from a positive connection, where DeprecationTime is {}
+		// and we now need to set this time
 		if !deprecable && (pe.DeprecationTime == time.Time{}.Unix()) {
 			depTime = t.Add(DeprecationTime)
 		}
 		// Add the deprecation time for the Puned Peer
 		pe.SetDeprecationDate(depTime)
 		pe.AggregateNegativeDelay()
-		fn = func(p *db.Peer) {
+		/*fn = func(p *db.Peer) {
 			p.AddNegConnAtt(deprecable)
-		}
+		}*/
 	case "peer id mismatch, peer dissmissed":
 		// TODO: try to recover the peers from the peerID using Decode
 		pe.AggregateNegativeDelay()
 		deprecable := pe.Deprecable(t)
+		// only enter here if DeprecationTime is {} (origin of times)
+		// this would mean that we come from a positive connection, where DeprecationTime is {}
+		// and we now need to set this time
 		if !deprecable && (pe.DeprecationTime != time.Time{}.Unix()) {
 			depTime = t.Add(DeprecationTime)
 		}
@@ -400,9 +414,9 @@ func (c *PruningStrategy) RecErrorHandler(pe *PrunedPeer, rec_err string) {
 			_, _ = c.Store.UpdateENRMaybe(newPeerID, enr)
 			c.Store.AddAddrs(newPeerID, addrs, time.Duration(48)*time.Hour)
 		*/
-		fn = func(p *db.Peer) {
+		/*fn = func(p *db.Peer) {
 			p.AddNegConnAtt(true)
-		}
+		}*/
 	default:
 		deprecable := pe.Deprecable(t)
 		// assign new deprecation time is the peer is not deprecable yet and
@@ -411,14 +425,15 @@ func (c *PruningStrategy) RecErrorHandler(pe *PrunedPeer, rec_err string) {
 			depTime = t.Add(DeprecationTime)
 		}
 		pe.AggregateNegativeDelay()
-		fn = func(p *db.Peer) {
+		/*fn = func(p *db.Peer) {
 			p.AddNegConnAtt(deprecable)
-		}
+		}*/
 		// Add the deprecation time for the Puned Peer
 		pe.SetDeprecationDate(depTime)
 	}
 
-	c.PeerStore.AddNewNegConnectionAttempt(pe.PeerID, rec_err, fn)
+	return deprecate, prettyErr
+	//c.PeerStore.AddNewNegConnectionAttempt(pe.PeerID, rec_err, fn)
 }
 
 // Extra Prunning methods
