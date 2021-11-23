@@ -44,14 +44,15 @@ type Peer struct {
 	ProtocolVersion string
 
 	// PeerMetrics
-	ConnectedDirection []string  // the directions of each connection event
-	IsConnected        bool      // If the peer is connected (CheckIfRealConnect)
-	Attempted          bool      // If the peer has been attempted to stablish a connection
-	Succeed            bool      // If the connection attempt (outbound) has been successful
-	Attempts           uint64    // Number of attempts done
-	Error              []string  // List of errors (also adding "None" errors), aligned with connection events
-	LastErrorTimestamp time.Time // Timestamp of the last error reported for this peer
-	Deprecated         bool      // Flag to rummarize whether the peer is longer valid for statistics or not. If false, the peer is not exported CSV / metrics.
+	ConnectedDirection    []string  // the directions of each connection event
+	IsConnected           bool      // If the peer is connected (CheckIfRealConnect)
+	Attempted             bool      // If the peer has been attempted to stablish a connection
+	Succeed               bool      // If the connection attempt (outbound) has been successful
+	Attempts              uint64    // Number of attempts done
+	Error                 []string  // List of errors (also adding "None" errors), aligned with connection events
+	LastErrorTimestamp    time.Time // Timestamp of the last error reported for this peer
+	Deprecated            bool      // Flag to rummarize whether the peer is longer valid for statistics or not. If false, the peer is not exported CSV / metrics.
+	LastIdentifyTimestamp time.Time // timestamp of the last time the peer was identified (get user agent...)
 
 	NegativeConnAttempts []time.Time // List of dates when the peer retreived a negative connection attempt (outbound) (if there is a possitive one, clean the struct)
 	ConnectionTimes      []time.Time // List of registered connections events
@@ -192,6 +193,11 @@ func (pm *Peer) FetchConnectionsFromNewPeer(newPeer Peer) {
 	if newPeer.LastErrorTimestamp.After(pm.LastErrorTimestamp) {
 		pm.LastErrorTimestamp = newPeer.LastErrorTimestamp
 	}
+
+	if newPeer.LastIdentifyTimestamp.After(pm.LastIdentifyTimestamp) {
+		pm.LastIdentifyTimestamp = newPeer.LastIdentifyTimestamp
+	}
+
 }
 
 // FetchChainNodeFromNewPeer
@@ -596,6 +602,7 @@ func (pm *Peer) ToCsvLine() string {
 		strconv.FormatUint(pm.Attempts, 10) + "," +
 		strings.Join(pm.Error, "|") + "," +
 		pm.LastErrorTimestamp.String() + "," +
+		pm.LastIdentifyTimestamp.String() + "," +
 		fmt.Sprintf("%.6f", pm.Latency) + "," +
 		fmt.Sprintf("%d", len(pm.ConnectionTimes)) + "," +
 		fmt.Sprintf("%d", len(pm.DisconnectionTimes)) + "," +
@@ -703,40 +710,46 @@ func PeerUnMarshal(m map[string]interface{}) Peer {
 		lastError = time.Time{}
 	}
 
+	lastIdentify, err := time.Parse(time.RFC3339, m["LastIdentifyTimestamp"].(string))
+	if err != nil {
+		lastIdentify = time.Time{}
+	}
+
 	// TODO: use constants for names
 	return Peer{
-		PeerId:               m["PeerId"].(string),
-		Pubkey:               m["Pubkey"].(string),
-		NodeId:               m["NodeId"].(string),
-		UserAgent:            m["UserAgent"].(string),
-		ClientName:           m["ClientName"].(string),
-		ClientOS:             m["ClientOS"].(string),
-		ClientVersion:        m["ClientVersion"].(string),
-		BlockchainNodeENR:    m["BlockchainNodeENR"].(string),
-		Ip:                   m["Ip"].(string),
-		Country:              m["Country"].(string),
-		CountryCode:          m["CountryCode"].(string),
-		City:                 m["City"].(string),
-		Latency:              m["Latency"].(float64),
-		MAddrs:               m_addrs, // correct
-		Protocols:            protocolList,
-		ProtocolVersion:      protocolVersionNew,
-		ConnectedDirection:   directionList,
-		IsConnected:          m["IsConnected"].(bool),
-		Attempted:            m["Attempted"].(bool),
-		Succeed:              m["Succeed"].(bool),
-		Attempts:             uint64(m["Attempts"].(float64)),
-		Error:                errorList,
-		LastErrorTimestamp:   lastError,
-		Deprecated:           m["Deprecated"].(bool),
-		NegativeConnAttempts: negConns,
-		ConnectionTimes:      connTimes,
-		DisconnectionTimes:   disconnTimes,
-		MetadataRequest:      m["MetadataRequest"].(bool),
-		MetadataSucceed:      m["MetadataSucceed"].(bool),
-		LastExport:           int64(m["LastExport"].(float64)),
-		MessageMetrics:       msgMetrics,
-		BeaconStatus:         beaconStatus,
+		PeerId:                m["PeerId"].(string),
+		Pubkey:                m["Pubkey"].(string),
+		NodeId:                m["NodeId"].(string),
+		UserAgent:             m["UserAgent"].(string),
+		ClientName:            m["ClientName"].(string),
+		ClientOS:              m["ClientOS"].(string),
+		ClientVersion:         m["ClientVersion"].(string),
+		BlockchainNodeENR:     m["BlockchainNodeENR"].(string),
+		Ip:                    m["Ip"].(string),
+		Country:               m["Country"].(string),
+		CountryCode:           m["CountryCode"].(string),
+		City:                  m["City"].(string),
+		Latency:               m["Latency"].(float64),
+		MAddrs:                m_addrs, // correct
+		Protocols:             protocolList,
+		ProtocolVersion:       protocolVersionNew,
+		ConnectedDirection:    directionList,
+		IsConnected:           m["IsConnected"].(bool),
+		Attempted:             m["Attempted"].(bool),
+		Succeed:               m["Succeed"].(bool),
+		Attempts:              uint64(m["Attempts"].(float64)),
+		Error:                 errorList,
+		LastErrorTimestamp:    lastError,
+		LastIdentifyTimestamp: lastIdentify,
+		Deprecated:            m["Deprecated"].(bool),
+		NegativeConnAttempts:  negConns,
+		ConnectionTimes:       connTimes,
+		DisconnectionTimes:    disconnTimes,
+		MetadataRequest:       m["MetadataRequest"].(bool),
+		MetadataSucceed:       m["MetadataSucceed"].(bool),
+		LastExport:            int64(m["LastExport"].(float64)),
+		MessageMetrics:        msgMetrics,
+		BeaconStatus:          beaconStatus,
 		// BeaconMetadata:       m["BeaconMetadata"].(BeaconMetadataStamped),
 	}
 }
