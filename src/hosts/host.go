@@ -39,6 +39,7 @@ type BasicLibp2pHost struct {
 	fullMultiAddr ma.Multiaddr
 
 	connEventNotChannel chan ConnectionEvent
+	identNotChannel     chan IdentificationEvent
 	peerID              peer.ID
 }
 
@@ -118,6 +119,7 @@ func NewBasicLibp2pHost(ctx context.Context, opts BasicLibp2pHostOpts) (*BasicLi
 		fullMultiAddr:       localMultiaddr,
 		peerID:              peer.ID(peerId),
 		connEventNotChannel: make(chan ConnectionEvent, ConnNotChannSize),
+		identNotChannel:     make(chan IdentificationEvent, ConnNotChannSize),
 	}
 	b.Log.Debug("setting custom notification functions")
 	basicHost.SetCustomNotifications()
@@ -153,6 +155,14 @@ func (b *BasicLibp2pHost) RecConnEvent(connEvent ConnectionEvent) {
 
 func (b *BasicLibp2pHost) ConnEventNotChannel() chan ConnectionEvent {
 	return b.connEventNotChannel
+}
+
+func (b *BasicLibp2pHost) RecIdentEvent(identEvent IdentificationEvent) {
+	b.identNotChannel <- identEvent
+}
+
+func (b *BasicLibp2pHost) IdentEventNotChannel() chan IdentificationEvent {
+	return b.identNotChannel
 }
 
 func (b *BasicLibp2pHost) GetInfoObj() *info.InfoData {
