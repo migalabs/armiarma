@@ -15,6 +15,7 @@ type PeeringStrategy interface {
 	NextPeer()
 	NewConnectionAttempt(ConnectionAttemptStatus)
 	NewConnectionEvent(hosts.ConnectionEvent)
+	NewIdentificationEvent(hosts.IdentificationEvent)
 	Type() string
 	//GetPeerBatch() []peer.ID
 	Close()

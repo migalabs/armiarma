@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -19,12 +20,14 @@ import (
 
 var (
 	PruningStrategyName = "PRUNING"
+	// Default Delays
+	DeprecationTime       = 24 * time.Hour  // hours after first negative connection that has to pass to deprecate a peer
+	DefaultNegDelay       = 12 * time.Hour  // Default delay that will be applied for those deprecated peers
+	DefaultPossitiveDelay = 6 * time.Hour   // Default delay after each possitive severe negative attempts
+	StartExpD             = 2 * time.Minute // Strating delay that will serve for the Exponencial Delay
 	// Control variables
-	DeprecationTime       = 12 * time.Hour   // hours after first negative connection that has to pass to deprecate a peer
-	DefaultPossitiveDelay = 20 * time.Minute // Default delay after each possitive attempt
-	DefaultNegDelay       = 4 * time.Hour    // hours of dealy after each negative attempt with delay
-	MinIterTime           = 10 * time.Second // Minimum time that has to pass before iterating again
-	ConnEventBuffSize     = 400
+	MinIterTime       = 10 * time.Second // Minimum time that has to pass before iterating again
+	ConnEventBuffSize = 400
 )
 
 type PruningOpts struct {
@@ -47,6 +50,7 @@ type PruningStrategy struct {
 	nextPeerChan   chan struct{}
 	connAttemptNot chan ConnectionAttemptStatus
 	connEventNot   chan hosts.ConnectionEvent
+	identEventNot  chan hosts.IdentificationEvent
 
 	// List of peers sorted by the amount of time thatwe have to wait
 	PeerQueue    PeerQueue
@@ -90,6 +94,7 @@ func NewPruningStrategy(ctx context.Context, peerstore *db.PeerStore, opts Pruni
 		nextPeerChan:   make(chan struct{}, ConnEventBuffSize),
 		connAttemptNot: make(chan ConnectionAttemptStatus, ConnEventBuffSize),
 		connEventNot:   make(chan hosts.ConnectionEvent, ConnEventBuffSize),
+		identEventNot:  make(chan hosts.IdentificationEvent, ConnEventBuffSize),
 	}
 	return pr, nil
 }
@@ -268,24 +273,23 @@ func (c *PruningStrategy) eventRecorderRoutine() {
 		// Receive the notification of a that got disconnected from the crawler
 		case connEvent := <-c.connEventNot:
 			switch connEvent.ConnType {
-			case int8(0):
-				c.Log.Debugf("not type assigned to event from %s", connEvent.Peer.PeerId)
-
 			case int8(1):
 				c.Log.Debugf("new conection from %s", connEvent.Peer.PeerId)
-				c.PeerStore.StoreOrUpdatePeer(connEvent.Peer)
-
 			case int8(2):
 				c.Log.Debugf("new disconnection has been received from peer %s", connEvent.Peer.PeerId)
-				c.PeerStore.StoreOrUpdatePeer(connEvent.Peer)
-
-			case int8(3):
-				c.Log.Debugf("updating host info from peer %s", connEvent.Peer.PeerId)
-				c.PeerStore.StoreOrUpdatePeer(connEvent.Peer)
-
 			default:
-				c.Log.Debugf("unrecognized event from peer %s", connEvent.Peer.PeerId)
+				c.Log.Warnf("unrecognized event from peer %s", connEvent.Peer.PeerId)
+				// since its an unexpected event, dont fetch the incoming peer and reset de select case
+				continue
 			}
+			c.PeerStore.StoreOrUpdatePeer(connEvent.Peer)
+
+		case identEvent := <-c.identEventNot:
+			// TODO: We received a new identification attempt
+			// stract whether it was success or a failure
+			// and track it in the PeerQuueue and un the peerstore
+			c.Log.Debugf("new identification %s from peer %s", strconv.FormatBool(identEvent.Peer.IsConnected), identEvent.Peer.PeerId)
+			c.PeerStore.StoreOrUpdatePeer(identEvent.Peer)
 
 		// detect if the context has been shut down to end the go routine
 		case <-modCtx.Done():
@@ -333,6 +337,11 @@ func (c *PruningStrategy) NewConnectionEvent(connEvent hosts.ConnectionEvent) {
 	c.connEventNot <- connEvent
 }
 
+func (c *PruningStrategy) NewIdentificationEvent(newIdent hosts.IdentificationEvent) {
+	c.Log.Debugf("new identification %s has been received from peer %s", strconv.FormatBool(newIdent.Peer.IsConnected), newIdent.Peer.PeerId)
+	c.identEventNot <- newIdent
+}
+
 // RecErrorHandler
 // * function that selects actuation method for each of the possible errors while actively dialing peers
 // @params peerID in string format, recorded error in string format
@@ -350,15 +359,10 @@ func (c *PruningStrategy) RecErrorHandler(pe *PrunedPeer, rec_err string) (bool,
 		// Add the deprecation time for the Puned Peer
 		pe.SetDeprecationDate(depTime)
 
-		/*fn = func(p *db.Peer) {
-			p.AddNegConnAtt(false) // hardcoded to no Peer is still there, alive
-		}*/
 	case "no route to host", "unreachable network", "dial to self attempted":
 		pe.AggregateNegativeDelay()
 		deprecate = true
-		/*fn = func(p *db.Peer) {
-			p.AddNegConnAtt(true) // Deprecate directly
-		}*/
+
 	case "i/o timeout":
 		deprecable := pe.Deprecable(t)
 		// only enter here if DeprecationTime is {} (origin of times)
@@ -370,9 +374,7 @@ func (c *PruningStrategy) RecErrorHandler(pe *PrunedPeer, rec_err string) (bool,
 		// Add the deprecation time for the Puned Peer
 		pe.SetDeprecationDate(depTime)
 		pe.AggregateNegativeDelay()
-		/*fn = func(p *db.Peer) {
-			p.AddNegConnAtt(deprecable)
-		}*/
+
 	case "peer id mismatch, peer dissmissed":
 		// TODO: try to recover the peers from the peerID using Decode
 		pe.AggregateNegativeDelay()
@@ -414,9 +416,6 @@ func (c *PruningStrategy) RecErrorHandler(pe *PrunedPeer, rec_err string) (bool,
 			_, _ = c.Store.UpdateENRMaybe(newPeerID, enr)
 			c.Store.AddAddrs(newPeerID, addrs, time.Duration(48)*time.Hour)
 		*/
-		/*fn = func(p *db.Peer) {
-			p.AddNegConnAtt(true)
-		}*/
 	default:
 		deprecable := pe.Deprecable(t)
 		// assign new deprecation time is the peer is not deprecable yet and
@@ -425,9 +424,6 @@ func (c *PruningStrategy) RecErrorHandler(pe *PrunedPeer, rec_err string) (bool,
 			depTime = t.Add(DeprecationTime)
 		}
 		pe.AggregateNegativeDelay()
-		/*fn = func(p *db.Peer) {
-			p.AddNegConnAtt(deprecable)
-		}*/
 		// Add the deprecation time for the Puned Peer
 		pe.SetDeprecationDate(depTime)
 	}

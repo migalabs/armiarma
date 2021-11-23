@@ -3,6 +3,8 @@ package hosts
 import (
 	"context"
 	"encoding/hex"
+	"fmt"
+	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -16,26 +18,25 @@ import (
 	"github.com/migalabs/armiarma/src/utils"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p/p2p/protocol/identify"
-
-	log "github.com/sirupsen/logrus"
 )
 
-var (
-	timeout time.Duration = 7 * time.Second
-)
+var ()
 
 // Function that opens a new Stream from the given host to send a RPC requesting the BeaconStatus of the given peer.ID
 // Returns the BeaconStatus of the given peer if succeed, error if failed
-func ReqBeaconStatus(ctx context.Context, h host.Host, peerID peer.ID) (data common.Status, err error) {
+func ReqBeaconStatus(ctx context.Context, wg *sync.WaitGroup, h host.Host, peerID peer.ID, stat *common.Status, finErr chan error) {
+	defer wg.Done()
 	// Generate the compression
 	comp := reqresp.SnappyCompression{}
 	// Generate the Server Error Code
 	var resCode reqresp.ResponseCode // error by default
-	err = methods.StatusRPCv1.RunRequest(ctx, h.NewStream, peerID, comp,
-		reqresp.RequestSSZInput{Obj: &data}, 1,
+	// record the error into the error channel
+	finErr <- methods.StatusRPCv1.RunRequest(ctx, h.NewStream, peerID, comp,
+		reqresp.RequestSSZInput{Obj: stat}, 1,
 		func() error {
 			return nil
 		},
@@ -49,25 +50,24 @@ func ReqBeaconStatus(ctx context.Context, h host.Host, peerID peer.ID) (data com
 				}
 				return errors.Errorf("error requesting BeaconStatus RPC: %s", msg)
 			case reqresp.SuccessCode:
-				var stat common.Status
-				if err := chunk.ReadObj(&stat); err != nil {
+				if err := chunk.ReadObj(stat); err != nil {
 					return errors.Wrap(err, "from requesting BeaconMetadata RPC")
 				}
-				data = stat
 			default:
 				return errors.New("unexpected result code for BeaconStatus RPC request")
 			}
 			return nil
 		})
-	return
 }
 
-func ReqBeaconMetadata(ctx context.Context, h host.Host, peerID peer.ID) (data common.MetaData, err error) {
+func ReqBeaconMetadata(ctx context.Context, wg *sync.WaitGroup, h host.Host, peerID peer.ID, meta *common.MetaData, finErr chan error) {
+	defer wg.Done()
 	// Generate the compression
 	comp := reqresp.SnappyCompression{}
 	// Generate the Server Error Code
 	var resCode reqresp.ResponseCode // error by default
-	err = methods.MetaDataRPCv1.RunRequest(ctx, h.NewStream, peerID, comp, reqresp.RequestSSZInput{Obj: nil}, 1,
+	// record the error into the error channel
+	finErr <- methods.MetaDataRPCv1.RunRequest(ctx, h.NewStream, peerID, comp, reqresp.RequestSSZInput{Obj: nil}, 1,
 		func() error {
 			return nil
 		},
@@ -80,17 +80,14 @@ func ReqBeaconMetadata(ctx context.Context, h host.Host, peerID peer.ID) (data c
 					return errors.Errorf("error requesting BeaconMetadata RPC: %s", msg)
 				}
 			case reqresp.SuccessCode:
-				var meta common.MetaData
-				if err := chunk.ReadObj(&meta); err != nil {
+				if err := chunk.ReadObj(meta); err != nil {
 					return errors.Wrap(err, "from requesting BeaconMetadata RPC")
 				}
-				data = meta
 			default:
 				return errors.New("unexpected result code for BeaconMetadata RPC request")
 			}
 			return nil
 		})
-	return
 }
 
 // Identify the peer from the Libp2p Identify Service
@@ -102,20 +99,24 @@ type HostWithIDService interface {
 // ReqHostInfo returns the basic host information regarding a given peer, from the libp2p perspective
 // it aggregates the info from the libp2p Identify protocol adding some extra info such as RTT between local host and remote peer
 // return empty struct and error if failure on the identify process
-func ReqHostInfo(ctx context.Context, h host.Host, conn network.Conn, peer *db.Peer) (err_ident error) {
+func ReqHostInfo(ctx context.Context, wg *sync.WaitGroup, h host.Host, conn network.Conn, peer *db.Peer, errIdent chan error) {
+	defer wg.Done()
 
 	peerID := conn.RemotePeer()
 
+	var finErr error
 	// Identify Peer to access main data
 	// convert host to IDService
 	withIdentify, ok := h.(HostWithIDService)
 	if !ok {
-		return errors.Errorf("host does not support libp2p identify protocol")
+		errIdent <- errors.Errorf("host does not support libp2p identify protocol")
+		return
 	}
 	t := time.Now()
 	idService := withIdentify.IDService()
 	if idService == nil {
-		return errors.Errorf("libp2p identify not enabled on this host")
+		errIdent <- errors.Errorf("libp2p identify not enabled on this host")
+		return
 	}
 	peer.MetadataRequest = true
 	var rtt time.Duration
@@ -124,9 +125,9 @@ func ReqHostInfo(ctx context.Context, h host.Host, conn network.Conn, peer *db.P
 		peer.MetadataSucceed = true
 		rtt = time.Since(t)
 	case <-ctx.Done():
-		return errors.Errorf("identification error caused by timed out")
+		errIdent <- errors.Errorf("identification error caused by timed out")
+		return
 	}
-
 	// Fill the the metrics
 	// Into the new peer to fetch
 	pv, err := h.Peerstore().Get(peerID, "ProtocolVersion")
@@ -141,17 +142,19 @@ func ReqHostInfo(ctx context.Context, h host.Host, conn network.Conn, peer *db.P
 	// Update the values of the
 	peer.Latency = float64(rtt/time.Millisecond) / 1000
 	peer.PeerId = peerID.String()
-
 	multiAddrStr := conn.RemoteMultiaddr().String() + "/p2p/" + peerID.String()
 	multiAddr, err := ma.NewMultiaddr(multiAddrStr)
 	if err != nil {
-		return errors.Wrap(err, "unable to compose the maddrs")
+		errIdent <- errors.Wrap(err, "unable to compose the maddrs")
+		fmt.Println("unable to extract multiaddrs")
+		return
 	}
 	// generate array of MAddr to fit the db.Peer struct
 	mAddrs := make([]ma.Multiaddr, 0)
 	mAddrs = append(mAddrs, multiAddr)
 	peer.MAddrs = mAddrs
 	peer.Ip = utils.ExtractIPFromMAddr(multiAddr).String()
+
 	country, city, countryCode, err := db_utils.GetLocationFromIp(peer.Ip)
 	if err != nil {
 		// TODO: think about a better idea to integrate a logger into this functions
@@ -171,12 +174,14 @@ func ReqHostInfo(ctx context.Context, h host.Host, conn network.Conn, peer *db.P
 	} else {
 		// EDGY CASE: when peers refuse the connection, the callback gets called and the identify protocol
 		// returns an empty struct (we are unable to identify them)
-		err_ident = errors.Errorf("unable to identify peer")
+		finErr = errors.Errorf("unable to identify peer")
 		peer.MetadataSucceed = false
 	}
 	pubk, err := conn.RemotePublicKey().Raw()
 	if err == nil {
 		peer.Pubkey = hex.EncodeToString(pubk)
 	}
-	return err_ident
+	// return the erro defined in the top
+	// nil if we could identify it, ident error if we couldnt line 181
+	errIdent <- finErr
 }
