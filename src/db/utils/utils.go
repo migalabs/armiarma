@@ -88,6 +88,10 @@ func FilterError(err string) string {
 		// Dialing a peer that does not longer exist
 		// Hoever there is a new one with another peerID
 		errorPretty = "peer id mismatch"
+	} else if strings.Contains(err, "None") {
+		errorPretty = "none"
+	} else if strings.Contains(err, "Error requesting metadata") {
+		errorPretty = "metadata error"
 	} else {
 		// Uncertain (not tracked one)
 		log.Errorf("uncertain error: %s", err)
