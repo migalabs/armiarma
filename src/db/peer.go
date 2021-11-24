@@ -403,6 +403,29 @@ func (pm Peer) GetLastActivityTime() time.Time {
 
 }
 
+// GetLastErrors
+// * Returns the error in last position. The array also contains the same error if it was repeated consecutively
+// @return and array with the same error
+func (pm *Peer) GetLastErrors() []string {
+	errorList := make([]string, 0)
+	lastError := ""
+
+	if len(pm.Error) > 0 { // get the last error
+		lastError = pm.Error[len(pm.Error)-1]
+	}
+
+	for i := range pm.Error {
+		tmpError := pm.Error[len(pm.Error)-i-1] // range backwards
+		if tmpError == lastError {              // if the error was the same as the lastone, add it to the list
+			errorList = append(errorList, tmpError)
+		} else { // once we find a different error, then it is not consecutive anymore: break
+			break
+		}
+	}
+	return errorList
+
+}
+
 // GetConnectedTime
 // * This method will calculate the total connected time
 // * based on con/disc timestamps. This means the total time that

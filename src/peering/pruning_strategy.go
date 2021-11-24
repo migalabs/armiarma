@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -147,6 +146,7 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 				nextPeer := c.PeerQueue.PeerList[peerCounter]
 				// check if the node is ready for connection
 				if nextPeer.IsReadyForConnection() {
+					//fmt.Printf("-----NewPeerConnect------\n\n\n")
 					pinfo, err := c.PeerStore.GetPeerData(nextPeer.PeerID)
 					if err != nil {
 						log.Warn(err)
@@ -179,8 +179,9 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 
 					// increment peerCounter to see if we finished iterating the peerstore
 					peerCounter++
+					fmt.Printf("PeerQueue Counter: %d\n", peerCounter)
 				} else {
-					fmt.Printf("peer is no ready for connection | next conn %d | current time %d\n", nextPeer.NextConnection, time.Now().Unix())
+					fmt.Printf("peer is no ready for connection | next conn %s | current time %s\n", nextPeer.NextConnection(), time.Now())
 					c.Log.Debug("next peers has to wait to be connected")
 					c.NextPeer()
 					nextIterFlag = true
@@ -237,35 +238,22 @@ func (c *PruningStrategy) eventRecorderRoutine() {
 		case connAttemtpStatus := <-c.connAttemptNot:
 			c.Log.Debugf("new connection attempt has been received from peer %s", connAttemtpStatus.Peer.PeerId)
 
-			if connAttemtpStatus.Successful {
+			if connAttemtpStatus.Successful { // in case of success we do not register in any prunned peer
+				// prunned per only receive psotivie events in the identify case down below
 				c.Log.Debugf("adding success connection to peer %s", connAttemtpStatus.Peer.PeerId)
-				//c.PeerStore.AddNewPosConnectionAttempt(connAttemtpStatus.Peer.PeerId)
 				connAttemtpStatus.Peer.AddPositiveConnAttempt()
-				// Update Pruning Metadata
-				var p *PrunedPeer
-				p, ok := c.PeerQueue.GetPeer(connAttemtpStatus.Peer.PeerId)
-				// In both cases, since the connection attempt was successfull,
-				// add next conn to peer current time plus the last iter time
-				// this way, new peers from dv5 remains first in the queue
-				if !ok {
-					p := NewPrunedPeer(connAttemtpStatus.Peer.PeerId)
-					p.AggregatePositiveDelay(time.Now().Add(c.lastIterTime))
-					c.PeerQueue.AddPeer(p)
-				} else {
-					p.AggregatePositiveDelay(time.Now().Add(c.lastIterTime))
-					p.SetDeprecationDate(time.Time{})
-				}
+
 			} else {
+				// negative event, register in prunned peer
 				c.Log.Debugf("adding negative connection to peer %s", connAttemtpStatus.Peer.PeerId)
 				// Update Pruning Metadata
 				var p *PrunedPeer
 				p, ok := c.PeerQueue.GetPeer(connAttemtpStatus.Peer.PeerId)
 				if !ok {
-					p = NewPrunedPeer(connAttemtpStatus.Peer.PeerId)
-					c.PeerQueue.AddPeer(p)
+					log.Warnf("Could not find peer in peerqueue: %s", ok)
 				}
-				deprecable, errString := c.RecErrorHandler(p, connAttemtpStatus.RecError.Error())
-				connAttemtpStatus.Peer.AddNegConnAtt(deprecable, errString)
+				errString := p.ConnEventHandler(connAttemtpStatus.RecError.Error())
+				connAttemtpStatus.Peer.AddNegConnAtt(p.Deprecable(), errString)
 
 			}
 			c.PeerStore.StoreOrUpdatePeer(connAttemtpStatus.Peer)
@@ -289,6 +277,25 @@ func (c *PruningStrategy) eventRecorderRoutine() {
 			// stract whether it was success or a failure
 			// and track it in the PeerQuueue and un the peerstore
 			c.Log.Debugf("new identification %s from peer %s", strconv.FormatBool(identEvent.Peer.IsConnected), identEvent.Peer.PeerId)
+
+			// by default ww think the identify was not successful, therefore negativewithhope and error
+			delayType := NegativeWithHopeDelayType
+			errorType := "Error requesting metadata"
+			if identEvent.Peer.MetadataSucceed {
+				// positive identify
+				delayType = PositiveDelayType
+				errorType = "None"
+			}
+			var p *PrunedPeer
+			p, ok := c.PeerQueue.GetPeer(identEvent.Peer.PeerId)
+			if !ok {
+				p = NewPrunedPeer(identEvent.Peer.PeerId, delayType)
+				c.PeerQueue.AddPeer(p)
+			}
+
+			p.ConnEventHandler(errorType)
+
+			// peerstore save data
 			c.PeerStore.StoreOrUpdatePeer(identEvent.Peer)
 
 		// detect if the context has been shut down to end the go routine
@@ -340,96 +347,6 @@ func (c *PruningStrategy) NewConnectionEvent(connEvent hosts.ConnectionEvent) {
 func (c *PruningStrategy) NewIdentificationEvent(newIdent hosts.IdentificationEvent) {
 	c.Log.Debugf("new identification %s has been received from peer %s", strconv.FormatBool(newIdent.Peer.IsConnected), newIdent.Peer.PeerId)
 	c.identEventNot <- newIdent
-}
-
-// RecErrorHandler
-// * function that selects actuation method for each of the possible errors while actively dialing peers
-// @params peerID in string format, recorded error in string format
-func (c *PruningStrategy) RecErrorHandler(pe *PrunedPeer, rec_err string) (bool, string) {
-	//var fn func(p *db.Peer)
-	// current time
-	t := time.Now()
-	deprecate := false // we will only change it case of wanting to deprecate the peer (true)
-	var depTime time.Time
-	prettyErr := utils.FilterError(rec_err)
-	switch prettyErr {
-	case "Connection reset by peer", "context deadline exceeded", "dial backoff", "connection refused":
-		// Wait a bit more to try next connection
-		pe.AggregatePositiveDelay(t.Add(c.lastIterTime))
-		// Add the deprecation time for the Puned Peer
-		pe.SetDeprecationDate(depTime)
-
-	case "no route to host", "unreachable network", "dial to self attempted":
-		pe.AggregateNegativeDelay()
-		deprecate = true
-
-	case "i/o timeout":
-		deprecable := pe.Deprecable(t)
-		// only enter here if DeprecationTime is {} (origin of times)
-		// this would mean that we come from a positive connection, where DeprecationTime is {}
-		// and we now need to set this time
-		if !deprecable && (pe.DeprecationTime == time.Time{}.Unix()) {
-			depTime = t.Add(DeprecationTime)
-		}
-		// Add the deprecation time for the Puned Peer
-		pe.SetDeprecationDate(depTime)
-		pe.AggregateNegativeDelay()
-
-	case "peer id mismatch, peer dissmissed":
-		// TODO: try to recover the peers from the peerID using Decode
-		pe.AggregateNegativeDelay()
-		deprecable := pe.Deprecable(t)
-		// only enter here if DeprecationTime is {} (origin of times)
-		// this would mean that we come from a positive connection, where DeprecationTime is {}
-		// and we now need to set this time
-		if !deprecable && (pe.DeprecationTime != time.Time{}.Unix()) {
-			depTime = t.Add(DeprecationTime)
-		}
-		// Add the deprecation time for the Puned Peer
-		pe.SetDeprecationDate(depTime)
-		// deprecate old peer and generate a new one
-		// trim new peerID from error message
-		np := strings.Split(rec_err, "key matches ")[1]
-		np = strings.Replace(np, ")", "", -1)
-		//newPeerID := peer.Decode(np)
-		//f.WriteString(fmt.Sprintf("%s shifted to %s\n", pe.String(), newPeerID))
-		// Generate a new Peer with the addrs of the previous one and the ID suggested at the
-		//log.Infof("deprecating peer %s, but adding possible new peer %s", pe, np)
-		/*
-			pubkey, err := newPeerID.ExtractPublicKey()
-			if err != nil {
-				fmt.Println("error obtainign pubkey from peerid", err)
-			} else {
-				fmt.Println("pubkey success, obtained")
-			}
-			TODO: -Fix empty pubkey originated from adding the new PeerID to the Peerstore
-					-Apparently the len of the new peer doesn't have the same one as the previous one
-			// Generate new Addrs for the possible new discovered peer
-			addrs := c.Store.Addrs(pe)
-			enr := c.Store.LatestENR(pe)
-			fmt.Println("len old", len(pe.String()), "len new", len(newPeerID.String()))
-			fmt.Println(rec_err)
-			// Info about the peer should be added to the metrics
-			// *** Carefull - problems with reading the pubkey ***
-			//newP := db.NewPeer(newPeerID.String())
-			//c.PeerStore.Store(newPeerID.String(), newP)
-			_, _ = c.Store.UpdateENRMaybe(newPeerID, enr)
-			c.Store.AddAddrs(newPeerID, addrs, time.Duration(48)*time.Hour)
-		*/
-	default:
-		deprecable := pe.Deprecable(t)
-		// assign new deprecation time is the peer is not deprecable yet and
-		// the pe.DeprecationTime was nil
-		if !deprecable && (pe.DeprecationTime == time.Time{}.Unix()) {
-			depTime = t.Add(DeprecationTime)
-		}
-		pe.AggregateNegativeDelay()
-		// Add the deprecation time for the Puned Peer
-		pe.SetDeprecationDate(depTime)
-	}
-
-	return deprecate, prettyErr
-	//c.PeerStore.AddNewNegConnectionAttempt(pe.PeerID, rec_err, fn)
 }
 
 // Extra Prunning methods
@@ -498,7 +415,7 @@ func (c *PeerQueue) Swap(i, j int) {
 
 // Less is part of sort.Interface. We use c.PeerList.NextConnection as the value to sort by
 func (c PeerQueue) Less(i, j int) bool {
-	return c.PeerList[i].NextConnection < c.PeerList[j].NextConnection
+	return c.PeerList[i].NextConnection().After(c.PeerList[j].NextConnection())
 }
 
 // Len is part of sort.Interface. We use the peer list to get the length of the array
@@ -522,25 +439,48 @@ func (c *PeerQueue) UpdatePeerListFromPeerStore(peerstore *db.PeerStore) error {
 			if err != nil {
 				return fmt.Errorf("unable import peer to PeerQueue. %s", err.Error())
 			}
-			// check the last connAttempt of the peer
-			lattempt, err := pInfo.LastNegAttempt()
-			// generate a new peer
-			newPeer := NewPrunedPeer(peerID.String())
+			// check the last connAttempt of the peer, in case we are restoring the peerqueue
+			// from the peerstore in case of restart
+			baseConnectionEvent := time.Now()
+			_, err = pInfo.LastNegAttempt()
+			delayDegree := 0
+			delayType := NegativeWithHopeDelayType // default
+
 			if err != nil {
-				// there arent negative connections, so the peer is new to the PeerQueue
-				// do not set NextConnection, this one will be 0000...0000 and will go to the top of the list
-			} else {
-				// there is a lastNegAtt, next connection will be LastConn+NumberOfNegAttemps*NegDelay
-				newPeer.SetCustomNextConnetion(lattempt.Add(DefaultNegDelay * time.Duration(int64(len(pInfo.NegativeConnAttempts)))))
-				firstConn, err := pInfo.FirstNegAttempt()
-				if err != nil {
-					log.Warnf("Error extracting FirstNegAttemtempt of peer %s", pInfo.PeerId)
+				// there arent negative connections, so:
+				// -> the peer is new to the PeerQueue
+				// -> the last connection was successful
+				delayType = Minus1DelayType
+
+				if pInfo.MetadataSucceed {
+					delayType = PositiveDelayType
 				}
-				// setting the deprecation date to firstNegAttemtp+DeprecationTime
-				newPeer.SetDeprecationDate(firstConn.Add(DeprecationTime))
+
+				baseConnectionEvent = time.Now() // all connections have been positive
+			} else {
+				// the last connection was negative, otherwise negative connections would have been flushed
+				// get lastError and number of repeated, to analyze degree of negative
+
+				lastErrorList := pInfo.GetLastErrors()
+
+				if len(lastErrorList) > 0 {
+					delayType = ErrorToDelayType(lastErrorList[0])
+					delayDegree = len(lastErrorList) // degree is amount of consecutive last errors
+
+					baseConnectionEvent = pInfo.NegativeConnAttempts[len(pInfo.NegativeConnAttempts)-delayDegree]
+
+				} else {
+					// there are no errors, otherwise it would be at least 1
+					// this does not make sense, launch error
+					log.Errorf("No Errors found when there are negative attempts")
+				}
 			}
+
+			newPrunnedPeer := NewPrunedPeer(pInfo.PeerId, delayType)
+			newPrunnedPeer.DelayObj.SetDegree(delayDegree)
+			newPrunnedPeer.BaseConnectionTimestamp = baseConnectionEvent
 			// add the new item to the list
-			c.AddPeer(newPeer)
+			c.AddPeer(newPrunnedPeer)
 		}
 	}
 	// Sort the list of peers based on the next connection
@@ -551,56 +491,106 @@ func (c *PeerQueue) UpdatePeerListFromPeerStore(peerstore *db.PeerStore) error {
 
 // TODO: think about includint a sync.RWMutex in case we upgrade to workers
 type PrunedPeer struct {
-	PeerID          string
-	NextConnection  int64
-	DeprecationTime int64
+	PeerID                   string
+	DelayObj                 DelayObject // define the delay to connect based on error
+	BaseConnectionTimestamp  time.Time   // define the first event. To calculate the next connection we sum this with delay. It is only changed
+	BaseDeprecationTimestamp time.Time   // this + DeprecationTime defines when we are ready to deprecate
 }
 
-func NewPrunedPeer(peerID string) *PrunedPeer {
+func NewPrunedPeer(peerID string, inputType string) *PrunedPeer {
+	t := time.Now()
 	pp := PrunedPeer{
-		PeerID:          peerID,
-		NextConnection:  time.Time{}.Unix(),
-		DeprecationTime: time.Time{}.Unix(),
+		PeerID:                   peerID,
+		DelayObj:                 ReturnAccordingDelayObject(inputType),
+		BaseConnectionTimestamp:  t,
+		BaseDeprecationTimestamp: time.Time{}, // by default we set it now, so if no positive connection it will be deprecated in 24 hours since creation of this prunned peer
+		// it is not logical
 	}
+
+	if pp.DelayObj.GetType() == PositiveDelayType {
+		// set Identifytime
+		pp.BaseDeprecationTimestamp = t
+	}
+
 	return &pp
 }
 
 // IsReadyForConnection
 // * This method evaluates if the given peer is ready to be connected.
-// * This means that the current time has exceeded the
-// * lastAttempt + waiting time, so we have already waited enough
 // @return True of False if we are in position to connect or not
 func (c *PrunedPeer) IsReadyForConnection() bool {
-	now := time.Now().Unix()
-	return now >= c.NextConnection
+	now := time.Now()
+	// if we are not before the time, then we are either equal or after the connection time
+
+	//fmt.Printf(strconv.FormatBool(!now.Before(c.NextConnection())))
+	//fmt.Printf("Now(): %s\nNext Connection: %s\n\n\n", now, c.NextConnection())
+	return !now.Before(c.NextConnection())
 }
 
-func (c *PrunedPeer) SetCustomNextConnetion(t time.Time) {
-	c.NextConnection = t.Unix()
+func (c *PrunedPeer) NextConnection() time.Time {
+	// nextConnection should be from first event + the applied delay
+	return c.BaseConnectionTimestamp.Add(c.DelayObj.CalculateDelay())
 }
 
-func (c *PrunedPeer) AggregatePositiveDelay(t time.Time) {
-	if t == (time.Time{}) {
-		// if no time was specified, lastIterRange should be normally given
-		// Aggregate DefaultPossitiveDelay
-		// this will ensure that new discovered peers are attempted before old ones
-		c.NextConnection = time.Now().Add(DefaultPossitiveDelay).Unix()
+// Deprecable
+// * This method evaluates if the peer is in time to be deprecated
+// @return true (in time to be deprecated) / false (not ready to be deprecated)
+func (c *PrunedPeer) Deprecable() bool {
+	// if the difference between now and the LastIdentifyTime is more than the DeprecationTime, true
+
+	if (c.BaseConnectionTimestamp != time.Time{}) && c.DelayObj.GetType() == NegativeWithHopeDelayType {
+		// it was identified and in hope case, do not deprecate
+		return false
 	}
-	c.NextConnection = t.Unix()
+
+	return time.Now().Sub(c.BaseConnectionTimestamp) >= DeprecationTime
 }
 
-func (c *PrunedPeer) AggregateNegativeDelay() {
-	c.NextConnection += int64(DefaultNegDelay.Seconds())
+// RecErrorHandler
+// * function that selects actuation method for each of the possible errors while actively dialing peers
+// @params peerID in string format, recorded error in string format
+func (c *PrunedPeer) ConnEventHandler(recErr string) string {
+
+	c.UpdateDelay(ErrorToDelayType(recErr))
+
+	return utils.FilterError(recErr)
 }
 
-func (c *PrunedPeer) SetDeprecationDate(t time.Time) {
-	c.DeprecationTime = t.Unix()
-}
+// NewEvent
+// * This method will reevaluate the delay in case of a new
+// * Positive or NegativeDelay happenned
+func (c *PrunedPeer) UpdateDelay(newDelayType string) {
+	// if the delaytype is different, always refresh the object
 
-// only return true if the Deprecation time is different than 0 and current time is same or bigger than the specified time
-func (c *PrunedPeer) Deprecable(t time.Time) bool {
-	if c.DeprecationTime != (time.Time{}).Unix() {
-		return t.Unix() >= c.DeprecationTime
+	if c.DelayObj.GetType() != newDelayType {
+		c.DelayObj = ReturnAccordingDelayObject(newDelayType)
+		// as there is a change, refresh the first event
+		c.BaseConnectionTimestamp = time.Now()
 	}
-	return false
+	// in case it is positive, refresh identify timestamp
+	// or
+	// it was empty, refresh to current, as we should count deprecation time from now
+	if c.DelayObj.GetType() == PositiveDelayType || c.BaseDeprecationTimestamp == (time.Time{}) {
+
+		// refresh IdentifyTimestamp
+		c.BaseDeprecationTimestamp = time.Now()
+	}
+
+	c.DelayObj.AddDegree()
+}
+
+func ErrorToDelayType(errString string) string {
+
+	switch utils.FilterError(errString) {
+	case "none":
+		return PositiveDelayType
+	case "Connection reset by peer", "connection refused", "context deadline exceeded", "dial backoff", "metadata error":
+		return NegativeWithHopeDelayType
+	case "no route to host", "unreachable network", "i/o timeout", "peer id mismatch", "dial to self attempted":
+		return NegativeWithNoHopeDelayType
+	default:
+		log.Warnf("Default Delay applied, error: %s\n", errString)
+		return NegativeWithHopeDelayType
+
+	}
 }
