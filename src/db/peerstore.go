@@ -28,9 +28,8 @@ type ErrorHandling func(*Peer)
 type PeerStore struct {
 	PeerStore PeerStoreStorage
 	// MessageDatabase   *database.MessageDatabase // TODO: Discuss
-	StartTime         time.Time
-	PeerstoreIterTime time.Duration
-	MsgNotChannels    map[string](chan bool) // TODO: Unused?
+	StartTime      time.Time
+	MsgNotChannels map[string](chan bool) // TODO: Unused?
 }
 
 func NewPeerStore(dbtype string, path string) PeerStore {
@@ -264,11 +263,6 @@ func (gm *PeerStore) GetErrorCounter() map[string]uint64 {
 	})
 
 	return errorsAndAmount
-}
-
-// Update the last iteration throught whole PeerStore
-func (c *PeerStore) NewPeerstoreIteration(t time.Duration) {
-	c.PeerstoreIterTime = t
 }
 
 // Exports to a csv, useful for debug
