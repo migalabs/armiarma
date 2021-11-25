@@ -132,7 +132,7 @@ func (c *PeerLocalizer) locatorRoutine() {
 			}
 			// check if there is any waiting time that we have to respect before next connection
 			if nextDelayRequest != time.Duration(0) {
-				logger.Debugf("call %d-> number of allowed requests has been exceed, waiting", call, nextDelayRequest+(5*time.Second))
+				logger.Debugf("call %d-> number of allowed requests has been exceed, waiting %#v", call, nextDelayRequest+(5*time.Second))
 				// set req delay to true, noone can make requests
 				time.Sleep(nextDelayRequest + (5 * time.Second))
 			}
@@ -176,7 +176,7 @@ func (c *PeerLocalizer) LocateIP(ip string) (IpApiMessage, error) {
 
 //
 func (c *PeerLocalizer) Close() {
-	logger.Info("closing", ModuleName)
+	logger.Info("closing ", ModuleName)
 	// close the context for ending up the routine
 	c.cancel()
 }
