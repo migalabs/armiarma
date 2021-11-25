@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
+	"sync/atomic"
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -25,7 +26,7 @@ var (
 	DefaultPossitiveDelay = 6 * time.Hour   // Default delay after each possitive severe negative attempts
 	StartExpD             = 2 * time.Minute // Strating delay that will serve for the Exponencial Delay
 	// Control variables
-	MinIterTime       = 10 * time.Second // Minimum time that has to pass before iterating again
+	MinIterTime       = 15 * time.Second // Minimum time that has to pass before iterating again
 	ConnEventBuffSize = 400
 )
 
@@ -52,14 +53,13 @@ type PruningStrategy struct {
 	identEventNot  chan hosts.IdentificationEvent
 
 	// List of peers sorted by the amount of time thatwe have to wait
-	PeerQueue    PeerQueue
-	lastIterTime time.Duration
-	/*
-		// TODO: Choose the necessary parameters for the pruning
-		FilterDigest beacon.ForkDigest `ask:"--filter-digest" help:"Only connect when the peer is known to have the given fork digest in ENR. Or connect to any if not specified."`
-		FilterPort   int               `ask:"--filter-port" help:"Only connect to peers that has the given port advertised on the ENR."`
-		Filtering    bool              `changed:"filter-digest"`
-	*/
+	PeerQueue PeerQueue
+
+	// Prometheus Control Variables
+	lastIterTime            time.Duration
+	iterForcingNextConnTime time.Time
+	attemptedPeers          int64
+	queueErroDistribution   map[string]int64
 }
 
 // NewPruningStrategy
@@ -82,6 +82,7 @@ func NewPruningStrategy(ctx context.Context, peerstore *db.PeerStore, opts Pruni
 	if err != nil {
 		return PruningStrategy{}, err
 	}
+
 	// Generate the ConnStatus notification channel
 	// TODO: consider making the ConnStatus channel larger
 	pr := PruningStrategy{
@@ -94,6 +95,8 @@ func NewPruningStrategy(ctx context.Context, peerstore *db.PeerStore, opts Pruni
 		connAttemptNot: make(chan ConnectionAttemptStatus, ConnEventBuffSize),
 		connEventNot:   make(chan hosts.ConnectionEvent, ConnEventBuffSize),
 		identEventNot:  make(chan hosts.IdentificationEvent, ConnEventBuffSize),
+		// Metrics Variables
+		queueErroDistribution: make(map[string]int64),
 	}
 	return pr, nil
 }
@@ -186,7 +189,7 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 				} else {
 					//fmt.Printf("peer is no ready for connection | next conn %s | current time %s\n", nextPeer.NextConnection(), time.Now())
 					c.Log.Debug("next peers has to wait to be connected")
-
+					c.iterForcingNextConnTime = nextPeer.NextConnection()
 					//fmt.Printf("Stopped until NextConection\n")
 					//fmt.Printf("Type: %s, NextConnection: %s\n", nextPeer.DelayObj.GetType(), nextPeer.NextConnection())
 
@@ -201,11 +204,11 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 			}
 			if nextIterFlag || peerCounter >= peerListLen {
 				// time to update the PeerList
-				iterTime := time.Since(iterStartTime)
-				c.lastIterTime = iterTime
-				c.Log.Info("peerstore iteration of ", peerCounter, " peers, done in ", iterTime)
+				c.lastIterTime = time.Since(iterStartTime)
+				atomic.StoreInt64(&c.attemptedPeers, int64(peerCounter))
+				c.Log.Info("peerstore iteration of ", peerCounter, " peers, done in ", c.lastIterTime)
 				c.Log.Info("missing ", c.PeerQueue.Len()-peerCounter, " peers waiting for next try")
-				c.PeerStore.NewPeerstoreIteration(iterTime)
+
 				// check if the minIterTime has been
 				<-validIterTimer.C
 
@@ -313,19 +316,6 @@ func (c *PruningStrategy) eventRecorderRoutine() {
 	}
 }
 
-// ClosePeerStream
-// * Closes in a controled secuence the module related go routines and channels
-// * Ending with the Base.Ctx cancelation
-func (c *PruningStrategy) Close() {
-	c.Log.Infof("closing pruning strategy")
-	// close the involved channels
-	close(c.peerStreamChan)
-	close(c.nextPeerChan)
-	close(c.connEventNot)
-	// shutdown the base context of the pruning
-	c.Cancel()
-}
-
 // NextPeer
 // * Notifies the peerstore iterator that a new peer has been requested
 // * After it, the peerstore iteratow will put the new peer in the PeerStreamChan
@@ -356,6 +346,40 @@ func (c *PruningStrategy) NewIdentificationEvent(newIdent hosts.IdentificationEv
 	c.identEventNot <- newIdent
 }
 
+// --------------------------------------------------
+// Metrics Exporting Functions for Peering Prometheus
+// --------------------------------------------------
+
+// Seconds
+func (c *PruningStrategy) LastIterTime() int64 {
+	return int64(time.Duration(c.lastIterTime.Seconds()))
+}
+
+func (c *PruningStrategy) IterForcingNextConnTime() string {
+	return c.iterForcingNextConnTime.String()
+}
+
+func (c *PruningStrategy) AttemptedPeersSinceLastIter() int64 {
+	return atomic.LoadInt64(&c.attemptedPeers)
+}
+
+func (c *PruningStrategy) ControlDistribution() map[string]int64 {
+	return c.PeerQueue.DelayDistribution()
+}
+
+// ClosePeerStream
+// * Closes in a controled secuence the module related go routines and channels
+// * Ending with the Base.Ctx cancelation
+func (c *PruningStrategy) Close() {
+	c.Log.Infof("closing pruning strategy")
+	// close the involved channels
+	close(c.peerStreamChan)
+	close(c.nextPeerChan)
+	close(c.connEventNot)
+	// shutdown the base context of the pruning
+	c.Cancel()
+}
+
 // Extra Prunning methods
 
 // PeerQueue
@@ -365,6 +389,13 @@ func (c *PruningStrategy) NewIdentificationEvent(newIdent hosts.IdentificationEv
 type PeerQueue struct {
 	PeerList []*PrunedPeer
 	PeerMap  map[string]*PrunedPeer
+	// Metrics
+	queueErroDistribution map[string]int64
+}
+
+// Return the distribution of the dela
+func (c *PeerQueue) DelayDistribution() map[string]int64 {
+	return c.queueErroDistribution
 }
 
 // NewPeerQueue
@@ -436,13 +467,15 @@ func (c *PeerQueue) UpdatePeerListFromPeerStore(peerstore *db.PeerStore) error {
 	peerList := peerstore.GetPeerList()
 	totcnt := 0
 	new := 0
-	delayMap := map[string]int{
+
+	c.queueErroDistribution = map[string]int64{
 		PositiveDelayType:           0,
 		NegativeWithHopeDelayType:   0,
 		NegativeWithNoHopeDelayType: 0,
 		ZeroDelayType:               0,
 		Minus1DelayType:             0,
 	}
+
 	// Fill the PeerQueue.PeerList with the missing peers from the
 	for _, peerID := range peerList {
 		totcnt++
@@ -513,15 +546,15 @@ func (c *PeerQueue) UpdatePeerListFromPeerStore(peerstore *db.PeerStore) error {
 
 			// add the new item to the list
 			c.AddPeer(newPrunnedPeer)
-			delayMap[delayType]++
+			c.queueErroDistribution[delayType]++
 		} else {
 			prunnedPeer, _ := c.GetPeer(peerID.String())
-			delayMap[prunnedPeer.DelayObj.GetType()]++
+			c.queueErroDistribution[prunnedPeer.DelayObj.GetType()]++
 		}
 	}
 	// Sort the list of peers based on the next connection
 	c.SortPeerList()
-	log.Infof("%+v", delayMap)
+	//log.Infof("%+v", c.queueErroDistribution)
 	log.Infof("len PeerQueue: %d\n", c.Len())
 	return nil
 }
