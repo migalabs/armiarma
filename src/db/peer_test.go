@@ -93,42 +93,63 @@ func Test_FetchPeerInfoFromNewPeer(t *testing.T) {
 	// generate base peer
 	peerBase := NewPeer("Peer1")
 
-	peer2 := NewPeer("Peer1")
-	peer2.NodeId = "Node1"
-	peer2.UserAgent = "Prysm/v0.0.0"
-	peer2.ClientName = "Prysm"
-	peer2.ClientVersion = "v0.0.0"
-	peer2.ClientOS = "Linux"
-	peer2.Pubkey = "PubKey"
-	peer2.AddMAddr("/ip4/95.169.232.98/tcp/9000")
-	peer2.Ip = "95.169.232.98"
-	peer2.City = "City1"
-	peer2.Country = "Country1"
-	peer2.Latency = float64(2) / 1000
-	peer2.MetadataRequest = true
-	peer2.MetadataSucceed = true
-	// Connected for 5 secs
-	peer2.ConnectionEvent("inbound", parseTime("2021-08-23T01:00:00.000Z", t))
-	peer2.DisconnectionEvent(parseTime("2021-08-23T01:00:05.000Z", t))
-	peer2.AddNegConnAtt(false, "Try")
-	peer2.AddPositiveConnAttempt()
-	peer2.AddNegConnAtt(false, "SecondTry")
-	peerBase.FetchPeerInfoFromNewPeer(peer2)
+	// peerHostInfo
+	peer2HostInfo := NewPeer("Peer2")
+	peer2HostInfo.NodeId = "Node2"
+	peer2HostInfo.UserAgent = "Prysm/v0.0.0"
+	peer2HostInfo.ClientName = "Prysm"
+	peer2HostInfo.ClientVersion = "v0.0.0"
+	peer2HostInfo.ClientOS = "Linux"
+	peer2HostInfo.Pubkey = "PubKey"
+	peer2HostInfo.AddMAddr("/ip4/95.169.232.98/tcp/9000")
+	peer2HostInfo.Ip = "95.169.232.98"
+	peer2HostInfo.City = "City1"
+	peer2HostInfo.Country = "Country1"
+	peer2HostInfo.ProtocolVersion = "TryProtocol"
+	peer2HostInfo.Protocols = append(peer2HostInfo.Protocols, "Protocol1")
 
-	// Peer Host/Node Info
-	require.Equal(t, peerBase.PeerId, "Peer1")
-	require.Equal(t, peerBase.NodeId, "Node1")
+	peerBase.FetchPeerInfoFromNewPeer(peer2HostInfo)
+
+	require.Equal(t, peerBase.PeerId, "Peer2")
+	require.Equal(t, peerBase.NodeId, "Node2")
 	require.Equal(t, peerBase.UserAgent, "Prysm/v0.0.0")
 	require.Equal(t, peerBase.ExtractPublicAddr().String(), "/ip4/95.169.232.98/tcp/9000")
 	require.Equal(t, peerBase.Ip, "95.169.232.98")
 	require.Equal(t, peerBase.Country, "Country1")
 	require.Equal(t, peerBase.City, "City1")
 	require.Equal(t, peerBase.Pubkey, "PubKey")
+	require.Equal(t, peerBase.ProtocolVersion, "TryProtocol")
+	require.Equal(t, peerBase.Protocols[0], "Protocol1")
+	require.Equal(t, len(peerBase.Protocols), 1)
+
+	peer3HostInfo := NewPeer("Peer3HostInfo")
+	peer3HostInfo.Protocols = append(peer3HostInfo.Protocols, "Protocol2")
+
+	peerBase.FetchPeerInfoFromNewPeer(peer3HostInfo)
+	require.Equal(t, peerBase.Protocols[0], "Protocol2")
+	require.Equal(t, len(peerBase.Protocols), 1)
+
+	// peer Connections
+	peer3Conn := NewPeer("Peer3")
+
+	peer3Conn.Latency = float64(2) / 1000
+	peer3Conn.MetadataRequest = true
+	peer3Conn.MetadataSucceed = true
+	// Connected for 5 secs
+	peer3Conn.ConnectionEvent("inbound", parseTime("2021-08-23T01:00:00.000Z", t))
+	peer3Conn.DisconnectionEvent(parseTime("2021-08-23T01:00:05.000Z", t))
+	peer3Conn.AddNegConnAtt(false, "Try")
+	peer3Conn.AddPositiveConnAttempt()
+	peer3Conn.AddNegConnAtt(false, "SecondTry")
+	peerBase.FetchPeerInfoFromNewPeer(peer3Conn)
+
+	require.Equal(t, peerBase.PeerId, "Peer3")
 	require.Equal(t, float64(2)/1000, peerBase.Latency)
 	require.Equal(t, peerBase.MetadataRequest, true)
 	require.Equal(t, peerBase.MetadataSucceed, true)
 	require.Equal(t, peerBase.Error[0], "Try")
 	require.Equal(t, peerBase.Error[1], "None")
+	require.Equal(t, peerBase.Attempts, uint64(3))
 	require.Equal(t, len(peerBase.NegativeConnAttempts), 1) // the positive cleaned the first negative attempt, only onw missing
 	require.Equal(t, len(peerBase.Error), 3)
 	require.Equal(t, len(peerBase.ConnectionTimes), 1)
@@ -137,9 +158,23 @@ func Test_FetchPeerInfoFromNewPeer(t *testing.T) {
 	// total connection time 1 minute
 	require.Equal(t, conTime1, float64(5)/60)
 
-	peerMod := NewPeer("Peer1")
-	peerMod.UserAgent = "UpdateUser"
-	peerMod.MetadataRequest = true
+	// more connections
+	peer4Conn := NewPeer("Peer4")
+	peer4Conn.AddPositiveConnAttempt()
+	peerBase.FetchPeerInfoFromNewPeer(peer4Conn)
+	require.Equal(t, len(peerBase.NegativeConnAttempts), 0) // as we received a new positive conn, negative should be cleaned
+	require.Equal(t, peerBase.Attempts, uint64(4))
+
+	// identification
+	peer5NotIdentified := NewPeer("Peer5")
+	peer5NotIdentified.MetadataSucceed = false
+	peer5NotIdentified.MetadataRequest = false
+
+	peerBase.FetchPeerInfoFromNewPeer(peer5NotIdentified)
+	require.Equal(t, peerBase.MetadataSucceed, true)
+	require.Equal(t, peerBase.MetadataRequest, true)
+
+	/*peerMod.MetadataRequest = true
 	peerMod.MetadataSucceed = false
 	// Connected for 5 secs
 	peerMod.ConnectionEvent("inbound", parseTime("2021-08-23T01:00:10.000Z", t))
@@ -155,7 +190,7 @@ func Test_FetchPeerInfoFromNewPeer(t *testing.T) {
 	require.Equal(t, len(peerBase.DisconnectionTimes), 2)
 	conTime2 := peerBase.GetConnectedTime()
 	// total connection time 1 minute
-	require.Equal(t, conTime2, float64(10)/60)
+	require.Equal(t, conTime2, float64(10)/60)*/
 }
 
 func Test_GetEnodeFromENR(t *testing.T) {
