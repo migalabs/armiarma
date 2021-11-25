@@ -71,7 +71,7 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 	peer = db.NewPeer(conn.RemotePeer().String())
 	h := c.Host()
 	// Request the Host Metadata
-	err := ReqHostInfo(mainCtx, h, conn, &peer)
+	err := ReqHostInfo(mainCtx, h, c.IpLocator, conn, &peer)
 	if err != nil {
 		c.Log.WithFields(logrus.Fields{
 			"ERROR": err,

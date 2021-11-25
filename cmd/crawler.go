@@ -31,8 +31,13 @@ import (
 	"github.com/migalabs/armiarma/src/info"
 	"github.com/migalabs/armiarma/src/peering"
 	"github.com/migalabs/armiarma/src/prometheus"
+	"github.com/migalabs/armiarma/src/utils/apis"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+)
+
+var (
+	IpCacheSize = 4000
 )
 
 // crawler status containing the main basemodule and info that the app will ConnectedF
@@ -45,6 +50,7 @@ type CrawlerBase struct {
 	Peering          peering.PeeringService
 	Gs               *gossipsub.GossipSub
 	Info             *info.InfoData
+	IpLocalizer      apis.PeerLocalizer
 	PrometheusRunner *prometheus.PrometheusRunner
 }
 
@@ -94,9 +100,13 @@ var crawlerCmd = &cobra.Command{
 		// TODO: generate a new DB
 		db := db.NewPeerStore(info_tmp.GetDBType(), info_tmp.GetOutputPath())
 
+		// IpLocalizer
+		ipLocalizer := apis.NewPeerLocalizer(b.Ctx(), IpCacheSize)
+
 		hostOpts := hosts.BasicLibp2pHostOpts{
 			Info_obj:  *info_tmp,
 			LogOpts:   baseOpts,
+			IpLocator: &ipLocalizer,
 			PeerStore: &db,
 		}
 
@@ -106,10 +116,14 @@ var crawlerCmd = &cobra.Command{
 			panic(err)
 		}
 
+		// generate local Enode and DV5
 		node_tmp := enode.NewLocalNode(b.Ctx(), info_tmp, stdOpts)
 		//node_tmp.AddEntries()
-		dv5_tmp := discovery.NewDiscovery(b.Ctx(), node_tmp, &db, info_tmp, 9006, stdOpts)
+		dv5_tmp := discovery.NewDiscovery(b.Ctx(), node_tmp, &db, &ipLocalizer, info_tmp, 9006, stdOpts)
+
+		// GossipSup
 		gs_tmp := gossipsub.NewGossipSub(b.Ctx(), host, &db, stdOpts)
+
 		// Generate the PeeringService
 		peeringOpts := &peering.PeeringOpts{
 			InfoObj: info_tmp,
@@ -139,6 +153,7 @@ var crawlerCmd = &cobra.Command{
 			Dv5:              dv5_tmp,
 			Peering:          peeringServ,
 			Gs:               gs_tmp,
+			IpLocalizer:      ipLocalizer,
 			PrometheusRunner: &prometheusRunner,
 		}
 
@@ -180,6 +195,7 @@ func (c *CrawlerBase) Run() error {
 	// initialization secuence for the crawler
 	mainctx := c.Ctx()
 
+	c.IpLocalizer.Run()
 	c.Host.Start()
 	c.Dv5.Start_dv5()
 	go c.Dv5.FindRandomNodes()
@@ -194,16 +210,18 @@ func (c *CrawlerBase) Run() error {
 	c.Gs.ServeMetrics()
 	// Generate a Peering Service (so far with default peering strategy)
 	c.DB.ServeMetrics(mainctx)
+
 	go c.DB.ExportLoop(mainctx, c.Info.GetOutputPath())
 
 	select {}
 	// return nil
 }
 
-// generate new CrawlerBase
+// generate new CrawlerBases
 func (c *CrawlerBase) Close() {
 	// initialization secuence for the crawler
 	c.Log.Info("stoping crawler client")
 	c.Host.Stop()
 	c.Peering.Close()
+	c.IpLocalizer.Close()
 }
