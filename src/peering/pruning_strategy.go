@@ -257,7 +257,7 @@ func (c *PruningStrategy) eventRecorderRoutine() {
 				var p *PrunedPeer
 				p, ok := c.PeerQueue.GetPeer(connAttemtpStatus.Peer.PeerId)
 				if !ok {
-					log.Warnf("Could not find peer in peerqueue: %s", ok)
+					log.Warnf("Could not find peer in peerqueue: %s", connAttemtpStatus.Peer.PeerId)
 				}
 				errString := p.ConnEventHandler(connAttemtpStatus.RecError.Error())
 				connAttemtpStatus.Peer.AddNegConnAtt(p.Deprecable(), errString)
