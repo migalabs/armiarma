@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strconv"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -38,6 +39,8 @@ type PeerLocalizer struct {
 	// control variables for IP-API request
 	// Control flags from prometheus
 	apiCalls *int32
+	// Threadsafe Requests
+	m sync.Mutex
 }
 
 func NewPeerLocalizer(ctx context.Context, cacheSize int) PeerLocalizer {
@@ -96,38 +99,52 @@ func (c *PeerLocalizer) locatorRoutine() {
 			var breakCallLoop bool = false
 			var response ipResponse
 
+			call := atomic.LoadInt32(c.apiCalls)
+			atomic.AddInt32(c.apiCalls, 1)
+
 			response.ip = request.ip
 			// new API call needs to be done
-			logger.Debugf("ip %s not in cache, making API call", response.ip)
+			logger.Debugf("call %d-> ip %s not in cache, making API call", call, response.ip)
+			// lock function so that it only gets done one by one
+			c.m.Lock()
+			logger.Debugf("call %d-> loquing requests", call)
 			for !breakCallLoop {
+				// if req delay is setted to true, make new request
 				// make the API call, and receive the apiResponse, the nextDelayRequest and the error from the connection
 				response.resp, nextDelayRequest, response.err = c.getLocationFromIp(request.ip)
 				if response.err != nil {
 					if response.err.Error() == TooManyRequestError {
 						// if the error reports that we tried too many calls on the API, sleep given time and try again
-						logger.Debug("error received:", response.err.Error(), "\nwaiting ", nextDelayRequest)
-						time.Sleep(nextDelayRequest * time.Second)
+						logger.Debug("call", call, "-> error received:", response.err.Error(), "\nwaiting ", nextDelayRequest+(5*time.Second))
+						// set req delay to true, noone can make requests
+						time.Sleep(nextDelayRequest + (5 * time.Second))
+						continue
 					} else {
-						logger.Debug("diff error received:", response.err.Error())
+						logger.Debug("call", call, "-> diff error received:", response.err.Error())
 						break
 					}
 				} else {
-					logger.Debug("api req success")
+					logger.Debugf("call %d-> api req success", call)
 					// if the error is different from TooManyRequestError break loop and store the request
 					break
 				}
+
 			}
+			// check if there is any waiting time that we have to respect before next connection
+			if nextDelayRequest != time.Duration(0) {
+				logger.Debugf("call %d-> number of allowed requests has been exceed, waiting", call, nextDelayRequest+(5*time.Second))
+				// set req delay to true, noone can make requests
+				time.Sleep(nextDelayRequest + (5 * time.Second))
+			}
+			// unlock request function
+			logger.Debugf("call %d-> unloquing requests", call)
+			c.m.Unlock()
+
 			// add the response into the responseCache
 			c.reqCache.addRequest(&response)
 
 			// put the received response in the channel to reply the external request
 			request.respChan <- response
-
-			// check if there is any waiting time that we have to respect before next connection
-			if nextDelayRequest != time.Duration(0) {
-				logger.Debug("number of allowed requests has been exceed, waiting", nextDelayRequest)
-				time.Sleep(nextDelayRequest * time.Second)
-			}
 
 		// the context has been deleted, clo
 		case <-c.ctx.Done():
