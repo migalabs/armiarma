@@ -11,7 +11,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/migalabs/armiarma/src/base"
 	"github.com/migalabs/armiarma/src/db"
-	"github.com/migalabs/armiarma/src/db/utils"
+	db_utils "github.com/migalabs/armiarma/src/db/utils"
 	"github.com/migalabs/armiarma/src/hosts"
 
 	log "github.com/sirupsen/logrus"
@@ -145,6 +145,8 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 				// read info about next peer
 				nextPeer := c.PeerQueue.PeerList[peerCounter]
 				// check if the node is ready for connection
+				//fmt.Printf("TimeNow: %s\n", time.Now())
+				//fmt.Printf("NextConnection: %s\n", nextPeer.NextConnection())
 				if nextPeer.IsReadyForConnection() {
 					//fmt.Printf("-----NewPeerConnect------\n\n\n")
 					pinfo, err := c.PeerStore.GetPeerData(nextPeer.PeerID)
@@ -179,10 +181,15 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 
 					// increment peerCounter to see if we finished iterating the peerstore
 					peerCounter++
-					fmt.Printf("PeerQueue Counter: %d\n", peerCounter)
+					//fmt.Printf("PeerQueue Counter: %d, Type: %s\n", peerCounter, nextPeer.DelayObj.GetType())
+
 				} else {
-					fmt.Printf("peer is no ready for connection | next conn %s | current time %s\n", nextPeer.NextConnection(), time.Now())
+					//fmt.Printf("peer is no ready for connection | next conn %s | current time %s\n", nextPeer.NextConnection(), time.Now())
 					c.Log.Debug("next peers has to wait to be connected")
+
+					//fmt.Printf("Stopped until NextConection\n")
+					//fmt.Printf("Type: %s, NextConnection: %s\n", nextPeer.DelayObj.GetType(), nextPeer.NextConnection())
+
 					c.NextPeer()
 					nextIterFlag = true
 				}
@@ -415,7 +422,7 @@ func (c *PeerQueue) Swap(i, j int) {
 
 // Less is part of sort.Interface. We use c.PeerList.NextConnection as the value to sort by
 func (c PeerQueue) Less(i, j int) bool {
-	return c.PeerList[i].NextConnection().After(c.PeerList[j].NextConnection())
+	return c.PeerList[i].NextConnection().Before(c.PeerList[j].NextConnection())
 }
 
 // Len is part of sort.Interface. We use the peer list to get the length of the array
@@ -429,6 +436,13 @@ func (c *PeerQueue) UpdatePeerListFromPeerStore(peerstore *db.PeerStore) error {
 	peerList := peerstore.GetPeerList()
 	totcnt := 0
 	new := 0
+	delayMap := map[string]int{
+		PositiveDelayType:           0,
+		NegativeWithHopeDelayType:   0,
+		NegativeWithNoHopeDelayType: 0,
+		ZeroDelayType:               0,
+		Minus1DelayType:             0,
+	}
 	// Fill the PeerQueue.PeerList with the missing peers from the
 	for _, peerID := range peerList {
 		totcnt++
@@ -441,51 +455,74 @@ func (c *PeerQueue) UpdatePeerListFromPeerStore(peerstore *db.PeerStore) error {
 			}
 			// check the last connAttempt of the peer, in case we are restoring the peerqueue
 			// from the peerstore in case of restart
-			baseConnectionEvent := time.Now()
-			_, err = pInfo.LastNegAttempt()
-			delayDegree := 0
+
+			errorList := pInfo.Error
+			delayDegree := 0                       // default
 			delayType := NegativeWithHopeDelayType // default
 
-			if err != nil {
-				// there arent negative connections, so:
-				// -> the peer is new to the PeerQueue
-				// -> the last connection was successful
-				delayType = Minus1DelayType
+			if len(pInfo.ConnectionTimes) > 0 || pInfo.Attempted { // this peer has had activity
+				// get last connection time
+				if len(errorList) > 0 {
+					// there are errors in the peer (either none or something)
+					lastError := errorList[len(errorList)-1]
 
-				if pInfo.MetadataSucceed {
-					delayType = PositiveDelayType
-				}
+					if lastError == "None" {
+						if !pInfo.MetadataSucceed {
+							// it could happen that error is None and MetadataSuccess = false
+							// connection successful, but no metadata
+							lastError = "Error requesting metadata"
+						}
 
-				baseConnectionEvent = time.Now() // all connections have been positive
-			} else {
-				// the last connection was negative, otherwise negative connections would have been flushed
-				// get lastError and number of repeated, to analyze degree of negative
+					} else {
+						// we iterate here even if the error is None, so we have the degree of same delaytype
+						for i := range errorList {
+							// recreate the nuber of consecutive errors backwards
+							if errorList[len(errorList)-1-i] == lastError {
+								delayDegree++
+							} else {
+								break
+							}
+						}
+					}
 
-				lastErrorList := pInfo.GetLastErrors()
-
-				if len(lastErrorList) > 0 {
-					delayType = ErrorToDelayType(lastErrorList[0])
-					delayDegree = len(lastErrorList) // degree is amount of consecutive last errors
-
-					baseConnectionEvent = pInfo.NegativeConnAttempts[len(pInfo.NegativeConnAttempts)-delayDegree]
+					// we now have the last error and the degree repeated
+					delayType = ErrorToDelayType(lastError)
 
 				} else {
-					// there are no errors, otherwise it would be at least 1
-					// this does not make sense, launch error
-					log.Errorf("No Errors found when there are negative attempts")
+					// there are no errors, but connections
+					// all inbound
+					if pInfo.MetadataSucceed {
+						delayType = PositiveDelayType
+					} else {
+						delayType = ErrorToDelayType("Error requesting metadata")
+					}
 				}
+
+			} else {
+				// this peer is new
+				delayType = Minus1DelayType
 			}
 
 			newPrunnedPeer := NewPrunedPeer(pInfo.PeerId, delayType)
 			newPrunnedPeer.DelayObj.SetDegree(delayDegree)
-			newPrunnedPeer.BaseConnectionTimestamp = baseConnectionEvent
+
+			if pInfo.Deprecated {
+				// set basedeprecationtime to the past
+				newPrunnedPeer.BaseDeprecationTimestamp = time.Now().Add(-DeprecationTime)
+			}
+
 			// add the new item to the list
 			c.AddPeer(newPrunnedPeer)
+			delayMap[delayType]++
+		} else {
+			prunnedPeer, _ := c.GetPeer(peerID.String())
+			delayMap[prunnedPeer.DelayObj.GetType()]++
 		}
 	}
 	// Sort the list of peers based on the next connection
 	c.SortPeerList()
-	log.Infof("len PeerQueue", c.Len())
+	log.Infof("%+v", delayMap)
+	log.Infof("len PeerQueue: %d\n", c.Len())
 	return nil
 }
 
@@ -503,13 +540,8 @@ func NewPrunedPeer(peerID string, inputType string) *PrunedPeer {
 		PeerID:                   peerID,
 		DelayObj:                 ReturnAccordingDelayObject(inputType),
 		BaseConnectionTimestamp:  t,
-		BaseDeprecationTimestamp: time.Time{}, // by default we set it now, so if no positive connection it will be deprecated in 24 hours since creation of this prunned peer
+		BaseDeprecationTimestamp: t, // by default we set it now, so if no positive connection it will be deprecated in 24 hours since creation of this prunned peer
 		// it is not logical
-	}
-
-	if pp.DelayObj.GetType() == PositiveDelayType {
-		// set Identifytime
-		pp.BaseDeprecationTimestamp = t
 	}
 
 	return &pp
@@ -528,6 +560,11 @@ func (c *PrunedPeer) IsReadyForConnection() bool {
 }
 
 func (c *PrunedPeer) NextConnection() time.Time {
+
+	if c.DelayObj.GetType() == Minus1DelayType { // in case of Minus1, this is dv5 and we want it to connect as soon as possible
+		return time.Time{}
+	}
+
 	// nextConnection should be from first event + the applied delay
 	return c.BaseConnectionTimestamp.Add(c.DelayObj.CalculateDelay())
 }
@@ -553,7 +590,7 @@ func (c *PrunedPeer) ConnEventHandler(recErr string) string {
 
 	c.UpdateDelay(ErrorToDelayType(recErr))
 
-	return utils.FilterError(recErr)
+	return db_utils.FilterError(recErr)
 }
 
 // NewEvent
@@ -567,13 +604,9 @@ func (c *PrunedPeer) UpdateDelay(newDelayType string) {
 		// as there is a change, refresh the first event
 		c.BaseConnectionTimestamp = time.Now()
 	}
-	// in case it is positive, refresh identify timestamp
-	// or
-	// it was empty, refresh to current, as we should count deprecation time from now
-	if c.DelayObj.GetType() == PositiveDelayType || c.BaseDeprecationTimestamp == (time.Time{}) {
 
-		// refresh IdentifyTimestamp
-		c.BaseDeprecationTimestamp = time.Now()
+	if c.DelayObj.GetType() == PositiveDelayType {
+		c.BaseConnectionTimestamp = time.Now()
 	}
 
 	c.DelayObj.AddDegree()
@@ -581,15 +614,16 @@ func (c *PrunedPeer) UpdateDelay(newDelayType string) {
 
 func ErrorToDelayType(errString string) string {
 
-	switch utils.FilterError(errString) {
+	prettyErr := db_utils.FilterError(errString)
+	switch prettyErr {
 	case "none":
 		return PositiveDelayType
-	case "Connection reset by peer", "connection refused", "context deadline exceeded", "dial backoff", "metadata error":
+	case "connection reset by peer", "connection refused", "context deadline exceeded", "dial backoff", "metadata error":
 		return NegativeWithHopeDelayType
 	case "no route to host", "unreachable network", "i/o timeout", "peer id mismatch", "dial to self attempted":
 		return NegativeWithNoHopeDelayType
 	default:
-		log.Warnf("Default Delay applied, error: %s\n", errString)
+		log.Warnf("Default Delay applied, error: %s-\n", prettyErr)
 		return NegativeWithHopeDelayType
 
 	}
