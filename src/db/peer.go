@@ -145,7 +145,7 @@ func (pm *Peer) FetchBasicHostInfoFromNewPeer(newPeer Peer) {
 
 func (pm *Peer) FetchConnectionsFromNewPeer(newPeer Peer) {
 
-	// Metadata requested
+	// only change these when old one was false, otherwise, leave as t is
 	if !pm.MetadataRequest {
 		pm.MetadataRequest = newPeer.MetadataRequest
 	}
@@ -154,6 +154,25 @@ func (pm *Peer) FetchConnectionsFromNewPeer(newPeer Peer) {
 	}
 
 	pm.Attempts += newPeer.Attempts
+
+	if newPeer.Attempted {
+		pm.Attempted = newPeer.Attempted
+		// as it was attempted, check if there were negative connections
+		// if not, then clean our negative connections
+		if len(newPeer.NegativeConnAttempts) == 0 {
+			//there are no negative attempts here
+			pm.NegativeConnAttempts = make([]time.Time, 0)
+		} else {
+			// copy the negative attempts
+			for _, negAttTmp := range newPeer.NegativeConnAttempts {
+				pm.NegativeConnAttempts = append(pm.NegativeConnAttempts, negAttTmp)
+			}
+		}
+	}
+
+	if !pm.Succeed {
+		pm.Succeed = newPeer.Succeed
+	}
 
 	// Check that we dont fetch old peer into old Peer
 	// Edgy case that makes the memory increase exponentially after several hours of run
