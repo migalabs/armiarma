@@ -59,11 +59,12 @@ func cleanVersion(version string) string {
 // funtion that formats the error into a Pretty understandable (standard) way
 // also important to cohesionate the extra-metrics output csv
 func FilterError(err string) string {
+	err = strings.ToLower(err)
 	errorPretty := "Uncertain"
 	// filter the error type
 	if strings.Contains(err, "connection reset by peer") {
 		// The peer that we tried to connect resets/drops the connection
-		errorPretty = "Connection reset by peer"
+		errorPretty = "connection reset by peer"
 	} else if strings.Contains(err, "i/o timeout") {
 		// When trying to connect a peer, the timeout waiting for stablishing the connection was triggered
 		errorPretty = "i/o timeout"
@@ -82,15 +83,15 @@ func FilterError(err string) string {
 	} else if strings.Contains(err, "no route to host") {
 		// Unable to find a host in that IP
 		errorPretty = "no route to host"
-	} else if strings.Contains(err, "network is unreachable") {
+	} else if strings.Contains(err, "network is unreachable") || strings.Contains(err, "unreachable network") {
 		errorPretty = "unreachable network"
 	} else if strings.Contains(err, "peer id mismatch") {
 		// Dialing a peer that does not longer exist
 		// Hoever there is a new one with another peerID
 		errorPretty = "peer id mismatch"
-	} else if strings.Contains(err, "None") {
+	} else if strings.Contains(err, "none") {
 		errorPretty = "none"
-	} else if strings.Contains(err, "Error requesting metadata") {
+	} else if strings.Contains(err, "error requesting metadata") {
 		errorPretty = "metadata error"
 	} else {
 		// Uncertain (not tracked one)

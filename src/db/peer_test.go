@@ -112,6 +112,7 @@ func Test_FetchPeerInfoFromNewPeer(t *testing.T) {
 	peer2.DisconnectionEvent(parseTime("2021-08-23T01:00:05.000Z", t))
 	peer2.AddNegConnAtt(false, "Try")
 	peer2.AddPositiveConnAttempt()
+	peer2.AddNegConnAtt(false, "SecondTry")
 	peerBase.FetchPeerInfoFromNewPeer(peer2)
 
 	// Peer Host/Node Info
@@ -128,7 +129,8 @@ func Test_FetchPeerInfoFromNewPeer(t *testing.T) {
 	require.Equal(t, peerBase.MetadataSucceed, true)
 	require.Equal(t, peerBase.Error[0], "Try")
 	require.Equal(t, peerBase.Error[1], "None")
-	require.Equal(t, len(peerBase.Error), 2)
+	require.Equal(t, len(peerBase.NegativeConnAttempts), 1) // the positive cleaned the first negative attempt, only onw missing
+	require.Equal(t, len(peerBase.Error), 3)
 	require.Equal(t, len(peerBase.ConnectionTimes), 1)
 	require.Equal(t, len(peerBase.DisconnectionTimes), 1)
 	conTime1 := peerBase.GetConnectedTime()
