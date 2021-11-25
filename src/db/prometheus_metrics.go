@@ -35,11 +35,6 @@ var (
 		Name:      "deprecated_peers",
 		Help:      "The number of peers deprecated by the crawler",
 	})
-	PeerstoreIterTime = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: "crawler",
-		Name:      "peerstore_iteration_time_mins",
-		Help:      "The time that the crawler takes to connect the entire peerstore in mins",
-	})
 	ClientVersionDistribution = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "crawler",
 		Name:      "observed_client_version_distribution",
