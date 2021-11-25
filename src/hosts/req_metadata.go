@@ -123,6 +123,7 @@ func ReqHostInfo(ctx context.Context, wg *sync.WaitGroup, h host.Host, conn netw
 	select {
 	case <-idService.IdentifyWait(conn):
 		peer.MetadataSucceed = true
+		peer.LastIdentifyTimestamp = time.Now()
 		rtt = time.Since(t)
 	case <-ctx.Done():
 		errIdent <- errors.Errorf("identification error caused by timed out")

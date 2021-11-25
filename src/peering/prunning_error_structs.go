@@ -20,7 +20,7 @@ var (
 		NegativeWithHopeDelayType:   2 * time.Minute,
 		NegativeWithNoHopeDelayType: 12 * time.Hour,
 		ZeroDelayType:               0 * time.Hour,
-		Minus1DelayType:             -1 * time.Hour,
+		Minus1DelayType:             -1000 * time.Hour,
 	}
 )
 
@@ -130,7 +130,7 @@ func NewMinus1Delay() Minus1Delay {
 // @return the delay in Time.Duration format
 func (d Minus1Delay) CalculateDelay() time.Duration {
 
-	// always return -1
+	// always return a negative delay
 	return InitialDelayTime[d.Type]
 }
 
