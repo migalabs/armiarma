@@ -598,9 +598,14 @@ func (pm *Peer) ToCsvLine() string {
 		connStablished = "true"
 	}
 	// get the multiaddress of the peers
-	mAddrss := ""
+	uniqueAddr := ""
 	if len(pm.MAddrs) != 0 {
-		mAddrss = pm.ExtractPublicAddr().String()
+		mAddrss := pm.ExtractPublicAddr()
+		if mAddrss != nil {
+			uniqueAddr = mAddrss.String()
+		} else {
+			uniqueAddr = pm.MAddrs[0].String()
+		}
 	}
 
 	node, err := pm.GetBlockchainNode()
@@ -627,7 +632,7 @@ func (pm *Peer) ToCsvLine() string {
 		pm.ClientName + "," +
 		pm.ClientVersion + "," +
 		pm.Pubkey + "," +
-		mAddrss + "," +
+		uniqueAddr + "," +
 		pm.Ip + "," +
 		pm.Country + "," +
 		pm.City + "," +
