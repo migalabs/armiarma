@@ -8,20 +8,27 @@ With this idea in mind, from Miga Labs, we want to provide a tool able to join p
 ## Who are we?
 [Miga Labs](http://migalabs.es/) is a young department of the Barcelona Supercomputing Center (BSC). Miga Labs is a group specialized in next-generation Blockchain technology, with a focus on Sharding and Proof-of-Stake protocols.
 
-## Installation
+## Binary insstallation
 
-Currently supported protocols:
-    - Ethereum 2
-        - Mainnet
+### Requisites
+For using the tool, the following requirements need to be installed on the machine:
+- Go on its 1.17 version or above. Go needs to be executable from the terminal. Lower versions will report a dependency import error for the package `io/fs`.
 
+
+### Steps
 In order to execute it, download the repository and build the project
 ```
-
+# Donwload the git repository of the tool
 git clone git@github.com:Cortze/armiarma.git
+
+# Switch from master branch to integral-refactor (newst stable version)
 git checkout integral-refactor
-go build
 
+# Compile the tool generating the armiarma binary
+go build -o armiarma
 
+# Ready to use calling
+./armiarma
 
 ```
 
@@ -33,14 +40,15 @@ EXECUTION:
     ./armiarma [command] [options]
 
 COMMANDS
-    crawler -   Crawls around the network looking for peers and their status
+    crawler     Crawls around the network looking for peers and their status
 
 OPTIONS:
-    --config-file=config.json - Load the configuration from the file into the executable
+    --config-file   Load the configuration from the file into the executable.
+                    Find a config.json example in ./config-files/config.json
 
-In order to execute it, download the repository and build the project
 ```
-
+## Docker installation
+We provide a Dockerfile that can be used to 
 
 ## The project
 
