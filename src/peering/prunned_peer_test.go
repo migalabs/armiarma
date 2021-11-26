@@ -64,12 +64,12 @@ func Test_PrunnedPeerDelays(t *testing.T) {
 	require.Equal(t, false, prunnedPeer1.NextConnection().After(tNow.Add(2049*time.Minute)))
 
 	prunnedPeer1.ConnEventHandler("peer id mismatch") // this should maintain in NegativeWithNoHope
-	require.Equal(t, true, prunnedPeer1.NextConnection().After(tNow.Add(96*time.Hour)))
-	require.Equal(t, false, prunnedPeer1.NextConnection().After(tNow.Add(97*time.Hour)))
+	require.Equal(t, true, prunnedPeer1.NextConnection().After(tNow.Add(2048*time.Minute)))
+	require.Equal(t, false, prunnedPeer1.NextConnection().After(tNow.Add(2049*time.Minute)))
 
 	prunnedPeer1.ConnEventHandler("dial to self attempted") // this should maintain in NegativeWithNoHope
-	require.Equal(t, true, prunnedPeer1.NextConnection().After(tNow.Add(192*time.Hour)))
-	require.Equal(t, false, prunnedPeer1.NextConnection().After(tNow.Add(193*time.Hour)))
+	require.Equal(t, true, prunnedPeer1.NextConnection().After(tNow.Add(2048*time.Minute)))
+	require.Equal(t, false, prunnedPeer1.NextConnection().After(tNow.Add(2049*time.Minute)))
 
 	tNow = time.Now()
 
@@ -87,6 +87,8 @@ func Test_PrunnedPeerDelays(t *testing.T) {
 	require.Equal(t, false, prunnedPeer1.NextConnection().After(tNow.Add(9*time.Minute)))
 
 	prunnedPeer1.ConnEventHandler("i/o timeout") // this should maintain in NegativeWithNoHope
+	fmt.Println(prunnedPeer1.NextConnection())
+	fmt.Println(tNow)
 	require.Equal(t, true, prunnedPeer1.NextConnection().After(tNow.Add(16*time.Minute)))
 	require.Equal(t, false, prunnedPeer1.NextConnection().After(tNow.Add(17*time.Minute)))
 
