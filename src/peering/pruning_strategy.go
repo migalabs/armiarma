@@ -658,9 +658,9 @@ func ErrorToDelayType(errString string) string {
 	switch prettyErr {
 	case "none":
 		return PositiveDelayType
-	case "connection reset by peer", "connection refused", "context deadline exceeded", "dial backoff", "metadata error":
+	case "connection reset by peer", "connection refused", "context deadline exceeded", "dial backoff", "metadata error", "i/o timeout":
 		return NegativeWithHopeDelayType
-	case "no route to host", "unreachable network", "i/o timeout", "peer id mismatch", "dial to self attempted":
+	case "no route to host", "unreachable network", "peer id mismatch", "dial to self attempted":
 		return NegativeWithNoHopeDelayType
 	default:
 		log.Warnf("Default Delay applied, error: %s-\n", prettyErr)
