@@ -42,7 +42,7 @@ type PeeringService struct {
 	host      *hosts.BasicLibp2pHost
 	PeerStore *db.PeerStore
 	strategy  PeeringStrategy
-	//
+	// Control Flags
 	Timeout    time.Duration
 	MaxRetries int
 }
@@ -118,6 +118,7 @@ func (c *PeeringService) Run() {
 		go c.peeringWorker(workerName, peerStreamChan)
 	}
 	go c.eventRecorderRoutine()
+	go c.ServeMetrics(c.Ctx())
 }
 
 func (c *PeeringService) peeringWorker(workerID string, peerStreamChan chan db.Peer) {

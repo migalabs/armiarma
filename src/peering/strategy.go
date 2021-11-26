@@ -12,13 +12,18 @@ import (
 type PeeringStrategy interface {
 	// one channel to give the next peer, one to request the second one
 	Run() chan db.Peer
+	Close()
+	Type() string
+	// Peering Strategy interaction
 	NextPeer()
 	NewConnectionAttempt(ConnectionAttemptStatus)
 	NewConnectionEvent(hosts.ConnectionEvent)
 	NewIdentificationEvent(hosts.IdentificationEvent)
-	Type() string
-	//GetPeerBatch() []peer.ID
-	Close()
+	// Prometheus Export Calls
+	LastIterTime() int64
+	IterForcingNextConnTime() string
+	AttemptedPeersSinceLastIter() int64
+	ControlDistribution() map[string]int64
 }
 
 // ConnectionAttemptStatus
