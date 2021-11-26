@@ -52,7 +52,6 @@ func NewPeeringService(ctx context.Context, h *hosts.BasicLibp2pHost, peerstore 
 	// TODO: cancel is still not implemented in the BaseCreation
 	peeringCtx, _ := context.WithCancel(ctx)
 	logOpts := peeringOpts.LogOpts
-	//logOpts.Level = "debug"
 	logOpts.ModName = MOD_NAME
 	b, err := base.NewBase(
 		base.WithContext(peeringCtx),
@@ -189,7 +188,6 @@ func (c *PeeringService) peeringWorker(workerID string, peerStreamChan chan db.P
 					connAttStat.RecError = err
 					// increment the attempts
 					attempts++
-					//time.Sleep(5 * time.Second)
 					continue
 				} else { // connection successfuly made
 					c.Log.Debugf("%s peer_id %s successful connection made", workerID, peerID.String())

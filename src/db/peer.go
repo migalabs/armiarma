@@ -142,7 +142,6 @@ func (pm *Peer) FetchBasicHostInfoFromNewPeer(newPeer Peer) {
 // * This method will read connections from the new peer and import it
 // * into our peer (pm)
 // @param newPeer: the peer where to extract new information
-
 func (pm *Peer) FetchConnectionsFromNewPeer(newPeer Peer) {
 
 	// only change these when old one was false, otherwise, leave as t is
@@ -193,6 +192,7 @@ func (pm *Peer) FetchConnectionsFromNewPeer(newPeer Peer) {
 		newConnectedDirection := ""
 		// if we have exceeded the length of the array, default
 		if connectedDirectionindex >= len(newPeer.ConnectedDirection) {
+			// this should never happen, all connections must have a direction
 			newConnectedDirection = "unknown"
 		} else {
 			newConnectedDirection = newPeer.ConnectedDirection[connectedDirectionindex]
