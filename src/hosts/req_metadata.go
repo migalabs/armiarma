@@ -16,6 +16,7 @@ import (
 	"github.com/migalabs/armiarma/src/rpc/methods"
 	"github.com/migalabs/armiarma/src/rpc/reqresp"
 	"github.com/migalabs/armiarma/src/utils"
+	"github.com/migalabs/armiarma/src/utils/apis"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 	log "github.com/sirupsen/logrus"
@@ -99,7 +100,7 @@ type HostWithIDService interface {
 // ReqHostInfo returns the basic host information regarding a given peer, from the libp2p perspective
 // it aggregates the info from the libp2p Identify protocol adding some extra info such as RTT between local host and remote peer
 // return empty struct and error if failure on the identify process
-func ReqHostInfo(ctx context.Context, wg *sync.WaitGroup, h host.Host, conn network.Conn, peer *db.Peer, errIdent chan error) {
+func ReqHostInfo(ctx context.Context, wg *sync.WaitGroup, ipLoc *apis.PeerLocalizer, h host.Host, conn network.Conn, peer *db.Peer, errIdent chan error) {
 	defer wg.Done()
 
 	peerID := conn.RemotePeer()
@@ -155,15 +156,14 @@ func ReqHostInfo(ctx context.Context, wg *sync.WaitGroup, h host.Host, conn netw
 	mAddrs = append(mAddrs, multiAddr)
 	peer.MAddrs = mAddrs
 	peer.Ip = utils.ExtractIPFromMAddr(multiAddr).String()
-
-	country, city, countryCode, err := db_utils.GetLocationFromIp(peer.Ip)
+	locResp, err := ipLoc.LocateIP(peer.Ip)
 	if err != nil {
 		// TODO: think about a better idea to integrate a logger into this functions
 		log.Warnf("error when fetching country/city from ip %s. %s", peer.Ip, err.Error())
 	} else {
-		peer.Country = country
-		peer.City = city
-		peer.CountryCode = countryCode
+		peer.Country = locResp.Country
+		peer.City = locResp.City
+		peer.CountryCode = locResp.CountryCode
 	}
 	// Fulfill the hInfo struct
 	ua, err := h.Peerstore().Get(peerID, "AgentVersion")

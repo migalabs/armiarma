@@ -20,11 +20,11 @@ import (
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/migalabs/armiarma/src/base"
 	"github.com/migalabs/armiarma/src/db"
-	"github.com/migalabs/armiarma/src/db/utils"
 	"github.com/migalabs/armiarma/src/enode"
 	"github.com/migalabs/armiarma/src/gossipsub/blockchaintopics"
 	"github.com/migalabs/armiarma/src/info"
 	all_utils "github.com/migalabs/armiarma/src/utils"
+	"github.com/migalabs/armiarma/src/utils/apis"
 
 	geth_log "github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/discover"
@@ -42,6 +42,7 @@ type Discovery struct {
 	*base.Base
 	Node         *enode.LocalNode
 	PeerStore    *db.PeerStore
+	IpLocator    *apis.PeerLocalizer
 	ListenPort   int
 	BootNodeList []*eth_enode.Node
 	info_data    *info.InfoData
@@ -59,7 +60,7 @@ func NewEmptyDiscovery() *Discovery {
 // @param input_opts the logging options object
 // @return the modified logging options object
 
-func NewDiscovery(ctx context.Context, input_node *enode.LocalNode, db *db.PeerStore, info_obj *info.InfoData, input_port int, stdOpts base.LogOpts) *Discovery {
+func NewDiscovery(ctx context.Context, input_node *enode.LocalNode, db *db.PeerStore, ipLoc *apis.PeerLocalizer, info_obj *info.InfoData, input_port int, stdOpts base.LogOpts) *Discovery {
 	localLogger := dv5LoggerOpts(stdOpts)
 	// instance base
 	new_base, err := base.NewBase(
@@ -76,6 +77,7 @@ func NewDiscovery(ctx context.Context, input_node *enode.LocalNode, db *db.PeerS
 		Base:       new_base,
 		Node:       input_node,
 		PeerStore:  db,
+		IpLocator:  ipLoc,
 		info_data:  info_obj,
 		ListenPort: input_port,
 	}
@@ -200,13 +202,13 @@ func (d *Discovery) HandleENR(node *eth_enode.Node) error {
 	peer.Ip = node.IP().String()
 	peer.MAddrs = mAddrs
 
-	country, city, countrycode, err := utils.GetLocationFromIp(node.IP().String())
+	locResp, err := d.IpLocator.LocateIP(node.IP().String())
 	if err != nil {
 		d.Log.Debugf("could not get location from ip: %s  error: %s", node.IP(), err)
 	} else {
-		peer.Country = country
-		peer.CountryCode = countrycode
-		peer.City = city
+		peer.Country = locResp.Country
+		peer.CountryCode = locResp.CountryCode
+		peer.City = locResp.City
 	}
 	d.PeerStore.StoreOrUpdatePeer(peer)
 	return nil
