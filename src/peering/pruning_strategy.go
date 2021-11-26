@@ -20,10 +20,10 @@ import (
 var (
 	PruningStrategyName = "PRUNING"
 	// Default Delays
-	DeprecationTime       = 24 * time.Hour  // hours after first negative connection that has to pass to deprecate a peer
-	DefaultNegDelay       = 12 * time.Hour  // Default delay that will be applied for those deprecated peers
-	DefaultPossitiveDelay = 6 * time.Hour   // Default delay after each possitive severe negative attempts
-	StartExpD             = 2 * time.Minute // Strating delay that will serve for the Exponencial Delay
+	DeprecationTime       = 1024 * time.Minute // minutes after first negative connection that has to pass to deprecate a peer
+	DefaultNegDelay       = 12 * time.Hour     // Default delay that will be applied for those deprecated peers
+	DefaultPossitiveDelay = 6 * time.Hour      // Default delay after each possitive severe negative attempts
+	StartExpD             = 2 * time.Minute    // Strating delay that will serve for the Exponencial Delay
 	// Control variables
 	MinIterTime       = 10 * time.Second // Minimum time that has to pass before iterating again
 	ConnEventBuffSize = 400
@@ -52,8 +52,10 @@ type PruningStrategy struct {
 	identEventNot  chan hosts.IdentificationEvent
 
 	// List of peers sorted by the amount of time thatwe have to wait
-	PeerQueue    PeerQueue
-	lastIterTime time.Duration
+	PeerQueue           PeerQueue
+	lastIterTime        time.Duration
+	PeerQueueIterations int // number of times we have refreshed the peerqueue, meaning we iterated everything that could
+	// be connectable inside the peerqueue
 	/*
 		// TODO: Choose the necessary parameters for the pruning
 		FilterDigest beacon.ForkDigest `ask:"--filter-digest" help:"Only connect when the peer is known to have the given fork digest in ENR. Or connect to any if not specified."`
@@ -126,6 +128,9 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 	c.Log.Debug("starting the peerstore iterator routine")
 	// get Ctx of the pruning module
 	modCtx := c.Ctx()
+
+	c.PeerQueueIterations = 0
+
 	// get the peer list from the peerstore
 	err := c.PeerQueue.UpdatePeerListFromPeerStore(c.PeerStore)
 	if err != nil {
@@ -145,9 +150,8 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 				// read info about next peer
 				nextPeer := c.PeerQueue.PeerList[peerCounter]
 				// check if the node is ready for connection
-				//fmt.Printf("TimeNow: %s\n", time.Now())
-				//fmt.Printf("NextConnection: %s\n", nextPeer.NextConnection())
-				if nextPeer.IsReadyForConnection() {
+				// or we are in the first iteration, then we always try all of them
+				if nextPeer.IsReadyForConnection() || c.PeerQueueIterations == 0 {
 					//fmt.Printf("-----NewPeerConnect------\n\n\n")
 					pinfo, err := c.PeerStore.GetPeerData(nextPeer.PeerID)
 					if err != nil {
@@ -212,6 +216,7 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 				// reset values
 				// get the peer list from the peerstore
 				err := c.PeerQueue.UpdatePeerListFromPeerStore(c.PeerStore)
+				c.PeerQueueIterations++ // another iteration
 				if err != nil {
 					c.Log.Error(err)
 				}
@@ -609,7 +614,11 @@ func (c *PrunedPeer) UpdateDelay(newDelayType string) {
 		c.BaseConnectionTimestamp = time.Now()
 	}
 
-	c.DelayObj.AddDegree()
+	// only add degree in case we have not exceeded the MaxDelay allowed
+	if c.DelayObj.CalculateDelay() < MaxDelayTime {
+
+		c.DelayObj.AddDegree()
+	}
 }
 
 func ErrorToDelayType(errString string) string {

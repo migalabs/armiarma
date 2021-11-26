@@ -14,11 +14,13 @@ var (
 	ZeroDelayType               string = "Zero"
 	Minus1DelayType             string = "Minus1"
 
+	MaxDelayTime time.Duration = time.Duration(math.Pow(2, 11) * float64(time.Minute))
+
 	// define the initial delay we apply in each of the types
 	InitialDelayTime = map[string]time.Duration{
-		PositiveDelayType:           6 * time.Hour,
+		PositiveDelayType:           128 * time.Minute,
 		NegativeWithHopeDelayType:   2 * time.Minute,
-		NegativeWithNoHopeDelayType: 12 * time.Hour,
+		NegativeWithNoHopeDelayType: 256 * time.Minute,
 		ZeroDelayType:               0 * time.Hour,
 		Minus1DelayType:             -1000 * time.Hour,
 	}
@@ -31,6 +33,7 @@ type DelayObject interface {
 	AddDegree()
 	GetType() string
 	SetDegree(int)
+	GetDegree() int
 }
 
 // all of our delay types will include this base, as they all have the same data
@@ -54,13 +57,23 @@ func NewBaseDelay(inputType string) *BaseDelay {
 // AddDegree
 // * This method will add 1 to the delaydegree
 func (bd *BaseDelay) AddDegree() {
+
 	bd.DelayDegree++
+
 }
 
 // SetDegree
 // * This method will the delaydegree
 func (bd *BaseDelay) SetDegree(newDegree int) {
 	bd.DelayDegree = newDegree
+}
+
+// GetDegree
+// @return the delaydegree
+func (bd *BaseDelay) GetDegree() int {
+
+	return bd.DelayDegree
+
 }
 
 // GetType
