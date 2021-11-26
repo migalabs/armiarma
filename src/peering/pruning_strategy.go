@@ -154,7 +154,6 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 				// check if the node is ready for connection
 				// or we are in the first iteration, then we always try all of them
 				if nextPeer.IsReadyForConnection() || c.PeerQueueIterations == 0 {
-					//fmt.Printf("-----NewPeerConnect------\n\n\n")
 					pinfo, err := c.PeerStore.GetPeerData(nextPeer.PeerID)
 					if err != nil {
 						log.Warn(err)
@@ -187,14 +186,10 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 
 					// increment peerCounter to see if we finished iterating the peerstore
 					peerCounter++
-					//fmt.Printf("PeerQueue Counter: %d, Type: %s\n", peerCounter, nextPeer.DelayObj.GetType())
 
 				} else {
-					//fmt.Printf("peer is no ready for connection | next conn %s | current time %s\n", nextPeer.NextConnection(), time.Now())
 					c.Log.Debug("next peers has to wait to be connected")
 					c.iterForcingNextConnTime = nextPeer.NextConnection()
-					//fmt.Printf("Stopped until NextConection\n")
-					//fmt.Printf("Type: %s, NextConnection: %s\n", nextPeer.DelayObj.GetType(), nextPeer.NextConnection())
 
 					c.NextPeer()
 					nextIterFlag = true
@@ -544,7 +539,7 @@ func (c *PeerQueue) UpdatePeerListFromPeerStore(peerstore *db.PeerStore) error {
 			newPrunnedPeer.DelayObj.SetDegree(delayDegree)
 
 			if pInfo.Deprecated {
-				// set basedeprecationtime to the past
+				// set basedeprecationtime to the past so this keeps deprecated
 				newPrunnedPeer.BaseDeprecationTimestamp = time.Now().Add(-DeprecationTime)
 			}
 
@@ -558,7 +553,6 @@ func (c *PeerQueue) UpdatePeerListFromPeerStore(peerstore *db.PeerStore) error {
 	}
 	// Sort the list of peers based on the next connection
 	c.SortPeerList()
-	//log.Infof("%+v", c.queueErroDistribution)
 	log.Infof("len PeerQueue: %d\n", c.Len())
 	return nil
 }
@@ -590,18 +584,14 @@ func NewPrunedPeer(peerID string, inputType string) *PrunedPeer {
 func (c *PrunedPeer) IsReadyForConnection() bool {
 	now := time.Now()
 	// if we are not before the time, then we are either equal or after the connection time
-
-	//fmt.Printf(strconv.FormatBool(!now.Before(c.NextConnection())))
-	//fmt.Printf("Now(): %s\nNext Connection: %s\n\n\n", now, c.NextConnection())
 	return !now.Before(c.NextConnection())
 }
 
 func (c *PrunedPeer) NextConnection() time.Time {
 
-	if c.DelayObj.GetType() == Minus1DelayType { // in case of Minus1, this is dv5 and we want it to connect as soon as possible
+	if c.DelayObj.GetType() == Minus1DelayType { // in case of Minus1, this is new peer and we want it to connect as soon as possible
 		return time.Time{}
 	}
-
 	// nextConnection should be from first event + the applied delay
 	return c.BaseConnectionTimestamp.Add(c.DelayObj.CalculateDelay())
 }
