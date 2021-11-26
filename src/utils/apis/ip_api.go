@@ -105,9 +105,6 @@ func (c *PeerLocalizer) locatorRoutine() {
 			response.ip = request.ip
 			// new API call needs to be done
 			logger.Debugf("call %d-> ip %s not in cache, making API call", call, response.ip)
-			// lock function so that it only gets done one by one
-			c.m.Lock()
-			logger.Debugf("call %d-> loquing requests", call)
 			for !breakCallLoop {
 				// if req delay is setted to true, make new request
 				// make the API call, and receive the apiResponse, the nextDelayRequest and the error from the connection
@@ -136,10 +133,8 @@ func (c *PeerLocalizer) locatorRoutine() {
 				// set req delay to true, noone can make requests
 				time.Sleep(nextDelayRequest + (5 * time.Second))
 			}
-			// unlock request function
-			logger.Debugf("call %d-> unloquing requests", call)
-			c.m.Unlock()
 
+			logger.Debugf("call %d-> saving new request and return it")
 			// add the response into the responseCache
 			c.reqCache.addRequest(&response)
 
