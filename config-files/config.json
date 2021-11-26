@@ -7,7 +7,7 @@
     "Eth2Endpoint": "",
     "ForkDigest": "afcaaba0",
     "UserAgent": "BSC-Eth2-Crawler",
-    "LogLevel": "info",
+    "LogLevel": "debug",
     "PrivateKey": "",
     "BootNodesFile": "./src/discovery/official-eth2-bootnodes.json",
     "OutputPath": "./peerstore",
