@@ -90,7 +90,7 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 
 	// Request the Host Metadata
 	h := c.Host()
-	go ReqHostInfo(mainCtx, &wg, h, conn, &peer, hinfoErr)
+	go ReqHostInfo(mainCtx, &wg, c.IpLocator, h, conn, &peer, hinfoErr)
 
 	var bMetadata common.MetaData
 	// Request the BeaconMetadata
