@@ -17,7 +17,6 @@ import (
 
 var (
 	ModuleName string = "PEER LOCALIZER"
-	chanSize   int    = 200
 
 	l      = log.New()
 	logger = l.WithField(
@@ -53,7 +52,7 @@ func NewPeerLocalizer(ctx context.Context, cacheSize int) PeerLocalizer {
 		ctx:             locContext,
 		cancel:          cancelFunc,
 		reqCache:        reqCache,
-		locationRequest: make(chan locReq, chanSize),
+		locationRequest: make(chan locReq),
 		apiCalls:        &calls,
 	}
 }
@@ -68,7 +67,7 @@ func (c *PeerLocalizer) Run() {
 // or if the routine gets canceled
 func (c *PeerLocalizer) locatorRoutine() {
 	logger.Info("IP locator routine started")
-	apiCallChan := make(chan locReq, chanSize)
+	apiCallChan := make(chan locReq, 20)
 	for {
 		select {
 		// New request to identify an IP
