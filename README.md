@@ -1,39 +1,50 @@
 # Armiarma. A distributed network monitoring tool
 
 ## Motivation
-Distributed p2p networks are gaining popularity with the popularization of blockchain applications. On a case scenario, where the critical message exchange complitely relies on the p2p network underneath, a deep and complete analysis on the real-time network status can directly prevent or spot vulnerabilities on the application protocol.
+Distributed p2p networks are gaining popularity with the popularization of blockchain applications. In a case scenario where the critical message exchange entirely relies on the p2p network underneath, a deep and complete analysis of the real-time network status can directly prevent or spot vulnerabilities on the application protocol.
 
-With this idea in mind, from Miga Labs, we want to provide a tool able to join p2p networks (check the protocol compatibility list), share and adopt the using protocols so that we can provide the datasets and the tools to study the new generation blockchain networks.
+With this idea in mind, from Miga Labs, we want to provide a tool able to join p2p networks (check the protocol compatibility list), share, and adopt the using protocols to provide the datasets and the tools to study the new generation blockchain networks.
 
 ## Who are we?
-[Miga Labs](http://migalabs.es/) is a young department of the Barcelona Supercomputing Center (BSC). Miga Labs is a group specialized in next-generation Blockchain technology, with a focus on Sharding and Proof-of-Stake protocols.
+[Miga Labs](http://migalabs.es/) is a young department of the Barcelona Supercomputing Center (BSC). Miga Labs is a group specialized in next-generation Blockchain technology, focusing on Sharding and Proof-of-Stake protocols.
 
-## Binary insstallation
 
-### Requisites
-For using the tool, the following requirements need to be installed on the machine:
+## Getting started
+The project offers a network crawler able to monitor the Eth2 p2p network. 
+
+### Prerequisites
+To use the tool, the following requirements need to be installed in the machine:
 - Go on its 1.17 version or above. Go needs to be executable from the terminal. Lower versions will report a dependency import error for the package `io/fs`.
 
+Alternatively, the tool can also be executed from:
+- Docker
+- Docker-compose
 
-### Steps
-In order to execute it, download the repository and build the project
+OPTIONAL for data visualization:
+- Prometheus time-series database.
+- Grafana dashboard.
+
+
+###  Binary compilation from source-code 
+To run the tool from the source code, follow these steps:
+
 ```
 # Donwload the git repository of the tool
-git clone git@github.com:Cortze/armiarma.git
+git clone https://github.com/migalabs/armiarma.git
 
-# Switch from master branch to integral-refactor (newst stable version)
+# Switch from 'master' branch to 'integral-refactor' (newest stable version)
 git checkout integral-refactor
 
 # Compile the tool generating the armiarma binary
 go build -o armiarma
 
-# Ready to use calling
-./armiarma
+# Ready to call the tool
+./armiarma [command] [options]
 
 ```
 
 ### Execution
-In order to execute it, download the repository and build the project
+At the moment, the tool only offers a single command for the crawler. Check the description bellow.
 ```
 
 EXECUTION:
@@ -48,39 +59,34 @@ OPTIONS:
 
 ```
 ## Docker installation
-We provide a Dockerfile that can be used to 
+We also provide a Dockerfile that can be used to run the crawler without having to compile it manually.
+```
+# Call docker-compose in the root of the repository and that's all
+docker-compose up 
+```
+Docker-compose will generate the Docker image for you and will run the crawler in your machine. 
+Please, note that by running the tool through the `docker-compose` command, the default config-file will serve as reference `config-files/config.json` for the tool configuration. The resulting `metrics.csv` and `peerstore.db` will be taken/generated from the folder `./peerstore`.
 
-## The project
+Remember that all these default configurations could be modified from the `docker-compose.yaml` file. 
 
-Our main goal is to build a crawler using the standard libp2p and ethereum go libraries.
-By using the standard libraries we aim to build and know our own project, providing the abilty to fully customize the crawler to adjuts it to specific cases.
-Having the possibility to fully customize the parameters of the crawler, we will be able to test specific and rare scenarios.
+### Supported networks
+Currently supported protocols:
+```
+Ethereum 2      Different networks or forks can be crawled by defining the 'ForkDigest' in the 'config.json' file    
+```
 
-## Structure
+## Data visualization
+The combination of Prometheus and Grafana is the one that we have chosen to display the network data. In the repository, both configuration files are provided. In addition, the crawler, by default, exports all the metrics to Prometheus in port 9080. 
 
-Our module is divided into several packages, each of them having a unique goal.
+The results of our analysis are also openly available on our website [migalabs.es](https://migalabs.es).
 
-#### Config
-The package is intended to read information from the configuration file (provided through command line) and expose the information so that it can be read into the module
+## Contact
+To get in contact with us, feel free to reach us through our [email](migalabs@protonmail.com), and don't forget to follow our latest news on [Twitter](https://twitter.com/miga_labs). 
 
-#### Info
-The package is intended to read information from the configuration file, making use of the Config package, and importing into an object which will then be used by other packages to access the information. This package also validates and formats the information to be easily read by other components of this project.
-
-#### Host
-The package is intended to create and start a host using the LibP2P standard library. This host will then be used, along with the node, to interact with the Ethereum 2.0 network.
-
-#### Enode
-The package is intended to create a node compatible with the Ethereum network.
-
-#### Discovery
-The package is intended to configure and start the discovery5 service in order to find other nodes in the network.
-This package will have all needed methods to interact with the discovery5 library for our specific scenarios.
+## Notes
+Please, note that the tool is currently in a developing stage. Any bugs reports and/or suggestions are very welcome.
 
 
-![alt text](https://github.com/Cortze/armiarma/blob/integral-refactor/doc/modules/Armiarma_packages.drawio.png)
 
-## NOTES
-Please, note that the tool is currently on a developing stage, any bugs reports or suggestions will be accepted.
-
-## LICENSE
+## License
 MIT, see [LICENSE](https://github.com/Cortze/armiarma/blob/master/LICENSE) file.
