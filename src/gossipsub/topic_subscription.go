@@ -38,6 +38,7 @@ type TopicSubscription struct {
 // * @return: pointer to TopicSubscription
 func NewTopicSubscription(ctx context.Context, topic *pubsub.Topic, sub pubsub.Subscription, msgMetrics *MessageMetrics, stdOpts base.LogOpts) *TopicSubscription {
 	localLogger := createTopicLoggerOpts(stdOpts)
+	//localLogger.Level = "debug"
 
 	// instance base
 	new_base, err := base.NewBase(
