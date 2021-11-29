@@ -20,7 +20,7 @@ type PeeringStrategy interface {
 	NewConnectionEvent(hosts.ConnectionEvent)
 	NewIdentificationEvent(hosts.IdentificationEvent)
 	// Prometheus Export Calls
-	LastIterTime() int64
+	LastIterTime() float64
 	IterForcingNextConnTime() string
 	AttemptedPeersSinceLastIter() int64
 	ControlDistribution() map[string]int64
