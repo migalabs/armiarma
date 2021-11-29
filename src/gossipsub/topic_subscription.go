@@ -55,7 +55,7 @@ func NewTopicSubscription(ctx context.Context, topic *pubsub.Topic, sub pubsub.S
 		Topic:          topic,
 		Sub:            &sub,
 		MessageMetrics: msgMetrics,
-		Messages:       make(chan []byte, 10),
+		Messages:       make(chan []byte),
 	}
 }
 
@@ -92,7 +92,10 @@ func (c *TopicSubscription) MessageReadingLoop(h host.Host, peerstore *db.PeerSt
 				peerstore.StoreOrUpdatePeer(newPeer)
 				// peerstore.MessageEvent(msg.ReceivedFrom.String(), c.Sub.Topic())
 				// Add notification on the notification channel
-				c.Messages <- msgData
+
+				// Commented because no other routine reads from the msg channel
+				//c.Messages <- msgData
+
 				// Add message to msg metrics counter
 				_ = c.MessageMetrics.AddMessgeToTopic(c.Sub.Topic())
 
@@ -107,6 +110,7 @@ func (c *TopicSubscription) MessageReadingLoop(h host.Host, peerstore *db.PeerSt
 						}
 					}
 				*/
+				c.Log.Debugf("msg content %s", msgData)
 			} else {
 				c.Log.Debugf("message sent by ourselfs received on %s", c.Sub.Topic())
 			}
