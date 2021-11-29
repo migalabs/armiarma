@@ -31,6 +31,7 @@ func (c *PeeringService) ServeMetrics(ctx context.Context) {
 				peersPeriter := c.strategy.AttemptedPeersSinceLastIter()
 				//peerIterForcingTime := c.strategy.IterForcingNextConnTime()
 				controlDist := c.strategy.ControlDistribution()
+				errorAttemptDist := c.strategy.GetErrorAttemptDistribution()
 				// get new values
 				PeerstoreIterTime.Set(iterTime) // Float in seconds
 				PeersAttemptedInLastIteration.Set(float64(peersPeriter))
@@ -39,6 +40,11 @@ func (c *PeeringService) ServeMetrics(ctx context.Context) {
 				// generate the distribution
 				for key, value := range controlDist {
 					PrunedErrorDistribution.WithLabelValues(key).Set(float64(value))
+				}
+
+				// generate the distribution
+				for key, value := range errorAttemptDist {
+					ErrorAttemptDistribution.WithLabelValues(key).Set(float64(value))
 				}
 
 				log.WithFields(log.Fields{

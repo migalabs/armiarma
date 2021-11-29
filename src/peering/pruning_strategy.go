@@ -56,10 +56,12 @@ type PruningStrategy struct {
 	PeerQueue PeerQueue
 
 	// Prometheus Control Variables
-	lastIterTime            time.Duration
-	iterForcingNextConnTime time.Time
-	attemptedPeers          int64
-	queueErroDistribution   map[string]int64
+	lastIterTime             time.Duration
+	iterForcingNextConnTime  time.Time
+	attemptedPeers           int64
+	queueErroDistribution    map[string]int64
+	PeerQueueIterations      int
+	ErrorAttemptDistribution map[string]int64
 }
 
 // NewPruningStrategy
@@ -96,7 +98,8 @@ func NewPruningStrategy(ctx context.Context, peerstore *db.PeerStore, opts Pruni
 		connEventNot:   make(chan hosts.ConnectionEvent),
 		identEventNot:  make(chan hosts.IdentificationEvent),
 		// Metrics Variables
-		queueErroDistribution: make(map[string]int64),
+		queueErroDistribution:    make(map[string]int64),
+		ErrorAttemptDistribution: make(map[string]int64),
 	}
 	return pr, nil
 }
@@ -136,6 +139,13 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 	err := c.PeerQueue.UpdatePeerListFromPeerStore(c.PeerStore)
 	if err != nil {
 		c.Log.Error(err)
+	}
+	errorAttemptCategories := map[string]int64{
+		PositiveDelayType:           0,
+		NegativeWithHopeDelayType:   0,
+		NegativeWithNoHopeDelayType: 0,
+		Minus1DelayType:             0,
+		ZeroDelayType:               0,
 	}
 	peerCounter := 0
 	peerListLen := c.PeerQueue.Len()
@@ -181,6 +191,7 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 
 					// Send next peer to the peering service
 					c.Log.Debugf("pushing next peer %s into peer stream", pinfo.PeerId)
+					errorAttemptCategories[nextPeer.DelayObj.GetType()]++
 					c.peerStreamChan <- pinfo
 
 					// increment peerCounter to see if we finished iterating the peerstore
@@ -211,6 +222,8 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 
 				// reset values
 				// get the peer list from the peerstore
+				errorAttemptCategories = ResetMapValues(errorAttemptCategories)
+				c.ErrorAttemptDistribution = errorAttemptCategories
 				err := c.PeerQueue.UpdatePeerListFromPeerStore(c.PeerStore)
 				c.PeerQueueIterations++ // another iteration
 				if err != nil {
@@ -365,6 +378,10 @@ func (c *PruningStrategy) ControlDistribution() map[string]int64 {
 	return c.PeerQueue.DelayDistribution()
 }
 
+func (c *PruningStrategy) GetErrorAttemptDistribution() map[string]int64 {
+	return c.ErrorAttemptDistribution
+}
+
 // ClosePeerStream
 // * Closes in a controled secuence the module related go routines and channels
 // * Ending with the Base.Ctx cancelation
@@ -465,15 +482,13 @@ func (c *PeerQueue) UpdatePeerListFromPeerStore(peerstore *db.PeerStore) error {
 	peerList := peerstore.GetPeerList()
 	totcnt := 0
 	new := 0
-
 	c.queueErroDistribution = map[string]int64{
 		PositiveDelayType:           0,
 		NegativeWithHopeDelayType:   0,
 		NegativeWithNoHopeDelayType: 0,
-		ZeroDelayType:               0,
 		Minus1DelayType:             0,
+		ZeroDelayType:               0,
 	}
-
 	// Fill the PeerQueue.PeerList with the missing peers from the
 	for _, peerID := range peerList {
 		totcnt++
@@ -657,4 +672,11 @@ func ErrorToDelayType(errString string) string {
 		return NegativeWithHopeDelayType
 
 	}
+}
+
+func ResetMapValues(inputMap map[string]int64) map[string]int64 {
+	for k, _ := range inputMap {
+		inputMap[k] = 0
+	}
+	return inputMap
 }
