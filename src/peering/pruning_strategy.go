@@ -26,8 +26,8 @@ var (
 	DefaultPossitiveDelay = 6 * time.Hour      // Default delay after each possitive severe negative attempts
 	StartExpD             = 2 * time.Minute    // Strating delay that will serve for the Exponencial Delay
 	// Control variables
-	MinIterTime       = 15 * time.Second // Minimum time that has to pass before iterating again
-	ConnEventBuffSize = 400
+	MinIterTime = 15 * time.Second // Minimum time that has to pass before iterating again
+	//ConnEventBuffSize = 400
 )
 
 type PruningOpts struct {
@@ -91,11 +91,11 @@ func NewPruningStrategy(ctx context.Context, peerstore *db.PeerStore, opts Pruni
 		strategyType:   PruningStrategyName,
 		PeerStore:      peerstore,
 		PeerQueue:      NewPeerQueue(),
-		peerStreamChan: make(chan db.Peer, ConnEventBuffSize),
-		nextPeerChan:   make(chan struct{}, ConnEventBuffSize),
-		connAttemptNot: make(chan ConnectionAttemptStatus, ConnEventBuffSize),
-		connEventNot:   make(chan hosts.ConnectionEvent, ConnEventBuffSize),
-		identEventNot:  make(chan hosts.IdentificationEvent, ConnEventBuffSize),
+		peerStreamChan: make(chan db.Peer, DefaultWorkers),
+		nextPeerChan:   make(chan struct{}, DefaultWorkers),
+		connAttemptNot: make(chan ConnectionAttemptStatus),
+		connEventNot:   make(chan hosts.ConnectionEvent),
+		identEventNot:  make(chan hosts.IdentificationEvent),
 		// Metrics Variables
 		queueErroDistribution: make(map[string]int64),
 	}
