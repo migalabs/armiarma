@@ -520,7 +520,6 @@ func (c *PeerQueue) UpdatePeerListFromPeerStore(peerstore *db.PeerStore) error {
 						}
 
 					} else {
-						// we iterate here even if the error is None, so we have the degree of same delaytype
 						for i := range errorList {
 							// recreate the nuber of consecutive errors backwards
 							if errorList[len(errorList)-1-i] == lastError {
