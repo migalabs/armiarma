@@ -32,7 +32,7 @@ func (c *PeeringService) ServeMetrics(ctx context.Context) {
 				//peerIterForcingTime := c.strategy.IterForcingNextConnTime()
 				controlDist := c.strategy.ControlDistribution()
 				// get new values
-				PeerstoreIterTime.Set(float64(iterTime))
+				PeerstoreIterTime.Set(iterTime) // Float in seconds
 				PeersAttemptedInLastIteration.Set(float64(peersPeriter))
 				//IterForcingNextConnTime.Set(peerIterForcingTime)
 

@@ -349,8 +349,8 @@ func (c *PruningStrategy) NewIdentificationEvent(newIdent hosts.IdentificationEv
 // --------------------------------------------------
 
 // Seconds
-func (c *PruningStrategy) LastIterTime() int64 {
-	return int64(time.Duration(c.lastIterTime.Seconds()))
+func (c *PruningStrategy) LastIterTime() float64 {
+	return float64(c.lastIterTime.Microseconds()) / 1000000
 }
 
 func (c *PruningStrategy) IterForcingNextConnTime() string {
