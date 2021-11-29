@@ -16,7 +16,7 @@ var (
 
 	ErrorAttemptDistribution = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "peering",
-		Name:      "iteration attempts by categroy distribution",
+		Name:      "iteration_attempts_by_category_distribution",
 		Help:      "Filter attempts in Peer Queue by errors that were tracked",
 	},
 		[]string{"controlAttemptdist"},
