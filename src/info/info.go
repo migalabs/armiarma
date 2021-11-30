@@ -78,7 +78,7 @@ type InfoData struct {
 // @return An InfoData object
 func NewDefaultInfoData(stdOpts base.LogOpts) InfoData {
 
-	config_object := config.NewEmptyConfigData(stdOpts)
+	config_object := config.NewEmptyConfig()
 
 	info_object := InfoData{}
 
@@ -89,19 +89,16 @@ func NewDefaultInfoData(stdOpts base.LogOpts) InfoData {
 
 // NewCustomInfoData
 // * This method will create an InfoData object
-// * using imported values from config
-// @param input_file which to give to the ConfigData object
+// * using imported values from givem config.ConfigData
+// @param input ConfigData object
 // @param stdOpts (meaning, mod name and the level will be added here)
 // @return An InfoData object
-func NewCustomInfoData(input_file string, stdOpts base.LogOpts) *InfoData {
+func NewCustomInfoData(configObj config.ConfigData, stdOpts base.LogOpts) *InfoData {
 
-	config_object := config.NewEmptyConfigData(stdOpts)
-	config_object.ReadFromJSON(input_file)
+	infoObj := InfoData{}
+	infoObj.importFromConfig(configObj, stdOpts)
 
-	info_object := InfoData{}
-	info_object.importFromConfig(config_object, stdOpts)
-
-	return &info_object
+	return &infoObj
 }
 
 // importFromConfig
