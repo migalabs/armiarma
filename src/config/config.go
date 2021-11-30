@@ -12,7 +12,6 @@ package config
 import (
 	"encoding/json"
 	"flag"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -72,14 +71,10 @@ func NewConfigFromArgs() (ConfigData, bool) {
 		localLogger: base.CreateLogger(defaultConfigLoggerOpts(base.LogOpts{})),
 	}
 
-	fmt.Println(help)
 	// check if the help was requested
 	if help {
-		fmt.Println("Help!")
 		return config, help
 	}
-
-	fmt.Println("-->", configFile)
 
 	// check if a file was given
 	if configFile != "" {
