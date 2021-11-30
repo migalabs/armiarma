@@ -11,6 +11,7 @@ package config
 
 import (
 	"encoding/json"
+	"flag"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -43,13 +44,44 @@ type ConfigData struct {
 
 // NewEmptyConfig
 // * This method will create a ConfigData empty object
-// @param opts The parameter including the logging options
 // @return A ConfigData object
-func NewEmptyConfigData(opts base.LogOpts) ConfigData {
-	opts = defaultConfigLoggerOpts(opts)
-	return ConfigData{
-		localLogger: base.CreateLogger(opts),
+func NewEmptyConfig() ConfigData {
+	// generate an empty configuration (will call later on the default info)
+	config := ConfigData{
+		localLogger: base.CreateLogger(defaultConfigLoggerOpts(base.LogOpts{})),
 	}
+
+	return config
+}
+
+// NewConfigFromArgs
+// * This method will create a ConfigData from the given args flags
+// @return A ConfigData object
+// @return whether the help was requested or not
+func NewConfigFromArgs() (ConfigData, bool) {
+	// Parse the arguments looking for the config-file
+	var help bool
+	var configFile string
+	flag.BoolVar(&help, "help", false, "display available commands and flags to run the armiarma crawler")
+	flag.StringVar(&configFile, "config-file", "./config-files/config.json", "config-file with all the available configurations. Find an example at ./config-files/config.json")
+	flag.Parse()
+
+	// generate an empty configuration (will call later on the default info)
+	config := ConfigData{
+		localLogger: base.CreateLogger(defaultConfigLoggerOpts(base.LogOpts{})),
+	}
+
+	// check if the help was requested
+	if help {
+		return config, help
+	}
+
+	// check if a file was given
+	if configFile != "" {
+		config.ReadFromJSON(configFile)
+	}
+
+	return config, help
 }
 
 // ReadFromJSON

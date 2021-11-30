@@ -2,7 +2,6 @@ package gossipsub
 
 import (
 	"fmt"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -16,7 +15,6 @@ import (
 // * Summarizes all the metrics that could be obtained from the received msgs
 // * Right now divided by topic and containing only the local counter between server ticker
 type MessageMetrics struct {
-	mutex     sync.RWMutex
 	topicList map[string]*int32
 }
 
@@ -33,9 +31,8 @@ func NewMessageMetrics() MessageMetrics {
 // @return a possitive boolean if the topic was
 // 		   already in Metrics, negative one otherwise
 func (c *MessageMetrics) NewTopic(topic string) bool {
-	counter := int32(0)
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
+	var counter int32
+	atomic.StoreInt32(&counter, 0)
 	_, exists := c.topicList[topic]
 	if exists {
 		return true
@@ -48,8 +45,6 @@ func (c *MessageMetrics) NewTopic(topic string) bool {
 // @param gossipsub topic name
 // @return curren message counter, or -1 if there was an error (non-existing topic)
 func (c *MessageMetrics) AddMessgeToTopic(topic string) int32 {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
 	v, exists := c.topicList[topic]
 	if !exists {
 		return int32(-1)
@@ -61,8 +56,6 @@ func (c *MessageMetrics) AddMessgeToTopic(topic string) int32 {
 // @param gossipsub topic name
 // @return curren message counter, or -1 if there was an error (non-existing topic)
 func (c *MessageMetrics) ResetTopic(topic string) int32 {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
 	v, exists := c.topicList[topic]
 	if !exists {
 		return int32(-1)
@@ -87,13 +80,11 @@ func (c *MessageMetrics) ResetAllTopics() error {
 // * Obtain the counter of messages from last ticker of given topic
 // @return curren message counter, or -1 if there was an error (non-existing topic)
 func (c *MessageMetrics) GetTopicMsgs(topic string) int32 {
-	c.mutex.RLock()
-	defer c.mutex.RUnlock()
 	v, exists := c.topicList[topic]
 	if !exists {
 		return int32(-1)
 	}
-	return *v
+	return atomic.LoadInt32(v)
 }
 
 // GetTotalMessages

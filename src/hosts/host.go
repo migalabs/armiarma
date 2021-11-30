@@ -9,6 +9,7 @@ import (
 	"github.com/migalabs/armiarma/src/base"
 	"github.com/migalabs/armiarma/src/db"
 	"github.com/migalabs/armiarma/src/info"
+	"github.com/migalabs/armiarma/src/utils/apis"
 
 	libp2p "github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/host"
@@ -30,6 +31,7 @@ type BasicLibp2pHost struct {
 	host      host.Host
 	identify  *identify.IDService
 	PeerStore *db.PeerStore
+	IpLocator *apis.PeerLocalizer
 
 	// Basic Host Metadata
 	info_obj      *info.InfoData
@@ -37,11 +39,13 @@ type BasicLibp2pHost struct {
 	fullMultiAddr ma.Multiaddr
 
 	connEventNotChannel chan ConnectionEvent
+	identNotChannel     chan IdentificationEvent
 	peerID              peer.ID
 }
 
 type BasicLibp2pHostOpts struct {
 	Info_obj  info.InfoData
+	IpLocator *apis.PeerLocalizer
 	LogOpts   base.LogOpts
 	PeerStore *db.PeerStore
 	// TODO: -Add IdService for the libp2p host
@@ -109,11 +113,13 @@ func NewBasicLibp2pHost(ctx context.Context, opts BasicLibp2pHostOpts) (*BasicLi
 		host:                host,
 		identify:            ids,
 		PeerStore:           opts.PeerStore,
+		IpLocator:           opts.IpLocator,
 		info_obj:            &opts.Info_obj,
 		multiAddr:           muladdr,
 		fullMultiAddr:       localMultiaddr,
 		peerID:              peer.ID(peerId),
 		connEventNotChannel: make(chan ConnectionEvent, ConnNotChannSize),
+		identNotChannel:     make(chan IdentificationEvent, ConnNotChannSize),
 	}
 	b.Log.Debug("setting custom notification functions")
 	basicHost.SetCustomNotifications()
@@ -149,6 +155,14 @@ func (b *BasicLibp2pHost) RecConnEvent(connEvent ConnectionEvent) {
 
 func (b *BasicLibp2pHost) ConnEventNotChannel() chan ConnectionEvent {
 	return b.connEventNotChannel
+}
+
+func (b *BasicLibp2pHost) RecIdentEvent(identEvent IdentificationEvent) {
+	b.identNotChannel <- identEvent
+}
+
+func (b *BasicLibp2pHost) IdentEventNotChannel() chan IdentificationEvent {
+	return b.identNotChannel
 }
 
 func (b *BasicLibp2pHost) GetInfoObj() *info.InfoData {

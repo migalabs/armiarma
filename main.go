@@ -1,22 +1,63 @@
 /*
-Copyright © 2021 Miga Labs
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+	Copyright © 2021 Miga Labs
 */
 package main
 
-import "github.com/migalabs/armiarma/cmd"
+import (
+	"context"
+	"fmt"
+	"os"
+	"os/signal"
+
+	"github.com/migalabs/armiarma/cmd"
+	"github.com/migalabs/armiarma/src/config"
+)
+
+var (
+	Version      = "v0.0.0\n"
+	WellcomeText = "Welcome to the Armiarma network monitoring tool."
+	SpecifyText  = "List of available flags:"
+)
 
 func main() {
-	cmd.Execute()
+	// read arguments from the command line
+	PrintVersion()
+
+	// generate new config for the crawler
+	crawlerConfig, help := config.NewConfigFromArgs()
+	if help {
+		CliHelp()
+		os.Exit(0)
+	}
+
+	// generate the crawler
+	crawler, err := cmd.NewCrawler(context.Background(), crawlerConfig)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	// launch crawler service
+	crawler.Run()
+
+	// register the shutdown signal
+	signal_channel := make(chan os.Signal, 1)
+	signal.Notify(signal_channel, os.Interrupt)
+	<-signal_channel
+	// End up app, finishing everything
+	crawler.Log.Info("SHUTDOWN DETECTED!")
+	// TODO: Shutdown all the services (manually to let them exit in a controled way)
+	crawler.Close()
+
+	os.Exit(0)
+
+}
+
+func CliHelp() {
+	fmt.Println(WellcomeText)
+	fmt.Println(SpecifyText)
+	fmt.Println(cmd.CrawlerHelp())
+}
+
+func PrintVersion() {
+	fmt.Println("Armirma " + Version)
 }

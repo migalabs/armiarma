@@ -20,7 +20,6 @@ func (ps *PeerStore) ServeMetrics(ctx context.Context) {
 	// register variables
 	prometheus.MustRegister(ClientDistribution)
 	prometheus.MustRegister(ConnectedPeers)
-	prometheus.MustRegister(PeerstoreIterTime)
 	prometheus.MustRegister(DeprecatedPeers)
 	prometheus.MustRegister(ClientVersionDistribution)
 	prometheus.MustRegister(IpDistribution)
@@ -100,7 +99,6 @@ func (ps *PeerStore) ServeMetrics(ctx context.Context) {
 				rttDis.SetValues(RttDistribution)
 				tctDis.SetValues(TotcontimeDistribution)
 				//allLastErrors := ps.GetErrorCounter()
-				PeerstoreIterTime.Set(float64(ps.PeerstoreIterTime) / (60 * 1000000000))
 				log.WithFields(log.Fields{
 					//"ClientsDist":        clients,
 					//"GeoDist":            geoDist,

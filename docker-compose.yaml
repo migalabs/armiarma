@@ -1,5 +1,4 @@
-version: "3.7" # Just first try
-
+version: "3.7" 
 
 networks:
         crawlernet:
@@ -15,5 +14,5 @@ services:
                         crawlernet:
                 ports: ["9020:9020/tcp", "9080:9080"]
                 volumes: ["./peerstore:/armiarma/peerstore", "./config-files:/armiarma/config-files"]
-                restart: on-failure
-                entrypoint: "/armiarma/armiarma-client crawler --config-file=./config-files/armiarma.json"
+                #restart: on-failure
+                entrypoint: "/armiarma/armiarma-client --config-file=./config-files/config.json"

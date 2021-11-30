@@ -9,6 +9,7 @@ With this interface, the given host will be able to retreive and connect a set o
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -41,7 +42,7 @@ type PeeringService struct {
 	host      *hosts.BasicLibp2pHost
 	PeerStore *db.PeerStore
 	strategy  PeeringStrategy
-	//
+	// Control Flags
 	Timeout    time.Duration
 	MaxRetries int
 }
@@ -51,7 +52,6 @@ func NewPeeringService(ctx context.Context, h *hosts.BasicLibp2pHost, peerstore 
 	// TODO: cancel is still not implemented in the BaseCreation
 	peeringCtx, _ := context.WithCancel(ctx)
 	logOpts := peeringOpts.LogOpts
-	//logOpts.Level = "debug"
 	logOpts.ModName = MOD_NAME
 	b, err := base.NewBase(
 		base.WithContext(peeringCtx),
@@ -117,6 +117,7 @@ func (c *PeeringService) Run() {
 		go c.peeringWorker(workerName, peerStreamChan)
 	}
 	go c.eventRecorderRoutine()
+	go c.ServeMetrics(c.Ctx())
 }
 
 func (c *PeeringService) peeringWorker(workerID string, peerStreamChan chan db.Peer) {
@@ -150,7 +151,7 @@ func (c *PeeringService) peeringWorker(workerID string, peerStreamChan chan db.P
 				}
 			}
 			if connected {
-				c.Log.Infof("%s -> Peer %s was already connected", workerID, peerID.String)
+				c.Log.Infof("%s -> Peer %s was already connected", workerID, nextPeer.PeerId)
 				c.strategy.NextPeer()
 				continue
 			}
@@ -187,7 +188,6 @@ func (c *PeeringService) peeringWorker(workerID string, peerStreamChan chan db.P
 					connAttStat.RecError = err
 					// increment the attempts
 					attempts++
-					//time.Sleep(5 * time.Second)
 					continue
 				} else { // connection successfuly made
 					c.Log.Debugf("%s peer_id %s successful connection made", workerID, peerID.String())
@@ -222,14 +222,13 @@ func (c *PeeringService) eventRecorderRoutine() {
 	peeringCtx := c.Ctx()
 	// get the connection and disconnection notification channels from the host
 	newConnEventChan := c.host.ConnEventNotChannel()
-
+	newIdentPeerChan := c.host.IdentEventNotChannel()
 	for {
 		select {
+
 		// New connection event
 		case newConn := <-newConnEventChan:
 			switch newConn.ConnType {
-			case int8(0):
-				c.Log.Debugf("not type assigned to event from %s", newConn.Peer.PeerId)
 			case int8(1):
 				c.Log.Debugf("new conection from %s", newConn.Peer.PeerId)
 			case int8(2):
@@ -239,7 +238,12 @@ func (c *PeeringService) eventRecorderRoutine() {
 			}
 			c.strategy.NewConnectionEvent(newConn)
 
-		// Stoping go routine
+		// New identification event has been recorded
+		case newIdent := <-newIdentPeerChan:
+			c.Log.Debugf("new identification %s from peer %s", strconv.FormatBool(newIdent.Peer.IsConnected), newIdent.Peer.PeerId)
+			c.strategy.NewIdentificationEvent(newIdent)
+
+			// Stoping go routine
 		case <-peeringCtx.Done():
 			c.Log.Debug("closing peering go routine")
 		}

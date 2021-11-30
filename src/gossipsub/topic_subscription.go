@@ -3,6 +3,7 @@ package gossipsub
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/golang/snappy"
 	"github.com/libp2p/go-libp2p-core/host"
@@ -37,6 +38,7 @@ type TopicSubscription struct {
 // * @return: pointer to TopicSubscription
 func NewTopicSubscription(ctx context.Context, topic *pubsub.Topic, sub pubsub.Subscription, msgMetrics *MessageMetrics, stdOpts base.LogOpts) *TopicSubscription {
 	localLogger := createTopicLoggerOpts(stdOpts)
+	//localLogger.Level = "debug"
 
 	// instance base
 	new_base, err := base.NewBase(
@@ -53,7 +55,7 @@ func NewTopicSubscription(ctx context.Context, topic *pubsub.Topic, sub pubsub.S
 		Topic:          topic,
 		Sub:            &sub,
 		MessageMetrics: msgMetrics,
-		Messages:       make(chan []byte, 10),
+		Messages:       make(chan []byte),
 	}
 }
 
@@ -85,9 +87,15 @@ func (c *TopicSubscription) MessageReadingLoop(h host.Host, peerstore *db.PeerSt
 			// To avoid getting track of our own messages, check if we are the senders
 			if msg.ReceivedFrom != h.ID() {
 				c.Log.Debugf("new message on %s from %s", c.Sub.Topic(), msg.ReceivedFrom)
-				peerstore.MessageEvent(msg.ReceivedFrom.String(), c.Sub.Topic())
+				newPeer := db.NewPeer(msg.ReceivedFrom.String())
+				newPeer.MessageEvent(c.Sub.Topic(), time.Now())
+				peerstore.StoreOrUpdatePeer(newPeer)
+				// peerstore.MessageEvent(msg.ReceivedFrom.String(), c.Sub.Topic())
 				// Add notification on the notification channel
-				c.Messages <- msgData
+
+				// Commented because no other routine reads from the msg channel
+				//c.Messages <- msgData
+
 				// Add message to msg metrics counter
 				_ = c.MessageMetrics.AddMessgeToTopic(c.Sub.Topic())
 
@@ -102,6 +110,7 @@ func (c *TopicSubscription) MessageReadingLoop(h host.Host, peerstore *db.PeerSt
 						}
 					}
 				*/
+				c.Log.Debugf("msg content %s", msgData)
 			} else {
 				c.Log.Debugf("message sent by ourselfs received on %s", c.Sub.Topic())
 			}
