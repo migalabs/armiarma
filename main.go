@@ -16,7 +16,7 @@ import (
 var (
 	Version      = "v0.0.0\n"
 	WellcomeText = "Welcome to the Armiarma network monitoring tool."
-	SpecifyText  = "Please, specify the command you want to run."
+	SpecifyText  = "List of available flags:"
 )
 
 func main() {
@@ -26,7 +26,7 @@ func main() {
 	// generate new config for the crawler
 	crawlerConfig, help := config.NewConfigFromArgs()
 	if help {
-		fmt.Println(cmd.CrawlerHelp())
+		CliHelp()
 		os.Exit(0)
 	}
 

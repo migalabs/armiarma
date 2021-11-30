@@ -26,7 +26,7 @@ var (
 )
 
 func CrawlerHelp() string {
-	return "-crawler\tLaunch the Network Crawler on the given network"
+	return "\t--config-file\tconfig-file with all the available configurations. Find an example at ./config-files/config.json"
 }
 
 // crawler status containing the main basemodule and info that the app will ConnectedF
