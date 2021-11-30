@@ -16,6 +16,7 @@ import (
 	"github.com/migalabs/armiarma/src/rpc/methods"
 	"github.com/migalabs/armiarma/src/rpc/reqresp"
 	"github.com/migalabs/armiarma/src/utils"
+	"github.com/migalabs/armiarma/src/utils/apis"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 
@@ -99,7 +100,7 @@ type HostWithIDService interface {
 // ReqHostInfo returns the basic host information regarding a given peer, from the libp2p perspective
 // it aggregates the info from the libp2p Identify protocol adding some extra info such as RTT between local host and remote peer
 // return empty struct and error if failure on the identify process
-func ReqHostInfo(ctx context.Context, wg *sync.WaitGroup, h host.Host, conn network.Conn, peer *db.Peer, errIdent chan error) {
+func ReqHostInfo(ctx context.Context, wg *sync.WaitGroup, h host.Host, ipLoc *apis.PeerLocalizer, conn network.Conn, peer *db.Peer, errIdent chan error) {
 	defer wg.Done()
 
 	peerID := conn.RemotePeer()
