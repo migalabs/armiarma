@@ -13,7 +13,6 @@ var (
 	},
 		[]string{"controldist"},
 	)
-
 	ErrorAttemptDistribution = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "peering",
 		Name:      "iteration_attempts_by_category_distribution",
@@ -21,7 +20,6 @@ var (
 	},
 		[]string{"controlAttemptdist"},
 	)
-
 	PeersAttemptedInLastIteration = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: "peering",
 		Name:      "peers_attempted_last_iteration",
