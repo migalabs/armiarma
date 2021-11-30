@@ -67,86 +67,101 @@ func (c *PeerLocalizer) Run() {
 // or if the routine gets canceled
 func (c *PeerLocalizer) locatorRoutine() {
 	logger.Info("IP locator routine started")
-	apiCallChan := make(chan locReq, 20)
-	for {
-		select {
-		// New request to identify an IP
-		case request := <-c.locationRequest:
-			logger.Debug("new request has been received for ip:", request.ip)
-			// Check if the IP is already in the cache
-			cacheResp, ok := c.reqCache.checkIpInCache(request.ip)
-			if ok { // the response was alreadi in the cache.
-				logger.Debugf("ip %s was in cache", request.ip)
-				response := *cacheResp
-				// TODO: might be interesting to check if the error is due to an invalid IP
-				// 		or if the reported error is due to a connection with the server (too many requests in the last minute)
-				if response.err != nil {
-					logger.Warn("readed response from cache includes an error:", response.err.Error())
+	apiCallChan := make(chan locReq) // Give it a size of 20 just in case there are many inbound requests at the same time
+	go func() {
+		for {
+			select {
+			// New request to identify an IP
+			case request := <-c.locationRequest:
+				logger.Debug("new request has been received for ip:", request.ip)
+				// Check if the IP is already in the cache
+				cacheResp, ok := c.reqCache.checkIpInCache(request.ip)
+				if ok { // the response was alreadi in the cache.
+					logger.Debugf("ip %s was in cache", request.ip)
+					response := *cacheResp
+					// TODO: might be interesting to check if the error is due to an invalid IP
+					// 		or if the reported error is due to a connection with the server (too many requests in the last minute)
+					if response.err != nil {
+						logger.Warn("readed response from cache includes an error:", response.err.Error())
+					}
+					// put the received response in the channel to reply the external request
+
+					request.respChan <- response
+				} else {
+					// Finally there is space in the channel
+					apiCallChan <- request
 				}
-				// put the received response in the channel to reply the external request
-				request.respChan <- response
-			} else {
-				// we need to make the call to the API, sending it to the other channel
-				apiCallChan <- request
+
+			// the context has been deleted, end go routine
+
+			case <-c.ctx.Done():
+				// close the channels
+				close(c.locationRequest)
+				break
 			}
+		}
+	}()
+	go func() {
+		for {
+			select {
+			// request to Identify IP through api call
+			case request := <-apiCallChan:
+				// control flag to see if we have to wait untill we get the next API call
+				// if nextDelayRequest is 0, we can go for the next one,
+				var nextDelayRequest time.Duration
+				var breakCallLoop bool = false
+				var response ipResponse
 
-		// request to Identify IP through api call
-		case request := <-apiCallChan:
-			// control flag to see if we have to wait untill we get the next API call
-			// if nextDelayRequest is 0, we can go for the next one,
-			var nextDelayRequest time.Duration
-			var breakCallLoop bool = false
-			var response ipResponse
+				call := atomic.LoadInt32(c.apiCalls)
+				atomic.AddInt32(c.apiCalls, 1)
 
-			call := atomic.LoadInt32(c.apiCalls)
-			atomic.AddInt32(c.apiCalls, 1)
-
-			response.ip = request.ip
-			// new API call needs to be done
-			logger.Debugf("call %d-> ip %s not in cache, making API call", call, response.ip)
-			for !breakCallLoop {
-				// if req delay is setted to true, make new request
-				// make the API call, and receive the apiResponse, the nextDelayRequest and the error from the connection
-				response.resp, nextDelayRequest, response.err = c.getLocationFromIp(request.ip)
-				if response.err != nil {
-					if response.err.Error() == TooManyRequestError {
-						// if the error reports that we tried too many calls on the API, sleep given time and try again
-						logger.Debug("call", call, "-> error received:", response.err.Error(), "\nwaiting ", nextDelayRequest+(5*time.Second))
-						// set req delay to true, noone can make requests
-						time.Sleep(nextDelayRequest + (5 * time.Second))
-						continue
+				response.ip = request.ip
+				// new API call needs to be done
+				logger.Debugf("call %d-> ip %s not in cache, making API call", call, response.ip)
+				for !breakCallLoop {
+					// if req delay is setted to true, make new request
+					// make the API call, and receive the apiResponse, the nextDelayRequest and the error from the connection
+					response.resp, nextDelayRequest, response.err = c.getLocationFromIp(request.ip)
+					if response.err != nil {
+						if response.err.Error() == TooManyRequestError {
+							// if the error reports that we tried too many calls on the API, sleep given time and try again
+							logger.Debug("call", call, "-> error received:", response.err.Error(), "\nwaiting ", nextDelayRequest+(5*time.Second))
+							// set req delay to true, noone can make requests
+							time.Sleep(nextDelayRequest + (5 * time.Second))
+							continue
+						} else {
+							logger.Debug("call", call, "-> diff error received:", response.err.Error())
+							break
+						}
 					} else {
-						logger.Debug("call", call, "-> diff error received:", response.err.Error())
+						logger.Debugf("call %d-> api req success", call)
+						// if the error is different from TooManyRequestError break loop and store the request
 						break
 					}
-				} else {
-					logger.Debugf("call %d-> api req success", call)
-					// if the error is different from TooManyRequestError break loop and store the request
-					break
+
+				}
+				// check if there is any waiting time that we have to respect before next connection
+				if nextDelayRequest != time.Duration(0) {
+					logger.Debugf("call %d-> number of allowed requests has been exceed, waiting %#v", call, nextDelayRequest+(5*time.Second))
+					// set req delay to true, noone can make requests
+					time.Sleep(nextDelayRequest + (5 * time.Second))
 				}
 
+				logger.Debugf("call %d-> saving new request and return it")
+				// add the response into the responseCache
+				c.reqCache.addRequest(&response)
+
+				// put the received response in the channel to reply the external request
+				request.respChan <- response
+
+			// the context has been deleted, end go routine
+			case <-c.ctx.Done():
+				// close the channels
+				close(apiCallChan)
+				break
 			}
-			// check if there is any waiting time that we have to respect before next connection
-			if nextDelayRequest != time.Duration(0) {
-				logger.Debugf("call %d-> number of allowed requests has been exceed, waiting %#v", call, nextDelayRequest+(5*time.Second))
-				// set req delay to true, noone can make requests
-				time.Sleep(nextDelayRequest + (5 * time.Second))
-			}
-
-			logger.Debugf("call %d-> saving new request and return it")
-			// add the response into the responseCache
-			c.reqCache.addRequest(&response)
-
-			// put the received response in the channel to reply the external request
-			request.respChan <- response
-
-		// the context has been deleted, clo
-		case <-c.ctx.Done():
-			// close the channels
-			close(c.locationRequest)
-			close(apiCallChan)
 		}
-	}
+	}()
 }
 
 // LocateIP is an externa request that any module could do to identify an IP
