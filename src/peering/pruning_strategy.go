@@ -222,8 +222,8 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 
 				// reset values
 				// get the peer list from the peerstore
-				errorAttemptCategories = ResetMapValues(errorAttemptCategories)
 				c.ErrorAttemptDistribution = errorAttemptCategories
+				errorAttemptCategories = ResetMapValues(errorAttemptCategories)
 				err := c.PeerQueue.UpdatePeerListFromPeerStore(c.PeerStore)
 				c.PeerQueueIterations++ // another iteration
 				if err != nil {
@@ -674,7 +674,7 @@ func ErrorToDelayType(errString string) string {
 }
 
 func ResetMapValues(inputMap map[string]int64) map[string]int64 {
-	for k, _ := range inputMap {
+	for k := range inputMap {
 		inputMap[k] = 0
 	}
 	return inputMap

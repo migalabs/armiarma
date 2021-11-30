@@ -17,6 +17,7 @@ func (c *PeeringService) ServeMetrics(ctx context.Context) {
 	ticker := time.NewTicker(promth.MetricLoopInterval)
 	// register variables
 	prometheus.MustRegister(PrunedErrorDistribution)
+	prometheus.MustRegister(ErrorAttemptDistribution)
 	prometheus.MustRegister(PeersAttemptedInLastIteration)
 	prometheus.MustRegister(PeerstoreIterTime)
 	//prometheus.MustRegister(IterForcingNextConnTime)
@@ -41,7 +42,6 @@ func (c *PeeringService) ServeMetrics(ctx context.Context) {
 				for key, value := range controlDist {
 					PrunedErrorDistribution.WithLabelValues(key).Set(float64(value))
 				}
-
 				// generate the distribution
 				for key, value := range errorAttemptDist {
 					ErrorAttemptDistribution.WithLabelValues(key).Set(float64(value))
@@ -51,7 +51,8 @@ func (c *PeeringService) ServeMetrics(ctx context.Context) {
 					"LastIterTime(secs)":          iterTime,
 					"AttemptedPeersSinceLastIter": peersPeriter,
 					//"IterForcingNextConnTime":         peerIterForcingTime,
-					"ControlDistribution": controlDist,
+					"ControlDistribution":        controlDist,
+					"ControlAttemptDistribution": errorAttemptDist,
 				}).Info("peering metrics summary")
 
 			case <-ctx.Done():
