@@ -39,7 +39,7 @@ git checkout integral-refactor
 go build -o armiarma
 
 # Ready to call the tool
-./armiarma [command] [options]
+./armiarma [options]
 
 ```
 
@@ -48,10 +48,7 @@ At the moment, the tool only offers a single command for the crawler. Check the 
 ```
 
 EXECUTION:
-    ./armiarma [command] [options]
-
-COMMANDS
-    crawler     Crawls around the network looking for peers and their status
+    ./armiarma [options]
 
 OPTIONS:
     --config-file   Load the configuration from the file into the executable.
