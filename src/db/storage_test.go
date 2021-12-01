@@ -7,13 +7,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var path string = "./test_db"
+var path string = "."
 
 func TestPeerStoreStorage(t *testing.T) {
 	// Test the BoltDB to store the information about a peer
 	db := NewBoltPeerDB(path)
 	defer db.Close()
-	defer os.Remove("./test_db")
+	defer os.Remove("./peerstore.db")
 	testStorage(t, db)
 	m := NewMemoryDB()
 	// Test the Memory DB to store the information about a peer

@@ -74,12 +74,13 @@ func NewDiscovery(ctx context.Context, input_node *enode.LocalNode, db *db.PeerS
 
 	// return the Discovery object
 	return &Discovery{
-		Base:       new_base,
-		Node:       input_node,
-		PeerStore:  db,
-		IpLocator:  ipLoc,
-		info_data:  info_obj,
-		ListenPort: input_port,
+		Base:         new_base,
+		Node:         input_node,
+		BootNodeList: make([]*eth_enode.Node, 0),
+		PeerStore:    db,
+		IpLocator:    ipLoc,
+		info_data:    info_obj,
+		ListenPort:   input_port,
 	}
 }
 
@@ -182,7 +183,7 @@ func (d *Discovery) HandleENR(node *eth_enode.Node) error {
 	multiAddrStr := fmt.Sprintf("/%s/%s/tcp/%d/p2p/%s", ipScheme, node.IP().String(), node.TCP(), peerID)
 	multiAddr, err := ma.NewMultiaddr(multiAddrStr)
 	if err != nil {
-		return fmt.Errorf("error composing the maddrs from peer", err)
+		return fmt.Errorf("error composing the maddrs from peer %s", err)
 	}
 	/* Unncesary here, peer.AddrInfo is only needed when connecting the peer
 	newAddrInfo, err := lib_peer.AddrInfoFromP2pAddr(multiAddr)
@@ -222,7 +223,7 @@ func (d *Discovery) HandleENR(node *eth_enode.Node) error {
 func (d *Discovery) ImportBootNodeList(import_json_file string) {
 
 	// where we will store the result
-	var bootNodeList []*eth_enode.Node
+	bootNodeList := make([]*eth_enode.Node, 0)
 
 	// where we will unmarshal from file
 	bootNodeListString := BootNodeListString{}
@@ -247,7 +248,6 @@ func (d *Discovery) ImportBootNodeList(import_json_file string) {
 	for _, element := range bootNodeListString.BootNodes {
 		bootNodeList = append(bootNodeList, eth_enode.MustParse(element))
 	}
-
 	//bootNodeList = append(bootNodeList, eth_enode.MustParse("enr:-Ku4QImhMc1z8yCiNJ1TyUxdcfNucje3BGwEHzodEZUan8PherEo4sF7pPHPSIB1NNuSg5fZy7qFsjmUKs2ea1Whi0EBh2F0dG5ldHOIAAAAAAAAAACEZXRoMpD1pf1CAAAAAP__________gmlkgnY0gmlwhBLf22SJc2VjcDI1NmsxoQOVphkDqal4QzPMksc5wnpuC3gvSC8AfbFOnZY_On34wIN1ZHCCIyg"))
 	d.SetBootNodeList(bootNodeList)
 	d.Log.Infof("running peer discovery with %d bootdode/s", len(d.GetBootNodeList()))
@@ -280,7 +280,8 @@ func (d Discovery) GetDv5Listener() *discover.UDPv5 {
 }
 
 func (d *Discovery) SetBootNodeList(input_list []*eth_enode.Node) {
-	d.BootNodeList = input_list
+	d.BootNodeList = make([]*eth_enode.Node, 0)
+	d.BootNodeList = append(d.BootNodeList, input_list...)
 }
 
 func (d Discovery) GetBootNodeList() []*eth_enode.Node {

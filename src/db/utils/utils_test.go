@@ -44,11 +44,11 @@ func Test_FilterClientType(t *testing.T) {
 	require.Equal(t, version, "")
 
 	client, version = FilterClientType("armiarma-crawler")
-	require.Equal(t, client, "BSC-Armiarma")
+	require.Equal(t, client, "Others")
 	require.Equal(t, version, "")
 
 	// Check it doesn't break for an unexpected agent
-	client, version = FilterClientType("43g56g-asd34/ssd")
-	require.Equal(t, client, "Unknown")
-	require.Equal(t, version, "Unknown")
+	client, version = FilterClientType("")
+	require.Equal(t, client, "NotIdentified")
+	require.Equal(t, version, "")
 }
