@@ -11,6 +11,8 @@ import (
 
 	"github.com/migalabs/armiarma/cmd"
 	"github.com/migalabs/armiarma/src/config"
+	"github.com/migalabs/armiarma/src/utils"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -29,6 +31,12 @@ func main() {
 		CliHelp()
 		os.Exit(0)
 	}
+	// read the log settings from the config
+	logger := log.New()
+	// Right now hardcoded
+	logger.SetFormatter(utils.ParseFormatter("text"))
+	logger.SetOutput(utils.ParseLogOutput("terminal"))
+	logger.SetLevel(utils.ParseLogLevel(crawlerConfig.GetLogLevel()))
 
 	// generate the crawler
 	crawler, err := cmd.NewCrawler(context.Background(), crawlerConfig)
