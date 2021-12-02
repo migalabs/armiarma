@@ -59,9 +59,9 @@ type PruningStrategy struct {
 	lastIterTime             time.Duration
 	iterForcingNextConnTime  time.Time
 	attemptedPeers           int64
-	queueErroDistribution    map[string]int64
+	queueErroDistribution    map[string]*int64
 	PeerQueueIterations      int
-	ErrorAttemptDistribution map[string]int64
+	ErrorAttemptDistribution map[string]*int64
 }
 
 // NewPruningStrategy
@@ -98,8 +98,8 @@ func NewPruningStrategy(ctx context.Context, peerstore *db.PeerStore, opts Pruni
 		connEventNot:   make(chan hosts.ConnectionEvent),
 		identEventNot:  make(chan hosts.IdentificationEvent),
 		// Metrics Variables
-		queueErroDistribution:    make(map[string]int64),
-		ErrorAttemptDistribution: make(map[string]int64),
+		queueErroDistribution:    make(map[string]*int64),
+		ErrorAttemptDistribution: make(map[string]*int64),
 	}
 	return pr, nil
 }
@@ -140,12 +140,19 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 	if err != nil {
 		c.Log.Error(err)
 	}
-	errorAttemptCategories := map[string]int64{
-		PositiveDelayType:           0,
-		NegativeWithHopeDelayType:   0,
-		NegativeWithNoHopeDelayType: 0,
-		Minus1DelayType:             0,
-		ZeroDelayType:               0,
+
+	posDelay := int64(0)
+	negWHDelay := int64(0)
+	negWHTDelay := int64(0)
+	min1Delay := int64(0)
+	zerDelay := int64(0)
+
+	errorAttemptCategories := map[string]*int64{
+		PositiveDelayType:           &posDelay,
+		NegativeWithHopeDelayType:   &negWHDelay,
+		NegativeWithNoHopeDelayType: &negWHTDelay,
+		Minus1DelayType:             &min1Delay,
+		ZeroDelayType:               &zerDelay,
 	}
 	peerCounter := 0
 	peerListLen := c.PeerQueue.Len()
@@ -191,7 +198,7 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 
 					// Send next peer to the peering service
 					c.Log.Debugf("pushing next peer %s into peer stream", pinfo.PeerId)
-					errorAttemptCategories[nextPeer.DelayObj.GetType()]++
+					atomic.AddInt64(errorAttemptCategories[nextPeer.DelayObj.GetType()], 1)
 					c.peerStreamChan <- pinfo
 
 					// increment peerCounter to see if we finished iterating the peerstore
@@ -374,11 +381,11 @@ func (c *PruningStrategy) AttemptedPeersSinceLastIter() int64 {
 	return atomic.LoadInt64(&c.attemptedPeers)
 }
 
-func (c *PruningStrategy) ControlDistribution() map[string]int64 {
+func (c *PruningStrategy) ControlDistribution() map[string]*int64 {
 	return c.PeerQueue.DelayDistribution()
 }
 
-func (c *PruningStrategy) GetErrorAttemptDistribution() map[string]int64 {
+func (c *PruningStrategy) GetErrorAttemptDistribution() map[string]*int64 {
 	return c.ErrorAttemptDistribution
 }
 
@@ -405,11 +412,11 @@ type PeerQueue struct {
 	PeerList []*PrunedPeer
 	PeerMap  map[string]*PrunedPeer
 	// Metrics
-	queueErroDistribution map[string]int64
+	queueErroDistribution map[string]*int64
 }
 
 // Return the distribution of the dela
-func (c *PeerQueue) DelayDistribution() map[string]int64 {
+func (c *PeerQueue) DelayDistribution() map[string]*int64 {
 	return c.queueErroDistribution
 }
 
@@ -418,8 +425,9 @@ func (c *PeerQueue) DelayDistribution() map[string]int64 {
 // @return new PeerQueue
 func NewPeerQueue() PeerQueue {
 	pq := PeerQueue{
-		PeerList: make([]*PrunedPeer, 0),
-		PeerMap:  make(map[string]*PrunedPeer),
+		PeerList:              make([]*PrunedPeer, 0),
+		PeerMap:               make(map[string]*PrunedPeer),
+		queueErroDistribution: make(map[string]*int64),
 	}
 	return pq
 }
@@ -482,12 +490,19 @@ func (c *PeerQueue) UpdatePeerListFromPeerStore(peerstore *db.PeerStore) error {
 	peerList := peerstore.GetPeerList()
 	totcnt := 0
 	new := 0
-	c.queueErroDistribution = map[string]int64{
-		PositiveDelayType:           0,
-		NegativeWithHopeDelayType:   0,
-		NegativeWithNoHopeDelayType: 0,
-		Minus1DelayType:             0,
-		ZeroDelayType:               0,
+
+	posType := int64(0)
+	negWHType := int64(0)
+	negWHTType := int64(0)
+	min1Type := int64(0)
+	zerType := int64(0)
+
+	c.queueErroDistribution = map[string]*int64{
+		PositiveDelayType:           &posType,
+		NegativeWithHopeDelayType:   &negWHType,
+		NegativeWithNoHopeDelayType: &negWHTType,
+		Minus1DelayType:             &min1Type,
+		ZeroDelayType:               &zerType,
 	}
 	// Fill the PeerQueue.PeerList with the missing peers from the
 	for _, peerID := range peerList {
@@ -558,10 +573,10 @@ func (c *PeerQueue) UpdatePeerListFromPeerStore(peerstore *db.PeerStore) error {
 
 			// add the new item to the list
 			c.AddPeer(newPrunnedPeer)
-			c.queueErroDistribution[delayType]++
+			atomic.AddInt64(c.queueErroDistribution[delayType], 1)
 		} else {
 			prunnedPeer, _ := c.GetPeer(peerID.String())
-			c.queueErroDistribution[prunnedPeer.DelayObj.GetType()]++
+			atomic.AddInt64(c.queueErroDistribution[prunnedPeer.DelayObj.GetType()], 1)
 		}
 	}
 	// Sort the list of peers based on the next connection
@@ -673,9 +688,9 @@ func ErrorToDelayType(errString string) string {
 	}
 }
 
-func ResetMapValues(inputMap map[string]int64) map[string]int64 {
+func ResetMapValues(inputMap map[string]*int64) map[string]*int64 {
 	for k := range inputMap {
-		inputMap[k] = 0
+		atomic.StoreInt64(inputMap[k], 0)
 	}
 	return inputMap
 }
