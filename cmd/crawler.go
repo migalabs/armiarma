@@ -24,8 +24,7 @@ var (
 	IpCacheSize = 4000
 
 	ModuleName = "CRAWLER"
-	l          = logrus.New()
-	log        = l.WithField(
+	log        = logrus.WithField(
 		"module", ModuleName,
 	)
 )
@@ -52,40 +51,34 @@ type Crawler struct {
 
 func NewCrawler(ctx context.Context, config config.ConfigData) (*Crawler, error) {
 	mainCtx, cancel := context.WithCancel(ctx)
-
 	info_tmp := info.NewCustomInfoData(config)
-
 	// Generate new DB for the peerstore
 	db := db.NewPeerStore(mainCtx, info_tmp.GetDBType(), info_tmp.GetOutputPath())
-
 	// IpLocalizer
 	ipLocalizer := apis.NewPeerLocalizer(mainCtx, IpCacheSize)
-
 	// generate libp2pHost
 	host, err := hosts.NewBasicLibp2pHost(mainCtx, *info_tmp, &ipLocalizer, &db)
 	if err != nil {
 		return nil, err
 	}
-
 	// generate local Enode and DV5
 	node_tmp := enode.NewLocalNode(mainCtx, info_tmp)
-
 	//node_tmp.AddEntries()
 	dv5_tmp := discovery.NewDiscovery(mainCtx, node_tmp, &db, &ipLocalizer, info_tmp, 9006)
-
 	// GossipSup
 	gs_tmp := gossipsub.NewGossipSub(mainCtx, host, &db)
-
-	// Generate the PeeringService
-
 	// generate the peering strategy
 	pStrategy, err := peering.NewPruningStrategy(mainCtx, &db)
-
+	if err != nil {
+		return nil, err
+	}
 	// Generate the PeeringService
 	peeringServ, err := peering.NewPeeringService(mainCtx, host, &db, info_tmp,
 		peering.WithPeeringStrategy(&pStrategy),
 	)
-
+	if err != nil {
+		return nil, err
+	}
 	prometheusRunner := prometheus.NewPrometheusRunner()
 
 	// generate the CrawlerBase
@@ -108,23 +101,18 @@ func NewCrawler(ctx context.Context, config config.ConfigData) (*Crawler, error)
 // generate new CrawlerBase
 func (c *Crawler) Run() {
 	// initialization secuence for the crawler
-
 	c.PrometheusRunner.Start()
 	c.IpLocalizer.Run()
 	c.Host.Start()
-
 	c.Dv5.Start()
 	c.Dv5.FindRandomNodes()
-
 	topics := blockchaintopics.ReturnTopics(c.Info.GetForkDigest(), c.Info.GetTopicArray())
 	for _, topic := range topics {
 		c.Gs.JoinAndSubscribe(topic)
 	}
-
 	c.Peering.Run()
 	c.Gs.ServePrometheusMetrics()
 	c.DB.ServePrometheusMetrics()
-
 	c.DB.ExportCsvService(c.Info.GetOutputPath())
 }
 
@@ -133,12 +121,10 @@ func (c *Crawler) Close() {
 	defer c.cancel()
 	// initialization secuence for the crawler
 	log.Info("stoping crawler client")
-	c.Gs.Close()
-	c.Host.Stop()
 	c.Dv5.CloseFindingNodes()
-	c.Peering.Close()
-	c.IpLocalizer.Close()
-	// TODO: generate a general interface from the Prometheus runner
-	// CloseMetricsExport closes both, prometheus exporter and csv exporter
 	c.DB.CloseMetricsExport()
+	c.Gs.Close()
+	c.Peering.Close()
+	c.Host.Stop()
+	c.IpLocalizer.Close()
 }
