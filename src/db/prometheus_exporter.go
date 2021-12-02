@@ -1,20 +1,21 @@
 package db
 
 import (
-	"context"
 	"fmt"
 	"math"
 	"time"
 
 	promth "github.com/migalabs/armiarma/src/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 // ServeMetrics
 // * This method will serve the global peerstore values to the
 // * local prometheus instance
-func (ps *PeerStore) ServeMetrics(ctx context.Context) {
+func (ps *PeerStore) ServePrometheusMetrics() {
+	ctx := ps.Ctx()
+
 	// Generate new ticker
 	ticker := time.NewTicker(promth.MetricLoopInterval)
 	// register variables
@@ -99,7 +100,7 @@ func (ps *PeerStore) ServeMetrics(ctx context.Context) {
 				rttDis.SetValues(RttDistribution)
 				tctDis.SetValues(TotcontimeDistribution)
 				//allLastErrors := ps.GetErrorCounter()
-				log.WithFields(log.Fields{
+				Log.WithFields(logrus.Fields{
 					//"ClientsDist":        clients,
 					//"GeoDist":            geoDist,
 					"NOfDiscoveredPeers": nOfDiscoveredPeers,
@@ -111,6 +112,8 @@ func (ps *PeerStore) ServeMetrics(ctx context.Context) {
 			case <-ctx.Done():
 				// closing the routine in a ordened way
 				ticker.Stop()
+				Log.Info("Closing DB prometheus exporter")
+				return
 			}
 		}
 	}()

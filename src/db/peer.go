@@ -13,7 +13,7 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 // Stores all the information related to a peer
@@ -176,12 +176,12 @@ func (pm *Peer) FetchConnectionsFromNewPeer(newPeer Peer) {
 	// Check that we dont fetch old peer into old Peer
 	// Edgy case that makes the memory increase exponentially after several hours of run
 	if len(newPeer.ConnectionTimes) > 1 {
-		log.Warnf("careful! peer with %d connections is getting fetched into peer with %d ones. This might end up in an exponential Heap-Memory increase.", len(newPeer.ConnectionTimes), len(pm.ConnectionTimes))
+		Log.Warnf("careful! peer with %d connections is getting fetched into peer with %d ones. This might end up in an exponential Heap-Memory increase.", len(newPeer.ConnectionTimes), len(pm.ConnectionTimes))
 	}
 
 	if len(newPeer.ConnectionTimes) != len(newPeer.ConnectedDirection) {
-		log.Warnf("Attention, fetching peer with different number of directions and connections")
-		log.Warnf("ConnectionTimes: %d, ConnectedDirection: %d", len(newPeer.ConnectionTimes), len(newPeer.ConnectedDirection))
+		Log.Warnf("Attention, fetching peer with different number of directions and connections")
+		Log.Warnf("ConnectionTimes: %d, ConnectedDirection: %d", len(newPeer.ConnectionTimes), len(newPeer.ConnectedDirection))
 	}
 
 	connectedDirectionindex := 0
@@ -611,7 +611,7 @@ func (pm *Peer) ToCsvLine() string {
 	node, err := pm.GetBlockchainNode()
 	forkDigest := ""
 	if err != nil {
-		log.Errorf("Could not parse ENR to CSV")
+		Log.Errorf("Could not parse ENR to CSV")
 
 	} else {
 		eth2Dat, _, err := all_utils.ParseNodeEth2Data(*node)
@@ -669,7 +669,7 @@ func (pm *Peer) ToCsvLine() string {
 // LogPeer
 // TODO: comment
 func (pm *Peer) LogPeer() {
-	log.WithFields(log.Fields{
+	Log.WithFields(logrus.Fields{
 		"PeerId":        pm.PeerId,
 		"NodeId":        pm.NodeId,
 		"UserAgent":     pm.UserAgent,
@@ -696,7 +696,7 @@ func PeerUnMarshal(m map[string]interface{}) Peer {
 	if m["MAddrs"] != nil {
 		m_addrs, err = utils.ParseInterfaceAddrArray(m["MAddrs"].([]interface{}))
 		if err != nil {
-			log.Errorf(err.Error())
+			Log.Errorf(err.Error())
 		}
 	}
 
@@ -740,7 +740,7 @@ func PeerUnMarshal(m map[string]interface{}) Peer {
 	if m["MessageMetrics"] != nil {
 		msgMetrics, err = ParseInterfaceMapMessageMetrics(m["MessageMetrics"].(map[string]interface{}))
 		if err != nil {
-			log.Warnf("unable to cast full gossip msg metrics while unmarshaling. %s", err.Error())
+			Log.Warnf("unable to cast full gossip msg metrics while unmarshaling. %s", err.Error())
 		}
 	}
 
@@ -748,7 +748,7 @@ func PeerUnMarshal(m map[string]interface{}) Peer {
 	if m["BeaconStatus"] != nil {
 		beaconStatus, err = ParseBeaconStatusFromInterface(m["BeaconStatus"])
 		if err != nil {
-			log.Warnf("unable to cast beaconStatus while unmarshaling. %s", err.Error())
+			Log.Warnf("unable to cast beaconStatus while unmarshaling. %s", err.Error())
 		}
 	}
 

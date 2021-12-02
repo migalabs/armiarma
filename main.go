@@ -32,11 +32,12 @@ func main() {
 		os.Exit(0)
 	}
 	// read the log settings from the config
-	logger := log.New()
-	// Right now hardcoded
-	logger.SetFormatter(utils.ParseFormatter("text"))
-	logger.SetOutput(utils.ParseLogOutput("terminal"))
-	logger.SetLevel(utils.ParseLogLevel(crawlerConfig.GetLogLevel()))
+
+	// Set the general log configurations for the entire tool
+	log.SetFormatter(utils.ParseLogFormatter("text"))
+	log.SetOutput(utils.ParseLogOutput("terminal"))
+	// read the log level from the config-file / default = info
+	log.SetLevel(utils.ParseLogLevel(crawlerConfig.GetLogLevel()))
 
 	// generate the crawler
 	crawler, err := cmd.NewCrawler(context.Background(), crawlerConfig)
@@ -52,7 +53,7 @@ func main() {
 	signal.Notify(signal_channel, os.Interrupt)
 	<-signal_channel
 	// End up app, finishing everything
-	crawler.Log.Info("SHUTDOWN DETECTED!")
+	log.Info("SHUTDOWN DETECTED!")
 	// TODO: Shutdown all the services (manually to let them exit in a controled way)
 	crawler.Close()
 

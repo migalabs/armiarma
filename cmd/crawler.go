@@ -5,9 +5,7 @@ package cmd
 
 import (
 	"context"
-	"time"
 
-	"github.com/migalabs/armiarma/src/base"
 	"github.com/migalabs/armiarma/src/config"
 	"github.com/migalabs/armiarma/src/db"
 	"github.com/migalabs/armiarma/src/discovery"
@@ -19,10 +17,17 @@ import (
 	"github.com/migalabs/armiarma/src/peering"
 	"github.com/migalabs/armiarma/src/prometheus"
 	"github.com/migalabs/armiarma/src/utils/apis"
+	"github.com/sirupsen/logrus"
 )
 
 var (
 	IpCacheSize = 4000
+
+	ModuleName = "CRAWLER"
+	l          = logrus.New()
+	log        = l.WithField(
+		"module", ModuleName,
+	)
 )
 
 func CrawlerHelp() string {
@@ -31,7 +36,9 @@ func CrawlerHelp() string {
 
 // crawler status containing the main basemodule and info that the app will ConnectedF
 type Crawler struct {
-	*base.Base
+	ctx    context.Context
+	cancel context.CancelFunc
+
 	Host             *hosts.BasicLibp2pHost
 	Node             *enode.LocalNode
 	DB               *db.PeerStore
@@ -44,78 +51,38 @@ type Crawler struct {
 }
 
 func NewCrawler(ctx context.Context, config config.ConfigData) (*Crawler, error) {
-	// TODO: just hardcoded
-	logOpts := base.LogOpts{
-		ModName:   "CRAWLER MAIN",
-		Output:    "terminal",
-		Formatter: "text",
-		Level:     "debug",
-	}
-	// generate a base for the crawler app
-	b, err := base.NewBase(
-		base.WithContext(ctx),
-		base.WithLogger(logOpts),
-	)
-	if err != nil {
-		return nil, err
-	}
+	mainCtx, cancel := context.WithCancel(ctx)
 
-	stdOpts := base.LogOpts{
-		Output:    "terminal",
-		Formatter: "text",
-	}
+	info_tmp := info.NewCustomInfoData(config)
 
-	info_tmp := info.NewCustomInfoData(config, stdOpts)
-	stdOpts.Level = info_tmp.GetLogLevel()
-
-	// TODO: just harcoded
-	baseOpts := base.LogOpts{
-		ModName:   "libp2p host",
-		Output:    "terminal",
-		Formatter: "text",
-		Level:     info_tmp.GetLogLevel(),
-	}
-
-	// TODO: generate a new DB
-	db := db.NewPeerStore(info_tmp.GetDBType(), info_tmp.GetOutputPath())
+	// Generate new DB for the peerstore
+	db := db.NewPeerStore(mainCtx, info_tmp.GetDBType(), info_tmp.GetOutputPath())
 
 	// IpLocalizer
-	ipLocalizer := apis.NewPeerLocalizer(b.Ctx(), IpCacheSize)
-
-	hostOpts := hosts.BasicLibp2pHostOpts{
-		Info_obj:  *info_tmp,
-		LogOpts:   baseOpts,
-		IpLocator: &ipLocalizer,
-		PeerStore: &db,
-	}
+	ipLocalizer := apis.NewPeerLocalizer(mainCtx, IpCacheSize)
 
 	// generate libp2pHost
-	host, err := hosts.NewBasicLibp2pHost(b.Ctx(), hostOpts)
+	host, err := hosts.NewBasicLibp2pHost(mainCtx, *info_tmp, &ipLocalizer, &db)
 	if err != nil {
 		return nil, err
 	}
 
 	// generate local Enode and DV5
-	node_tmp := enode.NewLocalNode(b.Ctx(), info_tmp, stdOpts)
+	node_tmp := enode.NewLocalNode(mainCtx, info_tmp)
+
 	//node_tmp.AddEntries()
-	dv5_tmp := discovery.NewDiscovery(b.Ctx(), node_tmp, &db, &ipLocalizer, info_tmp, 9006, stdOpts)
+	dv5_tmp := discovery.NewDiscovery(mainCtx, node_tmp, &db, &ipLocalizer, info_tmp, 9006)
 
 	// GossipSup
-	gs_tmp := gossipsub.NewGossipSub(b.Ctx(), host, &db, stdOpts)
+	gs_tmp := gossipsub.NewGossipSub(mainCtx, host, &db)
 
 	// Generate the PeeringService
-	peeringOpts := &peering.PeeringOpts{
-		InfoObj: info_tmp,
-		LogOpts: stdOpts,
-	}
-	// generate the peering strategy
-	prunOpts := peering.PruningOpts{
-		AggregatedDelay: 24 * time.Hour, // Hardcoded, still using the Default Delay
-		LogOpts:         stdOpts,
-	}
 
-	pStrategy, err := peering.NewPruningStrategy(b.Ctx(), &db, prunOpts)
-	peeringServ, err := peering.NewPeeringService(b.Ctx(), host, &db, peeringOpts,
+	// generate the peering strategy
+	pStrategy, err := peering.NewPruningStrategy(mainCtx, &db)
+
+	// Generate the PeeringService
+	peeringServ, err := peering.NewPeeringService(mainCtx, host, &db, info_tmp,
 		peering.WithPeeringStrategy(&pStrategy),
 	)
 
@@ -123,7 +90,8 @@ func NewCrawler(ctx context.Context, config config.ConfigData) (*Crawler, error)
 
 	// generate the CrawlerBase
 	crawler := &Crawler{
-		Base:             b,
+		ctx:              mainCtx,
+		cancel:           cancel,
 		Host:             host,
 		Info:             info_tmp,
 		DB:               &db,
@@ -140,33 +108,37 @@ func NewCrawler(ctx context.Context, config config.ConfigData) (*Crawler, error)
 // generate new CrawlerBase
 func (c *Crawler) Run() {
 	// initialization secuence for the crawler
-	mainctx := c.Ctx()
 
-	c.PrometheusRunner.Start(mainctx)
+	c.PrometheusRunner.Start()
 	c.IpLocalizer.Run()
 	c.Host.Start()
-	c.Dv5.Start_dv5()
-	go c.Dv5.FindRandomNodes()
+
+	c.Dv5.Start()
+	c.Dv5.FindRandomNodes()
 
 	topics := blockchaintopics.ReturnTopics(c.Info.GetForkDigest(), c.Info.GetTopicArray())
 	for _, topic := range topics {
 		c.Gs.JoinAndSubscribe(topic)
 	}
 
-	go c.Peering.Run()
+	c.Peering.Run()
+	c.Gs.ServePrometheusMetrics()
+	c.DB.ServePrometheusMetrics()
 
-	c.Gs.ServeMetrics()
-	// Generate a Peering Service (so far with default peering strategy)
-	c.DB.ServeMetrics(mainctx)
-
-	go c.DB.ExportLoop(mainctx, c.Info.GetOutputPath())
+	c.DB.ExportCsvService(c.Info.GetOutputPath())
 }
 
 // generate new CrawlerBases
 func (c *Crawler) Close() {
+	defer c.cancel()
 	// initialization secuence for the crawler
-	c.Log.Info("stoping crawler client")
+	log.Info("stoping crawler client")
+	c.Gs.Close()
 	c.Host.Stop()
+	c.Dv5.CloseFindingNodes()
 	c.Peering.Close()
 	c.IpLocalizer.Close()
+	// TODO: generate a general interface from the Prometheus runner
+	// CloseMetricsExport closes both, prometheus exporter and csv exporter
+	c.DB.CloseMetricsExport()
 }

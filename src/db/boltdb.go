@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/peer"
-	log "github.com/sirupsen/logrus"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -26,7 +25,7 @@ func NewBoltPeerDB(folderpath string) BoltPeerDB {
 	// Generate a new one
 	db, err := OpenBoltDB(folderpath+"/peerstore.db", "peerstore", 0600, nil)
 	if err != nil {
-		log.Panicf(err.Error())
+		Log.Panicf(err.Error())
 	}
 	db_obj := BoltPeerDB{
 		db:        db,
@@ -57,9 +56,9 @@ func NewBoltPeerDB(folderpath string) BoltPeerDB {
 		return true
 	})
 	if peercnt > 0 {
-		log.Infof("loaded BoltDB with %d peer on it (%d connected)", peercnt, len(connectedPeers))
+		Log.Infof("loaded BoltDB with %d peer on it (%d connected)", peercnt, len(connectedPeers))
 	} else {
-		log.Infof("generated new BoltDB")
+		Log.Infof("generated new BoltDB")
 	}
 
 	// last, lets add the disconnection event to those peers that remained connected
@@ -74,7 +73,7 @@ func NewBoltPeerDB(folderpath string) BoltPeerDB {
 func (p BoltPeerDB) Store(key string, value Peer) {
 	value_marshalled, err := json.Marshal(value)
 	if err != nil {
-		log.Error(err)
+		Log.Error(err)
 		return
 	}
 	p.db.Store([]byte(key), value_marshalled)
@@ -91,7 +90,7 @@ func (p BoltPeerDB) Load(key string) (value Peer, ok bool) {
 	err := json.Unmarshal(value_marshalled, &obj)
 
 	if err != nil {
-		log.Error(err)
+		Log.Error(err)
 		return Peer{}, false
 	}
 	return PeerUnMarshal(obj), true
@@ -109,7 +108,7 @@ func (p BoltPeerDB) Range(f func(key string, value Peer) bool) {
 
 		err := json.Unmarshal(value, &obj)
 		if err != nil {
-			log.Error(err)
+			Log.Error(err)
 
 			return false
 		}

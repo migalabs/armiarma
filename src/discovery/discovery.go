@@ -18,13 +18,13 @@ import (
 	"os"
 
 	"github.com/btcsuite/btcd/btcec"
-	"github.com/migalabs/armiarma/src/base"
 	"github.com/migalabs/armiarma/src/db"
 	"github.com/migalabs/armiarma/src/enode"
 	"github.com/migalabs/armiarma/src/gossipsub/blockchaintopics"
 	"github.com/migalabs/armiarma/src/info"
 	all_utils "github.com/migalabs/armiarma/src/utils"
 	"github.com/migalabs/armiarma/src/utils/apis"
+	"github.com/sirupsen/logrus"
 
 	geth_log "github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/discover"
@@ -36,10 +36,18 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 )
 
-const PKG_NAME string = "DV5"
+var (
+	ModuleName = "DV5"
+	Log        = logrus.WithField(
+		"module", ModuleName,
+	)
+)
 
 type Discovery struct {
-	*base.Base
+	// Service control variables
+	ctx    context.Context
+	cancel context.CancelFunc
+
 	Node         *enode.LocalNode
 	PeerStore    *db.PeerStore
 	IpLocator    *apis.PeerLocalizer
@@ -60,21 +68,12 @@ func NewEmptyDiscovery() *Discovery {
 // @param input_opts the logging options object
 // @return the modified logging options object
 
-func NewDiscovery(ctx context.Context, input_node *enode.LocalNode, db *db.PeerStore, ipLoc *apis.PeerLocalizer, info_obj *info.InfoData, input_port int, stdOpts base.LogOpts) *Discovery {
-	localLogger := dv5LoggerOpts(stdOpts)
-	// instance base
-	new_base, err := base.NewBase(
-		base.WithContext(ctx),
-		base.WithLogger(localLogger),
-	)
-
-	if err != nil {
-		new_base.Log.Errorf(err.Error())
-	}
-
+func NewDiscovery(ctx context.Context, input_node *enode.LocalNode, db *db.PeerStore, ipLoc *apis.PeerLocalizer, info_obj *info.InfoData, input_port int) *Discovery {
+	mainCtx, cancel := context.WithCancel(ctx)
 	// return the Discovery object
 	return &Discovery{
-		Base:         new_base,
+		ctx:          mainCtx,
+		cancel:       cancel,
 		Node:         input_node,
 		BootNodeList: make([]*eth_enode.Node, 0),
 		PeerStore:    db,
@@ -87,7 +86,7 @@ func NewDiscovery(ctx context.Context, input_node *enode.LocalNode, db *db.PeerS
 // Start_dv5
 // * This method will initiate the discovery listener to receive new
 // * peers connections. This will allow other peers to discover us.
-func (d *Discovery) Start_dv5() {
+func (d *Discovery) Start() {
 
 	// udp address to listen
 	udpAddr := &net.UDPAddr{
@@ -99,7 +98,7 @@ func (d *Discovery) Start_dv5() {
 	// start listening and create a connection object
 	conn, err := net.ListenUDP("udp", udpAddr)
 	if err != nil {
-		d.Log.Panicf(err.Error())
+		Log.Panicf(err.Error())
 	}
 
 	// Set custom logger for the discovery5 service (Debug)
@@ -122,12 +121,12 @@ func (d *Discovery) Start_dv5() {
 		ValidSchemes: eth_enode.ValidSchemes,
 	}
 
-	d.Log.Info("Starting dv5")
+	Log.Info("Starting dv5")
 
 	// start the discovery5 service and listen using the given connection
 	d.Dv5Listener, err = discover.ListenV5(conn, &d.Node.LocalNode, cfg)
 	if err != nil {
-		d.Log.Panicf(err.Error())
+		Log.Panicf(err.Error())
 	}
 }
 
@@ -136,17 +135,34 @@ func (d *Discovery) Start_dv5() {
 // * will create an iterator over randomly generated peers.
 // * For each peer, we will try to connect to it.
 func (d *Discovery) FindRandomNodes() {
-	iterator := d.Dv5Listener.RandomNodes()
-	for iterator.Next() {
-		d.Log.Debugf("new random node: %s\n", iterator.Node().ID().String())
-		node := iterator.Node()
-		err := d.HandleENR(node)
-		if err != nil {
-			// fo far printing a simple warp of the function and the received err
-			// with the id of the enode
-			d.Log.Debugf("unable to handle ENR from node %s, error: %s\n", node.ID().String(), err)
+	Log.Info("running random findnodes")
+	go func() {
+		iterator := d.Dv5Listener.RandomNodes()
+		for iterator.Next() {
+			node := iterator.Node()
+			if node == nil {
+				continue
+			}
+			Log.Debugf("new random node: %s\n", node.ID().String())
+			err := d.HandleENR(node)
+			if err != nil {
+				// fo far printing a simple warp of the function and the received err
+				// with the id of the enode
+				Log.Debugf("unable to handle ENR from node %s, error: %s\n", node.ID().String(), err)
+			}
+			// check if the CTX of the dv5 has been shutted down
+			// TODO: it could be also be moved to a select case
+			if d.ctx.Err() != nil {
+				Log.Info("closing the dv5 iterator")
+				return
+			}
 		}
-	}
+	}()
+}
+
+func (d *Discovery) CloseFindingNodes() {
+	Log.Debug("closing the dv5 iterator called")
+	d.cancel()
 }
 
 // HandleENR
@@ -205,7 +221,7 @@ func (d *Discovery) HandleENR(node *eth_enode.Node) error {
 
 	locResp, err := d.IpLocator.LocateIP(node.IP().String())
 	if err != nil {
-		d.Log.Debugf("could not get location from ip: %s  error: %s", node.IP(), err)
+		Log.Debugf("could not get location from ip: %s  error: %s", node.IP(), err)
 	} else {
 		peer.Country = locResp.Country
 		peer.CountryCode = locResp.CountryCode
@@ -230,17 +246,17 @@ func (d *Discovery) ImportBootNodeList(import_json_file string) {
 
 	// check if file exists
 	if _, err := os.Stat(import_json_file); os.IsNotExist(err) {
-		d.Log.Errorf("Bootnodes file does not exist")
+		Log.Errorf("Bootnodes file does not exist")
 	} else {
 		// exists
 		file, err := ioutil.ReadFile(import_json_file)
 		if err == nil {
 			err := json.Unmarshal([]byte(file), &bootNodeListString)
 			if err != nil {
-				d.Log.Errorf("Could not Unmarshal BootNodes file: %s", err)
+				Log.Errorf("Could not Unmarshal BootNodes file: %s", err)
 			}
 		} else {
-			d.Log.Errorf("Could not read BootNodes file: %s", err)
+			Log.Errorf("Could not read BootNodes file: %s", err)
 		}
 	}
 
@@ -250,19 +266,8 @@ func (d *Discovery) ImportBootNodeList(import_json_file string) {
 	}
 	//bootNodeList = append(bootNodeList, eth_enode.MustParse("enr:-Ku4QImhMc1z8yCiNJ1TyUxdcfNucje3BGwEHzodEZUan8PherEo4sF7pPHPSIB1NNuSg5fZy7qFsjmUKs2ea1Whi0EBh2F0dG5ldHOIAAAAAAAAAACEZXRoMpD1pf1CAAAAAP__________gmlkgnY0gmlwhBLf22SJc2VjcDI1NmsxoQOVphkDqal4QzPMksc5wnpuC3gvSC8AfbFOnZY_On34wIN1ZHCCIyg"))
 	d.SetBootNodeList(bootNodeList)
-	d.Log.Infof("running peer discovery with %d bootdode/s", len(d.GetBootNodeList()))
+	Log.Infof("running peer discovery with %d bootdode/s", len(d.GetBootNodeList()))
 
-}
-
-// dv5LoggerOpts
-// * This method will add logging options for the Discovery object
-// @param input_opts: basic logging options
-// @return the modified logging options object for the Discovery object
-func dv5LoggerOpts(input_opts base.LogOpts) base.LogOpts {
-	input_opts.ModName = PKG_NAME
-	//input_opts.Level = "error" // HARDCODED
-
-	return input_opts
 }
 
 // getters and setters

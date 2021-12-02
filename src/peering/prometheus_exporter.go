@@ -1,18 +1,17 @@
 package peering
 
 import (
-	"context"
 	"time"
 
 	promth "github.com/migalabs/armiarma/src/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 // ServeMetrics
 // * This method will serve the global peerstore values to the
 // * local prometheus instance
-func (c *PeeringService) ServeMetrics(ctx context.Context) {
+func (c *PeeringService) ServeMetrics() {
 	// Generate new ticker
 	ticker := time.NewTicker(promth.MetricLoopInterval)
 	// register variables
@@ -47,7 +46,7 @@ func (c *PeeringService) ServeMetrics(ctx context.Context) {
 					ErrorAttemptDistribution.WithLabelValues(key).Set(float64(value))
 				}
 
-				log.WithFields(log.Fields{
+				Log.WithFields(logrus.Fields{
 					"LastIterTime(secs)":          iterTime,
 					"AttemptedPeersSinceLastIter": peersPeriter,
 					//"IterForcingNextConnTime":         peerIterForcingTime,
@@ -55,9 +54,11 @@ func (c *PeeringService) ServeMetrics(ctx context.Context) {
 					"ControlAttemptDistribution": errorAttemptDist,
 				}).Info("peering metrics summary")
 
-			case <-ctx.Done():
+			case <-c.ctx.Done():
+				Log.Info("Closing the prometheus metrics export service")
 				// closing the routine in a ordened way
 				ticker.Stop()
+				return
 			}
 		}
 	}()

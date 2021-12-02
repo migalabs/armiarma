@@ -1,46 +1,32 @@
-package base
+package utils
 
 import (
 	"io"
 	"os"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 // App default configurations
 var (
-	DefaultLoglvl    = log.InfoLevel
+	DefaultLoglvl    = logrus.InfoLevel
 	DefaultLogOutput = os.Stdout
-	DefaultFormater  = &log.TextFormatter{}
+	DefaultFormater  = &logrus.TextFormatter{}
 )
 
-// LogOpts defines the basic struct to start a new logger
-type LogOpts struct {
-	ModName   string
-	Output    string
-	Formatter string
-	Level     string
-}
-
-// NewDefaultLogger generates a simple Module Logger
-func NewDefaultLogger() log.FieldLogger {
-	logger := log.New()
-	logger.SetFormatter(DefaultFormater)
-	logger.SetOutput(DefaultLogOutput)
-	logger.SetLevel(DefaultLoglvl)
-	l := logger.WithField("module", "default-module")
-	return l
-}
-
 // Select Log Level from string
-func ParseLogLevel(lvl string) log.Level {
+func ParseLogLevel(lvl string) logrus.Level {
 	switch lvl {
+	case "trace":
+		return logrus.TraceLevel
 	case "debug":
-		return log.DebugLevel
+		return logrus.DebugLevel
 	case "info":
-		return log.InfoLevel
+		return logrus.InfoLevel
+	case "warn":
+		return logrus.WarnLevel
 	case "error":
-		return log.ErrorLevel
+		return logrus.ErrorLevel
 	default:
 		return DefaultLoglvl
 	}
@@ -57,15 +43,16 @@ func ParseLogOutput(lvl string) io.Writer {
 }
 
 // parse Formatter from string
-func ParseLogFormatter(lvl string) log.Formatter {
+func ParseLogFormatter(lvl string) logrus.Formatter {
 	switch lvl {
 	case "text":
-		return &log.TextFormatter{}
+		return &logrus.TextFormatter{}
 	default:
 		return DefaultFormater
 	}
 }
 
+/*
 func CreateLogger(opts LogOpts) log.FieldLogger {
 	logger := log.New()
 	logger.SetFormatter(ParseLogFormatter(opts.Formatter))
@@ -91,3 +78,4 @@ func CreateStdLogOpts(input_output string, input_formatter string) LogOpts {
 		Formatter: input_formatter,
 	}
 }
+*/

@@ -8,7 +8,7 @@ import (
 	"github.com/migalabs/armiarma/src/gossipsub/blockchaintopics"
 	promth "github.com/migalabs/armiarma/src/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 // MessageMetrics
@@ -102,10 +102,10 @@ func (c *MessageMetrics) GetTotalMessages() int64 {
 	return total
 }
 
-// ServeMetrics
+// ServePrometheusMetrics
 // * This method will generate the metrics from GossipSub msg Metrics
 // * and serve the values to the local prometheus instance
-func (gs *GossipSub) ServeMetrics() {
+func (gs *GossipSub) ServePrometheusMetrics() {
 	gsCtx := gs.Ctx()
 	// tenerate a ticker
 	ticker := time.NewTicker(promth.MetricLoopInterval)
@@ -124,7 +124,7 @@ func (gs *GossipSub) ServeMetrics() {
 				for k, _ := range gs.MessageMetrics.topicList {
 					r := gs.MessageMetrics.GetTopicMsgs(k)
 					if r < int32(0) {
-						gs.Log.Warnf("Unable to get message count for topic %s", k)
+						Log.Warnf("Unable to get message count for topic %s", k)
 						continue
 					}
 					msgC := (float64(r) / (promth.MetricLoopInterval.Seconds())) * 60 // messages per minute
@@ -138,9 +138,9 @@ func (gs *GossipSub) ServeMetrics() {
 				// reset the values
 				err := gs.MessageMetrics.ResetAllTopics()
 				if err != nil {
-					gs.Log.Warnf("Unable to reset the gossip topic metrics. ", err.Error())
+					Log.Warnf("Unable to reset the gossip topic metrics. ", err.Error())
 				}
-				log.WithFields(log.Fields{
+				Log.WithFields(logrus.Fields{
 					"TopicMsg/min": msgPerMin,
 					"TotalMsg/min": tot,
 				}).Info("gossip metrics summary")
@@ -148,6 +148,8 @@ func (gs *GossipSub) ServeMetrics() {
 			case <-gsCtx.Done():
 				// closing the routine in a ordened way
 				ticker.Stop()
+				Log.Info("Closing GossipSub prometheus exporter")
+				return
 			}
 		}
 	}()

@@ -10,16 +10,17 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/migalabs/armiarma/src/base"
 	"github.com/migalabs/armiarma/src/db"
 	db_utils "github.com/migalabs/armiarma/src/db/utils"
 	"github.com/migalabs/armiarma/src/hosts"
-
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 var (
-	PruningStrategyName = "PRUNING"
+	PeerStratModuleName = "PRUNING"
+	slog                = logrus.WithField(
+		"module", PeerStratModuleName,
+	)
 	// Default Delays
 	DeprecationTime       = 1024 * time.Minute // minutes after first negative connection that has to pass to deprecate a peer
 	DefaultNegDelay       = 12 * time.Hour     // Default delay that will be applied for those deprecated peers
@@ -30,19 +31,13 @@ var (
 	//ConnEventBuffSize = 400
 )
 
-type PruningOpts struct {
-	AggregatedDelay time.Duration
-	LogOpts         base.LogOpts
-}
-
 // Pruning Strategy is a Peering Strategy that applies penalties to peers that haven't show activity when attempting to connect them.
 // Combined with the Deprecated flag in the db.Peer struct, it produces more accourated metrics when exporting, pruning peers that are no longer active.
 type PruningStrategy struct {
-	*base.Base
+	ctx          context.Context
+	cancel       context.CancelFunc
 	strategyType string
 	PeerStore    *db.PeerStore
-	// Delay unit time that gets applied to those slashed peers when reporting inactivity errors when activly connecting
-	AggregatedDelay time.Duration
 	// Peer Stream and Return ConnectionStatus channels (communication between modules)
 	// both empty by default (need for initialization)
 
@@ -72,24 +67,16 @@ type PruningStrategy struct {
 // @param opts: base and logging option
 // @return peering strategy interface with the prunning service:
 // @return error:
-func NewPruningStrategy(ctx context.Context, peerstore *db.PeerStore, opts PruningOpts) (PruningStrategy, error) {
+func NewPruningStrategy(ctx context.Context, peerstore *db.PeerStore) (PruningStrategy, error) {
 	// TODO: cancel is still not implemented in the BaseCreation
-	pruningCtx, _ := context.WithCancel(ctx)
-	opts.LogOpts.ModName = PruningStrategyName
-	//opts.LogOpts.Level = "debug"
-	b, err := base.NewBase(
-		base.WithContext(pruningCtx),
-		base.WithLogger(opts.LogOpts),
-	)
-	if err != nil {
-		return PruningStrategy{}, err
-	}
+	pruningCtx, cancel := context.WithCancel(ctx)
 
 	// Generate the ConnStatus notification channel
 	// TODO: consider making the ConnStatus channel larger
 	pr := PruningStrategy{
-		Base:           b,
-		strategyType:   PruningStrategyName,
+		ctx:            pruningCtx,
+		cancel:         cancel,
+		strategyType:   PeerStratModuleName,
 		PeerStore:      peerstore,
 		PeerQueue:      NewPeerQueue(),
 		peerStreamChan: make(chan db.Peer, DefaultWorkers),
@@ -129,16 +116,13 @@ func (c *PruningStrategy) Run() chan db.Peer {
 // * receive connections/disconnectios, and fetch info comming from the peering service into the db
 // * Main interaction of the Peering Service with the DB
 func (c *PruningStrategy) peerstoreIteratorRoutine() {
-	c.Log.Debug("starting the peerstore iterator routine")
-	// get Ctx of the pruning module
-	modCtx := c.Ctx()
-
+	slog.Debug("starting the peerstore iterator routine")
 	c.PeerQueueIterations = 0
 
 	// get the peer list from the peerstore
 	err := c.PeerQueue.UpdatePeerListFromPeerStore(c.PeerStore)
 	if err != nil {
-		c.Log.Error(err)
+		slog.Error(err)
 	}
 	errorAttemptCategories := map[string]int64{
 		PositiveDelayType:           0,
@@ -157,7 +141,7 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 		// Receive the notification of sending the next peer
 		case <-c.nextPeerChan:
 			if peerListLen > 0 {
-				c.Log.Debug("prepare next peer for pushing it into peer stream")
+				slog.Debug("prepare next peer for pushing it into peer stream")
 				// read info about next peer
 				nextPeer := c.PeerQueue.PeerList[peerCounter]
 				// check if the node is ready for connection
@@ -165,7 +149,7 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 				if nextPeer.IsReadyForConnection() || c.PeerQueueIterations == 0 {
 					pinfo, err := c.PeerStore.GetPeerData(nextPeer.PeerID)
 					if err != nil {
-						log.Warn(err)
+						slog.Warn(err)
 						pinfo = db.NewPeer(nextPeer.PeerID)
 					}
 					// compose all the detailed info for the given peer
@@ -179,7 +163,7 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 					}
 					pID, _ := peer.Decode(nextPeer.PeerID)
 					if err != nil {
-						c.Log.Errorf("error decoding PeerID string into peer.ID %s", err.Error())
+						slog.Errorf("error decoding PeerID string into peer.ID %s", err.Error())
 					}
 					npeer.PeerId = pID.String()
 					k, _ := pID.ExtractPublicKey()
@@ -190,7 +174,7 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 					c.PeerStore.StoreOrUpdatePeer(npeer)
 
 					// Send next peer to the peering service
-					c.Log.Debugf("pushing next peer %s into peer stream", pinfo.PeerId)
+					slog.Debugf("pushing next peer %s into peer stream", pinfo.PeerId)
 					errorAttemptCategories[nextPeer.DelayObj.GetType()]++
 					c.peerStreamChan <- pinfo
 
@@ -198,14 +182,14 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 					peerCounter++
 
 				} else {
-					c.Log.Debug("next peers has to wait to be connected")
+					slog.Debug("next peers has to wait to be connected")
 					c.iterForcingNextConnTime = nextPeer.NextConnection()
 
 					c.NextPeer()
 					nextIterFlag = true
 				}
 			} else {
-				c.Log.Warn("empty peerstore")
+				slog.Warn("empty peerstore")
 				// Recreate the call of the nextPeer that the iterator just used
 				c.NextPeer()
 
@@ -214,8 +198,8 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 				// time to update the PeerList
 				c.lastIterTime = time.Since(iterStartTime)
 				atomic.StoreInt64(&c.attemptedPeers, int64(peerCounter))
-				c.Log.Info("peerstore iteration of ", peerCounter, " peers, done in ", c.lastIterTime)
-				c.Log.Info("missing ", c.PeerQueue.Len()-peerCounter, " peers waiting for next try")
+				slog.Info("peerstore iteration of ", peerCounter, " peers, done in ", c.lastIterTime)
+				slog.Info("missing ", c.PeerQueue.Len()-peerCounter, " peers waiting for next try")
 
 				// check if the minIterTime has been
 				<-validIterTimer.C
@@ -227,10 +211,10 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 				err := c.PeerQueue.UpdatePeerListFromPeerStore(c.PeerStore)
 				c.PeerQueueIterations++ // another iteration
 				if err != nil {
-					c.Log.Error(err)
+					slog.Error(err)
 				}
 				peerListLen = c.PeerQueue.Len()
-				c.Log.Infof("got new peer list with %d", peerListLen)
+				slog.Infof("got new peer list with %d", peerListLen)
 				validIterTimer = time.NewTimer(MinIterTime)
 				iterStartTime = time.Now()
 				peerCounter = 0
@@ -238,8 +222,8 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 			}
 
 		// detect if the context has been shut down to end the go routine
-		case <-modCtx.Done():
-			c.Log.Debug("closing peerstore iterator")
+		case <-c.ctx.Done():
+			slog.Debug("closing peerstore iterator")
 			return
 		}
 	}
@@ -250,28 +234,26 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 // * receive connections/disconnectios, and fetch info comming from the peering service into the db
 // * Main interaction of the Peering Service with the DB
 func (c *PruningStrategy) eventRecorderRoutine() {
-	// get Ctx of the pruning module
-	modCtx := c.Ctx()
-	c.Log.Debugf("Running the Event RecorderRoutine")
+	slog.Debugf("Running the Event RecorderRoutine")
 	for {
 		select {
 		// Receive the status of the peer that got connected to the crawler
 		case connAttemtpStatus := <-c.connAttemptNot:
-			c.Log.Debugf("new connection attempt has been received from peer %s", connAttemtpStatus.Peer.PeerId)
+			slog.Debugf("new connection attempt has been received from peer %s", connAttemtpStatus.Peer.PeerId)
 
 			if connAttemtpStatus.Successful { // in case of success we do not register in any prunned peer
 				// prunned per only receive psotivie events in the identify case down below
-				c.Log.Debugf("adding success connection to peer %s", connAttemtpStatus.Peer.PeerId)
+				slog.Debugf("adding success connection to peer %s", connAttemtpStatus.Peer.PeerId)
 				connAttemtpStatus.Peer.AddPositiveConnAttempt()
 
 			} else {
 				// negative event, register in prunned peer
-				c.Log.Debugf("adding negative connection to peer %s", connAttemtpStatus.Peer.PeerId)
+				slog.Debugf("adding negative connection to peer %s", connAttemtpStatus.Peer.PeerId)
 				// Update Pruning Metadata
 				var p *PrunedPeer
 				p, ok := c.PeerQueue.GetPeer(connAttemtpStatus.Peer.PeerId)
 				if !ok {
-					log.Warnf("Could not find peer in peerqueue: %s", connAttemtpStatus.Peer.PeerId)
+					slog.Warnf("Could not find peer in peerqueue: %s", connAttemtpStatus.Peer.PeerId)
 				}
 				errString := p.ConnEventHandler(connAttemtpStatus.RecError.Error())
 				connAttemtpStatus.Peer.AddNegConnAtt(p.Deprecable(), errString)
@@ -283,11 +265,11 @@ func (c *PruningStrategy) eventRecorderRoutine() {
 		case connEvent := <-c.connEventNot:
 			switch connEvent.ConnType {
 			case int8(1):
-				c.Log.Debugf("new conection from %s", connEvent.Peer.PeerId)
+				slog.Debugf("new conection from %s", connEvent.Peer.PeerId)
 			case int8(2):
-				c.Log.Debugf("new disconnection has been received from peer %s", connEvent.Peer.PeerId)
+				slog.Debugf("new disconnection has been received from peer %s", connEvent.Peer.PeerId)
 			default:
-				c.Log.Warnf("unrecognized event from peer %s", connEvent.Peer.PeerId)
+				slog.Warnf("unrecognized event from peer %s", connEvent.Peer.PeerId)
 				// since its an unexpected event, dont fetch the incoming peer and reset de select case
 				continue
 			}
@@ -297,7 +279,7 @@ func (c *PruningStrategy) eventRecorderRoutine() {
 			// TODO: We received a new identification attempt
 			// stract whether it was success or a failure
 			// and track it in the PeerQuueue and un the peerstore
-			c.Log.Debugf("new identification %s from peer %s", strconv.FormatBool(identEvent.Peer.IsConnected), identEvent.Peer.PeerId)
+			slog.Debugf("new identification %s from peer %s", strconv.FormatBool(identEvent.Peer.IsConnected), identEvent.Peer.PeerId)
 
 			// by default ww think the identify was not successful, therefore negativewithhope and error
 			delayType := NegativeWithHopeDelayType
@@ -320,8 +302,8 @@ func (c *PruningStrategy) eventRecorderRoutine() {
 			c.PeerStore.StoreOrUpdatePeer(identEvent.Peer)
 
 		// detect if the context has been shut down to end the go routine
-		case <-modCtx.Done():
-			c.Log.Debug("closing event recorder routine")
+		case <-c.ctx.Done():
+			slog.Debug("closing event recorder routine")
 			return
 		}
 	}
@@ -331,7 +313,7 @@ func (c *PruningStrategy) eventRecorderRoutine() {
 // * Notifies the peerstore iterator that a new peer has been requested
 // * After it, the peerstore iteratow will put the new peer in the PeerStreamChan
 func (c *PruningStrategy) NextPeer() {
-	c.Log.Debug("next peer has been requested")
+	slog.Debug("next peer has been requested")
 	c.nextPeerChan <- struct{}{}
 }
 
@@ -339,7 +321,7 @@ func (c *PruningStrategy) NextPeer() {
 // * Notifies the peerstore iterator that a new ConnStatus has been received
 // * After it, the peerstore iteratow will aggregate the extra info
 func (c *PruningStrategy) NewConnectionAttempt(connAttStat ConnectionAttemptStatus) {
-	c.Log.Debug("new connection attempt has been received from peer", connAttStat.Peer.PeerId)
+	slog.Debug("new connection attempt has been received from peer", connAttStat.Peer.PeerId)
 	c.connAttemptNot <- connAttStat
 }
 
@@ -348,12 +330,12 @@ func (c *PruningStrategy) NewConnectionAttempt(connAttStat ConnectionAttemptStat
 // * I puts the connection metadata in the connNot channel to let the select
 // * loop all the metadata of the received connection
 func (c *PruningStrategy) NewConnectionEvent(connEvent hosts.ConnectionEvent) {
-	c.Log.Debug("next connection event has been received from peer", connEvent.Peer.PeerId)
+	slog.Debug("next connection event has been received from peer", connEvent.Peer.PeerId)
 	c.connEventNot <- connEvent
 }
 
 func (c *PruningStrategy) NewIdentificationEvent(newIdent hosts.IdentificationEvent) {
-	c.Log.Debugf("new identification %s has been received from peer %s", strconv.FormatBool(newIdent.Peer.IsConnected), newIdent.Peer.PeerId)
+	slog.Debugf("new identification %s has been received from peer %s", strconv.FormatBool(newIdent.Peer.IsConnected), newIdent.Peer.PeerId)
 	c.identEventNot <- newIdent
 }
 
@@ -386,13 +368,13 @@ func (c *PruningStrategy) GetErrorAttemptDistribution() map[string]int64 {
 // * Closes in a controled secuence the module related go routines and channels
 // * Ending with the Base.Ctx cancelation
 func (c *PruningStrategy) Close() {
-	c.Log.Infof("closing pruning strategy")
+	slog.Infof("closing pruning strategy")
 	// close the involved channels
 	close(c.peerStreamChan)
 	close(c.nextPeerChan)
 	close(c.connEventNot)
 	// shutdown the base context of the pruning
-	c.Cancel()
+	c.cancel()
 }
 
 // Extra Prunning methods
@@ -566,7 +548,7 @@ func (c *PeerQueue) UpdatePeerListFromPeerStore(peerstore *db.PeerStore) error {
 	}
 	// Sort the list of peers based on the next connection
 	c.SortPeerList()
-	log.Infof("len PeerQueue: %d\n", c.Len())
+	slog.Infof("len PeerQueue: %d\n", c.Len())
 	return nil
 }
 
@@ -667,7 +649,7 @@ func ErrorToDelayType(errString string) string {
 	case "no route to host", "unreachable network", "peer id mismatch", "dial to self attempted":
 		return NegativeWithNoHopeDelayType
 	default:
-		log.Warnf("Default Delay applied, error: %s-\n", prettyErr)
+		slog.Warnf("Default Delay applied, error: %s-\n", prettyErr)
 		return NegativeWithHopeDelayType
 
 	}

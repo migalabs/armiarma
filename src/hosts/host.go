@@ -6,7 +6,6 @@ import (
 
 	noise "github.com/libp2p/go-libp2p-noise"
 	tcp_transport "github.com/libp2p/go-tcp-transport"
-	"github.com/migalabs/armiarma/src/base"
 	"github.com/migalabs/armiarma/src/db"
 	"github.com/migalabs/armiarma/src/info"
 	"github.com/migalabs/armiarma/src/utils/apis"
@@ -16,17 +15,23 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p/p2p/protocol/identify"
 
+	"github.com/sirupsen/logrus"
+
 	ma "github.com/multiformats/go-multiaddr"
 )
 
 var (
-	ModuleName       = "LIBP2P_HOST"
-	ConnNotChannSize = 400
+	ModuleName = "LIBP2P-HOST"
+	Log        = logrus.WithField(
+		"module", ModuleName,
+	)
+	ConnNotChannSize = 200
 )
 
 // Struct that defines the Basic Struct asociated to the Libtp2p host
 type BasicLibp2pHost struct {
-	*base.Base
+	ctx    context.Context
+	cancel context.CancelFunc
 	// Basic sevices related with the libp2p host
 	host      host.Host
 	identify  *identify.IDService
@@ -34,7 +39,7 @@ type BasicLibp2pHost struct {
 	IpLocator *apis.PeerLocalizer
 
 	// Basic Host Metadata
-	info_obj      *info.InfoData
+	infoObj       *info.InfoData
 	multiAddr     ma.Multiaddr
 	fullMultiAddr ma.Multiaddr
 
@@ -43,54 +48,32 @@ type BasicLibp2pHost struct {
 	peerID              peer.ID
 }
 
-type BasicLibp2pHostOpts struct {
-	Info_obj  info.InfoData
-	IpLocator *apis.PeerLocalizer
-	LogOpts   base.LogOpts
-	PeerStore *db.PeerStore
-	// TODO: -Add IdService for the libp2p host
-}
-
 // Generate a new Libp2p host from the given context and Options
 // TODO: missing argument for app info (givin Privkeys, IPs, ports, userAgents)
-func NewBasicLibp2pHost(ctx context.Context, opts BasicLibp2pHostOpts) (*BasicLibp2pHost, error) {
-	// Generate Base module struct with basic funtioning
-	//opts.LogOpts.Level = "debug"
-	b, err := base.NewBase(
-		base.WithContext(ctx),
-		base.WithLogger(base.LogOpts{
-			ModName:   opts.LogOpts.ModName,
-			Output:    opts.LogOpts.Output,
-			Formatter: opts.LogOpts.Formatter,
-			Level:     opts.LogOpts.Level,
-		}),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't create base for host module. %s", err)
-	}
-	// check the parsed host options
+func NewBasicLibp2pHost(ctx context.Context, infoObj info.InfoData, ipLocator *apis.PeerLocalizer, ps *db.PeerStore) (*BasicLibp2pHost, error) {
+	mainCtx, cancel := context.WithCancel(ctx)
 
-	ip := opts.Info_obj.GetIPToString()
-	tcp := opts.Info_obj.GetTcpPortString()
-	privkey := opts.Info_obj.GetPrivKey()
-	userAgent := opts.Info_obj.GetUserAgent()
+	ip := infoObj.GetIPToString()
+	tcp := infoObj.GetTcpPortString()
+	privkey := infoObj.GetPrivKey()
+	userAgent := infoObj.GetUserAgent()
 
 	// generate de multiaddress
 	multiaddr := fmt.Sprintf("/ip4/%s/tcp/%s", ip, tcp)
 	muladdr, err := ma.NewMultiaddr(multiaddr)
 	if err != nil {
-		b.Log.Debugf("couldn't generate multiaddress from ip %s and tcp %s", ip, tcp)
+		Log.Debugf("couldn't generate multiaddress from ip %s and tcp %s", ip, tcp)
 		multiaddr = fmt.Sprintf("/ip4/%s/tcp/%s", DefaultIP, DefaultTCP)
 		muladdr, _ = ma.NewMultiaddr(multiaddr)
 	}
-	b.Log.Debugf("setting multiaddress to %s", muladdr)
+	Log.Debugf("setting multiaddress to %s", muladdr)
 
 	// Generate the main Libp2p host that will be exposed to the network
 	host, err := libp2p.New(
-		b.Ctx(),
+		mainCtx,
 		libp2p.ListenAddrs(muladdr),
 		libp2p.Identity(privkey),
-		libp2p.UserAgent(opts.Info_obj.GetUserAgent()),
+		libp2p.UserAgent(infoObj.GetUserAgent()),
 		libp2p.Transport(tcp_transport.NewTCPTransport),
 		libp2p.Security(noise.ID, noise.New),
 		libp2p.NATPortMap(),
@@ -101,7 +84,7 @@ func NewBasicLibp2pHost(ctx context.Context, opts BasicLibp2pHostOpts) (*BasicLi
 	peerId := host.ID().String()
 	fmaddr := host.Addrs()[0].String() + "/p2p/" + host.ID().String()
 	localMultiaddr, _ := ma.NewMultiaddr(fmaddr)
-	b.Log.Debugf("full multiaddress %s", localMultiaddr)
+	Log.Debugf("full multiaddress %s", localMultiaddr)
 	// generate the identify service
 	ids, err := identify.NewIDService(host, identify.UserAgent(userAgent), identify.DisableSignedPeerRecord())
 	if err != nil {
@@ -109,19 +92,20 @@ func NewBasicLibp2pHost(ctx context.Context, opts BasicLibp2pHostOpts) (*BasicLi
 	}
 	// Gererate the struct that contains all the configuration and structs surrounding the Libp2p Host
 	basicHost := &BasicLibp2pHost{
-		Base:                b,
+		ctx:                 mainCtx,
+		cancel:              cancel,
 		host:                host,
 		identify:            ids,
-		PeerStore:           opts.PeerStore,
-		IpLocator:           opts.IpLocator,
-		info_obj:            &opts.Info_obj,
+		PeerStore:           ps,
+		IpLocator:           ipLocator,
+		infoObj:             &infoObj,
 		multiAddr:           muladdr,
 		fullMultiAddr:       localMultiaddr,
 		peerID:              peer.ID(peerId),
 		connEventNotChannel: make(chan ConnectionEvent, ConnNotChannSize),
 		identNotChannel:     make(chan IdentificationEvent, ConnNotChannSize),
 	}
-	b.Log.Debug("setting custom notification functions")
+	Log.Debug("setting custom notification functions")
 	basicHost.SetCustomNotifications()
 
 	return basicHost, nil
@@ -137,16 +121,21 @@ func (b *BasicLibp2pHost) Host() host.Host {
 func (b *BasicLibp2pHost) Start() {
 	err := b.host.Network().Listen()
 	if err != nil {
-		b.Log.Errorf("error starting. %s", err)
+		Log.Errorf("error starting. %s", err)
 	} else {
-		b.Log.Infof("libp2p host module started")
+		Log.Infof("libp2p host module started")
 	}
 }
 
 // cancel the context of the libp2pHost module
 func (b *BasicLibp2pHost) Stop() {
-	b.Log.Info("stopping Libp2p host")
-	b.Cancel()
+	Log.Info("stopping Libp2p host")
+	b.cancel()
+}
+
+// Ctx returns the main Ctx of the service
+func (b *BasicLibp2pHost) Ctx() context.Context {
+	return b.ctx
 }
 
 func (b *BasicLibp2pHost) RecConnEvent(connEvent ConnectionEvent) {
@@ -166,5 +155,5 @@ func (b *BasicLibp2pHost) IdentEventNotChannel() chan IdentificationEvent {
 }
 
 func (b *BasicLibp2pHost) GetInfoObj() *info.InfoData {
-	return b.info_obj
+	return b.infoObj
 }

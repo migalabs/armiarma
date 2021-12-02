@@ -3,16 +3,11 @@ package info
 import (
 	"testing"
 
-	"github.com/migalabs/armiarma/src/base"
 	"github.com/stretchr/testify/require"
 )
 
 func Test_CustomInfoDataSuccess(t *testing.T) {
-	stdOpts := base.LogOpts{
-		Output:    "terminal",
-		Formatter: "text",
-	}
-	info_object := NewCustomInfoData("../config/config_success.json", stdOpts)
+	info_object := NewCustomInfoData("../config/config_success.json")
 
 	require.Equal(t, "127.0.0.1", info_object.GetIP().String())
 	require.Equal(t, 100, info_object.GetTcpPort())
@@ -31,11 +26,7 @@ func Test_CustomInfoDataSuccess(t *testing.T) {
 // * This method tests the InfoData creation using a failing config file
 // * All should be default as keys of the config should fail
 func Test_CustomInfoDataFail(t *testing.T) {
-	stdOpts := base.LogOpts{
-		Output:    "terminal",
-		Formatter: "text",
-	}
-	info_object := NewCustomInfoData("../config/config_fail.json", stdOpts)
+	info_object := NewCustomInfoData("../config/config_fail.json")
 
 	require.Equal(t, "0.0.0.0", info_object.GetIP().String())
 	require.Equal(t, 9000, info_object.GetTcpPort())

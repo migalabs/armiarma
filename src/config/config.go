@@ -16,17 +16,19 @@ import (
 	"os"
 	"strings"
 
-	"github.com/migalabs/armiarma/src/base"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 // define constant variables
 var (
-	PkgName string = "CONFIG"
+	ModuleName string = "CONFIG"
+	l                 = logrus.New()
+	log               = l.WithField(
+		"module", ModuleName,
+	)
 )
 
 type ConfigData struct {
-	localLogger   log.FieldLogger
 	IP            string   `json:"IP"`
 	TcpPort       int      `json:"TcpPort"`
 	UdpPort       int      `json:"UdpPort"`
@@ -46,12 +48,7 @@ type ConfigData struct {
 // * This method will create a ConfigData empty object
 // @return A ConfigData object
 func NewEmptyConfig() ConfigData {
-	// generate an empty configuration (will call later on the default info)
-	config := ConfigData{
-		localLogger: base.CreateLogger(defaultConfigLoggerOpts(base.LogOpts{})),
-	}
-
-	return config
+	return ConfigData{}
 }
 
 // NewConfigFromArgs
@@ -66,18 +63,18 @@ func NewConfigFromArgs() (ConfigData, bool) {
 	flag.StringVar(&configFile, "config-file", "./config-files/config.json", "config-file with all the available configurations. Find an example at ./config-files/config.json")
 	flag.Parse()
 
-	// generate an empty configuration (will call later on the default info)
-	config := ConfigData{
-		localLogger: base.CreateLogger(defaultConfigLoggerOpts(base.LogOpts{})),
-	}
+	// generate an empty configuration
+	config := NewEmptyConfig()
 
 	// check if the help was requested
 	if help {
+		log.Debug("help flag was active")
 		return config, help
 	}
 
 	// check if a file was given
 	if configFile != "" {
+		log.Debug("config file was provided")
 		config.ReadFromJSON(configFile)
 	}
 
@@ -89,37 +86,25 @@ func NewConfigFromArgs() (ConfigData, bool) {
 // * into the current ConfigData object
 // @param input_file where to read configuration from
 func (c *ConfigData) ReadFromJSON(input_file string) {
-	c.localLogger.Infof("Reading configuration from file: %s", input_file)
+	log.Infof("Reading configuration from file: %s", input_file)
 
 	if _, err := os.Stat(input_file); os.IsNotExist(err) {
-		c.localLogger.Warnf("File does not exist or is corrupted")
+		log.Warnf("File does not exist or is corrupted")
 	} else {
 
 		file, err := ioutil.ReadFile(input_file)
 		if err == nil {
 			err := json.Unmarshal([]byte(file), c)
 			if err != nil {
-				c.localLogger.Warnf("Could not Unmarshal Config file content: %s", err)
+				log.Warnf("Could not Unmarshal Config file content: %s", err)
 			}
 		} else {
-			c.localLogger.Warnf("Could not read Config file: %s", err)
+			log.Warnf("Could not read Config file: %s", err)
 		}
 	}
 }
 
-// defaultConfigLoggerOpts
-// * This method will apply logging options on top of an existing
-// * logging object for a ConfigData.
-// @param opts the base logging object
-// @return the modified logging object adjusted to ConfigData
-func defaultConfigLoggerOpts(input_opts base.LogOpts) base.LogOpts {
-	input_opts.ModName = PkgName
-	input_opts.Level = "info"
-	return input_opts
-}
-
 // getters and setters
-
 func (c *ConfigData) GetTcpPort() int {
 	return c.TcpPort
 }
@@ -130,6 +115,7 @@ func (c *ConfigData) SetTcpPort(input_port int) {
 func (c *ConfigData) GetUdpPort() int {
 	return c.UdpPort
 }
+
 func (c *ConfigData) SetUdpPort(input_port int) {
 	c.UdpPort = input_port
 }

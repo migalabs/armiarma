@@ -33,11 +33,11 @@ type IdentificationEvent struct {
 }
 
 func (c *BasicLibp2pHost) standardListenF(net network.Network, addr ma.Multiaddr) {
-	c.Log.Debug("Listen")
+	Log.Debug("Listen")
 }
 
 func (c *BasicLibp2pHost) standardListenCloseF(net network.Network, addr ma.Multiaddr) {
-	c.Log.Debug("Close listen")
+	Log.Debug("Close listen")
 }
 
 func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Conn) {
@@ -64,7 +64,7 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 
 	c.RecConnEvent(cs)
 
-	c.Log.WithFields(logrus.Fields{
+	Log.WithFields(logrus.Fields{
 		"EVENT":     "Connection detected",
 		"DIRECTION": conn.Stat().Direction.String(),
 	}).Debug("Peer: ", conn.RemotePeer().String())
@@ -108,32 +108,32 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 	// if if there is an error  in the channel, print error
 	if err, _ := <-hinfoErr; err != nil {
 		// if error, cancel the timeout and stop ReqMetadata and ReqStatus
-		c.Log.WithFields(logrus.Fields{
+		Log.WithFields(logrus.Fields{
 			"ERROR": err.Error(),
 		}).Debug("ReqHostInfo Peer: ", conn.RemotePeer().String())
 	} else {
-		c.Log.Debug("peer identified, succeed")
+		Log.Debug("peer identified, succeed")
 	}
 
 	// Beacon Status request error check
 	// if if there is an error  in the channel, print error
 	if err := <-metadataErr; err != nil {
-		c.Log.WithFields(logrus.Fields{
+		Log.WithFields(logrus.Fields{
 			"ERROR": err.Error(),
 		}).Debug("ReqMetadata Peer: ", conn.RemotePeer().String())
 	} else {
-		c.Log.Debug("peer metadata req, succeed")
+		Log.Debug("peer metadata req, succeed")
 		peer.UpdateBeaconMetadata(bMetadata)
 	}
 
 	// Beacon Status request error check
 	// if if there is an error  in the channel, print error
 	if err := <-statusErr; err != nil {
-		c.Log.WithFields(logrus.Fields{
+		Log.WithFields(logrus.Fields{
 			"ERROR": err.Error(),
 		}).Debug("ReqStatus Peer: ", conn.RemotePeer().String())
 	} else {
-		c.Log.Debug("peer status req, succeed")
+		Log.Debug("peer status req, succeed")
 		peer.UpdateBeaconStatus(bStatus)
 	}
 	// close channels
@@ -160,7 +160,7 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 			peer.NodeId = eth_node.PubkeyToIDV4(edcsakey).String()
 		}
 	*/
-	c.Log.Debug("sending identification event of peer", peer.PeerId)
+	Log.Debug("sending identification event of peer", peer.PeerId)
 	identStat := IdentificationEvent{
 		Peer:      peer,
 		Timestamp: t,
@@ -172,7 +172,7 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 }
 
 func (c *BasicLibp2pHost) standardDisconnectF(net network.Network, conn network.Conn) {
-	c.Log.Debugf("disconnected from peer %s", conn.RemotePeer().String())
+	Log.Debugf("disconnected from peer %s", conn.RemotePeer().String())
 	// TEMP
 
 	peer := db.NewPeer(conn.RemotePeer().String())
@@ -188,11 +188,11 @@ func (c *BasicLibp2pHost) standardDisconnectF(net network.Network, conn network.
 }
 
 func (c *BasicLibp2pHost) standardOpenedStreamF(net network.Network, str network.Stream) {
-	c.Log.Debug("Open Stream")
+	Log.Debug("Open Stream")
 }
 
 func (c *BasicLibp2pHost) standardClosedF(net network.Network, str network.Stream) {
-	c.Log.Debug("Close")
+	Log.Debug("Close")
 }
 
 //
