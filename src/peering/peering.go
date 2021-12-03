@@ -51,6 +51,7 @@ type PeeringService struct {
 	MaxRetries int
 }
 
+// Constructor
 func NewPeeringService(
 	ctx context.Context,
 	h *hosts.BasicLibp2pHost,
@@ -76,18 +77,6 @@ func NewPeeringService(
 			return pServ, err
 		}
 	}
-	/* -- Check Performance of the previous PeeringServ + Pruning
-	// check if there is any peering strategy assigned
-	if pServ.strategy == nil {
-		// Choose the Default strategy (Pruning)
-		prOpts := PruningOpts{
-			AggregatedDelay: 24 * time.Hour,
-			logOpts:         peeringOpts.LogOpts,
-		}
-		pruning := NewPruningStrategy(pServ.Base.Ctx(), peerstore, prOpts)
-		pServ.strategy = pruning
-	}
-	*/
 	return pServ, nil
 }
 
@@ -102,10 +91,10 @@ func WithPeeringStrategy(strategy PeeringStrategy) PeeringOption {
 	}
 }
 
-// Run
-// * Main peering event selector,
-// * For every next peer received from the strategy, attempt the connection and record the status of this one
-// * Notify the strategy of any conn/disconn recorded
+// Run:
+// Main peering event selector.
+// For every next peer received from the strategy, attempt the connection and record the status of this one.
+// Notify the strategy of any conn/disconn recorded.
 func (c *PeeringService) Run() {
 	Log.Debug("starting the peering service")
 
@@ -121,6 +110,10 @@ func (c *PeeringService) Run() {
 	go c.ServeMetrics()
 }
 
+// peeringWorker
+// Peering routine that will be launched several times (several workers).
+// @param workerID: id of the worker.
+// @param peerStreamChan: used to receive the next peer.
 func (c *PeeringService) peeringWorker(workerID string, peerStreamChan chan db.Peer) {
 	Log.Infof("launching %s", workerID)
 	peeringCtx := c.ctx
@@ -215,10 +208,9 @@ func (c *PeeringService) peeringWorker(workerID string, peerStreamChan chan db.P
 
 }
 
-// eventRecorderRoutine
-// * Connection and Disconnection event recorder,
-// * the event selector records the status of any incoming connection and disconnection
-// * Notify the strategy of any conn/disconn recorded
+// eventRecorderRoutine:
+// The event selector records the status of any incoming connection and disconnection and
+// notifies the strategy of any recorded conn/disconn.
 func (c *PeeringService) eventRecorderRoutine() {
 	Log.Debug("starting the event recorder service")
 	// get the connection and disconnection notification channels from the host
@@ -253,7 +245,7 @@ func (c *PeeringService) eventRecorderRoutine() {
 }
 
 // Close
-// * Stops the Peering Service, closing with it the peering strategy and their context
+// Stops the Peering Service, closing with it the peering strategy and their context
 func (c *PeeringService) Close() {
 	Log.Info("stoping the peering service")
 	// Stop the strategy

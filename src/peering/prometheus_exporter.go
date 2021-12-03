@@ -9,9 +9,9 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// ServeMetrics
-// * This method will serve the global peerstore values to the
-// * local prometheus instance
+// ServeMetrics:
+// This method will serve the global peerstore values to the
+// local prometheus instance.
 func (c *PeeringService) ServeMetrics() {
 	// Generate new ticker
 	ticker := time.NewTicker(promth.MetricLoopInterval)
@@ -20,7 +20,6 @@ func (c *PeeringService) ServeMetrics() {
 	prometheus.MustRegister(ErrorAttemptDistribution)
 	prometheus.MustRegister(PeersAttemptedInLastIteration)
 	prometheus.MustRegister(PeerstoreIterTime)
-	//prometheus.MustRegister(IterForcingNextConnTime)
 
 	// routine to loop
 	go func() {
@@ -30,13 +29,12 @@ func (c *PeeringService) ServeMetrics() {
 
 				iterTime := c.strategy.LastIterTime()
 				peersPeriter := c.strategy.AttemptedPeersSinceLastIter()
-				//peerIterForcingTime := c.strategy.IterForcingNextConnTime()
+
 				controlDist := c.strategy.ControlDistribution()
 				errorAttemptDist := c.strategy.GetErrorAttemptDistribution()
 				// get new values
 				PeerstoreIterTime.Set(iterTime) // Float in seconds
 				PeersAttemptedInLastIteration.Set(float64(peersPeriter))
-				//IterForcingNextConnTime.Set(peerIterForcingTime)
 
 				// generate the distribution
 				for key, value := range controlDist {

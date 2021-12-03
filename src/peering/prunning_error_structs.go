@@ -36,7 +36,7 @@ type DelayObject interface {
 	GetDegree() int
 }
 
-// all of our delay types will include this base, as they all have the same data
+// All of our delay types will include this base, as they all have the same data
 // just the delay calculation is different
 type BaseDelay struct {
 	DelayDegree int    // number of times we have delayed
@@ -44,9 +44,9 @@ type BaseDelay struct {
 }
 
 // NewBaseDelay
-// * Constructor
-// * we use pointers so the methods are directly added to inherited structs
-// @param inputType: the type of delay we want to set (just string)
+// Constructor.
+// We use pointers so the methods are directly added to inherited structs.
+// @param inputType: the type of delay we want to set (just string).
 func NewBaseDelay(inputType string) *BaseDelay {
 	return &BaseDelay{
 		DelayDegree: 0,
@@ -54,30 +54,30 @@ func NewBaseDelay(inputType string) *BaseDelay {
 	}
 }
 
-// AddDegree
-// * This method will add 1 to the delaydegree
+// AddDegree:
+// This method will add 1 to the delaydegree.
 func (bd *BaseDelay) AddDegree() {
 
 	bd.DelayDegree++
 
 }
 
-// SetDegree
-// * This method will the delaydegree
+// SetDegree:
+// This method will the delaydegree.
 func (bd *BaseDelay) SetDegree(newDegree int) {
 	bd.DelayDegree = newDegree
 }
 
-// GetDegree
-// @return the delaydegree
+// GetDegree:
+// @return the delaydegree.
 func (bd *BaseDelay) GetDegree() int {
 
 	return bd.DelayDegree
 
 }
 
-// GetType
-//@return the type in string format
+// GetType:
+//@return the type in string format.
 func (bd BaseDelay) GetType() string {
 	return bd.Type
 }
@@ -88,18 +88,18 @@ type PositiveDelay struct {
 	*BaseDelay // include it as pointer to have the methods added directly
 }
 
-// NewPositiveDelay
-// * Constructor
-// @return a PositiveDelay object
+// NewPositiveDelay:
+// Constructor.
+// @return a PositiveDelay object.
 func NewPositiveDelay() PositiveDelay {
 	return PositiveDelay{
 		BaseDelay: NewBaseDelay(PositiveDelayType),
 	}
 }
 
-// CalculateDelay
-// * This method will calculate the delay to be applied based on degree
-// @return the delay in Time.Duration format
+// CalculateDelay:
+// This method will calculate the delay to be applied based on degree.
+// @return the delay in Time.Duration format.
 func (d PositiveDelay) CalculateDelay() time.Duration {
 	// return 6 hours * the degree (6,12,18...)
 	return time.Duration(d.DelayDegree) * InitialDelayTime[d.Type]
@@ -117,9 +117,9 @@ func NewZeroDelay() ZeroDelay {
 	}
 }
 
-// CalculateDelay
-// * This method will calculate the delay to be applied based on degree
-// @return the delay in Time.Duration format
+// CalculateDelay:
+// This method will calculate the delay to be applied based on degree.
+// @return the delay in Time.Duration format.
 func (d ZeroDelay) CalculateDelay() time.Duration {
 
 	// always return 0
@@ -138,9 +138,9 @@ func NewMinus1Delay() Minus1Delay {
 	}
 }
 
-// CalculateDelay
-// * This method will calculate the delay to be applied based on degree
-// @return the delay in Time.Duration format
+// CalculateDelay:
+// This method will calculate the delay to be applied based on degree.
+// @return the delay in Time.Duration format.
 func (d Minus1Delay) CalculateDelay() time.Duration {
 
 	// always return a negative delay
@@ -159,9 +159,9 @@ func NewNegativeDelay(inputType string) *NegativeDelay {
 	}
 }
 
-// CalculateDelay
-// * This method will calculate the delay to be applied based on degree
-// @return the delay in Time.Duration format
+// CalculateDelay:
+// This method will calculate the delay to be applied based on degree.
+// @return the delay in Time.Duration format.
 func (d NegativeDelay) CalculateDelay() time.Duration {
 
 	// if there are no attempts, there is no delay
@@ -192,6 +192,9 @@ func NewNegativeWithNoHopeDelay() NegativeWithNoHopeDelay {
 	}
 }
 
+// ReturnAccordingDelayObject
+// @param delayType: string representing a type of delay.
+// @return the according delayobject
 func ReturnAccordingDelayObject(delayType string) DelayObject {
 	switch delayType {
 	case PositiveDelayType:

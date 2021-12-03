@@ -22,25 +22,25 @@ var (
 		"module", PeerStratModuleName,
 	)
 	// Default Delays
-	DeprecationTime       = 1024 * time.Minute // minutes after first negative connection that has to pass to deprecate a peer
-	DefaultNegDelay       = 12 * time.Hour     // Default delay that will be applied for those deprecated peers
-	DefaultPossitiveDelay = 6 * time.Hour      // Default delay after each possitive severe negative attempts
-	StartExpD             = 2 * time.Minute    // Strating delay that will serve for the Exponencial Delay
+	DeprecationTime       = 1024 * time.Minute // mMinutes after first negative connection that has to pass to deprecate a peer.
+	DefaultNegDelay       = 12 * time.Hour     // Default delay that will be applied for those deprecated peers.
+	DefaultPossitiveDelay = 6 * time.Hour      // Default delay after each positive severe negative attempts.
+	StartExpD             = 2 * time.Minute    // Starting delay that will serve for the Exponential Delay.
 	// Control variables
-	MinIterTime = 15 * time.Second // Minimum time that has to pass before iterating again
-	//ConnEventBuffSize = 400
+	MinIterTime = 15 * time.Second // Minimum time that has to pass before iterating again.
+
 )
 
-// Pruning Strategy is a Peering Strategy that applies penalties to peers that haven't show activity when attempting to connect them.
-// Combined with the Deprecated flag in the db.Peer struct, it produces more accourated metrics when exporting, pruning peers that are no longer active.
+// Pruning Strategy is a Peering Strategy that applies penalties to peers that haven't shown activity when attempting to connect them.
+// Combined with the Deprecated flag in the db.Peer struct, it produces more accurate metrics when exporting pruning peers that are no longer active.
 type PruningStrategy struct {
 	ctx          context.Context
 	cancel       context.CancelFunc
 	strategyType string
 	PeerStore    *db.PeerStore
+
 	// Peer Stream and Return ConnectionStatus channels (communication between modules)
 	// both empty by default (need for initialization)
-
 	peerStreamChan chan db.Peer
 	nextPeerChan   chan struct{}
 	connAttemptNot chan ConnectionAttemptStatus
@@ -59,14 +59,14 @@ type PruningStrategy struct {
 	ErrorAttemptDistribution map[string]*int64
 }
 
-// NewPruningStrategy
-// * Pruning strategy constructor, that will offer a db.Peer stream for the
-// * peering service. The povided db.Peer stream are ready to connect.
-// @param ctx: parent context
-// @param peerstore: db.PeerStore
-// @param opts: base and logging option
-// @return peering strategy interface with the prunning service:
-// @return error:
+// NewPruningStrategy:
+// Pruning strategy constructor, that will offer a db.Peer stream for the
+// peering service. The provided db.Peer stream are ready to connect.
+// @param ctx: parent context.
+// @param peerstore: db.PeerStore.
+// @param opts: base and logging option.
+// @return peering strategy interface with the prunning service.
+// @return error.
 func NewPruningStrategy(ctx context.Context, peerstore *db.PeerStore) (PruningStrategy, error) {
 	// TODO: cancel is still not implemented in the BaseCreation
 	pruningCtx, cancel := context.WithCancel(ctx)
@@ -91,18 +91,18 @@ func NewPruningStrategy(ctx context.Context, peerstore *db.PeerStore) (PruningSt
 	return pr, nil
 }
 
-// Type
-// * Returns the strategy type that has been set
-// @return string with the name of the pruning strategy
+// Type:
+// Returns the strategy type that has been set.
+// @return string with the name of the pruning strategy.
 func (c PruningStrategy) Type() string {
 	return c.strategyType
 }
 
-// Run
-// * initializes the db.Peer stream on the returning db.Peer chan
-// * stores locally an auxiliary map wuth an array that will keep
-// * track of the next connection time.
-// @return db.Peer channel with the next peer to connect
+// Run:
+// Initializes the db.Peer stream on the returning db.Peer chan
+// stores locally an auxiliary map wuth an array that will keep
+// track of the next connection time.
+// @return db.Peer channel with the next peer to connect.
 func (c *PruningStrategy) Run() chan db.Peer {
 	// start go routine that will notify of the full peerstore iteration and notifies it to the main strategy loop
 	go c.peerstoreIteratorRoutine()
@@ -111,10 +111,10 @@ func (c *PruningStrategy) Run() chan db.Peer {
 	return c.peerStreamChan
 }
 
-// peerstoreIterator
-// * Private function that is in charge of iterating through the peerstore,
-// * receive connections/disconnectios, and fetch info comming from the peering service into the db
-// * Main interaction of the Peering Service with the DB
+// peerstoreIterator:
+// Private function that is in charge of iterating through the peerstore,
+// receive connections/disconnections, and fetch info comming from the peering service into the db.
+// Main interaction of the Peering Service with the DB.
 func (c *PruningStrategy) peerstoreIteratorRoutine() {
 	slog.Debug("starting the peerstore iterator routine")
 	c.PeerQueueIterations = 0
@@ -212,9 +212,10 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 				<-validIterTimer.C
 
 				// reset values
-				// get the peer list from the peerstore
+
 				c.ErrorAttemptDistribution = errorAttemptCategories
 				errorAttemptCategories = ResetMapValues(errorAttemptCategories)
+				// get the peer list from the peerstore
 				err := c.PeerQueue.UpdatePeerListFromPeerStore(c.PeerStore)
 				c.PeerQueueIterations++ // another iteration
 				if err != nil {
@@ -236,10 +237,10 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 	}
 }
 
-// peerstoreIterator
-// * Private function that is in charge of iterating through the peerstore,
-// * receive connections/disconnectios, and fetch info comming from the peering service into the db
-// * Main interaction of the Peering Service with the DB
+// peerstoreIterator:
+// Private function that is in charge of iterating through the peerstore,
+// receive connections/disconnections, and fetch info comming from the peering service into the db.
+// Main interaction of the Peering Service with the DB.
 func (c *PruningStrategy) eventRecorderRoutine() {
 	slog.Debugf("Running the Event RecorderRoutine")
 	for {
@@ -248,13 +249,13 @@ func (c *PruningStrategy) eventRecorderRoutine() {
 		case connAttemtpStatus := <-c.connAttemptNot:
 			slog.Debugf("new connection attempt has been received from peer %s", connAttemtpStatus.Peer.PeerId)
 
-			if connAttemtpStatus.Successful { // in case of success we do not register in any prunned peer
-				// prunned per only receive psotivie events in the identify case down below
+			if connAttemtpStatus.Successful { // in case of success we do not register in any pruned peer
+				// pruned per only receives positive events in the identify case down below
 				slog.Debugf("adding success connection to peer %s", connAttemtpStatus.Peer.PeerId)
 				connAttemtpStatus.Peer.AddPositiveConnAttempt()
 
 			} else {
-				// negative event, register in prunned peer
+				// negative event, register in pruned peer
 				slog.Debugf("adding negative connection to peer %s", connAttemtpStatus.Peer.PeerId)
 				// Update Pruning Metadata
 				var p *PrunedPeer
@@ -268,7 +269,7 @@ func (c *PruningStrategy) eventRecorderRoutine() {
 			}
 			c.PeerStore.StoreOrUpdatePeer(connAttemtpStatus.Peer)
 
-		// Receive the notification of a that got disconnected from the crawler
+		// Receive a notification of a connection event
 		case connEvent := <-c.connEventNot:
 			switch connEvent.ConnType {
 			case int8(1):
@@ -284,11 +285,11 @@ func (c *PruningStrategy) eventRecorderRoutine() {
 
 		case identEvent := <-c.identEventNot:
 			// TODO: We received a new identification attempt
-			// stract whether it was success or a failure
-			// and track it in the PeerQuueue and un the peerstore
+			// extract whether it was success or a failure
+			// and track it in the PeerQueue and in the peerstore
 			slog.Debugf("new identification %s from peer %s", strconv.FormatBool(identEvent.Peer.IsConnected), identEvent.Peer.PeerId)
 
-			// by default ww think the identify was not successful, therefore negativewithhope and error
+			// by default we think the identify was not successful, therefore negativewithhope and error
 			delayType := NegativeWithHopeDelayType
 			errorType := "Error requesting metadata"
 			if identEvent.Peer.MetadataSucceed {
@@ -316,31 +317,35 @@ func (c *PruningStrategy) eventRecorderRoutine() {
 	}
 }
 
-// NextPeer
-// * Notifies the peerstore iterator that a new peer has been requested
-// * After it, the peerstore iteratow will put the new peer in the PeerStreamChan
+// NextPeer:
+// Notifies the peerstore iterator that a new peer has been requested.
+// After it, the peerstore iterator will put the new peer in the PeerStreamChan.
 func (c *PruningStrategy) NextPeer() {
 	slog.Debug("next peer has been requested")
 	c.nextPeerChan <- struct{}{}
 }
 
-// NewConnectionAttempt
-// * Notifies the peerstore iterator that a new ConnStatus has been received
-// * After it, the peerstore iteratow will aggregate the extra info
+// NewConnectionAttempt:
+// Notifies the peerstore iterator that a new ConnStatus has been received.
+// After it, the peerstore iterator will aggregate the extra info.
+// @param connAttStat: the object containing the data from the attempt
 func (c *PruningStrategy) NewConnectionAttempt(connAttStat ConnectionAttemptStatus) {
 	slog.Debug("new connection attempt has been received from peer", connAttStat.Peer.PeerId)
 	c.connAttemptNot <- connAttStat
 }
 
-// NewConnectionEvent
-// * Notifies the peerstore iterator that a new Connection has been received
-// * I puts the connection metadata in the connNot channel to let the select
-// * loop all the metadata of the received connection
+// NewConnectionEvent:
+// Notifies the peerstore iterator that a new Connection has been received.
+// It puts the connection metadata in the connNot channel to let the select
+// loop all the metadata of the received connection.
 func (c *PruningStrategy) NewConnectionEvent(connEvent hosts.ConnectionEvent) {
 	slog.Debug("next connection event has been received from peer", connEvent.Peer.PeerId)
 	c.connEventNot <- connEvent
 }
 
+// NewIdentificationEvent:
+// This method will insert a new identification item in the identificationeventnorifier channel.
+// @param newIdent: the object containing data about the event.
 func (c *PruningStrategy) NewIdentificationEvent(newIdent hosts.IdentificationEvent) {
 	slog.Debugf("new identification %s has been received from peer %s", strconv.FormatBool(newIdent.Peer.IsConnected), newIdent.Peer.PeerId)
 	c.identEventNot <- newIdent
@@ -350,7 +355,8 @@ func (c *PruningStrategy) NewIdentificationEvent(newIdent hosts.IdentificationEv
 // Metrics Exporting Functions for Peering Prometheus
 // --------------------------------------------------
 
-// Seconds
+// LastIterTime
+// @return the lastiteration time of the peerqueue
 func (c *PruningStrategy) LastIterTime() float64 {
 	return float64(c.lastIterTime.Microseconds()) / 1000000
 }
@@ -371,9 +377,9 @@ func (c *PruningStrategy) GetErrorAttemptDistribution() map[string]*int64 {
 	return c.ErrorAttemptDistribution
 }
 
-// ClosePeerStream
-// * Closes in a controled secuence the module related go routines and channels
-// * Ending with the Base.Ctx cancelation
+// ClosePeerStream:
+// Closes in a controled sequence the module related go routines and channels.
+// Ending with the Base.Ctx cancellation.
 func (c *PruningStrategy) Close() {
 	slog.Infof("closing pruning strategy")
 	// close the involved channels
@@ -384,12 +390,10 @@ func (c *PruningStrategy) Close() {
 	c.cancel()
 }
 
-// Extra Prunning methods
-
-// PeerQueue
-// * Auxiliar peer array and map list to keep the list of peers sorted
-// * by cooner connection time, and still able to modify in a short time
-// * the values of each peer
+// PeerQueue:
+// Auxiliar peer array and map list to keep the list of peers sorted
+// by connection time, and still able to modify in a short time
+// the values of each peer.
 type PeerQueue struct {
 	PeerList []*PrunedPeer
 	PeerMap  map[string]*PrunedPeer
@@ -397,14 +401,15 @@ type PeerQueue struct {
 	queueErroDistribution map[string]*int64
 }
 
-// Return the distribution of the dela
+// DelayDistribution:
+// @return the distribution of the delays in a map.
 func (c *PeerQueue) DelayDistribution() map[string]*int64 {
 	return c.queueErroDistribution
 }
 
-// NewPeerQueue
-// * Constructor of a NewPeerQueue
-// @return new PeerQueue
+// NewPeerQueue:
+// Constructor of a NewPeerQueue.
+// @return new PeerQueue.
 func NewPeerQueue() PeerQueue {
 	pq := PeerQueue{
 		PeerList:              make([]*PrunedPeer, 0),
@@ -414,37 +419,37 @@ func NewPeerQueue() PeerQueue {
 	return pq
 }
 
-// IsPeerAlready
-// * Check whether a peer is already in the Queue
-// @params peerID: string of the peerID that we want to find
-// @return true is peer is already, false if not
+// IsPeerAlready:
+// Check whether a peer is already in the Queue.
+// @params peerID: string of the peerID that we want to find.
+// @return true is peer is already, false if not.
 func (c *PeerQueue) IsPeerAlready(peerID string) bool {
 	_, ok := c.PeerMap[peerID]
 	return ok
 }
 
-// IsPeerAlready
-// * Check whether a peer is already in the Queue
-// @params peerID: string of the peerID that we want to find
-// @return true is peer is already, false if not
+// AddPeer
+// Add a peer to the peerqueue.
+// @params pPeer: the pruned peer to add
 func (c *PeerQueue) AddPeer(pPeer *PrunedPeer) {
-	// append new item at the begining of the array
+	// append new item at the beginning of the array
 	c.PeerList = append([]*PrunedPeer{pPeer}, c.PeerList...)
 	c.PeerMap[pPeer.PeerID] = pPeer
 }
 
-// GetPeer
-// * retrieves the info of the peer requested from args
-// @params peerID: string of the peerID that we want to find
-// @return pointer to prunned peer, bool, true if exists, false if doesn't
+// GetPeer:
+// Retrieves the info of the peer requested from args.
+// @params peerID: string of the peerID that we want to find.
+// @return pointer to pruned peer.
+// @return bool, true if exists, false if doesn't.
 func (c *PeerQueue) GetPeer(peerID string) (*PrunedPeer, bool) {
 	p, ok := c.PeerMap[peerID]
 	return p, ok
 }
 
-// SortPeerList
-// * Sort the PeerQueue array leaving at the begining the peers
-// * with the shorter next peer connection
+// SortPeerList:
+// Sort the PeerQueue array leaving at the beginning the peers
+// with the shorter next peer connection.
 func (c *PeerQueue) SortPeerList() {
 	sort.Sort(c)
 }
@@ -456,17 +461,20 @@ func (c *PeerQueue) Swap(i, j int) {
 	c.PeerList[i], c.PeerList[j] = c.PeerList[j], c.PeerList[i]
 }
 
-// Less is part of sort.Interface. We use c.PeerList.NextConnection as the value to sort by
+// Less is part of sort.Interface. We use c.PeerList.NextConnection as the value to sort by.
 func (c PeerQueue) Less(i, j int) bool {
 	return c.PeerList[i].NextConnection().Before(c.PeerList[j].NextConnection())
 }
 
-// Len is part of sort.Interface. We use the peer list to get the length of the array
+// Len is part of sort.Interface. We use the peer list to get the length of the array.
 func (c PeerQueue) Len() int {
 	return len(c.PeerList)
 }
 
-//
+// UpdatePeerListFromPeerStore
+// This method will refresh the peerqueue with the peerstore.
+// Basically we add those peers that did not exist before in the peerqueue.
+// @param peerstore: db where to read from.
 func (c *PeerQueue) UpdatePeerListFromPeerStore(peerstore *db.PeerStore) error {
 	// Get the list of peers from the peerstore
 	peerList := peerstore.GetPeerList()
@@ -571,7 +579,7 @@ func (c *PeerQueue) UpdatePeerListFromPeerStore(peerstore *db.PeerStore) error {
 type PrunedPeer struct {
 	PeerID                   string
 	DelayObj                 DelayObject // define the delay to connect based on error
-	BaseConnectionTimestamp  time.Time   // define the first event. To calculate the next connection we sum this with delay. It is only changed
+	BaseConnectionTimestamp  time.Time   // define the first event. To calculate the next connection we sum this with delay.
 	BaseDeprecationTimestamp time.Time   // this + DeprecationTime defines when we are ready to deprecate
 }
 
@@ -582,15 +590,14 @@ func NewPrunedPeer(peerID string, inputType string) *PrunedPeer {
 		DelayObj:                 ReturnAccordingDelayObject(inputType),
 		BaseConnectionTimestamp:  t,
 		BaseDeprecationTimestamp: t, // by default we set it now, so if no positive connection it will be deprecated in 24 hours since creation of this prunned peer
-		// it is not logical
 	}
 
 	return &pp
 }
 
-// IsReadyForConnection
-// * This method evaluates if the given peer is ready to be connected.
-// @return True of False if we are in position to connect or not
+// IsReadyForConnection:
+// This method evaluates if the given peer is ready to be connected.
+// @return True of False if we are in time to connect or not.
 func (c *PrunedPeer) IsReadyForConnection() bool {
 	now := time.Now()
 	// if we are not before the time, then we are either equal or after the connection time
@@ -606,9 +613,9 @@ func (c *PrunedPeer) NextConnection() time.Time {
 	return c.BaseConnectionTimestamp.Add(c.DelayObj.CalculateDelay())
 }
 
-// Deprecable
-// * This method evaluates if the peer is in time to be deprecated
-// @return true (in time to be deprecated) / false (not ready to be deprecated)
+// Deprecable:
+// This method evaluates if the peer is in time to be deprecated.
+// @return true (in time to be deprecated) / false (not ready to be deprecated).
 func (c *PrunedPeer) Deprecable() bool {
 	// if the difference between now and the LastIdentifyTime is more than the DeprecationTime, true
 
@@ -620,9 +627,9 @@ func (c *PrunedPeer) Deprecable() bool {
 	return time.Now().Sub(c.BaseConnectionTimestamp) >= DeprecationTime
 }
 
-// RecErrorHandler
-// * function that selects actuation method for each of the possible errors while actively dialing peers
-// @params peerID in string format, recorded error in string format
+// RecErrorHandler:
+// Function that selects actuation method for each of the possible errors while actively dialing peers.
+// @params peerID in string format, recorded error in string format.
 func (c *PrunedPeer) ConnEventHandler(recErr string) string {
 
 	c.UpdateDelay(ErrorToDelayType(recErr))
@@ -630,9 +637,9 @@ func (c *PrunedPeer) ConnEventHandler(recErr string) string {
 	return db_utils.FilterError(recErr)
 }
 
-// NewEvent
-// * This method will reevaluate the delay in case of a new
-// * Positive or NegativeDelay happenned
+// NewEvent:
+// This method will reevaluate the delay in case of a new
+// Positive or NegativeDelay happenned
 func (c *PrunedPeer) UpdateDelay(newDelayType string) {
 	// if the delaytype is different, always refresh the object
 
@@ -653,6 +660,10 @@ func (c *PrunedPeer) UpdateDelay(newDelayType string) {
 	}
 }
 
+// ErrorToDelayType:
+// Transforms an error into a DelayType.
+// @param errString: the string to analyze.
+// @return the categroy type in string format.
 func ErrorToDelayType(errString string) string {
 
 	prettyErr := db_utils.FilterError(errString)
@@ -670,6 +681,9 @@ func ErrorToDelayType(errString string) string {
 	}
 }
 
+// ResetMapValues
+// Iterates over a string int map and resets all values to 0.
+// @return the reset map
 func ResetMapValues(inputMap map[string]*int64) map[string]*int64 {
 	for k := range inputMap {
 		atomic.StoreInt64(inputMap[k], 0)
