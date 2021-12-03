@@ -26,12 +26,14 @@ func NewMemoryDB() MemoryDB {
 	return mdb
 }
 
-// Store keeps adds key and Peer values into a sync.Map in memory
+// Store keeps adds key and Peer values into a sync.Map in memory.
+// @param key: used as key in the map.
+// @param value: the object to store with the given key.
 func (p MemoryDB) Store(key string, value Peer) {
 	p.m.Store(key, value)
 }
 
-// Loads peer value of given key from sync.Map in memory
+// Loads peer value of given key from sync.Map in memory.
 func (p MemoryDB) Load(key string) (value Peer, ok bool) {
 	v, ok := p.m.Load(key)
 	if !ok {
@@ -41,12 +43,14 @@ func (p MemoryDB) Load(key string) (value Peer, ok bool) {
 	return
 }
 
-// Delete removes key and value from sync.Map
+// Delete removes key and value from sync.Map.
+// @param key: the string to locate the value to delete.
 func (p MemoryDB) Delete(key string) {
 	p.m.Delete(key)
 }
 
 // Range iterates through the key and values of the sync.Map
+// @param f: the function to apply to each item in the db
 func (p MemoryDB) Range(f func(key string, value Peer) bool) {
 	p.m.Range(func(key, value interface{}) bool {
 		ok := f(key.(string), value.(Peer))
@@ -64,9 +68,9 @@ func (p MemoryDB) Close() {
 }
 
 // Peers
-// * This method returns a string array with the list of PeerIDs
-// * existing in the DB.
-// * These would be the keys of each entry in the map
+// This method returns a string array with the list of PeerIDs
+// existing in the DB.
+// These would be the keys of each entry in the map
 // @return the string array containisssng the PeerIDs
 func (p MemoryDB) Peers() []peer.ID {
 	result := make([]peer.ID, 0)

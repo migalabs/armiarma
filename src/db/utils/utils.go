@@ -13,7 +13,7 @@ var (
 	)
 )
 
-// Gets the client and version for a given userAgent
+// Gets the client and version for a given userAgent.
 // TODO: Perhaps use some regex
 func FilterClientType(userAgent string) (string, string) {
 	// Examples:
@@ -63,8 +63,8 @@ func cleanVersion(version string) string {
 	return cleaned
 }
 
-// funtion that formats the error into a Pretty understandable (standard) way
-// also important to cohesionate the extra-metrics output csv
+// Funtion that formats the error into a Pretty understandable (standard) way.
+// Also important to cohesionate the extra-metrics output csv.
 func FilterError(err string) string {
 	err = strings.ToLower(err)
 	errorPretty := "Uncertain"

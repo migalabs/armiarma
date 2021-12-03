@@ -48,8 +48,12 @@ type BasicLibp2pHost struct {
 	peerID              peer.ID
 }
 
-// Generate a new Libp2p host from the given context and Options
-// TODO: missing argument for app info (givin Privkeys, IPs, ports, userAgents)
+// NewBasicLibp2pHost:
+// Generate a new Libp2p host from the given context and Options.
+// @param ctx: the parent context
+// @param infoObj: the info object containig our source of information (user parameters).
+// @param ipLocator: object to get ip information.
+// @param ps: peerstore where to store information.
 func NewBasicLibp2pHost(ctx context.Context, infoObj info.InfoData, ipLocator *apis.PeerLocalizer, ps *db.PeerStore) (*BasicLibp2pHost, error) {
 	mainCtx, cancel := context.WithCancel(ctx)
 
@@ -111,13 +115,13 @@ func NewBasicLibp2pHost(ctx context.Context, infoObj info.InfoData, ipLocator *a
 	return basicHost, nil
 }
 
-// return the libp2p host from the host Module
 func (b *BasicLibp2pHost) Host() host.Host {
 	return b.host
 }
 
-// start the libp2pHost module (perhaps NOT NECESARY)
-// So far, start listening on the fullMultiAddrs
+// Start:
+// Start the libp2pHost module (perhaps NOT NECESSARY).
+// So far, start listening on the fullMultiAddrs.
 func (b *BasicLibp2pHost) Start() {
 	err := b.host.Network().Listen()
 	if err != nil {
@@ -127,17 +131,18 @@ func (b *BasicLibp2pHost) Start() {
 	}
 }
 
-// cancel the context of the libp2pHost module
 func (b *BasicLibp2pHost) Stop() {
 	Log.Info("stopping Libp2p host")
 	b.cancel()
 }
 
-// Ctx returns the main Ctx of the service
 func (b *BasicLibp2pHost) Ctx() context.Context {
 	return b.ctx
 }
 
+// RecConnEvent
+// Record Connection Event
+// @param connEvent: the event to insert in the notification channel
 func (b *BasicLibp2pHost) RecConnEvent(connEvent ConnectionEvent) {
 	b.connEventNotChannel <- connEvent
 }
@@ -146,6 +151,9 @@ func (b *BasicLibp2pHost) ConnEventNotChannel() chan ConnectionEvent {
 	return b.connEventNotChannel
 }
 
+// RecIdentEvent
+// Record Identification Event
+// @param identEvent: the event to insert in the notification channel
 func (b *BasicLibp2pHost) RecIdentEvent(identEvent IdentificationEvent) {
 	b.identNotChannel <- identEvent
 }

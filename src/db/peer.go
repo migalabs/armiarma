@@ -44,23 +44,23 @@ type Peer struct {
 	ProtocolVersion string
 
 	// PeerMetrics
-	ConnectedDirection    []string  // the directions of each connection event
-	IsConnected           bool      // If the peer is connected (CheckIfRealConnect)
-	Attempted             bool      // If the peer has been attempted to stablish a connection
-	Succeed               bool      // If the connection attempt (outbound) has been successful
-	Attempts              uint64    // Number of attempts done
-	Error                 []string  // List of errors (also adding "None" errors), aligned with connection events
-	LastErrorTimestamp    time.Time // Timestamp of the last error reported for this peer
-	Deprecated            bool      // Flag to rummarize whether the peer is longer valid for statistics or not. If false, the peer is not exported CSV / metrics.
-	LastIdentifyTimestamp time.Time // timestamp of the last time the peer was identified (get user agent...)
+	ConnectedDirection    []string  // The directions of each connection event.
+	IsConnected           bool      // If the peer is connected (CheckIfRealConnect).
+	Attempted             bool      // If the peer has been attempted to stablish a connection.
+	Succeed               bool      // If the connection attempt (outbound) has been successful.
+	Attempts              uint64    // Number of attempts done.
+	Error                 []string  // List of errors (also adding "None" errors), aligned with connection events.
+	LastErrorTimestamp    time.Time // Timestamp of the last error reported for this peer.
+	Deprecated            bool      // Flag to rummarize whether the peer is still valid for statistics or not. If true, the peer is not exported CSV / metrics.
+	LastIdentifyTimestamp time.Time // Timestamp of the last time the peer was identified (get user agent...).
 
-	NegativeConnAttempts []time.Time // List of dates when the peer retreived a negative connection attempt (outbound) (if there is a possitive one, clean the struct)
-	ConnectionTimes      []time.Time // List of registered connections events
-	DisconnectionTimes   []time.Time // List of Disconnection Events
-	MetadataRequest      bool        // If the peer has been attempted to request its metadata
-	MetadataSucceed      bool        // If the peer has been successfully requested its metadata
+	NegativeConnAttempts []time.Time // List of dates when the peer retrieved a negative connection attempt (outbound) (if there is a possitive one, clean the array).
+	ConnectionTimes      []time.Time // List of registered connections events.
+	DisconnectionTimes   []time.Time // List of Disconnection Events.
+	MetadataRequest      bool        // If the peer has been attempted to request its metadata.
+	MetadataSucceed      bool        // If the peer has been successfully requested its metadata.
 
-	LastExport int64 //(timestamp in seconds of the last exported time (backup for when we are loading the Peer)
+	LastExport int64 // Timestamp in seconds of the last exported time (backup for when we are loading the Peer).
 
 	// Beacon
 	BeaconStatus   BeaconStatusStamped
@@ -71,10 +71,7 @@ type Peer struct {
 	MessageMetrics map[string]MessageMetric
 }
 
-// **********************************************************
-// *						PEER_BASICS						*
-//***********************************************************
-
+// Default constructor
 func NewPeer(peerId string) Peer {
 	pm := Peer{
 		PeerId:               peerId,
@@ -90,11 +87,11 @@ func NewPeer(peerId string) Peer {
 	return pm
 }
 
-// FetchPeerInfoFromPeer
-// * This method will read information from a new peer,
-// * and update the self (pm) peer with the new peer's attributes.
-// * Keep in mind that only fields which are not empty in the new peer
-// * will be overwriten in the old peer.
+// FetchPeerInfoFromPeer:
+// This method will read information from a new peer,
+// and update the self (pm) peer with the new peer's attributes.
+// Keep in mind that only fields which are not empty in the new peer
+// will be overwriten in the old peer.
 // @param newPeer: the peer from where to get new information and update
 // the old one.
 func (pm *Peer) FetchPeerInfoFromNewPeer(newPeer Peer) {
@@ -105,10 +102,10 @@ func (pm *Peer) FetchPeerInfoFromNewPeer(newPeer Peer) {
 
 }
 
-// FetchBasicHostInfoFromNewPeer
-// * This method will read basic host info from the new peer and import it
-// * into our peer (pm)
-// @param newPeer: the peer where to extract new information
+// FetchBasicHostInfoFromNewPeer:
+// This method will read basic host info from the new peer and import it
+// into our peer (pm).
+// @param newPeer: the peer where to extract new information.
 func (pm *Peer) FetchBasicHostInfoFromNewPeer(newPeer Peer) {
 
 	// Somehow weird to update the peerID, since it is going to be the same one
@@ -138,10 +135,10 @@ func (pm *Peer) FetchBasicHostInfoFromNewPeer(newPeer Peer) {
 
 }
 
-// FetchConnectionsFromNewPeer
-// * This method will read connections from the new peer and import it
-// * into our peer (pm)
-// @param newPeer: the peer where to extract new information
+// FetchConnectionsFromNewPeer:
+// This method will read connections from the new peer and import it
+// into our peer (pm).
+// @param newPeer: the peer where to extract new information.
 func (pm *Peer) FetchConnectionsFromNewPeer(newPeer Peer) {
 
 	// only change these when old one was false, otherwise, leave as t is
@@ -219,10 +216,10 @@ func (pm *Peer) FetchConnectionsFromNewPeer(newPeer Peer) {
 
 }
 
-// FetchChainNodeFromNewPeer
-// * This method will read chain node information from the new peer and import it
-// * into our peer (pm)
-// @param newPeer: the peer where to extract new information
+// FetchChainNodeFromNewPeer:
+// This method will read chain node information from the new peer and import it
+// into our peer (pm).
+// @param newPeer: the peer where to extract new information.
 
 func (pm *Peer) FetchChainNodeFromNewPeer(newPeer Peer) {
 	pm.NodeId = getNonEmpty(pm.NodeId, newPeer.NodeId)
@@ -236,10 +233,10 @@ func (pm *Peer) FetchChainNodeFromNewPeer(newPeer Peer) {
 	}
 }
 
-// **********************************************************
-// *						PEER_ETH2_NODE					*
-//***********************************************************
-
+// GetBlockchainNode:
+// Parses and returns the stored BlockchainNode. It uses the stored ENR to get the data.
+// @return Node: the resulting node of parsing the ENR.
+// @return any error if it was the case.
 func (pm *Peer) GetBlockchainNode() (*enode.Node, error) {
 	if pm.BlockchainNodeENR == "" {
 		return nil, fmt.Errorf("unable to get ENODE for peer, no ENR was recorded")
@@ -251,13 +248,8 @@ func (pm *Peer) GetBlockchainNode() (*enode.Node, error) {
 	return pointer, nil
 }
 
-// **********************************************************
-// *						PEER_NETWORK					*
-//***********************************************************
-
-// AddAddr
-// * This method adds a new multiaddress in string format to the
-// * Addrs array.
+// AddAddr:
+// This method adds a new multiaddress in string format to the MAddrs array.
 // @return Any error. Otherwise nil.
 func (pm *Peer) AddMAddr(input_addr string) error {
 	new_ma, err := ma.NewMultiaddr(input_addr) // parse and format
@@ -269,10 +261,10 @@ func (pm *Peer) AddMAddr(input_addr string) error {
 	return nil
 }
 
-// ExtractPublicMAddr
-// * This method loops over all multiaddress and extract the one that has
-// * a public IP. There must be only one.
-// @return the found multiaddress, nil if error
+// ExtractPublicMAddr:
+// This method loops over all multiaddress and extract the first one that has
+// a public IP.
+// @return the found multiaddress, nil if error.
 func (pm *Peer) ExtractPublicAddr() ma.Multiaddr {
 
 	// loop over all multiaddresses in the array
@@ -289,24 +281,22 @@ func (pm *Peer) ExtractPublicAddr() ma.Multiaddr {
 
 }
 
-// **********************************************************
-// *						PEER_METRICS					*
-//***********************************************************
-
+// ResetDynamicMetrics:
+// It will reset the metrics by reinstancing the map.
 func (pm *Peer) ResetDynamicMetrics() {
 	pm.MessageMetrics = make(map[string]MessageMetric)
 }
 
-// IsDeprecated
-// This method return the deprecated attirbute of the peer
-// @return true or false
+// IsDeprecated:
+// This method return the deprecated attirbute of the peer.
+// @return true or false.
 func (pm Peer) IsDeprecated() bool {
 	return pm.Deprecated
 }
 
-// LastNegAttempt
-// * This method will calculate the last negative attempt time
-// @return the time of the last negative connection attempt with this peer and and error if applicable
+// LastNegAttempt:
+// This method will calculate the last negative attempt time.
+// @return the time of the last negative connection attempt with this peer and and error if applicable.
 func (pm Peer) LastNegAttempt() (t time.Time, err error) {
 	if len(pm.NegativeConnAttempts) == 0 {
 		err = errors.New("no negative connections for the peer")
@@ -317,9 +307,9 @@ func (pm Peer) LastNegAttempt() (t time.Time, err error) {
 	return
 }
 
-// FirstNegAttempt
-// * This method will calculate the last negative attempt time
-// @return the time of the first negative connection attempt with this peer and and error if applicable
+// FirstNegAttempt:
+// This method will calculate the last negative attempt time.
+// @return the time of the first negative connection attempt with this peer and and error if applicable.
 func (pm Peer) FirstNegAttempt() (t time.Time, err error) {
 	if len(pm.NegativeConnAttempts) == 0 {
 		err = errors.New("no negative connections for the peer")
@@ -330,10 +320,10 @@ func (pm Peer) FirstNegAttempt() (t time.Time, err error) {
 	return
 }
 
-// AddNegConnAtt
-// * This method will register a new negative connection attempt in the peer (outbound)
-// @param deprecated: in case we want to activate the deprecation flag
-// @param err: error string to add to the peer error list
+// AddNegConnAtt:
+// This method will register a new negative connection attempt in the peer (outbound).
+// @param deprecated: in case we want to activate the deprecation flag.
+// @param err: error string to add to the peer error list.
 func (pm *Peer) AddNegConnAtt(deprecated bool, err string) {
 
 	t := time.Now()
@@ -349,8 +339,8 @@ func (pm *Peer) AddNegConnAtt(deprecated bool, err string) {
 
 // TODO: these two methods could possibly be merged with parameters
 
-// AddPositiveConnAttempt
-// * This method will register a new positive connection attempt in the peer (outbound)
+// AddPositiveConnAttempt:
+// This method will register a new positive connection attempt in the peer (outbound).
 func (pm *Peer) AddPositiveConnAttempt() {
 	// as we have a positive attempt, flush the negative attempts
 	pm.NegativeConnAttempts = make([]time.Time, 0)
@@ -362,8 +352,10 @@ func (pm *Peer) AddPositiveConnAttempt() {
 
 }
 
-// ConnectionEvent
-// * Register when a new connection was detected and the direction
+// ConnectionEvent:
+// Register when a new connection was detected and the direction.
+// @param direction: whether inbound or outbound.
+// @param time: when the event happenned.
 func (pm *Peer) ConnectionEvent(direction string, time time.Time) {
 	pm.ConnectionTimes = append(pm.ConnectionTimes, time)
 	pm.ConnectedDirection = append(pm.ConnectedDirection, direction)
@@ -371,17 +363,18 @@ func (pm *Peer) ConnectionEvent(direction string, time time.Time) {
 	pm.IsConnected = pm.CheckIfPeerRealConnect()
 }
 
-// DisconnectionEvent
-// * Register when a new disconnection was detected
+// DisconnectionEvent:
+// Register when a new disconnection was detected.
+// @param time: when the event happenned.
 func (pm *Peer) DisconnectionEvent(time time.Time) {
 	pm.DisconnectionTimes = append(pm.DisconnectionTimes, time)
 	// update isconnected flag based on the last connection / disconnection
 	pm.IsConnected = pm.CheckIfPeerRealConnect()
 }
 
-// CheckIfPeerRealConnect
-// * This method will return whether the peer is currently connected or not.
-// * @return true if connected, false if not.
+// CheckIfPeerRealConnect:
+// This method will return whether the peer is currently connected or not.
+// @return true if connected, false if not.
 func (pm *Peer) CheckIfPeerRealConnect() bool {
 	if len(pm.ConnectionTimes) == 0 {
 		return false
@@ -397,9 +390,9 @@ func (pm *Peer) CheckIfPeerRealConnect() bool {
 	return lastDisconn.Before(lastConn)
 }
 
-// GetLastActivityTime
-// * Calculates the last activity recorded for the peer
-// @return last activity recorded for the peer
+// GetLastActivityTime:
+// Calculates the last activity recorded for the peer.
+// @return last activity recorded for the peer.
 func (pm Peer) GetLastActivityTime() time.Time {
 	// check len before
 	last_negative_activity := time.Time{}
@@ -422,9 +415,9 @@ func (pm Peer) GetLastActivityTime() time.Time {
 
 }
 
-// GetLastErrors
-// * Returns the error in last position. The array also contains the same error if it was repeated consecutively
-// @return and array with the same error
+// GetLastErrors:
+// Returns the error in last position. The array also contains the same error if it was repeated consecutively.
+// @return and array with the same error.
 func (pm *Peer) GetLastErrors() []string {
 	errorList := make([]string, 0)
 	lastError := ""
@@ -445,13 +438,13 @@ func (pm *Peer) GetLastErrors() []string {
 
 }
 
-// GetConnectedTime
-// * This method will calculate the total connected time
-// * based on con/disc timestamps. This means the total time that
-// * the peer has been connected.
-// * Shifted some calculus to nanoseconds, Millisecons were
-// * leaving fields empty when exporting (less that 3 decimals)
-// @return the resulting time in float64 format
+// GetConnectedTime:
+// This method will calculate the total connected time
+// based on con/disc timestamps. This means the total time that
+// the peer has been connected.
+// Shifted some calculus to nanoseconds. Millisecons were
+// leaving fields empty when exporting (less that 3 decimals).
+// @return the resulting time in float64 format.
 func (pm *Peer) GetConnectedTime() float64 {
 	var totalConnectedTime int64
 	for _, conTime := range pm.ConnectionTimes {
@@ -468,16 +461,17 @@ func (pm *Peer) GetConnectedTime() float64 {
 	return float64(totalConnectedTime) / 60000000000
 }
 
-// MetadataEvent
-// * Add a Metadata Event to the given peer (successful or not)
-// @param success: whether successful or not.
+// MetadataEvent:
+// Add a Metadata Event to the given peer (successful or not).
+// @param success: whether successful (to identify the peer) or not.
 func (pm *Peer) MetadataEvent(success bool) {
 	pm.MetadataRequest = true
 	pm.MetadataSucceed = success
 }
 
-// UpdateBeaconMetadata
-// * Update beacon Metadata of the peer
+// UpdateBeaconMetadata:
+// Update beacon Metadata of the peer.
+// @param bMetadata: the Metadata object used to update the data
 func (pm *Peer) UpdateBeaconMetadata(bMetadata common.MetaData) {
 	pm.BeaconMetadata = BeaconMetadataStamped{
 		Timestamp: time.Now(),
@@ -485,7 +479,9 @@ func (pm *Peer) UpdateBeaconMetadata(bMetadata common.MetaData) {
 	}
 }
 
-// Update beacon Status of the peer
+// UpdateBeaconStatus:
+// Update beacon Status of the peer.
+// @param bStatus: the Status object used to update the data
 func (pm *Peer) UpdateBeaconStatus(bStatus common.Status) {
 	pm.BeaconStatus = BeaconStatusStamped{
 		Timestamp: time.Now(),
@@ -493,28 +489,17 @@ func (pm *Peer) UpdateBeaconStatus(bStatus common.Status) {
 	}
 }
 
-// **********************************************************
-// *						BEACON							*
-//***********************************************************
 // Basic BeaconMetadata struct that includes the timestamp of the received beacon metadata
-// TODO: comment
 type BeaconMetadataStamped struct {
 	Timestamp time.Time
 	Metadata  common.MetaData
 }
 
-// BEACON STATUS
-
 //  Basic BeaconMetadata struct that includes The timestamp of the received beacon Status
-// TODO: comment
 type BeaconStatusStamped struct {
 	Timestamp time.Time
 	Status    common.Status
 }
-
-// **********************************************************
-// *						MESSAGE							*
-//***********************************************************
 
 // Information regarding the messages received on a given topic
 type MessageMetric struct {
@@ -523,8 +508,11 @@ type MessageMetric struct {
 	LastMessageTime  time.Time
 }
 
-// Count the messages we get per topis and its first/last timestamps
-// TODO: comment
+// MessageEvent:
+// Add one to the message count for the given topic.
+// Also update the LastMessageTime.
+// @param topicName: the topic to add a message on.
+// @param time: when it was received.
 func (pm *Peer) MessageEvent(topicName string, time time.Time) {
 	m, ok := pm.MessageMetrics[topicName]
 	if !ok {
@@ -537,9 +525,11 @@ func (pm *Peer) MessageEvent(topicName string, time time.Time) {
 	pm.MessageMetrics[topicName] = m
 }
 
+// GetNumOfMsgFromTopic:
 // Get the number of messages that we got for a given topic. Note that
 // the topic name is the shortened name i.e. BeaconBlock
-// TODO: comment
+// @param shortTopic: the topic to get count from.
+// @return a uint64 with the total count.
 func (pm *Peer) GetNumOfMsgFromTopic(shortTopic string) uint64 {
 	msgMetric, ok := pm.MessageMetrics[bc_topics.GenerateEth2Topics(bc_topics.MainnetKey, shortTopic)]
 	if ok {
@@ -548,9 +538,9 @@ func (pm *Peer) GetNumOfMsgFromTopic(shortTopic string) uint64 {
 	return uint64(0)
 }
 
-// Get total of message rx from that peer
-// GetAllMessagesCount
-// TODO: comment
+// GetAllMessagesCount:
+// Get total of messages received from that peer.
+// @return a unit64 with the count.
 func (pm *Peer) GetAllMessagesCount() uint64 {
 	totalMessages := uint64(0)
 	for _, messageMetric := range pm.MessageMetrics {
@@ -559,15 +549,11 @@ func (pm *Peer) GetAllMessagesCount() uint64 {
 	return totalMessages
 }
 
-// **********************************************************
-// *						UTILS							*
-//***********************************************************
-
-// getNonEmpty
-// * This method will compare two strings and return one of them
-// @param old: the old string
-// @param new: the new string
-// @return the new string in case not empty, the old one in any other case
+// getNonEmpty:
+// This method will compare two strings and return one of them.
+// @param old: the old string.
+// @param new: the new string.
+// @return the new string in case not empty, the old one in any other case.
 func getNonEmpty(old string, new string) string {
 	if new != "" {
 		return new
@@ -575,11 +561,11 @@ func getNonEmpty(old string, new string) string {
 	return old
 }
 
-// getNonEmptyMAddrArray
-// * This method will compare two multiaddresses arrays and return one of them
-// @param old: the old (already in db) multiaddress array
-// @param new: the new (just found) multiadddress array
-// @return the new ma array in case not empty, the old one in any other case
+// getNonEmptyMAddrArray:
+// This method will compare two multiaddresses arrays and return one of them.
+// @param old: the old (already in db) multiaddress array.
+// @param new: the new (just found) multiadddress array.
+// @return the new ma array in case not empty, the old one in any other case.
 func getNonEmptyMAddrArray(old []ma.Multiaddr, new []ma.Multiaddr) []ma.Multiaddr {
 	if len(new) != 0 {
 		return new
@@ -587,10 +573,10 @@ func getNonEmptyMAddrArray(old []ma.Multiaddr, new []ma.Multiaddr) []ma.Multiadd
 	return old
 }
 
-// ToCsvLine
-// * This method will export all peer attributes into a single string
-// * in CSV format
-// @return the resulting string
+// ToCsvLine:
+// This method will export all peer attributes into a single string
+// in CSV format.
+// @return the resulting string.
 func (pm *Peer) ToCsvLine() string {
 	// register if the peer was conected
 	connStablished := "false"
@@ -641,9 +627,6 @@ func (pm *Peer) ToCsvLine() string {
 		strconv.FormatBool(pm.Attempted) + "," +
 		strconv.FormatBool(pm.Succeed) + "," +
 		strconv.FormatBool(pm.Deprecated) + "," +
-		// right now we would just write TRUE if the peer was connected when exporting the metrics
-		// However, we want to know if the peer established a connection with us
-		// Measure it, as we said from the length of the connection times
 		connStablished + "," +
 		strconv.FormatBool(pm.IsConnected) + "," +
 		strconv.FormatUint(pm.Attempts, 10) + "," +
@@ -666,8 +649,8 @@ func (pm *Peer) ToCsvLine() string {
 	return csvRow
 }
 
-// LogPeer
-// TODO: comment
+// LogPeer:
+// Log peer information
 func (pm *Peer) LogPeer() {
 	Log.WithFields(logrus.Fields{
 		"PeerId":        pm.PeerId,
@@ -685,9 +668,9 @@ func (pm *Peer) LogPeer() {
 	}).Info("Peer Info")
 }
 
-// PeerUnMarshal
-// * This method will create a Peer object reading a map of string -> interface
-// @return the resulting Peer
+// PeerUnMarshal:
+// This method will create a Peer object reading a map of (string -> interface).
+// @return the resulting Peer.
 func PeerUnMarshal(m map[string]interface{}) Peer {
 
 	// for some fields we need to perform a check and parsing
@@ -801,6 +784,10 @@ func PeerUnMarshal(m map[string]interface{}) Peer {
 	}
 }
 
+// ParseInterfaceMapMessageMetrics:
+// Parse the inputMap into the MessageMetric format
+// @param inputMap: a map of string interface
+// @return a map of string MessageMetric
 func ParseInterfaceMapMessageMetrics(inputMap map[string]interface{}) (map[string]MessageMetric, error) {
 	result := make(map[string]MessageMetric)
 	// we will range over a slice of interfaces
@@ -825,6 +812,10 @@ func ParseInterfaceMapMessageMetrics(inputMap map[string]interface{}) (map[strin
 
 }
 
+// ParseBeaconStatusFromInterface:
+// Parse the inputMap into the BeaconStatusStamped format
+// @param inputMap: a map of string interface
+// @return a map of string BeaconStatusStamped
 func ParseBeaconStatusFromInterface(input interface{}) (BeaconStatusStamped, error) {
 	var result BeaconStatusStamped
 	var err error

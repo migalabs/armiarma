@@ -12,10 +12,10 @@ import (
 )
 
 // TopicSubscription
-// * Sumarizes the control fields necesary to manage and
-// * govern over a joined and subscribed topic like
-// * message logging or record
-// * Serves as a server for a singe topic subscription
+// Sumarizes the control fields necesary to manage and
+// govern over a joined and subscribed topic like
+// message logging or record.
+// Serves as a server for a singe topic subscription.
 type TopicSubscription struct {
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -27,15 +27,15 @@ type TopicSubscription struct {
 	MessageMetrics *MessageMetrics
 }
 
-// NewTopicSubscription
-// * Sumarizes the control fields necesary to manage and
-// * govern over a joined and subscribed topic like
-// * @param ctx: parent context of the topic subscription, generaly gossipsub context
-// * @param topic: the libp2p.PubSub topic of the joined topic
-// * @param sub: the libp2p.PubSub subscription of the subscribed topic
-// * @param msgMetrics: underlaying message metrics regarding each of the joined topics
-// * @param stdOpts: list of options to generate the base of the topic subscription service
-// * @return: pointer to TopicSubscription
+// NewTopicSubscription:
+// Sumarizes the control fields necesary to manage and
+// govern over a joined and subscribed topic.
+// @param ctx: parent context of the topic subscription, generally gossipsub context.
+// @param topic: the libp2p.PubSub topic of the joined topic.
+// @param sub: the libp2p.PubSub subscription of the subscribed topic.
+// @param msgMetrics: underlaying message metrics regarding each of the joined topics.
+// @param stdOpts: list of options to generate the base of the topic subscription service.
+// @return: pointer to TopicSubscription.
 func NewTopicSubscription(ctx context.Context, topic *pubsub.Topic, sub pubsub.Subscription, msgMetrics *MessageMetrics) *TopicSubscription {
 	mainCtx, cancel := context.WithCancel(ctx)
 
@@ -49,11 +49,11 @@ func NewTopicSubscription(ctx context.Context, topic *pubsub.Topic, sub pubsub.S
 	}
 }
 
-// MessageReadingLoop
-// * pulls messages from the pubsub topic and pushes them onto the Messages channel
-// * and the underlaying msg metrics
-// * @param h: libp2p host
-// * @param peerstore: peerstore of the crawler app
+// MessageReadingLoop:
+// Pulls messages from the pubsub topic and pushes them onto the Messages channel
+// and the underlaying msg metrics.
+// @param h: libp2p host.
+// @param peerstore: peerstore of the crawler app.
 func (c *TopicSubscription) MessageReadingLoop(h host.Host, peerstore *db.PeerStore) {
 	Log.Infof("topic subscription %s reading loop", c.Sub.Topic())
 	subsCtx := c.ctx
@@ -80,26 +80,9 @@ func (c *TopicSubscription) MessageReadingLoop(h host.Host, peerstore *db.PeerSt
 				newPeer := db.NewPeer(msg.ReceivedFrom.String())
 				newPeer.MessageEvent(c.Sub.Topic(), time.Now())
 				peerstore.StoreOrUpdatePeer(newPeer)
-				// peerstore.MessageEvent(msg.ReceivedFrom.String(), c.Sub.Topic())
-				// Add notification on the notification channel
-
-				// Commented because no other routine reads from the msg channel
-				//c.Messages <- msgData
-
 				// Add message to msg metrics counter
 				_ = c.MessageMetrics.AddMessgeToTopic(c.Sub.Topic())
 
-				// Deserialize the message depending on the topic name
-				// generate a new ReceivedMessage on the Temp Database
-				// check if the topic has a db asiciated
-				/*
-					if peerstore.MessageDatabase != nil {
-						err = AddMsgToMsgDB(peerstore.MessageDatabase, msgData, msg.ReceivedFrom, msg.ArrivalTime, msg.MessageID, topicName)
-						if err != nil {
-							c.Log.WithError(err).WithField("topic", topicName).Error("Error saving message on temp database")
-						}
-					}
-				*/
 				Log.Debugf("msg content %s", msgData)
 			} else {
 				Log.Debugf("message sent by ourselfs received on %s", c.Sub.Topic())

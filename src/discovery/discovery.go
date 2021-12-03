@@ -64,10 +64,9 @@ func NewEmptyDiscovery() *Discovery {
 }
 
 // NewDiscovery
-// * This method will create a Discovery object usign the given data
-// @param input_opts the logging options object
-// @return the modified logging options object
-
+// This method will create a Discovery object using the given data
+// @param input_opts the logging options object.
+// @return the modified logging options object.
 func NewDiscovery(ctx context.Context, input_node *enode.LocalNode, db *db.PeerStore, ipLoc *apis.PeerLocalizer, info_obj *info.InfoData, input_port int) *Discovery {
 	mainCtx, cancel := context.WithCancel(ctx)
 	// return the Discovery object
@@ -83,14 +82,13 @@ func NewDiscovery(ctx context.Context, input_node *enode.LocalNode, db *db.PeerS
 	}
 }
 
-// Start_dv5
-// * This method will initiate the discovery listener to receive new
-// * peers connections. This will allow other peers to discover us.
+// Start
+// This method will initiate the discovery listener to receive new
+// peers connections. This will allow other peers to discover us.
 func (d *Discovery) Start() {
 
 	// udp address to listen
 	udpAddr := &net.UDPAddr{
-		//IP:   net.ParseIP(d.GetInfoObj().GetIPToString()),
 		IP:   net.IPv4zero,
 		Port: int(d.GetListenPort()),
 	}
@@ -105,7 +103,6 @@ func (d *Discovery) Start() {
 	gethLogger := geth_log.New()
 	gethLogger.SetHandler(geth_log.FuncHandler(func(r *geth_log.Record) error {
 
-		// d.b.Log.Debugf("%+v\n", r)
 		return nil
 	}))
 
@@ -130,10 +127,10 @@ func (d *Discovery) Start() {
 	}
 }
 
-// FindRandomNodes
-// * This method will initiate the randomNodes method, which
-// * will create an iterator over randomly generated peers.
-// * For each peer, we will try to connect to it.
+// FindRandomNodes:
+// This method will initiate the randomNodes method, which
+// will create an iterator over randomly generated peers.
+// For each peer, we will try to connect to it.
 func (d *Discovery) FindRandomNodes() {
 	Log.Info("running random findnodes")
 	go func() {
@@ -146,7 +143,7 @@ func (d *Discovery) FindRandomNodes() {
 			Log.Debugf("new random node: %s\n", node.ID().String())
 			err := d.HandleENR(node)
 			if err != nil {
-				// fo far printing a simple warp of the function and the received err
+				// fo far printing a simple wrap of the function and the received err
 				// with the id of the enode
 				Log.Debugf("unable to handle ENR from node %s, error: %s\n", node.ID().String(), err)
 			}
@@ -166,14 +163,14 @@ func (d *Discovery) CloseFindingNodes() {
 }
 
 // HandleENR
-// *
-// @param res represents the enode of the newly discovered peer
+// Retrieve information from the ENR
+// @param node: represents the enode of the newly discovered peer
 func (d *Discovery) HandleENR(node *eth_enode.Node) error {
 	eth2Dat, ok, err := all_utils.ParseNodeEth2Data(*node)
 	if err != nil {
 		return fmt.Errorf("enr parse error: %v", err)
 	}
-	// check if the peerexists
+	// check if the peer exists
 	if !ok {
 		return fmt.Errorf("peer doesn't exist")
 	}
@@ -201,12 +198,7 @@ func (d *Discovery) HandleENR(node *eth_enode.Node) error {
 	if err != nil {
 		return fmt.Errorf("error composing the maddrs from peer %s", err)
 	}
-	/* Unncesary here, peer.AddrInfo is only needed when connecting the peer
-	newAddrInfo, err := lib_peer.AddrInfoFromP2pAddr(multiAddr)
-	if err != nil {
-		return fmt.Errorf(err)
-	}
-	*/
+
 	// generate array of MAddr to fit the db.Peer struct
 	mAddrs := make([]ma.Multiaddr, 0)
 	mAddrs = append(mAddrs, multiAddr)
@@ -232,10 +224,10 @@ func (d *Discovery) HandleENR(node *eth_enode.Node) error {
 }
 
 // ImportBootNodeList
-// * This method will read the bootnodes list in string format and create an
-// * enode array with the parsed ENRs of the bootnodes
+// This method will read the bootnodes list in string format and create an
+// enode array with the parsed ENRs of the bootnodes.
 // @param import_json_file represents the file where to read the bootnodes from.
-// this file is configured in the config file
+// This file is configured in the config file.
 func (d *Discovery) ImportBootNodeList(import_json_file string) {
 
 	// where we will store the result
@@ -264,7 +256,6 @@ func (d *Discovery) ImportBootNodeList(import_json_file string) {
 	for _, element := range bootNodeListString.BootNodes {
 		bootNodeList = append(bootNodeList, eth_enode.MustParse(element))
 	}
-	//bootNodeList = append(bootNodeList, eth_enode.MustParse("enr:-Ku4QImhMc1z8yCiNJ1TyUxdcfNucje3BGwEHzodEZUan8PherEo4sF7pPHPSIB1NNuSg5fZy7qFsjmUKs2ea1Whi0EBh2F0dG5ldHOIAAAAAAAAAACEZXRoMpD1pf1CAAAAAP__________gmlkgnY0gmlwhBLf22SJc2VjcDI1NmsxoQOVphkDqal4QzPMksc5wnpuC3gvSC8AfbFOnZY_On34wIN1ZHCCIyg"))
 	d.SetBootNodeList(bootNodeList)
 	Log.Infof("running peer discovery with %d bootdode/s", len(d.GetBootNodeList()))
 

@@ -93,20 +93,16 @@ func (ps *PeerStore) ServePrometheusMetrics() {
 				// Country distribution
 				geoDist.SetValues(GeoDistribution)
 				// IP distribution
-				// count how many ips host the same nodess
+				// count how many ips host the same nodes
 				// key: number of nodes, value: number of ips
 				auxIpDist := ipDist.ObtainDistribution()
 				auxIpDist.SetValues(IpDistribution)
 				rttDis.SetValues(RttDistribution)
 				tctDis.SetValues(TotcontimeDistribution)
-				//allLastErrors := ps.GetErrorCounter()
 				Log.WithFields(logrus.Fields{
-					//"ClientsDist":        clients,
-					//"GeoDist":            geoDist,
 					"NOfDiscoveredPeers": nOfDiscoveredPeers,
 					"NOfConnectedPeers":  nOfConnectedPeers,
 					"NOfDeprecatedPeers": nOfDeprecatedPeers,
-					//"LastErrors":         allLastErrors,
 				}).Info("peerstore metrics summary")
 
 			case <-ctx.Done():

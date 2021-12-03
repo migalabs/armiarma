@@ -46,7 +46,7 @@ type PeerStore struct {
 func NewPeerStore(ctx context.Context, dbtype string, path string) PeerStore {
 	mainCtx, cancel := context.WithCancel(ctx)
 	var db PeerStoreStorage
-	// TODO: once the db works well and it is defined
+
 	switch dbtype {
 	case DBTypes[BoltDBKey]:
 		if len(path) <= 0 {
@@ -72,17 +72,18 @@ func NewPeerStore(ctx context.Context, dbtype string, path string) PeerStore {
 }
 
 // Ctx
-// * Retreives the context asigned to the Peerstore
+// Retreives the context asigned to the Peerstore
 func (c *PeerStore) Ctx() context.Context {
 	return c.ctx
 }
 
-// Ctx
-// * Retreives the cancel function to kill the Peerstore ctx
+// GetCtxCancel
+// Retreives the cancel function to kill the Peerstore ctx
 func (c *PeerStore) GetCtxCancel() context.CancelFunc {
 	return c.cancel
 }
 
+// TODO: ImportPeerStoreMetrics
 func (c *PeerStore) ImportPeerStoreMetrics(importFolder string) error {
 	// TODO: Load to memory an existing csv
 	// Perhaps not needed since we are migrating to a database
@@ -91,6 +92,7 @@ func (c *PeerStore) ImportPeerStoreMetrics(importFolder string) error {
 	return nil
 }
 
+// TODO: Review if needed ResetDynamicMetrics
 // Function that resets to 0 the connections/disconnections, and message counters
 // this way the Ram Usage gets limited (up to ~10k nodes for a 12h-24h )
 // NOTE: Keep in mind that the peers that we ended up connected to, will experience a weid connection time
@@ -107,18 +109,19 @@ func (c *PeerStore) ResetDynamicMetrics() {
 	Log.Info("Finished Reseting Dynamic Metrics")
 }
 
-// Function that adds a notification channel to the message gossip topic
+// AddNotChannel:
+// Function that adds a notification channel to the message gossip topic.
+// @param topicName: the name of the topic used to identify the channel in the map.
 func (c *PeerStore) AddNotChannel(topicName string) {
 	c.MsgNotChannels[topicName] = make(chan bool, 100)
 }
 
-// Updates the peer without overwritting all its content
+// StoreOrUpdatePeer:
+// Updates the peer without overwritting all its content.
+// If peer exists, aggregate data to the existing peer.
+// Otherwise, store the peer.
+// @param peer: the peer to store or update
 func (c *PeerStore) StoreOrUpdatePeer(peer Peer) {
-	// TODO: We could also store the old data if there was a change. For example
-	// if a given client upgrated it version. Use oldData
-	// See: https://github.com/migalabs/armiarma/issues/17
-	// Currently just overwritting what was before
-	// TEMP
 
 	oldPeer, err := c.GetPeerData(peer.PeerId)
 
@@ -134,19 +137,19 @@ func (c *PeerStore) StoreOrUpdatePeer(peer Peer) {
 	runtime.GC()
 }
 
-// StorePeer
-// * This method stores a single peer in the peerstore.
-// * It will use the peerID as key
-// @param peer: the peer object to store
+// StorePeer:
+// This method stores a single peer in the peerstore.
+// It will use the peerID as key.
+// @param peer: the peer object to store.
 func (c *PeerStore) StorePeer(peer Peer) {
 	c.PeerStore.Store(peer.PeerId, peer)
 }
 
-// GetPeerData
-// * This method return a Peer object from the peerstore
-// * using the given peerID.
-// @param peerID: the peerID to look for in string format
-// @return the found Peer object and an error if there was
+// GetPeerData:
+// This method return a Peer object from the peerstore
+// using the given peerID.
+// @param peerID: the peerID to look for in string format.
+// @return the found Peer object and an error if there was.
 func (c *PeerStore) GetPeerData(peerId string) (Peer, error) {
 	peerData, ok := c.PeerStore.Load(peerId)
 	if !ok {
@@ -156,14 +159,18 @@ func (c *PeerStore) GetPeerData(peerId string) (Peer, error) {
 	return peerData, nil
 }
 
-// GetPeerList
-// * This method returns the list of PeerIDs in the DB
-// @return the list of PeerIDs in string format
+// GetPeerList:
+// This method returns the list of PeerIDs in the DB.
+// @return the list of PeerIDs in string format.
 func (c *PeerStore) GetPeerList() []peer.ID {
 	return c.PeerStore.Peers()
 }
 
-//
+// GetENR
+// Returns the Node after parsing the ENR.
+// @param peerID: the peerID of which to get the Node.
+// @return the resulting Node.
+// @return error if applicable, nil in any other case.
 func (c *PeerStore) GetENR(peerID string) (*enode.Node, error) {
 	p, err := c.GetPeerData(peerID)
 	if err != nil {
@@ -172,7 +179,10 @@ func (c *PeerStore) GetENR(peerID string) (*enode.Node, error) {
 	return p.GetBlockchainNode()
 }
 
-// Get a map with the errors we got when connecting and their amount
+// TODO: review if needed
+// GetErrorCounter:
+// Get a map with the errors we got when connecting and their amount.
+// @return a map where string is the errorName and value is the count.
 func (gm *PeerStore) GetErrorCounter() map[string]uint64 {
 	errorsAndAmount := make(map[string]uint64)
 	gm.PeerStore.Range(func(key string, value Peer) bool {
@@ -186,12 +196,10 @@ func (gm *PeerStore) GetErrorCounter() map[string]uint64 {
 	return errorsAndAmount
 }
 
-// Exports to a csv, useful for debug
 // ExportToCSV
-// * This method will export the whole peerstore into a CSV file
-// @param filePath file where to dumpt the CSV lines
-// (create / open)
-// @return an error if there was
+// This method will export the whole peerstore into a CSV file.
+// @param filePath file where to dump the CSV lines (create if it does not exist).
+// @return an error if there was.
 func (c *PeerStore) ExportToCSV(filePath string) error {
 	Log.Info("Exporting metrics to csv: ", filePath)
 	csvFile, err := os.Create(filePath)
@@ -220,6 +228,9 @@ func (c *PeerStore) ExportToCSV(filePath string) error {
 	return nil
 }
 
+// ExportCsvService
+// We will export to csv regularly, therefoe this service will execute the export every X seconds (ExportLoopTime)
+// @param folderpath: the folder to export the csv file (always named metrics.csv)
 func (ps *PeerStore) ExportCsvService(folderpath string) {
 	Log.Info("Peerstore CSV exporting service launched")
 	go func() {
@@ -238,7 +249,7 @@ func (ps *PeerStore) ExportCsvService(folderpath string) {
 	}()
 }
 
-// CloseMetricsExport closes any go routine related with the DB metrics
+// CloseMetricsExport: closes any go routine related with the DB metrics
 func (ps *PeerStore) CloseMetricsExport() {
 	Log.Info("closing metrics exporting services")
 	cancel := ps.GetCtxCancel()

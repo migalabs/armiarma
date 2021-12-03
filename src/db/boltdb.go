@@ -19,8 +19,9 @@ type BoltPeerDB struct {
 	startTime time.Time
 }
 
-// New BoltPeerDB creates an new MemoryDB ready to accept new peers
-// fulfills PeerStoreStorage interface
+// New BoltPeerDB creates an new MemoryDB ready to accept new peers.
+// Fulfills PeerStoreStorage interface
+// @param folderpath: folder where to open / create the db (always named peerstore)
 func NewBoltPeerDB(folderpath string) BoltPeerDB {
 	// Generate a new one
 	db, err := OpenBoltDB(folderpath+"/peerstore.db", "peerstore", 0600, nil)
@@ -33,16 +34,15 @@ func NewBoltPeerDB(folderpath string) BoltPeerDB {
 	}
 
 	// check if there is something inside the bolt database
-	// if so, fill the disconnectin for these peers that were connected
+	// if so, fill the disconnection for these peers that were connected
 	// when the crawler was shutdown
-	connectedPeers := make([]Peer, 0) // store the Peers that were connected, so Disconnection was not registered.
-	// so they remain connected
+	connectedPeers := make([]Peer, 0) // keep the Peers that were still connected, meaning that Disconnection was not registered.
 	peercnt := 0
 	lastCrawlerActivity := time.Time{} // representation of least possible time
 	db_obj.Range(func(key string, value Peer) bool {
-		// check if there was an Open connection
+		// check if there was an open connection
 		if value.IsConnected {
-			// it remains connected
+			// it "remains" connected
 			connectedPeers = append(connectedPeers, value)
 		}
 
@@ -70,6 +70,9 @@ func NewBoltPeerDB(folderpath string) BoltPeerDB {
 	return db_obj
 }
 
+// Stores a Peer with the given key.
+// @param key: the key to access the object.
+// @param Peer: the value to store.
 func (p BoltPeerDB) Store(key string, value Peer) {
 	value_marshalled, err := json.Marshal(value)
 	if err != nil {
@@ -80,6 +83,10 @@ func (p BoltPeerDB) Store(key string, value Peer) {
 
 }
 
+// Retrieves an object from the db using a key.
+// @param key: the string to use to get the object.
+// @return Peer: the resulting object.
+// @return ok: whether the operation was successful or not.
 func (p BoltPeerDB) Load(key string) (value Peer, ok bool) {
 
 	value_marshalled, ok := p.db.Load([]byte(key))
@@ -96,6 +103,8 @@ func (p BoltPeerDB) Load(key string) (value Peer, ok bool) {
 	return PeerUnMarshal(obj), true
 }
 
+// Deletes the object for the given key in the db.
+// @param key: the string to access the desired object.
 func (p BoltPeerDB) Delete(key string) {
 	p.db.Delete([]byte(key))
 }
@@ -121,6 +130,8 @@ func (p BoltPeerDB) Range(f func(key string, value Peer) bool) {
 }
 
 // TODO: pending return / print some kind of error if it was the case
+// Resturns a list of peerIDs existing in the db
+// @return the list of peerID in peer.ID format
 func (p BoltPeerDB) Peers() []peer.ID {
 	peers := make([]peer.ID, 0)
 	p.Range(func(key string, value Peer) bool {
@@ -146,6 +157,9 @@ type BoltDB struct {
 	bucket string
 }
 
+// Opens the existing db and creates a bucket is not existing. The busket is where we will store the information.
+// @param path: path to db to open.
+//@param bucketName: the bucket we are opening / creating (in our case, we always use the same)
 func OpenBoltDB(path string, bucketName string, mode fs.FileMode, options *bolt.Options) (*BoltDB, error) {
 	boltDB, err := bolt.Open(path, mode, options)
 	if err != nil {
@@ -167,6 +181,10 @@ func (db *BoltDB) Close() {
 	db.db.Close()
 }
 
+// Loads data from the db.
+// @param key: the key in byte format to access the data.
+// @return the bytes as a result, marshaled.
+// @return a boolean whether the operation was successful or not.
 func (db *BoltDB) Load(key []byte) ([]byte, bool) {
 
 	var got []byte
@@ -186,6 +204,9 @@ func (db *BoltDB) Load(key []byte) ([]byte, bool) {
 	return value, true
 }
 
+// Stores a given data in the db.
+// @param key: the key to access the desired object in the db.
+// @param value: the data to store.
 func (db *BoltDB) Store(key, value []byte) {
 
 	db.db.Update(func(t *bolt.Tx) error {
@@ -195,6 +216,8 @@ func (db *BoltDB) Store(key, value []byte) {
 	})
 }
 
+// Deletes a given object from the db.
+// @param key: the key to locate the object in the db.
 func (db *BoltDB) Delete(key []byte) {
 
 	db.db.Update(func(t *bolt.Tx) error {
@@ -204,6 +227,8 @@ func (db *BoltDB) Delete(key []byte) {
 	})
 }
 
+// Iterates and executes a function over the db for each value.
+// @param f: the function to apply to each item in the db.
 func (db *BoltDB) Range(f func(key, value []byte) bool) {
 
 	db.db.View(func(t *bolt.Tx) error {

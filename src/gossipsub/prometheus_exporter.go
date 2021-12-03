@@ -12,13 +12,13 @@ import (
 )
 
 // MessageMetrics
-// * Summarizes all the metrics that could be obtained from the received msgs
-// * Right now divided by topic and containing only the local counter between server ticker
+// fgdgdfgdfgSummarizes all the metrics that could be obtained from the received msgs.
+// Right now divided by topic and containing only the local counter between server ticker.
 type MessageMetrics struct {
 	topicList map[string]*int32
 }
 
-// NewMessageMetrics
+// NewMessageMetrics:
 // @return intialized MessageMetrics struct
 func NewMessageMetrics() MessageMetrics {
 	return MessageMetrics{
@@ -26,10 +26,10 @@ func NewMessageMetrics() MessageMetrics {
 	}
 }
 
-// NewTopic
+// NewTopic:
 // @param name of the topic
 // @return a possitive boolean if the topic was
-// 		   already in Metrics, negative one otherwise
+// already in Metrics, negative one otherwise
 func (c *MessageMetrics) NewTopic(topic string) bool {
 	var counter int32
 	atomic.StoreInt32(&counter, 0)
@@ -41,9 +41,9 @@ func (c *MessageMetrics) NewTopic(topic string) bool {
 	return false
 }
 
-// AddMessgeToTopic
-// @param gossipsub topic name
-// @return curren message counter, or -1 if there was an error (non-existing topic)
+// AddMessgeToTopic:
+// @param gossipsub topic name.
+// @return curren message counter, or -1 if there was an error (non-existing topic).
 func (c *MessageMetrics) AddMessgeToTopic(topic string) int32 {
 	v, exists := c.topicList[topic]
 	if !exists {
@@ -52,9 +52,9 @@ func (c *MessageMetrics) AddMessgeToTopic(topic string) int32 {
 	return atomic.AddInt32(v, 1)
 }
 
-// ResetTopic
-// @param gossipsub topic name
-// @return curren message counter, or -1 if there was an error (non-existing topic)
+// ResetTopic:
+// @param gossipsub topic name.
+// @return curren message counter, or -1 if there was an error (non-existing topic).
 func (c *MessageMetrics) ResetTopic(topic string) int32 {
 	v, exists := c.topicList[topic]
 	if !exists {
@@ -63,9 +63,9 @@ func (c *MessageMetrics) ResetTopic(topic string) int32 {
 	return atomic.SwapInt32(v, int32(0))
 }
 
-// ResetAllTopics
-// * resets all the topic counters to 0
-// @return curren message counter, or -1 if there was an error (non-existing topic)
+// ResetAllTopics:
+// Resets all the topic counters to 0.
+// @return current message counter, or -1 if there was an error (non-existing topic).
 func (c *MessageMetrics) ResetAllTopics() error {
 	for k, _ := range c.topicList {
 		r := c.ResetTopic(k)
@@ -76,9 +76,9 @@ func (c *MessageMetrics) ResetAllTopics() error {
 	return nil
 }
 
-// GetTopicMsgs
-// * Obtain the counter of messages from last ticker of given topic
-// @return curren message counter, or -1 if there was an error (non-existing topic)
+// GetTopicMsgs:
+// Obtain the counter of messages from last ticker of given topic.
+// @return current message counter, or -1 if there was an error (non-existing topic).
 func (c *MessageMetrics) GetTopicMsgs(topic string) int32 {
 	v, exists := c.topicList[topic]
 	if !exists {
@@ -87,9 +87,9 @@ func (c *MessageMetrics) GetTopicMsgs(topic string) int32 {
 	return atomic.LoadInt32(v)
 }
 
-// GetTotalMessages
-// * Obtain the total of messages received from last ticker from all the topics
-// @return total message counter, or -1 if there was an error (non-existing topic)
+// GetTotalMessages:
+// Obtain the total of messages received from last ticker from all the topics.
+// @return total message counter, or -1 if there was an error (non-existing topic).
 func (c *MessageMetrics) GetTotalMessages() int64 {
 	var total int64
 	for k, _ := range c.topicList {
@@ -102,9 +102,9 @@ func (c *MessageMetrics) GetTotalMessages() int64 {
 	return total
 }
 
-// ServePrometheusMetrics
-// * This method will generate the metrics from GossipSub msg Metrics
-// * and serve the values to the local prometheus instance
+// ServePrometheusMetrics:
+// This method will generate the metrics from GossipSub msg Metrics
+// and serve the values to the local prometheus instance.
 func (gs *GossipSub) ServePrometheusMetrics() {
 	gsCtx := gs.Ctx()
 	// tenerate a ticker

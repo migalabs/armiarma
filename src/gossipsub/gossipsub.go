@@ -30,8 +30,8 @@ var (
 )
 
 // GossipSub
-// * Sumarizes the control fields necesary to manage and
-// * govern the GossipSub internal service
+// sumarizes the control fields necesary to manage and
+// govern the GossipSub internal service.
 type GossipSub struct {
 	ctx           context.Context
 	cancel        context.CancelFunc
@@ -44,22 +44,22 @@ type GossipSub struct {
 	MessageMetrics *MessageMetrics
 }
 
-// NewEmptyGossipSub
-// * Sumarizes the control fields necesary to manage and
-// * govern over a joined and subscribed topic like
-// * @return: gossipsub struct
+// NewEmptyGossipSub:
+// Sumarizes the control fields necesary to manage and
+// govern over a joined and subscribed topic
+// @return: gossipsub struct
 func NewEmptyGossipSub() *GossipSub {
 	return &GossipSub{}
 }
 
-// NewGossipSub
-// * Sumarizes the control fields necesary to manage and
-// * govern over a joined and subscribed topic like
-// * @param ctx: parent context for the gossip service
-// * @param h: the libp2p.PubSub topic of the joined topic
-// * @param peerstore: the peerstore of the
-// * @param stdOpts: list of options to generate the base of the gossipsub service
-// * @return: pointer to GossipSub struct
+// NewGossipSub:
+// Sumarizes the control fields necesary to manage and
+// govern over a joined and subscribed topic.
+// @param ctx: parent context for the gossip service.
+// @param h: the libp2p.PubSub topic of the joined topic.
+// @param peerstore: the peerstore where to sotre the data.
+// @param stdOpts: list of options to generate the base of the gossipsub service.
+// @return: pointer to GossipSub struct.
 func NewGossipSub(ctx context.Context, h *hosts.BasicLibp2pHost, peerstore *db.PeerStore) *GossipSub {
 	mainCtx, cancel := context.WithCancel(ctx)
 
@@ -100,11 +100,11 @@ func MsgIDFunction(pmsg *pubsub_pb.Message) string {
 	return base64.URLEncoding.EncodeToString(id)
 }
 
-// JoinAndSubscribe
-// * this method allows the GossipSub service to join and
-// * subscribe to a topic
-// * @param topicName: name of the topic to subscribe
-// * @return: pointer to GossipSub struct
+// JoinAndSubscribe:
+// This method allows the GossipSub service to join and
+// subscribe to a topic.
+// @param topicName: name of the topic to subscribe.
+// @return: pointer to GossipSub struct.
 func (gs *GossipSub) JoinAndSubscribe(topicName string) {
 	// Join topic
 	topic, err := gs.PubsubService.Join(topicName)

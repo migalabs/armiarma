@@ -27,8 +27,15 @@ import (
 
 var ()
 
-// Function that opens a new Stream from the given host to send a RPC requesting the BeaconStatus of the given peer.ID
-// Returns the BeaconStatus of the given peer if succeed, error if failed
+// ReqBeaconStatus:
+// Function that opens a new Stream from the given host to send a RPC requesting the BeaconStatus of the given peer.ID.
+// Returns the BeaconStatus of the given peer if succeed, error if failed.
+// @param ctx: parent context.
+// @param wg: wait group to notify when function has been done.
+// @param h: host to use to connect.
+// @param peerID: who to connect to.
+// @param stat: where to deserialize the content of the beacon status: output.
+// @param finErr: error channel.
 func ReqBeaconStatus(ctx context.Context, wg *sync.WaitGroup, h host.Host, peerID peer.ID, stat *common.Status, finErr chan error) {
 	defer wg.Done()
 	// Generate the compression
@@ -61,6 +68,15 @@ func ReqBeaconStatus(ctx context.Context, wg *sync.WaitGroup, h host.Host, peerI
 		})
 }
 
+// ReqBeaconMetadata:
+// Function that opens a new Stream from the given host to send a RPC requesting the BeaconStatus of the given peer.ID.
+// Returns the BeaconStatus of the given peer if succeed, error if failed.
+// @param ctx: parent context.
+// @param wg: wait group to notify when function has been done.
+// @param h: host to use to connect.
+// @param peerID: who to connect to.
+// @param meta: where to deserialize the content of the beacon metadata: output.
+// @param finErr: error channel.
 func ReqBeaconMetadata(ctx context.Context, wg *sync.WaitGroup, h host.Host, peerID peer.ID, meta *common.MetaData, finErr chan error) {
 	defer wg.Done()
 	// Generate the compression
@@ -97,9 +113,18 @@ type HostWithIDService interface {
 	IDService() *identify.IDService
 }
 
+// ReqBeaconMetadata:
 // ReqHostInfo returns the basic host information regarding a given peer, from the libp2p perspective
 // it aggregates the info from the libp2p Identify protocol adding some extra info such as RTT between local host and remote peer
-// return empty struct and error if failure on the identify process
+// return empty struct and error if failure on the identify process.
+// Returns the BeaconStatus of the given peer if succeed, error if failed.
+// @param ctx: parent context.
+// @param wg: wait group to notify when function has been done.
+// @param h: host to use to connect.
+// @param peerID: who to connect to.
+// @param meta: where to deserialize the content of the beacon metadata: output.
+// @param finErr: error channel.
+
 func ReqHostInfo(ctx context.Context, wg *sync.WaitGroup, h host.Host, ipLoc *apis.PeerLocalizer, conn network.Conn, peer *db.Peer, errIdent chan error) {
 	defer wg.Done()
 

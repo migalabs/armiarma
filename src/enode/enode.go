@@ -24,12 +24,12 @@ type LocalNode struct {
 	info_data *info.InfoData
 }
 
-// NewLocalNode
-// * This method will create a LocalNode object using the given arguments
-// @param ctx the context, usually inherited from the base
-// @param info_obj the InfoData object where to get the configuration data from the user
-// @param stdOpts the logging options object
-// @return the LocalNode object
+// NewLocalNode:
+// This method will create a LocalNode object using the given arguments.
+// @param ctx the context, usually inherited from the base.
+// @param info_obj the InfoData object where to get the configuration data from the user.
+// @param stdOpts the logging options object.
+// @return the LocalNode object.
 func NewLocalNode(ctx context.Context, info_obj *info.InfoData) *LocalNode {
 	mainCtx, cancel := context.WithCancel(ctx)
 	// db where to store the ENRs
@@ -47,8 +47,8 @@ func NewLocalNode(ctx context.Context, info_obj *info.InfoData) *LocalNode {
 	}
 }
 
-// AddEntries
-// * This method will add specific Eth2 Key Value entries to the created Node
+// AddEntries:
+// This method will add specific Eth2 Key Value entries to the created Node.
 // TODO: confirm which data to add and structure appropiately
 func (l *LocalNode) AddEntries() {
 	l.LocalNode.Set(all_utils.NewAttnetsENREntry("ffffffffffffffff"))

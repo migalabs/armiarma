@@ -71,12 +71,12 @@ type InfoData struct {
 	dBType        string
 }
 
-// NewDefaultInfoData
-// * This method will create an empty InfoData object
-// * This method will create an InfoData object
-// * using default values from config
-// @param stdOpts (meaning, without the mod name and the level)
-// @return An InfoData object
+// NewDefaultInfoData:
+// This method will create an empty InfoData object.
+// This method will create an InfoData object.
+// using default values from config.
+// @param stdOpts (meaning, without the mod name and the level).
+// @return An InfoData object.
 func NewDefaultInfoData() InfoData {
 
 	configObj := config.NewEmptyConfig()
@@ -88,12 +88,12 @@ func NewDefaultInfoData() InfoData {
 	return infoObj
 }
 
-// NewCustomInfoData
-// * This method will create an InfoData object
-// * using imported values from givem config.ConfigData
-// @param input ConfigData object
-// @param stdOpts (meaning, mod name and the level will be added here)
-// @return An InfoData object
+// NewCustomInfoData:
+// This method will create an InfoData object
+// using imported values from givem config.ConfigData.
+// @param input ConfigData object.
+// @param stdOpts (meaning, mod name and the level will be added here).
+// @return An InfoData object.
 func NewCustomInfoData(configObj config.ConfigData) *InfoData {
 
 	infoObj := InfoData{}
@@ -102,12 +102,12 @@ func NewCustomInfoData(configObj config.ConfigData) *InfoData {
 	return &infoObj
 }
 
-// importFromConfig
-// * This method will import all data from the given ConfigData object
-// * As soon as we read the log level from the config object
-// * we create the logger object
-// @param inputConfig object to import data from
-// @param stdOpts base logging options
+// importFromConfig:
+// This method will import all data from the given ConfigData object.
+// As soon as we read the log level from the config object
+// we create the logger object.
+// @param inputConfig object to import data from.
+// @param stdOpts base logging options.
 func (i *InfoData) importFromConfig(inputConfig config.ConfigData) {
 
 	// first of all import the log level
@@ -327,10 +327,10 @@ func (i InfoData) GetTopicArray() []string {
 	return i.topicArray
 }
 
-// SetTopicArray
-// * This method loops over the given array and validate that topics exist before setting the array.
-// * We need at least one valid
-// @return boolean in case any topic in the list was applied (true) or none was applied (false)
+// SetTopicArray:
+// This method loops over the given array and validate that topics exist before setting the array.
+// We need at least one valid.
+// @return boolean in case any topic in the list was applied (true) or none was applied (false).
 func (i *InfoData) SetTopicArray(inputList []string) bool {
 	resultTopicList := make([]string, 0)
 	if len(inputList) > 0 {

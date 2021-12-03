@@ -31,20 +31,6 @@ var (
 	}
 	DefaultForkDigest string = ForkDigests[AltairKey]
 
-	/*BeaconBlockKey          string = "BeaconBlock"
-	BeaconAggregateProofKey string = "BeaconAggregateProof"
-	VoluntaryExitKey        string = "VoluntaryExit"
-	ProposerSlashingKey     string = "ProposerSlashing"
-	AttesterSlashingKey     string = "AttesterSlashing"
-
-	MessageTypes = map[string]string{
-		BeaconBlockKey:          "beacon_block",
-		BeaconAggregateProofKey: "beacon_aggregate_and_proof",
-		VoluntaryExitKey:        "voluntary_exit",
-		ProposerSlashingKey:     "proposer_slashing",
-		AttesterSlashingKey:     "attester_slashing",
-	}*/
-
 	MessageTypes = []string{
 		"beacon_block",
 		"beacon_aggregate_and_proof",
@@ -56,12 +42,11 @@ var (
 	Encoding string = "ssz_snappy"
 )
 
-// GenerateEth2Topics
-// * This method returns the built topic out of the given arguments
-// * You may check the commented examples above
+// GenerateEth2Topics:
+// This method returns the built topic out of the given arguments.
+// You may check the commented examples above.
 // @param forkDigest: the forDigest key in the map. You may use the Key constants.
 // @param topic: the message type we want to use in the topic. You may use the Key constants.
-// @param encoding: TODO: to be removed as it is always the same
 func GenerateEth2Topics(forkDigest string, messageTypeName string) string {
 	// check valid messagetype
 	if !utils.ExistsInArray(MessageTypes, messageTypeName) {
@@ -78,20 +63,20 @@ func GenerateEth2Topics(forkDigest string, messageTypeName string) string {
 		"/" + Encoding
 }
 
-// Eth2TopicPretty
-// * This method returns the topic based on it's message type
-// * in a pretty version of it
-// * would return "beacon_block" out of the given "/eth2/b5303f2a/beacon_block/ssz_snappy" topic
-// @param eth2topic:the entire composed eth2 topic with fork digest and compression
-// @return topic pretty
+// Eth2TopicPretty:
+// This method returns the topic based on it's message type
+// in a pretty version of it.
+// It would return "beacon_block" out of the given "/eth2/b5303f2a/beacon_block/ssz_snappy" topic
+// @param eth2topic:the entire composed eth2 topic with fork digest and compression.
+// @return topic pretty.
 func Eth2TopicPretty(eth2topic string) string {
 	return strings.Split(eth2topic, "/")[3]
 }
 
-// ReturnAllTopics
-// * This method will iterate over the mesagetype map and return any possible topic for the
-// * given fork digest
-// @return the array of topics
+// ReturnAllTopics:
+// This method will iterate over the mesagetype map and return any possible topic for the
+// given fork digest.
+// @return the array of topics.
 func ReturnAllTopics(inputForkDigest string) []string {
 	result_array := make([]string, 0)
 	for _, messageValue := range MessageTypes {
@@ -100,6 +85,11 @@ func ReturnAllTopics(inputForkDigest string) []string {
 	return result_array
 }
 
+// ReturnTopics:
+// Returns topics for the given parameters.
+// @param forkDigest: the forkDigest to use in the topic.
+// @param messageTypeName: the type of topic.
+// @return the list of generated topics with the given parameters (several messageTypes).
 func ReturnTopics(forkDigest string, messageTypeName []string) []string {
 	result_array := make([]string, 0)
 
@@ -109,10 +99,10 @@ func ReturnTopics(forkDigest string, messageTypeName []string) []string {
 	return result_array
 }
 
-// CheckValidForkDigest
-// * This method will check if Fork Digest exists in the corresponding map (ForkDigests)
-// * @return the fork digest of the given network
-// * @return a boolean (true for valid, false for not valid)
+// CheckValidForkDigest:
+// This method will check if Fork Digest exists in the corresponding map (ForkDigests).
+// @return the fork digest of the given network.
+// @return a boolean (true for valid, false for not valid).
 func CheckValidForkDigest(input_string string) (string, bool) {
 	for forkDigestKey, _ := range ForkDigests {
 		if strings.ToLower(forkDigestKey) == input_string {
