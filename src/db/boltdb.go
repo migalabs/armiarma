@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"os"
 	"reflect"
 	"runtime"
 	"time"
@@ -28,7 +29,7 @@ func NewBoltPeerDB(folderpath string) BoltPeerDB {
 	if err != nil {
 		Log.Panicf(err.Error())
 	}
-	db_obj := BoltPeerDB{
+	dbObj := BoltPeerDB{
 		db:        db,
 		startTime: time.Now(),
 	}
@@ -39,7 +40,17 @@ func NewBoltPeerDB(folderpath string) BoltPeerDB {
 	connectedPeers := make([]Peer, 0) // keep the Peers that were still connected, meaning that Disconnection was not registered.
 	peercnt := 0
 	lastCrawlerActivity := time.Time{} // representation of least possible time
-	db_obj.Range(func(key string, value Peer) bool {
+	dbReadingError := false
+	dbObj.Range(func(key string, value Peer) bool {
+		// TEMPORARY FIX - check if the peer is empty (error reading the existing DB)
+		if value.IsEmpty() {
+			// the peer is empty, therefore, there was an error reading the DB
+			dbReadingError = true
+			return false
+		}
+
+		// check if the Peer was successfully read by checking if PeerID was
+
 		// check if there was an open connection
 		if value.IsConnected {
 			// it "remains" connected
@@ -55,6 +66,13 @@ func NewBoltPeerDB(folderpath string) BoltPeerDB {
 		peercnt++
 		return true
 	})
+	if dbReadingError {
+		Log.Errorf("Unable to read existing DB at %s .", folderpath+"/peerstore.db")
+		Log.Error("It could be originated from a non-compatible DB version or a corrupted DB.")
+		Log.Error("Please, make a copy / remove the existing DB and rerun it.")
+		os.Exit(0)
+	}
+
 	if peercnt > 0 {
 		Log.Infof("loaded BoltDB with %d peer on it (%d connected)", peercnt, len(connectedPeers))
 	} else {
@@ -64,10 +82,10 @@ func NewBoltPeerDB(folderpath string) BoltPeerDB {
 	// last, lets add the disconnection event to those peers that remained connected
 	for _, connectedPeerTmp := range connectedPeers {
 		connectedPeerTmp.DisconnectionEvent(lastCrawlerActivity)
-		db_obj.Store(connectedPeerTmp.PeerId, connectedPeerTmp)
+		dbObj.Store(connectedPeerTmp.PeerId, connectedPeerTmp)
 	}
 
-	return db_obj
+	return dbObj
 }
 
 // Stores a Peer with the given key.
@@ -87,8 +105,7 @@ func (p BoltPeerDB) Store(key string, value Peer) {
 // @param key: the string to use to get the object.
 // @return Peer: the resulting object.
 // @return ok: whether the operation was successful or not.
-func (p BoltPeerDB) Load(key string) (value Peer, ok bool) {
-
+func (p BoltPeerDB) Load(key string) (Peer, bool) {
 	value_marshalled, ok := p.db.Load([]byte(key))
 	if !ok {
 		return Peer{}, false
@@ -100,7 +117,11 @@ func (p BoltPeerDB) Load(key string) (value Peer, ok bool) {
 		Log.Error(err)
 		return Peer{}, false
 	}
-	return PeerUnMarshal(obj), true
+	pObj, err := PeerUnMarshal(obj)
+	if err != nil {
+		return Peer{}, false
+	}
+	return pObj, true
 }
 
 // Deletes the object for the given key in the db.
@@ -121,10 +142,13 @@ func (p BoltPeerDB) Range(f func(key string, value Peer) bool) {
 
 			return false
 		}
-		value_unmarshalled := PeerUnMarshal(obj)
-
-		ok := f(string(key), value_unmarshalled)
+		// unmarshal the peer
+		// If the peer wasn't able to be unmarshalled, we will return an empty peer to the given func
+		// handle in the fn that empty peers as it requires
+		pObj, _ := PeerUnMarshal(obj)
+		ok := f(string(key), pObj)
 		return ok
+
 	})
 
 }
