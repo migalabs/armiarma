@@ -1,6 +1,8 @@
 package peering
 
 import (
+	"context"
+	"sync/atomic"
 	"time"
 
 	promth "github.com/migalabs/armiarma/src/prometheus"
@@ -39,11 +41,11 @@ func (c *PeeringService) ServeMetrics() {
 
 				// generate the distribution
 				for key, value := range controlDist {
-					PrunedErrorDistribution.WithLabelValues(key).Set(float64(value))
+					PrunedErrorDistribution.WithLabelValues(key).Set(float64(atomic.LoadInt64(value)))
 				}
 				// generate the distribution
 				for key, value := range errorAttemptDist {
-					ErrorAttemptDistribution.WithLabelValues(key).Set(float64(value))
+					ErrorAttemptDistribution.WithLabelValues(key).Set(float64(atomic.LoadInt64(value)))
 				}
 
 				Log.WithFields(logrus.Fields{
