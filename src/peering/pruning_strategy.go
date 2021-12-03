@@ -619,12 +619,12 @@ func (c *PrunedPeer) NextConnection() time.Time {
 func (c *PrunedPeer) Deprecable() bool {
 	// if the difference between now and the LastIdentifyTime is more than the DeprecationTime, true
 
-	if (c.BaseConnectionTimestamp != time.Time{}) && c.DelayObj.GetType() == NegativeWithHopeDelayType {
+	if (c.BaseDeprecationTimestamp != time.Time{}) && c.DelayObj.GetType() == NegativeWithHopeDelayType {
 		// it was identified and in hope case, do not deprecate
 		return false
 	}
 
-	return time.Now().Sub(c.BaseConnectionTimestamp) >= DeprecationTime
+	return time.Now().Sub(c.BaseDeprecationTimestamp) >= DeprecationTime
 }
 
 // RecErrorHandler:
@@ -649,13 +649,14 @@ func (c *PrunedPeer) UpdateDelay(newDelayType string) {
 		c.BaseConnectionTimestamp = time.Now()
 	}
 
+	// if there is a positive delay (success identify), then we update the deprecation time
+	// therefore, we start counting from now to deprecate
 	if c.DelayObj.GetType() == PositiveDelayType {
-		c.BaseConnectionTimestamp = time.Now()
+		c.BaseDeprecationTimestamp = time.Now()
 	}
 
 	// only add degree in case we have not exceeded the MaxDelay allowed
 	if c.DelayObj.CalculateDelay() < MaxDelayTime {
-
 		c.DelayObj.AddDegree()
 	}
 }
