@@ -1,16 +1,24 @@
 package prometheus
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 var (
+	ModuleName = "PROMETHEUS"
+	Log        = logrus.WithField(
+		"module", ModuleName,
+	)
+
+	// TODO: Just hardcoded, move to config
+	ExposedPort string = "9080"
+	EndpointUrl string = "metrics"
+
 	MetricLoopInterval time.Duration = 15 * time.Second
 )
 
@@ -22,16 +30,16 @@ type PrometheusRunner struct {
 
 func NewPrometheusRunner() PrometheusRunner {
 	return PrometheusRunner{
-		ExposePort:  "9080",
-		EndpointUrl: "metrics",
+		ExposePort:  ExposedPort,
+		EndpointUrl: EndpointUrl,
 	}
 }
 
-func (c *PrometheusRunner) Start(ctx context.Context) error {
+func (c *PrometheusRunner) Start() error {
 	http.Handle("/metrics", promhttp.Handler())
 
 	go func() {
-		log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", c.ExposePort), nil))
+		Log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", c.ExposePort), nil))
 	}()
 
 	return nil

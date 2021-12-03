@@ -7,19 +7,17 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strconv"
-	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 var (
-	ModuleName string = "PEER LOCALIZER"
+	ModuleName string = "PEER-LOCALIZER"
 
-	l      = log.New()
-	logger = l.WithField(
+	Log = logrus.WithField(
 		"module", ModuleName,
 	)
 
@@ -38,8 +36,6 @@ type PeerLocalizer struct {
 	// control variables for IP-API request
 	// Control flags from prometheus
 	apiCalls *int32
-	// Threadsafe Requests
-	m sync.Mutex
 }
 
 func NewPeerLocalizer(ctx context.Context, cacheSize int) PeerLocalizer {
@@ -59,30 +55,30 @@ func NewPeerLocalizer(ctx context.Context, cacheSize int) PeerLocalizer {
 
 // Run the necessary routines to locate the IPs
 func (c *PeerLocalizer) Run() {
-	//l.SetLevel(log.DebugLevel)
-	go c.locatorRoutine()
+	//l.SetLevel(Log.DebugLevel)
+	c.locatorRoutine()
 }
 
 // locatorRoutine is the main routine that will wait until an request to identify an IP arrives
 // or if the routine gets canceled
 func (c *PeerLocalizer) locatorRoutine() {
-	logger.Info("IP locator routine started")
+	Log.Info("IP locator routine started")
 	apiCallChan := make(chan locReq) // Give it a size of 20 just in case there are many inbound requests at the same time
 	go func() {
 		for {
 			select {
 			// New request to identify an IP
 			case request := <-c.locationRequest:
-				logger.Debug("new request has been received for ip:", request.ip)
+				Log.Debug("new request has been received for ip:", request.ip)
 				// Check if the IP is already in the cache
 				cacheResp, ok := c.reqCache.checkIpInCache(request.ip)
 				if ok { // the response was alreadi in the cache.
-					logger.Debugf("ip %s was in cache", request.ip)
+					Log.Debugf("ip %s was in cache", request.ip)
 					response := *cacheResp
 					// TODO: might be interesting to check if the error is due to an invalid IP
 					// 		or if the reported error is due to a connection with the server (too many requests in the last minute)
 					if response.err != nil {
-						logger.Warn("readed response from cache includes an error:", response.err.Error())
+						Log.Warn("readed response from cache includes an error:", response.err.Error())
 					}
 					// put the received response in the channel to reply the external request
 
@@ -97,7 +93,7 @@ func (c *PeerLocalizer) locatorRoutine() {
 			case <-c.ctx.Done():
 				// close the channels
 				close(c.locationRequest)
-				break
+				return
 			}
 		}
 	}()
@@ -117,7 +113,7 @@ func (c *PeerLocalizer) locatorRoutine() {
 
 				response.ip = request.ip
 				// new API call needs to be done
-				logger.Debugf("call %d-> ip %s not in cache, making API call", call, response.ip)
+				Log.Debugf("call %d-> ip %s not in cache, making API call", call, response.ip)
 				for !breakCallLoop {
 					// if req delay is setted to true, make new request
 					// make the API call, and receive the apiResponse, the nextDelayRequest and the error from the connection
@@ -125,16 +121,23 @@ func (c *PeerLocalizer) locatorRoutine() {
 					if response.err != nil {
 						if response.err.Error() == TooManyRequestError {
 							// if the error reports that we tried too many calls on the API, sleep given time and try again
-							logger.Debug("call", call, "-> error received:", response.err.Error(), "\nwaiting ", nextDelayRequest+(5*time.Second))
+							Log.Debug("call", call, "-> error received:", response.err.Error(), "\nwaiting ", nextDelayRequest+(5*time.Second))
 							// set req delay to true, noone can make requests
+							// TODO: Change all the sleeps for
+							/*
+									select {
+									case <- time.After(DURATION):
+									case <- ctx.Done()
+								}
+							*/
 							time.Sleep(nextDelayRequest + (5 * time.Second))
 							continue
 						} else {
-							logger.Debug("call", call, "-> diff error received:", response.err.Error())
+							Log.Debug("call", call, "-> diff error received:", response.err.Error())
 							break
 						}
 					} else {
-						logger.Debugf("call %d-> api req success", call)
+						Log.Debugf("call %d-> api req success", call)
 						// if the error is different from TooManyRequestError break loop and store the request
 						break
 					}
@@ -142,12 +145,12 @@ func (c *PeerLocalizer) locatorRoutine() {
 				}
 				// check if there is any waiting time that we have to respect before next connection
 				if nextDelayRequest != time.Duration(0) {
-					logger.Debugf("call %d-> number of allowed requests has been exceed, waiting %#v", call, nextDelayRequest+(5*time.Second))
+					Log.Debugf("call %d-> number of allowed requests has been exceed, waiting %#v", call, nextDelayRequest+(5*time.Second))
 					// set req delay to true, noone can make requests
 					time.Sleep(nextDelayRequest + (5 * time.Second))
 				}
 
-				logger.Debugf("call %d-> saving new request and return it")
+				Log.Debugf("call %d-> saving new request and return it")
 				// add the response into the responseCache
 				c.reqCache.addRequest(&response)
 
@@ -158,7 +161,7 @@ func (c *PeerLocalizer) locatorRoutine() {
 			case <-c.ctx.Done():
 				// close the channels
 				close(apiCallChan)
-				break
+				return
 			}
 		}
 	}()
@@ -185,7 +188,7 @@ func (c *PeerLocalizer) LocateIP(ip string) (IpApiMessage, error) {
 
 //
 func (c *PeerLocalizer) Close() {
-	logger.Info("closing ", ModuleName)
+	Log.Info("closing ", ModuleName)
 	// close the context for ending up the routine
 	c.cancel()
 }
@@ -231,7 +234,7 @@ func (c *requestCache) checkIpInCache(ip string) (*ipResponse, bool) {
 // If the cache is its limit, remove first request from the list and
 // store the new one
 func (c *requestCache) addRequest(response *ipResponse) error {
-	logger.Debug("adding new response to the cache from IP:" + response.ip)
+	Log.Debug("adding new response to the cache from IP:" + response.ip)
 	// check if the IP is empty
 	if response.ip == "" {
 		return errors.New("the given IP is empty")
@@ -309,7 +312,7 @@ func (c *PeerLocalizer) getLocationFromIp(ip string) (apiMsg IpApiMessage, delay
 	timeLeft, _ := strconv.Atoi(resp.Header["X-Ttl"][0])
 	// check if the error that we are receiving means that we exeeded the request limit
 	if resp.StatusCode == 429 {
-		logger.Warnf("limit of requests per minute has been exeeded, wait for next call %s secs", resp.Header["X-Ttl"][0])
+		Log.Warnf("limit of requests per minute has been exeeded, wait for next call %s secs", resp.Header["X-Ttl"][0])
 		retErr = errors.New(TooManyRequestError)
 		delayTime = time.Duration(timeLeft) * time.Second
 		return

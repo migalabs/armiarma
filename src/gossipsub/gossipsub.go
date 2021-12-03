@@ -15,20 +15,26 @@ import (
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
-	"github.com/migalabs/armiarma/src/base"
 	"github.com/migalabs/armiarma/src/db"
 	"github.com/migalabs/armiarma/src/hosts"
 	"github.com/migalabs/armiarma/src/info"
 	"github.com/minio/sha256-simd"
+	"github.com/sirupsen/logrus"
 )
 
-const PKG_NAME string = "GOSSIP_SUB"
+var (
+	ModuleName = "GOSSIP-SUB"
+	Log        = logrus.WithField(
+		"module", ModuleName,
+	)
+)
 
 // GossipSub
 // * Sumarizes the control fields necesary to manage and
 // * govern the GossipSub internal service
 type GossipSub struct {
-	*base.Base
+	ctx           context.Context
+	cancel        context.CancelFunc
 	InfoObj       *info.InfoData
 	BasicHost     *hosts.BasicLibp2pHost
 	PeerStore     *db.PeerStore
@@ -54,18 +60,8 @@ func NewEmptyGossipSub() *GossipSub {
 // * @param peerstore: the peerstore of the
 // * @param stdOpts: list of options to generate the base of the gossipsub service
 // * @return: pointer to GossipSub struct
-func NewGossipSub(ctx context.Context, h *hosts.BasicLibp2pHost, peerstore *db.PeerStore, stdOpts base.LogOpts) *GossipSub {
-	localLogger := gossipsubLoggerOpts(stdOpts)
-
-	// instance base
-	new_base, err := base.NewBase(
-		base.WithContext(ctx),
-		base.WithLogger(localLogger),
-	)
-
-	if err != nil {
-		new_base.Log.Errorf(err.Error())
-	}
+func NewGossipSub(ctx context.Context, h *hosts.BasicLibp2pHost, peerstore *db.PeerStore) *GossipSub {
+	mainCtx, cancel := context.WithCancel(ctx)
 
 	// define gossipsub option
 	// Signature is not used in Eth2, therefore it is needed
@@ -76,11 +72,15 @@ func NewGossipSub(ctx context.Context, h *hosts.BasicLibp2pHost, peerstore *db.P
 		pubsub.WithStrictSignatureVerification(false),
 		pubsub.WithMessageIdFn(MsgIDFunction),
 	}
-	ps, err := pubsub.NewGossipSub(ctx, h.Host(), psOptions...)
+	ps, err := pubsub.NewGossipSub(mainCtx, h.Host(), psOptions...)
+	if err != nil {
+		Log.Panic(err)
+	}
 	msgMetrics := NewMessageMetrics()
 	// return the GossipSub object
 	return &GossipSub{
-		Base:           new_base,
+		ctx:            mainCtx,
+		cancel:         cancel,
 		InfoObj:        h.GetInfoObj(),
 		BasicHost:      h,
 		PeerStore:      peerstore,
@@ -109,34 +109,34 @@ func (gs *GossipSub) JoinAndSubscribe(topicName string) {
 	// Join topic
 	topic, err := gs.PubsubService.Join(topicName)
 	if err != nil {
-		gs.Log.Errorf("Could not join topic: %s", topicName)
-		gs.Log.Errorf(err.Error())
+		Log.Errorf("Could not join topic: %s", topicName)
+		Log.Errorf(err.Error())
 	}
 	// Subscribe to the topic
 	sub, err := topic.Subscribe()
 	if err != nil {
-		gs.Log.Errorf("Could not subscribe to topic: %s", topicName)
-		gs.Log.Errorf(err.Error())
+		Log.Errorf("Could not subscribe to topic: %s", topicName)
+		Log.Errorf(err.Error())
 	}
 	// Add the topic to the metrics list
 	_ = gs.MessageMetrics.NewTopic(topicName)
 
-	topicLogOpts := base.LogOpts{
-		Output:    "terminal",
-		Formatter: "text",
-		Level:     gs.InfoObj.GetLogLevel(),
-	}
-
-	new_topic_handler := NewTopicSubscription(gs.Ctx(), topic, *sub, gs.MessageMetrics, topicLogOpts)
+	new_topic_handler := NewTopicSubscription(gs.ctx, topic, *sub, gs.MessageMetrics)
 	// Add the new Topic to the list of supported/subscribed topics in GossipSub
 	gs.TopicArray[topicName] = new_topic_handler
 
 	go gs.TopicArray[topicName].MessageReadingLoop(gs.BasicHost.Host(), gs.PeerStore)
-
 }
 
-func gossipsubLoggerOpts(input_opts base.LogOpts) base.LogOpts {
-	input_opts.ModName = PKG_NAME
+func (gs *GossipSub) Close() {
+	Log.Info("gossipsub close has been detected, closing dependant go-routines")
+	gs.cancel()
+}
 
-	return input_opts
+func (gs *GossipSub) Ctx() context.Context {
+	return gs.ctx
+}
+
+func (gs *GossipSub) GetCtxCancel() context.CancelFunc {
+	return gs.cancel
 }

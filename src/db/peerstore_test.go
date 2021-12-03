@@ -1,6 +1,7 @@
 package db
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -9,7 +10,7 @@ import (
 
 func Test_StoreOrUpdatePeer(t *testing.T) {
 	// stores a peer
-	peerStore := NewPeerStore("memory", "")
+	peerStore := NewPeerStore(context.Background(), "memory", "")
 	p1 := NewPeer("Peer1")
 	p1.ClientName = "Client1"
 	peerStore.StoreOrUpdatePeer(p1)
@@ -39,7 +40,7 @@ func Test_StoreOrUpdatePeer(t *testing.T) {
 
 func Test_GetPeerList(t *testing.T) {
 	// stores a peer
-	peerStore := NewPeerStore("memory", "")
+	peerStore := NewPeerStore(context.Background(), "memory", "")
 	p1 := NewPeer("16Uiu2HAmCWwVV2qaLpEpPqkQHyX3ozazQs4sasXtFmVex8qzDqRG")
 	peerStore.StoreOrUpdatePeer(p1)
 	peerIDList := peerStore.GetPeerList()

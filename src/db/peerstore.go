@@ -9,12 +9,19 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 var (
-	ExportLoopTime time.Duration = 1 * time.Minute
+	// logging variables
+	ModuleName = "PEERSTORE"
+	Log        = logrus.WithField(
+		"module", ModuleName,
+	)
 
+	// TODO: put it into a config-variable
+	ExportLoopTime time.Duration = 1 * time.Minute
+	// DB config-options (TODO: unnecessary so far, we just have 2 of them)
 	BoltDBKey string            = "BoltDB"
 	MemoryKey string            = "Memory"
 	DBTypes   map[string]string = map[string]string{
@@ -26,13 +33,18 @@ var (
 type ErrorHandling func(*Peer)
 
 type PeerStore struct {
+	// control variables for the exporting routines
+	ctx    context.Context
+	cancel context.CancelFunc
+
 	PeerStore PeerStoreStorage
 	// MessageDatabase   *database.MessageDatabase // TODO: Discuss
 	StartTime      time.Time
 	MsgNotChannels map[string](chan bool) // TODO: Unused?
 }
 
-func NewPeerStore(dbtype string, path string) PeerStore {
+func NewPeerStore(ctx context.Context, dbtype string, path string) PeerStore {
+	mainCtx, cancel := context.WithCancel(ctx)
 	var db PeerStoreStorage
 	// TODO: once the db works well and it is defined
 	switch dbtype {
@@ -50,11 +62,25 @@ func NewPeerStore(dbtype string, path string) PeerStore {
 		db = NewBoltPeerDB(path)
 	}
 	ps := PeerStore{
+		ctx:            mainCtx,
+		cancel:         cancel,
 		PeerStore:      db,
 		StartTime:      time.Now(),
 		MsgNotChannels: make(map[string](chan bool)),
 	}
 	return ps
+}
+
+// Ctx
+// * Retreives the context asigned to the Peerstore
+func (c *PeerStore) Ctx() context.Context {
+	return c.ctx
+}
+
+// Ctx
+// * Retreives the cancel function to kill the Peerstore ctx
+func (c *PeerStore) GetCtxCancel() context.CancelFunc {
+	return c.cancel
 }
 
 func (c *PeerStore) ImportPeerStoreMetrics(importFolder string) error {
@@ -70,7 +96,7 @@ func (c *PeerStore) ImportPeerStoreMetrics(importFolder string) error {
 // NOTE: Keep in mind that the peers that we ended up connected to, will experience a weid connection time
 // TODO: Fix peers that stayed connected to the tool
 func (c *PeerStore) ResetDynamicMetrics() {
-	log.Info("Reseting Dynamic Metrics in Peer")
+	Log.Info("Reseting Dynamic Metrics in Peer")
 
 	// Iterate throught the peers in the metrics, restarting connection events and messages
 	c.PeerStore.Range(func(key string, value Peer) bool {
@@ -78,7 +104,7 @@ func (c *PeerStore) ResetDynamicMetrics() {
 		c.PeerStore.Store(key, value)
 		return true
 	})
-	log.Info("Finished Reseting Dynamic Metrics")
+	Log.Info("Finished Reseting Dynamic Metrics")
 }
 
 // Function that adds a notification channel to the message gossip topic
@@ -167,7 +193,7 @@ func (gm *PeerStore) GetErrorCounter() map[string]uint64 {
 // (create / open)
 // @return an error if there was
 func (c *PeerStore) ExportToCSV(filePath string) error {
-	log.Info("Exporting metrics to csv: ", filePath)
+	Log.Info("Exporting metrics to csv: ", filePath)
 	csvFile, err := os.Create(filePath)
 	if err != nil {
 		return errors.Wrap(err, "error opening the file "+filePath)
@@ -194,15 +220,27 @@ func (c *PeerStore) ExportToCSV(filePath string) error {
 	return nil
 }
 
-func (p *PeerStore) ExportLoop(ctx context.Context, folderpath string) {
-	ticker := time.NewTicker(ExportLoopTime)
-	for {
-		select {
-		case <-ticker.C:
-			p.ExportToCSV(folderpath + "/metrics.csv")
-		case <-ctx.Done():
-			ticker.Stop()
-			return
+func (ps *PeerStore) ExportCsvService(folderpath string) {
+	Log.Info("Peerstore CSV exporting service launched")
+	go func() {
+		ctx := ps.Ctx()
+		ticker := time.NewTicker(ExportLoopTime)
+		for {
+			select {
+			case <-ticker.C:
+				ps.ExportToCSV(folderpath + "/metrics.csv")
+			case <-ctx.Done():
+				ticker.Stop()
+				Log.Info("Closing DB CSV exporter")
+				return
+			}
 		}
-	}
+	}()
+}
+
+// CloseMetricsExport closes any go routine related with the DB metrics
+func (ps *PeerStore) CloseMetricsExport() {
+	Log.Info("closing metrics exporting services")
+	cancel := ps.GetCtxCancel()
+	cancel()
 }

@@ -3,7 +3,14 @@ package utils
 import (
 	"strings"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
+)
+
+var (
+	ModuleName = "DB-UTILS"
+	log        = logrus.WithField(
+		"module", ModuleName,
+	)
 )
 
 // Gets the client and version for a given userAgent
