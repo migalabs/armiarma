@@ -1,7 +1,6 @@
 package peering
 
 import (
-	"context"
 	"sync/atomic"
 	"time"
 
