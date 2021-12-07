@@ -22,10 +22,10 @@ var (
 		"module", PeerStratModuleName,
 	)
 	// Default Delays
-	DeprecationTime       = 10 * time.Minute // mMinutes after first negative connection that has to pass to deprecate a peer.
-	DefaultNegDelay       = 12 * time.Hour   // Default delay that will be applied for those deprecated peers.
-	DefaultPossitiveDelay = 6 * time.Hour    // Default delay after each positive severe negative attempts.
-	StartExpD             = 2 * time.Minute  // Starting delay that will serve for the Exponential Delay.
+	DeprecationTime       = 1024 * time.Minute // mMinutes after first negative connection that has to pass to deprecate a peer.
+	DefaultNegDelay       = 12 * time.Hour     // Default delay that will be applied for those deprecated peers.
+	DefaultPossitiveDelay = 6 * time.Hour      // Default delay after each positive severe negative attempts.
+	StartExpD             = 2 * time.Minute    // Starting delay that will serve for the Exponential Delay.
 	// Control variables
 	MinIterTime = 15 * time.Second // Minimum time that has to pass before iterating again.
 
