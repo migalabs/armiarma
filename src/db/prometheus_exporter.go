@@ -48,7 +48,6 @@ func (ps *PeerStore) ServePrometheusMetrics() {
 					if !peerData.IsDeprecated() {
 						if peerData.MetadataRequest {
 							if peerData.ClientName != "" {
-								//fmt.Println(peerData.ClientName)
 								clients.AddClientVersion(peerData.ClientName, peerData.ClientVersion)
 							}
 							if peerData.IsConnected {

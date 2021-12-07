@@ -22,10 +22,10 @@ var (
 		"module", PeerStratModuleName,
 	)
 	// Default Delays
-	DeprecationTime       = 1024 * time.Minute // mMinutes after first negative connection that has to pass to deprecate a peer.
-	DefaultNegDelay       = 12 * time.Hour     // Default delay that will be applied for those deprecated peers.
-	DefaultPossitiveDelay = 6 * time.Hour      // Default delay after each positive severe negative attempts.
-	StartExpD             = 2 * time.Minute    // Starting delay that will serve for the Exponential Delay.
+	DeprecationTime       = 10 * time.Minute // mMinutes after first negative connection that has to pass to deprecate a peer.
+	DefaultNegDelay       = 12 * time.Hour   // Default delay that will be applied for those deprecated peers.
+	DefaultPossitiveDelay = 6 * time.Hour    // Default delay after each positive severe negative attempts.
+	StartExpD             = 2 * time.Minute  // Starting delay that will serve for the Exponential Delay.
 	// Control variables
 	MinIterTime = 15 * time.Second // Minimum time that has to pass before iterating again.
 
@@ -617,14 +617,9 @@ func (c *PrunedPeer) NextConnection() time.Time {
 // This method evaluates if the peer is in time to be deprecated.
 // @return true (in time to be deprecated) / false (not ready to be deprecated).
 func (c *PrunedPeer) Deprecable() bool {
-	// if the difference between now and the LastIdentifyTime is more than the DeprecationTime, true
-
-	if (c.BaseDeprecationTimestamp != time.Time{}) && c.DelayObj.GetType() == NegativeWithHopeDelayType {
-		// it was identified and in hope case, do not deprecate
-		return false
-	}
-
-	return time.Now().Sub(c.BaseDeprecationTimestamp) >= DeprecationTime
+	// if the difference between now and the BaseDeprecationTimestampo is more than the DeprecationTime, true
+	result := time.Now().Sub(c.BaseDeprecationTimestamp) >= DeprecationTime
+	return result
 }
 
 // RecErrorHandler:

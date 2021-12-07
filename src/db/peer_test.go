@@ -2,6 +2,7 @@ package db
 
 import (
 	//log "github.com/sirupsen/logrus"
+
 	"testing"
 	"time"
 
@@ -135,18 +136,23 @@ func Test_FetchPeerInfoFromNewPeer(t *testing.T) {
 	peer3Conn.Latency = float64(2) / 1000
 	peer3Conn.MetadataRequest = true
 	peer3Conn.MetadataSucceed = true
+
+	//fmt.Println(peer3Conn.Deprecated)
 	// Connected for 5 secs
 	peer3Conn.ConnectionEvent("inbound", parseTime("2021-08-23T01:00:00.000Z", t))
 	peer3Conn.DisconnectionEvent(parseTime("2021-08-23T01:00:05.000Z", t))
 	peer3Conn.AddNegConnAtt(false, "Try")
 	peer3Conn.AddPositiveConnAttempt()
 	peer3Conn.AddNegConnAtt(false, "SecondTry")
+	peer3Conn.Deprecated = true
 	peerBase.FetchPeerInfoFromNewPeer(peer3Conn)
 
 	require.Equal(t, peerBase.PeerId, "Peer3")
 	require.Equal(t, float64(2)/1000, peerBase.Latency)
 	require.Equal(t, peerBase.MetadataRequest, true)
 	require.Equal(t, peerBase.MetadataSucceed, true)
+
+	require.Equal(t, peerBase.Deprecated, true)
 	require.Equal(t, peerBase.Error[0], "Try")
 	require.Equal(t, peerBase.Error[1], "None")
 	require.Equal(t, peerBase.Attempts, uint64(3))
@@ -169,10 +175,12 @@ func Test_FetchPeerInfoFromNewPeer(t *testing.T) {
 	peer5NotIdentified := NewPeer("Peer5")
 	peer5NotIdentified.MetadataSucceed = false
 	peer5NotIdentified.MetadataRequest = false
+	peer5NotIdentified.BlockchainNodeENR = "test"
 
 	peerBase.FetchPeerInfoFromNewPeer(peer5NotIdentified)
 	require.Equal(t, peerBase.MetadataSucceed, true)
 	require.Equal(t, peerBase.MetadataRequest, true)
+	require.Equal(t, peerBase.BlockchainNodeENR, "test")
 
 	/*peerMod.MetadataRequest = true
 	peerMod.MetadataSucceed = false
@@ -188,9 +196,9 @@ func Test_FetchPeerInfoFromNewPeer(t *testing.T) {
 	require.Equal(t, peerBase.MetadataSucceed, true)
 	require.Equal(t, len(peerBase.ConnectionTimes), 2)
 	require.Equal(t, len(peerBase.DisconnectionTimes), 2)
-	conTime2 := peerBase.GetConnectedTime()
+	//conTime2 := peerBase.GetConnectedTime()
 	// total connection time 1 minute
-	require.Equal(t, conTime2, float64(10)/60)*/
+	//require.Equal(t, conTime2, float64(10)/60)*/
 }
 
 func Test_GetEnodeFromENR(t *testing.T) {

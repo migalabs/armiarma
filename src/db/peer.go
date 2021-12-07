@@ -148,6 +148,7 @@ func (pm *Peer) FetchConnectionsFromNewPeer(newPeer Peer) {
 	if !pm.MetadataSucceed {
 		pm.MetadataSucceed = newPeer.MetadataSucceed
 	}
+	pm.Deprecated = newPeer.Deprecated
 
 	pm.Attempts += newPeer.Attempts
 
@@ -214,6 +215,8 @@ func (pm *Peer) FetchConnectionsFromNewPeer(newPeer Peer) {
 		pm.LastIdentifyTimestamp = newPeer.LastIdentifyTimestamp
 	}
 
+	pm.Deprecated = newPeer.Deprecated
+
 }
 
 // FetchChainNodeFromNewPeer:
@@ -231,6 +234,8 @@ func (pm *Peer) FetchChainNodeFromNewPeer(newPeer Peer) {
 	if newPeer.BeaconStatus != (BeaconStatusStamped{}) {
 		pm.BeaconStatus = newPeer.BeaconStatus
 	}
+
+	pm.BlockchainNodeENR = newPeer.BlockchainNodeENR
 }
 
 // GetBlockchainNode:
