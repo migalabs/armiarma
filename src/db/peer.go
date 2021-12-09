@@ -649,6 +649,13 @@ func (pm *Peer) ToCsvLine() string {
 	return csvRow
 }
 
+// IsEmpty:
+// Check if the Peer struct is Empty or not
+// @return boolean
+func (pm *Peer) IsEmpty() bool {
+	return pm.PeerId == ""
+}
+
 // LogPeer:
 // Log peer information
 func (pm *Peer) LogPeer() {
@@ -671,7 +678,16 @@ func (pm *Peer) LogPeer() {
 // PeerUnMarshal:
 // This method will create a Peer object reading a map of (string -> interface).
 // @return the resulting Peer.
-func PeerUnMarshal(m map[string]interface{}) Peer {
+func PeerUnMarshal(m map[string]interface{}) (p Peer, finErr error) {
+	// TEMP FIX - Check if the loaded interfaces from the peer-fields are not nil
+	// if any of the interfaces is nil, there was a problem Unmarshaling the peer
+	defer func() {
+		if err := recover(); err != nil {
+			// If the PeerId is empty, there was a promblem unmarshalling the peer
+			// return an error to avoid the raw panic and handle it from avobe
+			Log.Debug("panic error detected unmarshalling peer from Json")
+		}
+	}()
 
 	// for some fields we need to perform a check and parsing
 	m_addrs := make([]ma.Multiaddr, 0) // where to store the unmarshalled
@@ -685,18 +701,18 @@ func PeerUnMarshal(m map[string]interface{}) Peer {
 
 	negConns := make([]time.Time, 0)
 	if m["NegativeConnAttempts"] != nil {
-		negConns, err = utils.ParseInterfaceTimeArray(m["NegativeConnAttempts"].([]interface{}))
+		negConns, _ = utils.ParseInterfaceTimeArray(m["NegativeConnAttempts"].([]interface{}))
 
 	}
 
 	connTimes := make([]time.Time, 0)
 	if m["ConnectionTimes"] != nil {
-		connTimes, err = utils.ParseInterfaceTimeArray(m["ConnectionTimes"].([]interface{}))
+		connTimes, _ = utils.ParseInterfaceTimeArray(m["ConnectionTimes"].([]interface{}))
 	}
 
 	disconnTimes := make([]time.Time, 0)
 	if m["DisconnectionTimes"] != nil {
-		disconnTimes, err = utils.ParseInterfaceTimeArray(m["DisconnectionTimes"].([]interface{}))
+		disconnTimes, _ = utils.ParseInterfaceTimeArray(m["DisconnectionTimes"].([]interface{}))
 	}
 
 	protocolList := make([]string, 0)
@@ -746,7 +762,7 @@ func PeerUnMarshal(m map[string]interface{}) Peer {
 	}
 
 	// TODO: use constants for names
-	return Peer{
+	p = Peer{
 		PeerId:                m["PeerId"].(string),
 		Pubkey:                m["Pubkey"].(string),
 		NodeId:                m["NodeId"].(string),
@@ -782,6 +798,7 @@ func PeerUnMarshal(m map[string]interface{}) Peer {
 		BeaconStatus:          beaconStatus,
 		// BeaconMetadata:       m["BeaconMetadata"].(BeaconMetadataStamped),
 	}
+	return p, nil
 }
 
 // ParseInterfaceMapMessageMetrics:
