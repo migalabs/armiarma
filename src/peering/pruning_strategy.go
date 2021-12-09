@@ -129,6 +129,7 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 	negWHDelay := int64(0)
 	negWHTDelay := int64(0)
 	min1Delay := int64(0)
+	timeoutType := int64(0)
 	zerDelay := int64(0)
 
 	errorAttemptCategories := map[string]*int64{
@@ -137,6 +138,7 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 		NegativeWithNoHopeDelayType: &negWHTDelay,
 		Minus1DelayType:             &min1Delay,
 		ZeroDelayType:               &zerDelay,
+		TimeoutDelayType:            &timeoutType,
 	}
 	peerCounter := 0
 	peerListLen := c.PeerQueue.Len()
@@ -153,7 +155,7 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 				nextPeer := c.PeerQueue.PeerList[peerCounter]
 				// check if the node is ready for connection
 				// or we are in the first iteration, then we always try all of them
-				if nextPeer.IsReadyForConnection() || c.PeerQueueIterations == 0 {
+				if nextPeer.IsReadyForConnection() { // || c.PeerQueueIterations == 0 {
 					pinfo, err := c.PeerStore.GetPeerData(nextPeer.PeerID)
 					if err != nil {
 						slog.Warn(err)
@@ -485,6 +487,7 @@ func (c *PeerQueue) UpdatePeerListFromPeerStore(peerstore *db.PeerStore) error {
 	negWHType := int64(0)
 	negWHTType := int64(0)
 	min1Type := int64(0)
+	timeoutType := int64(0)
 	zerType := int64(0)
 
 	c.queueErroDistribution = map[string]*int64{
@@ -493,6 +496,7 @@ func (c *PeerQueue) UpdatePeerListFromPeerStore(peerstore *db.PeerStore) error {
 		NegativeWithNoHopeDelayType: &negWHTType,
 		Minus1DelayType:             &min1Type,
 		ZeroDelayType:               &zerType,
+		TimeoutDelayType:            &timeoutType,
 	}
 	// Fill the PeerQueue.PeerList with the missing peers from the
 	for _, peerID := range peerList {
@@ -618,8 +622,11 @@ func (c *PrunedPeer) NextConnection() time.Time {
 // @return true (in time to be deprecated) / false (not ready to be deprecated).
 func (c *PrunedPeer) Deprecable() bool {
 	// if the difference between now and the BaseDeprecationTimestampo is more than the DeprecationTime, true
-	result := time.Now().Sub(c.BaseDeprecationTimestamp) >= DeprecationTime
-	return result
+	if time.Now().Sub(c.BaseDeprecationTimestamp) >= DeprecationTime {
+		return true
+	}
+
+	return false
 }
 
 // RecErrorHandler:
@@ -637,11 +644,10 @@ func (c *PrunedPeer) ConnEventHandler(recErr string) string {
 // Positive or NegativeDelay happenned
 func (c *PrunedPeer) UpdateDelay(newDelayType string) {
 	// if the delaytype is different, always refresh the object
+	c.BaseConnectionTimestamp = time.Now()
 
 	if c.DelayObj.GetType() != newDelayType {
 		c.DelayObj = ReturnAccordingDelayObject(newDelayType)
-		// as there is a change, refresh the first event
-		c.BaseConnectionTimestamp = time.Now()
 	}
 
 	// if there is a positive delay (success identify), then we update the deprecation time
@@ -666,14 +672,15 @@ func ErrorToDelayType(errString string) string {
 	switch prettyErr {
 	case "none":
 		return PositiveDelayType
-	case "connection reset by peer", "connection refused", "context deadline exceeded", "dial backoff", "metadata error", "i/o timeout":
+	case "connection reset by peer", "connection refused", "context deadline exceeded", "dial backoff", "metadata error":
 		return NegativeWithHopeDelayType
 	case "no route to host", "unreachable network", "peer id mismatch", "dial to self attempted":
 		return NegativeWithNoHopeDelayType
+	case "i/o timeout":
+		return TimeoutDelayType
 	default:
 		slog.Warnf("Default Delay applied, error: %s-\n", prettyErr)
 		return NegativeWithHopeDelayType
-
 	}
 }
 

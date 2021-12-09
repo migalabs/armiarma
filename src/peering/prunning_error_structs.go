@@ -13,6 +13,7 @@ var (
 	NegativeWithNoHopeDelayType string = "NegativeWithNoHope"
 	ZeroDelayType               string = "Zero"
 	Minus1DelayType             string = "Minus1"
+	TimeoutDelayType            string = "Timeout"
 
 	MaxDelayTime time.Duration = time.Duration(math.Pow(2, 11) * float64(time.Minute))
 
@@ -23,6 +24,7 @@ var (
 		NegativeWithNoHopeDelayType: 256 * time.Minute,
 		ZeroDelayType:               0 * time.Hour,
 		Minus1DelayType:             -1000 * time.Hour,
+		TimeoutDelayType:            16 * time.Minute,
 	}
 )
 
@@ -101,8 +103,9 @@ func NewPositiveDelay() PositiveDelay {
 // This method will calculate the delay to be applied based on degree.
 // @return the delay in Time.Duration format.
 func (d PositiveDelay) CalculateDelay() time.Duration {
-	// return 6 hours * the degree (6,12,18...)
-	return time.Duration(d.DelayDegree) * InitialDelayTime[d.Type]
+	// return 2 hours * the degree (6,12,18...)
+	//return time.Duration(d.DelayDegree) * InitialDelayTime[d.Type]
+	return InitialDelayTime[d.Type]
 }
 
 /**/
@@ -192,6 +195,16 @@ func NewNegativeWithNoHopeDelay() NegativeWithNoHopeDelay {
 	}
 }
 
+type TimeoutDelay struct {
+	*NegativeDelay
+}
+
+func NewTimeoutDelay() NegativeWithNoHopeDelay {
+	return NegativeWithNoHopeDelay{
+		NegativeDelay: NewNegativeDelay(TimeoutDelayType),
+	}
+}
+
 // ReturnAccordingDelayObject
 // @param delayType: string representing a type of delay.
 // @return the according delayobject
@@ -203,6 +216,8 @@ func ReturnAccordingDelayObject(delayType string) DelayObject {
 		return NewNegativeWithHopeDelay()
 	case NegativeWithNoHopeDelayType:
 		return NewNegativeWithNoHopeDelay()
+	case TimeoutDelayType:
+		return NewTimeoutDelay()
 	case ZeroDelayType:
 		return NewZeroDelay()
 	case Minus1DelayType:

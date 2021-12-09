@@ -11,8 +11,9 @@ import (
 func Test_PrunnedPeerDelays(t *testing.T) {
 
 	tNow := time.Now()
-	time.Sleep(5 * time.Second)
+
 	prunnedPeer1 := NewPrunedPeer("Peer1", PositiveDelayType)
+	time.Sleep(5 * time.Second)
 
 	prunnedPeer1.ConnEventHandler("None")
 	require.Equal(t, true, prunnedPeer1.NextConnection().After(tNow.Add(128*time.Minute)))
