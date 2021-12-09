@@ -148,7 +148,10 @@ func (pm *Peer) FetchConnectionsFromNewPeer(newPeer Peer) {
 	if !pm.MetadataSucceed {
 		pm.MetadataSucceed = newPeer.MetadataSucceed
 	}
-	pm.Deprecated = newPeer.Deprecated
+
+	if newPeer.MetadataSucceed || newPeer.Deprecated {
+		pm.Deprecated = newPeer.Deprecated
+	}
 
 	pm.Attempts += newPeer.Attempts
 
@@ -215,8 +218,6 @@ func (pm *Peer) FetchConnectionsFromNewPeer(newPeer Peer) {
 		pm.LastIdentifyTimestamp = newPeer.LastIdentifyTimestamp
 	}
 
-	pm.Deprecated = newPeer.Deprecated
-
 }
 
 // FetchChainNodeFromNewPeer:
@@ -235,7 +236,10 @@ func (pm *Peer) FetchChainNodeFromNewPeer(newPeer Peer) {
 		pm.BeaconStatus = newPeer.BeaconStatus
 	}
 
-	pm.BlockchainNodeENR = newPeer.BlockchainNodeENR
+	if newPeer.BlockchainNodeENR != "" {
+		pm.BlockchainNodeENR = newPeer.BlockchainNodeENR
+	}
+
 }
 
 // GetBlockchainNode:
@@ -627,6 +631,7 @@ func (pm *Peer) ToCsvLine() string {
 		pm.Ip + "," +
 		pm.Country + "," +
 		pm.City + "," +
+		pm.BlockchainNodeENR + "," +
 		strconv.FormatBool(pm.MetadataRequest) + "," +
 		strconv.FormatBool(pm.MetadataSucceed) + "," +
 		strconv.FormatBool(pm.Attempted) + "," +
