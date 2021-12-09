@@ -8,9 +8,11 @@ import (
 	"os"
 	"reflect"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/migalabs/armiarma/src/utils"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -67,22 +69,48 @@ func NewBoltPeerDB(folderpath string) BoltPeerDB {
 		return true
 	})
 	if dbReadingError {
-		Log.Errorf("Unable to read existing DB at %s .", folderpath+"/peerstore.db")
-		Log.Error("It could be originated from a non-compatible DB version or a corrupted DB.")
-		Log.Error("Please, make a copy / remove the existing DB and rerun it.")
-		os.Exit(0)
-	}
+		// If there has been any issue reading the previously existing DB, generte a new one on the
+		// user given new name
+		Log.Errorf("Unable to read existing DB at %s", folderpath+"/peerstore.db")
+		Log.Error("It could be originated from a non-compatible DB version or a corrupted DB")
+		Log.Error("Please, introduce the name you want to assign to the backup-file of the previously existing DB (press ENTER to confirm)")
+		var newName string
+		// Taking input from user
+		n, err := fmt.Scanln(&newName)
+		if err != nil {
+			Log.Error(n, err)
+		}
+		if !strings.Contains(newName, ".db") {
+			newName = newName + ".db"
+		}
+		Log.Info("making backup to ", newName)
+		// Rename the old db
+		err = utils.CopyFileToNewPath(folderpath+"/peerstore.db", folderpath+"/"+newName)
+		if err != nil {
+			Log.Errorf("Unable to copy existing DB to %s .", folderpath+"/"+newName)
+			os.Exit(0)
+		}
+		// Generate new file for the new Bolt DB
+		db, err = OpenBoltDB(folderpath+"/peerstore.db", "peerstore", 0600, nil)
+		if err != nil {
+			Log.Panicf(err.Error())
+		}
+		// Fill the previous existing DB Obj with the new db
+		dbObj.db = db
 
-	if peercnt > 0 {
-		Log.Infof("loaded BoltDB with %d peer on it (%d connected)", peercnt, len(connectedPeers))
 	} else {
-		Log.Infof("generated new BoltDB")
-	}
+		// if there hasn't been any error, proceed to fill the connect peers with the needed disconnections
+		if peercnt > 0 {
+			Log.Infof("loaded BoltDB with %d peer on it (%d connected)", peercnt, len(connectedPeers))
+		} else {
+			Log.Infof("generated new BoltDB")
+		}
 
-	// last, lets add the disconnection event to those peers that remained connected
-	for _, connectedPeerTmp := range connectedPeers {
-		connectedPeerTmp.DisconnectionEvent(lastCrawlerActivity)
-		dbObj.Store(connectedPeerTmp.PeerId, connectedPeerTmp)
+		// last, lets add the disconnection event to those peers that remained connected
+		for _, connectedPeerTmp := range connectedPeers {
+			connectedPeerTmp.DisconnectionEvent(lastCrawlerActivity)
+			dbObj.Store(connectedPeerTmp.PeerId, connectedPeerTmp)
+		}
 	}
 
 	return dbObj
