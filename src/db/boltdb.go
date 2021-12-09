@@ -50,15 +50,11 @@ func NewBoltPeerDB(folderpath string) BoltPeerDB {
 			dbReadingError = true
 			return false
 		}
-
-		// check if the Peer was successfully read by checking if PeerID was
-
 		// check if there was an open connection
 		if value.IsConnected {
 			// it "remains" connected
 			connectedPeers = append(connectedPeers, value)
 		}
-
 		// we also need to figure out the last activity of the crawler
 		// this way we can set the disconnection time for the remained connected
 		peerLastActivity := value.GetLastActivityTime()
