@@ -16,6 +16,10 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+var (
+	MaxArraySize int = 10
+)
+
 // Stores all the information related to a peer
 type Peer struct {
 
@@ -202,12 +206,22 @@ func (pm *Peer) FetchConnectionsFromNewPeer(newPeer Peer) {
 
 		pm.ConnectionEvent(newConnectedDirection, time)
 	}
+
+	if len(pm.ConnectedDirection) > MaxArraySize {
+		tmpConnDirection := pm.ConnectedDirection[len(pm.ConnectedDirection)-MaxArraySize-1 : len(pm.ConnectedDirection)-1]
+		pm.ConnectedDirection = tmpConnDirection
+	}
+
 	for _, time := range newPeer.DisconnectionTimes {
 		pm.DisconnectionEvent(time)
 	}
 
 	for _, errorTmp := range newPeer.Error {
 		pm.Error = append(pm.Error, errorTmp)
+	}
+	if len(pm.Error) > MaxArraySize {
+		tmpError := pm.ConnectedDirection[len(pm.Error)-MaxArraySize-1 : len(pm.Error)-1]
+		pm.Error = tmpError
 	}
 
 	if newPeer.LastErrorTimestamp.After(pm.LastErrorTimestamp) {
