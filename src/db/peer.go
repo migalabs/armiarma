@@ -220,7 +220,7 @@ func (pm *Peer) FetchConnectionsFromNewPeer(newPeer Peer) {
 		pm.Error = append(pm.Error, errorTmp)
 	}
 	if len(pm.Error) > MaxArraySize {
-		tmpError := pm.ConnectedDirection[len(pm.Error)-MaxArraySize-1 : len(pm.Error)-1]
+		tmpError := pm.Error[len(pm.Error)-MaxArraySize-1 : len(pm.Error)-1]
 		pm.Error = tmpError
 	}
 
