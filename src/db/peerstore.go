@@ -22,8 +22,8 @@ var (
 	// TODO: put it into a config-variable
 	ExportLoopTime time.Duration = 1 * time.Minute
 	// DB config-options (TODO: unnecessary so far, we just have 2 of them)
-	BoltDBKey string            = "BoltDB"
-	MemoryKey string            = "Memory"
+	BoltDBKey string            = "bolt"
+	MemoryKey string            = "memory"
 	DBTypes   map[string]string = map[string]string{
 		BoltDBKey: "bolt",
 		MemoryKey: "memory",
