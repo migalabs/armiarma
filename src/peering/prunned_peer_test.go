@@ -1,7 +1,6 @@
 package peering
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
@@ -23,11 +22,8 @@ func Test_PrunnedPeerDelays(t *testing.T) {
 	require.Equal(t, true, time.Now().Sub(prunnedPeer1.BaseDeprecationTimestamp) < 1*time.Second)
 
 	prunnedPeer1.ConnEventHandler("None")
-	fmt.Println(prunnedPeer1.DelayObj.GetDegree())
-	fmt.Println(prunnedPeer1.NextConnection())
-	fmt.Println(tNow.Add(256 * time.Minute))
-	require.Equal(t, true, prunnedPeer1.NextConnection().After(tNow.Add(256*time.Minute)))
-	require.Equal(t, false, prunnedPeer1.NextConnection().After(tNow.Add(257*time.Minute)))
+	require.Equal(t, true, prunnedPeer1.NextConnection().After(tNow.Add(128*time.Minute)))
+	require.Equal(t, false, prunnedPeer1.NextConnection().After(tNow.Add(129*time.Minute)))
 
 	tNow = time.Now()
 	prunnedPeer1.ConnEventHandler("") // this should go to NegativeWithHope
@@ -87,11 +83,26 @@ func Test_PrunnedPeerDelays(t *testing.T) {
 	require.Equal(t, true, prunnedPeer1.NextConnection().After(tNow.Add(8*time.Minute)))
 	require.Equal(t, false, prunnedPeer1.NextConnection().After(tNow.Add(9*time.Minute)))
 
-	prunnedPeer1.ConnEventHandler("i/o timeout") // this should maintain in NegativeWithNoHope
-	fmt.Println(prunnedPeer1.NextConnection())
-	fmt.Println(tNow)
+	prunnedPeer1.ConnEventHandler("error requesting metadata") // this should maintain in NegativeWithNoHope
 	require.Equal(t, true, prunnedPeer1.NextConnection().After(tNow.Add(16*time.Minute)))
 	require.Equal(t, false, prunnedPeer1.NextConnection().After(tNow.Add(17*time.Minute)))
+
+	prunnedPeer1.ConnEventHandler("error requesting metadata") // this should maintain in NegativeWithNoHope
+	require.Equal(t, true, prunnedPeer1.NextConnection().After(tNow.Add(32*time.Minute)))
+	require.Equal(t, false, prunnedPeer1.NextConnection().After(tNow.Add(33*time.Minute)))
+
+	tNow = time.Now()
+	prunnedPeer1.ConnEventHandler("i/o timeout") // this should reset to timeoutdelay
+	require.Equal(t, true, prunnedPeer1.NextConnection().After(tNow.Add(32*time.Minute)))
+	require.Equal(t, false, prunnedPeer1.NextConnection().After(tNow.Add(33*time.Minute)))
+
+	prunnedPeer1.ConnEventHandler("i/o timeout") // this should maintain in timeoutdelay
+	require.Equal(t, true, prunnedPeer1.NextConnection().After(tNow.Add(64*time.Minute)))
+	require.Equal(t, false, prunnedPeer1.NextConnection().After(tNow.Add(65*time.Minute)))
+
+	prunnedPeer1.ConnEventHandler("i/o timeout") // this should maintain in timeoutdelay
+	require.Equal(t, true, prunnedPeer1.NextConnection().After(tNow.Add(128*time.Minute)))
+	require.Equal(t, false, prunnedPeer1.NextConnection().After(tNow.Add(129*time.Minute)))
 
 	// check this has not been refreshed
 	require.Equal(t, true, time.Now().Sub(prunnedPeer1.BaseDeprecationTimestamp) > 5*time.Second)

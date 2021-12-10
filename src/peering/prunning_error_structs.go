@@ -24,7 +24,7 @@ var (
 		NegativeWithNoHopeDelayType: 256 * time.Minute,
 		ZeroDelayType:               0 * time.Hour,
 		Minus1DelayType:             -1000 * time.Hour,
-		TimeoutDelayType:            16 * time.Minute,
+		TimeoutDelayType:            32 * time.Minute, //experimental
 	}
 )
 
@@ -110,6 +110,8 @@ func (d PositiveDelay) CalculateDelay() time.Duration {
 
 /**/
 
+// ZeroDelay:
+// It could be applied to specific error cases where we apply a delay of 0 minutes.
 type ZeroDelay struct {
 	*BaseDelay
 }
@@ -130,7 +132,9 @@ func (d ZeroDelay) CalculateDelay() time.Duration {
 }
 
 /**/
-
+// Minus1Delay:
+// Delay type applied to new peers coming from the Discovery5 service.
+// These are always set to be connected the first ones.
 type Minus1Delay struct {
 	*BaseDelay
 }
@@ -152,6 +156,10 @@ func (d Minus1Delay) CalculateDelay() time.Duration {
 
 /**/
 
+// NegativeDelay:
+// Delay type applied to peers that had any sort of error.
+// The delays are exponentially increased.
+// The child clases will apply a different type which only varies the baseDelay time.
 type NegativeDelay struct {
 	*BaseDelay
 }
@@ -175,6 +183,10 @@ func (d NegativeDelay) CalculateDelay() time.Duration {
 	return time.Duration(math.Pow(2, float64(d.DelayDegree-1))) * InitialDelayTime[d.Type]
 }
 
+// NegativeWithHopeDelay:
+// In case of "connection reset by peer", "connection refused", "context deadline exceeded", "dial backoff", "metadata error" and default.
+// Usually peers that have returned and error but could possibly be identified.
+// baseDelay = 2 minutes.
 type NegativeWithHopeDelay struct {
 	*NegativeDelay
 }
@@ -185,6 +197,10 @@ func NewNegativeWithHopeDelay() NegativeWithHopeDelay {
 	}
 }
 
+// NegativeWithNoHopeDelay:
+// In case of "no route to host", "unreachable network", "peer id mismatch", "dial to self attempted".
+// Usually peers that have returned and error and are not probably running anymore.
+// baseDelay = 256 minutes.
 type NegativeWithNoHopeDelay struct {
 	*NegativeDelay
 }
@@ -195,6 +211,10 @@ func NewNegativeWithNoHopeDelay() NegativeWithNoHopeDelay {
 	}
 }
 
+// TimeoutDelay
+// In case of "i/o timeout"
+// Only peers that have returned a timeout error.
+// baseDelay = 16 minutes.
 type TimeoutDelay struct {
 	*NegativeDelay
 }

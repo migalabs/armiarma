@@ -31,6 +31,7 @@ func (ps *PeerStore) ServePrometheusMetrics() {
 
 	// routine to loop
 	go func() {
+		//t := time.Now()
 		for {
 			select {
 			case <-ticker.C:
@@ -46,6 +47,7 @@ func (ps *PeerStore) ServePrometheusMetrics() {
 				// Iterate the peerstore to generate the exporting metrics
 				ps.PeerStore.Range(func(k string, peerData Peer) bool {
 					if !peerData.IsDeprecated() {
+						//if t.Sub(peerData.LastIdentifyTimestamp) < 1024*time.Minute {
 						if peerData.MetadataRequest {
 							if peerData.ClientName != "" {
 								clients.AddClientVersion(peerData.ClientName, peerData.ClientVersion)

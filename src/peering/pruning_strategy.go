@@ -140,6 +140,7 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 		ZeroDelayType:               &zerDelay,
 		TimeoutDelayType:            &timeoutType,
 	}
+	c.ErrorAttemptDistribution = errorAttemptCategories
 	peerCounter := 0
 	peerListLen := c.PeerQueue.Len()
 	validIterTimer := time.NewTimer(MinIterTime)
@@ -155,7 +156,7 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 				nextPeer := c.PeerQueue.PeerList[peerCounter]
 				// check if the node is ready for connection
 				// or we are in the first iteration, then we always try all of them
-				if nextPeer.IsReadyForConnection() { // || c.PeerQueueIterations == 0 {
+				if nextPeer.IsReadyForConnection() || c.PeerQueueIterations == 0 {
 					pinfo, err := c.PeerStore.GetPeerData(nextPeer.PeerID)
 					if err != nil {
 						slog.Warn(err)
@@ -529,7 +530,7 @@ func (c *PeerQueue) UpdatePeerListFromPeerStore(peerstore *db.PeerStore) error {
 						}
 
 					} else {
-						for i := range errorList {
+						for i, _ := range errorList { /// experimental
 							// recreate the nuber of consecutive errors backwards
 							if errorList[len(errorList)-1-i] == lastError {
 								delayDegree++
