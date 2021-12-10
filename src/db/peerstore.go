@@ -124,7 +124,6 @@ func (c *PeerStore) AddNotChannel(topicName string) {
 func (c *PeerStore) StoreOrUpdatePeer(peer Peer) {
 
 	oldPeer, err := c.GetPeerData(peer.PeerId)
-
 	// if error means not found, just store it
 	if err != nil {
 		c.PeerStore.Store(peer.PeerId, peer)
@@ -153,7 +152,7 @@ func (c *PeerStore) StorePeer(peer Peer) {
 func (c *PeerStore) GetPeerData(peerId string) (Peer, error) {
 	peerData, ok := c.PeerStore.Load(peerId)
 	if !ok {
-		return Peer{}, errors.New("could not find peer in peerstore: " + peerId)
+		return Peer{}, errors.New("could not find peer in peerstore or peer was unable to unmarshal: " + peerId)
 	}
 
 	return peerData, nil
