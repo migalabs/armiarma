@@ -614,6 +614,11 @@ func (c *PrunedPeer) NextConnection() time.Time {
 	if c.DelayObj.GetType() == Minus1DelayType { // in case of Minus1, this is new peer and we want it to connect as soon as possible
 		return time.Time{}
 	}
+
+	if c.DelayObj.CalculateDelay() > MaxDelayTime {
+		return c.BaseConnectionTimestamp.Add(MaxDelayTime)
+	}
+
 	// nextConnection should be from first event + the applied delay
 	return c.BaseConnectionTimestamp.Add(c.DelayObj.CalculateDelay())
 }
@@ -657,10 +662,7 @@ func (c *PrunedPeer) UpdateDelay(newDelayType string) {
 		c.BaseDeprecationTimestamp = time.Now()
 	}
 
-	// only add degree in case we have not exceeded the MaxDelay allowed
-	if c.DelayObj.CalculateDelay() < MaxDelayTime {
-		c.DelayObj.AddDegree()
-	}
+	c.DelayObj.AddDegree()
 }
 
 // ErrorToDelayType:
