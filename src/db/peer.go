@@ -370,8 +370,8 @@ func (pm *Peer) AddPositiveConnAttempt() {
 	pm.Deprecated = false // not deprecated anymore
 	pm.Attempted = true
 	pm.Attempts += 1
-	pm.Succeed = true                   // this peer counts now as succeeded
-	pm.Error = append(pm.Error, "None") // append the no error
+	pm.Succeed = true // this peer counts now as succeeded
+	//pm.Error = append(pm.Error, "None") // append the no error
 
 }
 

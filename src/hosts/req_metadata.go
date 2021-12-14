@@ -149,7 +149,6 @@ func ReqHostInfo(ctx context.Context, wg *sync.WaitGroup, h host.Host, ipLoc *ap
 	select {
 	case <-idService.IdentifyWait(conn):
 		peer.MetadataSucceed = true
-		peer.LastIdentifyTimestamp = time.Now()
 		rtt = time.Since(t)
 	case <-ctx.Done():
 		errIdent <- errors.Errorf("identification error caused by timed out")
@@ -212,6 +211,10 @@ func ReqHostInfo(ctx context.Context, wg *sync.WaitGroup, h host.Host, ipLoc *ap
 	pubk, err := conn.RemotePublicKey().Raw()
 	if err == nil {
 		peer.Pubkey = hex.EncodeToString(pubk)
+	}
+
+	if peer.MetadataSucceed {
+		peer.LastIdentifyTimestamp = time.Now()
 	}
 	// return the erro defined in the top
 	// nil if we could identify it, ident error if we couldnt line 181
