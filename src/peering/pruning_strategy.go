@@ -307,7 +307,7 @@ func (c *PruningStrategy) eventRecorderRoutine() {
 				c.PeerQueue.AddPeer(p)
 			}
 
-			identEvent.Peer.Error = append(identEvent.Peer.Error, p.ConnEventHandler(errorType))
+			p.ConnEventHandler(errorType)
 
 			// peerstore save data
 			c.PeerStore.StoreOrUpdatePeer(identEvent.Peer)
