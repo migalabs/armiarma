@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/migalabs/armiarma/src/db"
+	"github.com/migalabs/armiarma/src/db/models"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/sirupsen/logrus"
@@ -20,15 +20,15 @@ import (
 // It is the struct that compiles the data of a received a connection from the host
 // The struct will be shared between peering and strategy.
 type ConnectionEvent struct {
-	ConnType  int8      // (0)-Empty (1)-Connection (2)-Disconnection
-	Peer      db.Peer   // TODO: right now just sending the entire info about the peer, (recheck after Peer struct subdivision)
-	Timestamp time.Time // Timestamp of when was the attempt done
+	ConnType  int8        // (0)-Empty (1)-Connection (2)-Disconnection
+	Peer      models.Peer // TODO: right now just sending the entire info about the peer, (recheck after Peer struct subdivision)
+	Timestamp time.Time   // Timestamp of when was the attempt done
 	// TODO: More things to add in te future
 }
 
 type IdentificationEvent struct {
-	Peer      db.Peer   // TODO: right now just sending the entire info about the peer, (recheck after Peer struct subdivision)
-	Timestamp time.Time // Timestamp of when was the attempt done
+	Peer      models.Peer // TODO: right now just sending the entire info about the peer, (recheck after Peer struct subdivision)
+	Timestamp time.Time   // Timestamp of when was the attempt done
 }
 
 func (c *BasicLibp2pHost) standardListenF(net network.Network, addr ma.Multiaddr) {
@@ -44,7 +44,7 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 	// Add new connection event
 	// ConnectionEvent and Disconnection
 	t := time.Now()
-	p := db.NewPeer(conn.RemotePeer().String())
+	p := models.NewPeer(conn.RemotePeer().String())
 	// TODO: Add the connection ID to the connection and disconnection events
 	p.ConnectionEvent(conn.Stat().Direction.String(), t)
 	cs := ConnectionEvent{
@@ -64,7 +64,7 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 
 	// identify everything that we can about the peer
 	// not adding the connection 2 times
-	peer := db.NewPeer(conn.RemotePeer().String())
+	peer := models.NewPeer(conn.RemotePeer().String())
 
 	// Aggregate timeout context for the different
 	mainCtx, cancel := context.WithTimeout(c.Ctx(), 5*time.Second)
@@ -147,7 +147,7 @@ func (c *BasicLibp2pHost) standardDisconnectF(net network.Network, conn network.
 	Log.Debugf("disconnected from peer %s", conn.RemotePeer().String())
 	// TEMP
 
-	peer := db.NewPeer(conn.RemotePeer().String())
+	peer := models.NewPeer(conn.RemotePeer().String())
 	t := time.Now()
 	peer.DisconnectionEvent(t)
 	disconnStat := ConnectionEvent{

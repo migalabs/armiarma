@@ -57,3 +57,8 @@ func Test_Deprecation(t *testing.T) {
 	require.Equal(t, false, testPeer.Deprecable())
 
 }
+
+// Test the overall functionning of the pruning strategy
+func Test_Pruning(t *testing.T) {
+
+}

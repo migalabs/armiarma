@@ -21,7 +21,7 @@ import (
 )
 
 var (
-	IpCacheSize = 4000
+	IpCacheSize = 400
 
 	ModuleName = "CRAWLER"
 	log        = logrus.WithField(
@@ -122,7 +122,7 @@ func (c *Crawler) Close() {
 	// initialization secuence for the crawler
 	log.Info("stoping crawler client")
 	c.Dv5.CloseFindingNodes()
-	c.DB.CloseMetricsExport()
+	c.DB.Close()
 	c.Gs.Close()
 	c.Peering.Close()
 	c.Host.Stop()

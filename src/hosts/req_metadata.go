@@ -11,7 +11,7 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/migalabs/armiarma/src/db"
+	"github.com/migalabs/armiarma/src/db/models"
 	db_utils "github.com/migalabs/armiarma/src/db/utils"
 	"github.com/migalabs/armiarma/src/rpc/methods"
 	"github.com/migalabs/armiarma/src/rpc/reqresp"
@@ -125,7 +125,7 @@ type HostWithIDService interface {
 // @param meta: where to deserialize the content of the beacon metadata: output.
 // @param finErr: error channel.
 
-func ReqHostInfo(ctx context.Context, wg *sync.WaitGroup, h host.Host, ipLoc *apis.PeerLocalizer, conn network.Conn, peer *db.Peer, errIdent chan error) {
+func ReqHostInfo(ctx context.Context, wg *sync.WaitGroup, h host.Host, ipLoc *apis.PeerLocalizer, conn network.Conn, peer *models.Peer, errIdent chan error) {
 	defer wg.Done()
 
 	peerID := conn.RemotePeer()
@@ -176,7 +176,7 @@ func ReqHostInfo(ctx context.Context, wg *sync.WaitGroup, h host.Host, ipLoc *ap
 		fmt.Println("unable to extract multiaddrs")
 		return
 	}
-	// generate array of MAddr to fit the db.Peer struct
+	// generate array of MAddr to fit the models.Peer struct
 	mAddrs := make([]ma.Multiaddr, 0)
 	mAddrs = append(mAddrs, multiAddr)
 	peer.MAddrs = mAddrs

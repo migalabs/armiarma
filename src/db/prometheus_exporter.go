@@ -44,8 +44,16 @@ func (ps *PeerStore) ServePrometheusMetrics() {
 				ipDist := NewStringMapMetric()
 				rttDis := NewStringMapMetric()
 				tctDis := NewStringMapMetric()
+
+				// TODO:	-remove the Storage.Range from the PrometheusExport workflow
+				//			for loop over the PeerList might not be the best idea, but should work for now
 				// Iterate the peerstore to generate the exporting metrics
-				ps.PeerStore.Range(func(k string, peerData Peer) bool {
+				peerList := ps.GetPeerList()
+				for _, pID := range peerList {
+					peerData, err := ps.GetPeerData(pID.String())
+					if err != nil {
+						continue
+					}
 					if !peerData.IsDeprecated() {
 						//if t.Sub(peerData.LastIdentifyTimestamp) < 1024*time.Minute {
 						if peerData.MetadataRequest {
@@ -76,8 +84,7 @@ func (ps *PeerStore) ServePrometheusMetrics() {
 						nOfDeprecatedPeers++
 					}
 					nOfDiscoveredPeers++
-					return true
-				})
+				}
 				TotPeers.Set(float64(nOfDiscoveredPeers))
 				ConnectedPeers.Set(float64(nOfConnectedPeers))
 				DeprecatedPeers.Set(float64(nOfDeprecatedPeers))

@@ -1,10 +1,19 @@
 package db
 
 import (
+	"fmt"
+	"os"
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/migalabs/armiarma/src/db/models"
+	"github.com/pkg/errors"
+)
+
+var (
+	MemoryType = "MemoryDB"
 )
 
 // PeerStoreMemory save the peer's data in RAM.
@@ -29,42 +38,47 @@ func NewMemoryDB() MemoryDB {
 // Store keeps adds key and Peer values into a sync.Map in memory.
 // @param key: used as key in the map.
 // @param value: the object to store with the given key.
-func (p MemoryDB) Store(key string, value Peer) {
-	p.m.Store(key, value)
+func (m MemoryDB) Store(key string, value models.Peer) {
+	m.m.Store(key, value)
 }
 
 // Loads peer value of given key from sync.Map in memory.
-func (p MemoryDB) Load(key string) (value Peer, ok bool) {
-	v, ok := p.m.Load(key)
+func (m MemoryDB) Load(key string) (value models.Peer, ok bool) {
+	v, ok := m.m.Load(key)
 	if !ok {
-		return Peer{}, ok
+		return models.Peer{}, ok
 	}
-	value = v.(Peer)
+	value = v.(models.Peer)
 	return
 }
 
 // Delete removes key and value from sync.Map.
 // @param key: the string to locate the value to delete.
-func (p MemoryDB) Delete(key string) {
-	p.m.Delete(key)
+func (m MemoryDB) Delete(key string) {
+	m.m.Delete(key)
 }
 
 // Range iterates through the key and values of the sync.Map
 // @param f: the function to apply to each item in the db
-func (p MemoryDB) Range(f func(key string, value Peer) bool) {
-	p.m.Range(func(key, value interface{}) bool {
-		ok := f(key.(string), value.(Peer))
+func (m MemoryDB) Range(f func(key string, value models.Peer) bool) {
+	m.m.Range(func(key, value interface{}) bool {
+		ok := f(key.(string), value.(models.Peer))
 		return ok
 	})
 }
 
 // Close and free the space from the memory relative to the DB
 // So far just initialize the
-func (p MemoryDB) Close() {
-	p.m.Range(func(key, _ interface{}) bool {
-		p.m.Delete(key.(string))
+func (m MemoryDB) Close() {
+	m.m.Range(func(key, _ interface{}) bool {
+		m.m.Delete(key.(string))
 		return true
 	})
+}
+
+// Type
+func (m MemoryDB) Type() string {
+	return MemoryType
 }
 
 // Peers
@@ -72,9 +86,9 @@ func (p MemoryDB) Close() {
 // existing in the DB.
 // These would be the keys of each entry in the map
 // @return the string array containisssng the PeerIDs
-func (p MemoryDB) Peers() []peer.ID {
+func (m MemoryDB) Peers() []peer.ID {
 	result := make([]peer.ID, 0)
-	p.Range(func(key string, value Peer) bool {
+	m.Range(func(key string, value models.Peer) bool {
 		peerID_obj, err := peer.Decode(key)
 		if err != nil {
 			//return false
@@ -84,4 +98,46 @@ func (p MemoryDB) Peers() []peer.ID {
 		return true
 	})
 	return result
+}
+
+// GetENR returns the Node after parsing the ENR.
+// @param peerID: the peerID of which to get the Node.
+// @return the resulting Node.
+// @return error if applicable, nil in any other case.
+func (m MemoryDB) GetENR(peerID string) (*enode.Node, error) {
+	p, ok := m.Load(peerID)
+	if !ok {
+		return nil, fmt.Errorf("No peer was found under ID %s", peerID)
+	}
+	return p.GetBlockchainNode()
+}
+
+// ExportToCSV
+// This method will export the whole peerstore into a CSV file.
+// @param filePath file where to dump the CSV lines (create if it does not exist).
+// @return an error if there was.
+func (m MemoryDB) ExportToCSV(filePath string) error {
+	Log.Info("Exporting metrics to csv: ", filePath)
+	csvFile, err := os.Create(filePath)
+	if err != nil {
+		return errors.Wrap(err, "error opening the file "+filePath)
+	}
+	defer csvFile.Close()
+
+	// First raw of the file will be the Titles of the columns
+	_, err = csvFile.WriteString("Peer Id,Node Id,Fork Digest,User Agent,Client,Version,Pubkey,Address,Ip,Country,City,ENR,Request Metadata,Success Metadata,Attempted,Succeed,Deprecated,ConnStablished,IsConnected,Attempts,Error,Last Error Timestamp,Last Identify Timestamp,Latency,Connections,Disconnections,Last Connection,Conn Direction,Connected Time,Beacon Blocks,Beacon Aggregations,Voluntary Exits,Proposer Slashings,Attester Slashings,Total Messages\n")
+	if err != nil {
+		errors.Wrap(err, "error while writing the titles on the csv "+filePath)
+	}
+
+	err = nil
+	m.Range(func(key string, value models.Peer) bool {
+		_, err = csvFile.WriteString(value.ToCsvLine())
+		return true
+	})
+
+	if err != nil {
+		return errors.Wrap(err, "could not export peer metrics")
+	}
+	return nil
 }

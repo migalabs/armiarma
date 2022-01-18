@@ -50,6 +50,7 @@ require (
 	github.com/klauspost/cpuid/v2 v2.0.4 // indirect
 	github.com/konsorten/go-windows-terminal-sequences v1.0.3 // indirect
 	github.com/koron/go-ssdp v0.0.0-20191105050749-2e1c40ed0b5d // indirect
+	github.com/lib/pq v1.10.4 // indirect
 	github.com/libp2p/go-addr-util v0.1.0 // indirect
 	github.com/libp2p/go-buffer-pool v0.0.2 // indirect
 	github.com/libp2p/go-conn-security-multistream v0.2.1 // indirect
