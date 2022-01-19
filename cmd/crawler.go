@@ -51,20 +51,20 @@ type Crawler struct {
 
 func NewCrawler(ctx context.Context, config config.ConfigData) (*Crawler, error) {
 	mainCtx, cancel := context.WithCancel(ctx)
-	info_tmp := info.NewCustomInfoData(config)
+	infoObj := info.NewCustomInfoData(config)
 	// Generate new DB for the peerstore
-	db := db.NewPeerStore(mainCtx, info_tmp.GetDBType(), info_tmp.GetOutputPath())
+	db := db.NewPeerStore(mainCtx, infoObj.GetDBType(), infoObj.GetOutputPath(), infoObj.GetDBEndpoint())
 	// IpLocalizer
 	ipLocalizer := apis.NewPeerLocalizer(mainCtx, IpCacheSize)
 	// generate libp2pHost
-	host, err := hosts.NewBasicLibp2pHost(mainCtx, *info_tmp, &ipLocalizer, &db)
+	host, err := hosts.NewBasicLibp2pHost(mainCtx, *infoObj, &ipLocalizer, &db)
 	if err != nil {
 		return nil, err
 	}
 	// generate local Enode and DV5
-	node_tmp := enode.NewLocalNode(mainCtx, info_tmp)
+	node_tmp := enode.NewLocalNode(mainCtx, infoObj)
 	//node_tmp.AddEntries()
-	dv5_tmp := discovery.NewDiscovery(mainCtx, node_tmp, &db, &ipLocalizer, info_tmp, 9006)
+	dv5_tmp := discovery.NewDiscovery(mainCtx, node_tmp, &db, &ipLocalizer, infoObj, 9006)
 	// GossipSup
 	gs_tmp := gossipsub.NewGossipSub(mainCtx, host, &db)
 	// generate the peering strategy
@@ -73,7 +73,7 @@ func NewCrawler(ctx context.Context, config config.ConfigData) (*Crawler, error)
 		return nil, err
 	}
 	// Generate the PeeringService
-	peeringServ, err := peering.NewPeeringService(mainCtx, host, &db, info_tmp,
+	peeringServ, err := peering.NewPeeringService(mainCtx, host, &db, infoObj,
 		peering.WithPeeringStrategy(&pStrategy),
 	)
 	if err != nil {
@@ -86,7 +86,7 @@ func NewCrawler(ctx context.Context, config config.ConfigData) (*Crawler, error)
 		ctx:              mainCtx,
 		cancel:           cancel,
 		Host:             host,
-		Info:             info_tmp,
+		Info:             infoObj,
 		DB:               &db,
 		Node:             node_tmp,
 		Dv5:              dv5_tmp,

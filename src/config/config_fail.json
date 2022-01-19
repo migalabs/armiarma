@@ -4,6 +4,7 @@
     "/UdpPort": 101,
     "/TopicArray": ["echo", "ohce"],
     "/Network": "testnet",
+    "DBEndpoint": "postgres://database",
     "/Eth2Endpoint": "https://infura.test.endpoint",
     "/ForkDigest": "Altair",
     "/serAgent": "bsc_test",

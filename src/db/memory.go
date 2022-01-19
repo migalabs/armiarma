@@ -38,12 +38,12 @@ func NewMemoryDB() MemoryDB {
 // Store keeps adds key and Peer values into a sync.Map in memory.
 // @param key: used as key in the map.
 // @param value: the object to store with the given key.
-func (m MemoryDB) Store(key string, value models.Peer) {
+func (m MemoryDB) StorePeer(key string, value models.Peer) {
 	m.m.Store(key, value)
 }
 
 // Loads peer value of given key from sync.Map in memory.
-func (m MemoryDB) Load(key string) (value models.Peer, ok bool) {
+func (m MemoryDB) LoadPeer(key string) (value models.Peer, ok bool) {
 	v, ok := m.m.Load(key)
 	if !ok {
 		return models.Peer{}, ok
@@ -54,7 +54,7 @@ func (m MemoryDB) Load(key string) (value models.Peer, ok bool) {
 
 // Delete removes key and value from sync.Map.
 // @param key: the string to locate the value to delete.
-func (m MemoryDB) Delete(key string) {
+func (m MemoryDB) DeletePeer(key string) {
 	m.m.Delete(key)
 }
 
@@ -86,7 +86,7 @@ func (m MemoryDB) Type() string {
 // existing in the DB.
 // These would be the keys of each entry in the map
 // @return the string array containisssng the PeerIDs
-func (m MemoryDB) Peers() []peer.ID {
+func (m MemoryDB) GetPeers() []peer.ID {
 	result := make([]peer.ID, 0)
 	m.Range(func(key string, value models.Peer) bool {
 		peerID_obj, err := peer.Decode(key)
@@ -104,8 +104,8 @@ func (m MemoryDB) Peers() []peer.ID {
 // @param peerID: the peerID of which to get the Node.
 // @return the resulting Node.
 // @return error if applicable, nil in any other case.
-func (m MemoryDB) GetENR(peerID string) (*enode.Node, error) {
-	p, ok := m.Load(peerID)
+func (m MemoryDB) GetPeerENR(peerID string) (*enode.Node, error) {
+	p, ok := m.LoadPeer(peerID)
 	if !ok {
 		return nil, fmt.Errorf("No peer was found under ID %s", peerID)
 	}

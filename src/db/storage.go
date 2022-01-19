@@ -16,15 +16,14 @@ var (
 // to interact with peers data.
 // It is either saved in a Db or in Memory.
 type PeerStoreStorage interface {
-	Store(key string, value models.Peer)
-	Load(key string) (value models.Peer, ok bool)
-	Delete(key string)
-	Range(f func(key string, value models.Peer) bool)
+	StorePeer(string, models.Peer)
+	LoadPeer(string) (models.Peer, bool)
+	DeletePeer(string)
 	Close()
 	// New calls
 	Type() string
-	Peers() []peer.ID
-	GetENR(string) (*enode.Node, error)
+	GetPeers() []peer.ID
+	GetPeerENR(string) (*enode.Node, error)
 	ExportToCSV(string) error
 	// TODO: -Implement statistics directly from the PeerStoreStorage module?
 }

@@ -4,6 +4,7 @@
     "UdpPort": 101,
     "TopicArray": ["BeaconBlock"],
     "Network": "testnet",
+    "DBEndpoint": "postgres://database",
     "Eth2Endpoint": "https://infura.test.endpoint",
     "ForkDigest": "0xdlskgfn",
     "UserAgent": "bsc_test",

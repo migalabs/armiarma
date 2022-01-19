@@ -112,7 +112,7 @@ func NewBoltPeerDB(folderpath string) BoltPeerDB {
 		// last, lets add the disconnection event to those peers that remained connected
 		for _, connectedPeerTmp := range connectedPeers {
 			connectedPeerTmp.DisconnectionEvent(lastCrawlerActivity)
-			dbObj.Store(connectedPeerTmp.PeerId, connectedPeerTmp)
+			dbObj.StorePeer(connectedPeerTmp.PeerId, connectedPeerTmp)
 		}
 	}
 
@@ -122,7 +122,7 @@ func NewBoltPeerDB(folderpath string) BoltPeerDB {
 // Stores a Peer with the given key.
 // @param key: the key to access the object.
 // @param Peer: the value to store.
-func (b BoltPeerDB) Store(key string, value models.Peer) {
+func (b BoltPeerDB) StorePeer(key string, value models.Peer) {
 	value_marshalled, err := json.Marshal(value)
 	if err != nil {
 		Log.Error(err)
@@ -136,7 +136,7 @@ func (b BoltPeerDB) Store(key string, value models.Peer) {
 // @param key: the string to use to get the object.
 // @return Peer: the resulting object.
 // @return ok: whether the operation was successful or not.
-func (b BoltPeerDB) Load(key string) (models.Peer, bool) {
+func (b BoltPeerDB) LoadPeer(key string) (models.Peer, bool) {
 	value_marshalled, ok := b.db.load([]byte(key))
 	if !ok {
 		return models.Peer{}, false
@@ -157,7 +157,7 @@ func (b BoltPeerDB) Load(key string) (models.Peer, bool) {
 
 // Deletes the object for the given key in the db.
 // @param key: the string to access the desired object.
-func (p BoltPeerDB) Delete(key string) {
+func (p BoltPeerDB) DeletePeer(key string) {
 	p.db.delete([]byte(key))
 }
 
@@ -192,7 +192,7 @@ func (b BoltPeerDB) Type() string {
 // TODO: pending return / print some kind of error if it was the case
 // Resturns a list of peerIDs existing in the db
 // @return the list of peerID in peer.ID format
-func (b BoltPeerDB) Peers() []peer.ID {
+func (b BoltPeerDB) GetPeers() []peer.ID {
 	peers := make([]peer.ID, 0)
 	b.Range(func(key string, value models.Peer) bool {
 		peerID_obj, err := peer.Decode(string(key))
@@ -211,8 +211,8 @@ func (b BoltPeerDB) Peers() []peer.ID {
 // @param peerID: the peerID of which to get the Node.
 // @return the resulting Node.
 // @return error if applicable, nil in any other case.
-func (b BoltPeerDB) GetENR(peerID string) (*enode.Node, error) {
-	p, ok := b.Load(peerID)
+func (b BoltPeerDB) GetPeerENR(peerID string) (*enode.Node, error) {
+	p, ok := b.LoadPeer(peerID)
 	if !ok {
 		return nil, fmt.Errorf("No peer was found under ID %s", peerID)
 	}

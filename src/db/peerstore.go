@@ -7,6 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/migalabs/armiarma/src/db/models"
+	"github.com/migalabs/armiarma/src/db/postgres"
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/pkg/errors"
@@ -25,9 +26,11 @@ var (
 	// DB config-options (TODO: unnecessary so far, we just have 2 of them)
 	BoltDBKey string            = "bolt"
 	MemoryKey string            = "memory"
+	PsqlKey   string            = "postgresql"
 	DBTypes   map[string]string = map[string]string{
 		BoltDBKey: "bolt",
 		MemoryKey: "memory",
+		PsqlKey:   "postgresql",
 	}
 )
 
@@ -41,9 +44,10 @@ type PeerStore struct {
 	Storage PeerStoreStorage
 }
 
-func NewPeerStore(ctx context.Context, dbtype string, path string) PeerStore {
+func NewPeerStore(ctx context.Context, dbtype string, path string, endpoint string) PeerStore {
 	mainCtx, cancel := context.WithCancel(ctx)
 	var db PeerStoreStorage
+	var err error
 
 	switch dbtype {
 	case DBTypes[BoltDBKey]:
@@ -53,6 +57,11 @@ func NewPeerStore(ctx context.Context, dbtype string, path string) PeerStore {
 		db = NewBoltPeerDB(path)
 	case DBTypes[MemoryKey]:
 		db = NewMemoryDB()
+	case DBTypes[PsqlKey]:
+		db, err = postgres.ConnectToDB(mainCtx, endpoint)
+		if err != nil {
+			Log.Panicf(err.Error())
+		}
 	default:
 		if len(path) <= 0 {
 			path = default_db_path
@@ -91,11 +100,11 @@ func (c *PeerStore) StoreOrUpdatePeer(peer models.Peer) {
 	oldPeer, err := c.GetPeerData(peer.PeerId)
 	// if error means not found, just store it
 	if err != nil {
-		c.Storage.Store(peer.PeerId, peer)
+		c.Storage.StorePeer(peer.PeerId, peer)
 	} else {
 		// Fetch the new info of a peer directly from the new peer struct
 		oldPeer.FetchPeerInfoFromNewPeer(peer)
-		c.Storage.Store(peer.PeerId, oldPeer)
+		c.Storage.StorePeer(peer.PeerId, oldPeer)
 	}
 	// Force Garbage collector
 	runtime.GC()
@@ -106,7 +115,7 @@ func (c *PeerStore) StoreOrUpdatePeer(peer models.Peer) {
 // It will use the peerID as key.
 // @param peer: the peer object to store.
 func (c *PeerStore) StorePeer(peer models.Peer) {
-	c.Storage.Store(peer.PeerId, peer)
+	c.Storage.StorePeer(peer.PeerId, peer)
 }
 
 // GetPeerData:
@@ -115,7 +124,7 @@ func (c *PeerStore) StorePeer(peer models.Peer) {
 // @param peerID: the peerID to look for in string format.
 // @return the found Peer object and an error if there was.
 func (c *PeerStore) GetPeerData(peerId string) (models.Peer, error) {
-	peerData, ok := c.Storage.Load(peerId)
+	peerData, ok := c.Storage.LoadPeer(peerId)
 	if !ok {
 		return models.Peer{}, errors.New("could not find peer in peerstore or peer was unable to unmarshal: " + peerId)
 	}
@@ -127,11 +136,11 @@ func (c *PeerStore) GetPeerData(peerId string) (models.Peer, error) {
 // This method returns the list of PeerIDs in the DB.
 // @return the list of PeerIDs in string format.
 func (c *PeerStore) GetPeerList() []peer.ID {
-	return c.Storage.Peers()
+	return c.Storage.GetPeers()
 }
 
 func (c *PeerStore) GetPeerENR(peerID string) (*enode.Node, error) {
-	return c.Storage.GetENR(peerID)
+	return c.Storage.GetPeerENR(peerID)
 }
 
 // ExportCsvService will export to csv regularly, therefoe this service will execute the export every X seconds (ExportLoopTime)

@@ -63,6 +63,7 @@ type InfoData struct {
 	topicArray    []string
 	network       string
 	forkDigest    string
+	dbEndpoint    string
 	eth2endpoint  string
 	logLevel      string
 	privateKey    *crypto.Secp256k1PrivateKey
@@ -169,6 +170,12 @@ func (i *InfoData) importFromConfig(inputConfig config.ConfigData) {
 		i.SetEth2Endpoint(inputConfig.GetEth2Endpoint())
 	}
 
+	// Eth2 Endpoint
+	// Check if any Eth2Endpoint was given to get the ForkDigest
+	if inputConfig.GetDBEndpoint() != "" {
+		i.SetDBEndpoint(inputConfig.GetDBEndpoint())
+	}
+
 	// Fork digest
 	valid := i.SetForkDigest(inputConfig.GetForkDigest())
 	if !valid {
@@ -267,7 +274,6 @@ func (i InfoData) GetTcpPort() int {
 	return i.tcpPort
 }
 func (i InfoData) GetTcpPortString() string {
-
 	return fmt.Sprintf("%d", i.tcpPort)
 }
 func (i *InfoData) SetTcpPort(input_port int) {
@@ -283,7 +289,6 @@ func (i InfoData) GetUdpPort() int {
 	return i.udpPort
 }
 func (i InfoData) GetUdpPortString() string {
-
 	return fmt.Sprintf("%d", i.udpPort)
 }
 func (i *InfoData) SetUdpPort(input_port int) {
@@ -363,22 +368,29 @@ func (i *InfoData) SetTopicArrayFromString(input_list string) bool {
 func (i InfoData) GetNetwork() string {
 	return i.network
 }
-func (i *InfoData) SetNetwork(input_string string) {
-	i.network = input_string
+func (i *InfoData) SetNetwork(inputString string) {
+	i.network = inputString
+}
+
+func (i InfoData) GetDBEndpoint() string {
+	return i.dbEndpoint
+}
+func (i *InfoData) SetDBEndpoint(inputString string) {
+	i.dbEndpoint = inputString
 }
 
 func (i InfoData) GetEth2Endpoint() string {
 	return i.eth2endpoint
 }
-func (i *InfoData) SetEth2Endpoint(input_string string) {
-	i.eth2endpoint = input_string
+func (i *InfoData) SetEth2Endpoint(inputString string) {
+	i.eth2endpoint = inputString
 }
 
 func (i InfoData) GetForkDigest() string {
 	return i.forkDigest
 }
-func (i *InfoData) SetForkDigest(input_string string) bool {
-	new_fork_digest, valid := blockchaintopics.CheckValidForkDigest(input_string)
+func (i *InfoData) SetForkDigest(inputString string) bool {
+	new_fork_digest, valid := blockchaintopics.CheckValidForkDigest(inputString)
 	if valid {
 		i.forkDigest = new_fork_digest
 		return true
@@ -390,8 +402,8 @@ func (i *InfoData) SetForkDigest(input_string string) bool {
 func (i InfoData) GetLogLevel() string {
 	return i.logLevel
 }
-func (i *InfoData) SetLogLevel(input_string string) {
-	i.logLevel = input_string
+func (i *InfoData) SetLogLevel(inputString string) {
+	i.logLevel = inputString
 }
 func (i InfoData) checkValidLogLevel(input_level string) bool {
 	for _, log_level := range PossibleLogLevels {
@@ -425,20 +437,20 @@ func (i *InfoData) SetPrivKeyFromString(input_key string) error {
 func (i InfoData) GetBootNodeFile() string {
 	return i.bootNodesFile
 }
-func (i *InfoData) SetBootNodeFile(input_string string) {
-	i.bootNodesFile = input_string
+func (i *InfoData) SetBootNodeFile(inputString string) {
+	i.bootNodesFile = inputString
 }
 
 func (i InfoData) GetOutputPath() string {
 	return i.OutputPath
 }
-func (i *InfoData) SetOutputPath(input_string string) {
-	i.OutputPath = input_string
+func (i *InfoData) SetOutputPath(inputString string) {
+	i.OutputPath = inputString
 }
 
 func (i InfoData) GetDBType() string {
 	return i.dBType
 }
-func (i *InfoData) SetDBType(input_string string) {
-	i.dBType = input_string
+func (i *InfoData) SetDBType(inputString string) {
+	i.dBType = inputString
 }

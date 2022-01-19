@@ -5,6 +5,7 @@
     "TopicArray": [],
     "Network": "mainnet",
     "Eth2Endpoint": "",
+    "DBEndpoint": "",
     "ForkDigest": "afcaaba0",
     "UserAgent": "BSC-Eth2-Crawler",
     "LogLevel": "info",

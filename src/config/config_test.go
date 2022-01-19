@@ -15,6 +15,7 @@ func Test_ReadJSON_Success(t *testing.T) {
 	require.Equal(t, config_object.GetUdpPort(), 101)
 	require.Equal(t, config_object.GetTopicArray(), []string{"BeaconBlock"})
 	require.Equal(t, config_object.GetNetwork(), "testnet")
+	require.Equal(t, config_object.GetDBEndpoint(), "https://infura.test.endpoint")
 	require.Equal(t, config_object.GetEth2Endpoint(), "https://infura.test.endpoint")
 	require.Equal(t, config_object.GetForkDigest(), "0xdlskgfn")
 	require.Equal(t, config_object.GetUserAgent(), "bsc_test")
