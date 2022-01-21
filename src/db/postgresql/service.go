@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	pgx "github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -23,7 +23,7 @@ type PostgresDBService struct {
 	ctx           context.Context
 	cancel        context.CancelFunc
 	connectionUrl string // the url might not be necessary (better to remove it?¿)
-	psqlConn      *pgx.Conn
+	psqlPool      *pgxpool.Pool
 	// Metric Variables
 	// TODO: missing some sort of local-crawler identification fields
 	// 		 like: location, IP, ID, etc
@@ -36,7 +36,7 @@ func ConnectToDB(ctx context.Context, url string) (*PostgresDBService, error) {
 	if strings.Contains(url, "@") {
 		log.Debugf("Connecting to PostgresDB at %s", strings.Split(url, "@")[1])
 	}
-	psqlConn, err := pgx.Connect(mainCtx, url)
+	psqlPool, err := pgxpool.Connect(mainCtx, url)
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +47,7 @@ func ConnectToDB(ctx context.Context, url string) (*PostgresDBService, error) {
 		ctx:           mainCtx,
 		cancel:        cancel,
 		connectionUrl: url,
-		psqlConn:      psqlConn,
+		psqlPool:      psqlPool,
 	}
 	// init the psql db
 	err = psqlDB.init()
@@ -63,11 +63,20 @@ func ConnectToDB(ctx context.Context, url string) (*PostgresDBService, error) {
 // 				- read/load item
 
 // Initialize all the DBs creating tables and making sure that everything is ready to start crawling
-func (p *PostgresDBService) init() error {
+func (p *PostgresDBService) init() (err error) {
 
 	// IMPORTANT: !!!!! When the table is initialized, the peer connected need to be disconnected
 	// TODO:
-	err := p.createPeerTable()
+	err = p.createPeerTable()
+	if err != nil {
+		return err
+	}
+	ok := p.CheckPeersSummaryTableStatus()
+	if !ok {
+		return errors.New("unable to check existing connected peers in the postgres db")
+	}
+
+	err = p.createPeerMessageMetricsTable()
 	if err != nil {
 		return err
 	}
@@ -81,6 +90,6 @@ func (p *PostgresDBService) Type() string {
 
 func (p *PostgresDBService) Close() {
 	log.Debug("Closing ProstgresDB")
-	p.psqlConn.Close(p.ctx)
+	p.psqlPool.Close()
 	p.cancel()
 }

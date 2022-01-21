@@ -7,7 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/migalabs/armiarma/src/db/models"
-	"github.com/migalabs/armiarma/src/db/postgres"
+	postgresql "github.com/migalabs/armiarma/src/db/postgresql"
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/pkg/errors"
@@ -58,9 +58,9 @@ func NewPeerStore(ctx context.Context, dbtype string, path string, endpoint stri
 	case DBTypes[MemoryKey]:
 		db = NewMemoryDB()
 	case DBTypes[PsqlKey]:
-		db, err = postgres.ConnectToDB(mainCtx, endpoint)
+		db, err = postgresql.ConnectToDB(mainCtx, endpoint)
 		if err != nil {
-			Log.Panicf(err.Error())
+			Log.Panic(err.Error())
 		}
 	default:
 		if len(path) <= 0 {

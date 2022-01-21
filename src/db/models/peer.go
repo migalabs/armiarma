@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/hex"
 	"fmt"
 	"strconv"
 	"strings"
@@ -829,132 +830,6 @@ func PeerUnMarshal(m map[string]interface{}) (p Peer, finErr error) {
 	return p, nil
 }
 
-// PeerUnMarshal:
-// This method will create a Peer object reading a map of (string -> interface).
-// @return the resulting Peer.
-func ComposePerFromPsql(m map[string]interface{}) (p Peer, finErr error) {
-	// TEMP FIX - Check if the loaded interfaces from the peer-fields are not nil
-	// if any of the interfaces is nil, there was a problem Unmarshaling the peer
-	defer func() {
-		if err := recover(); err != nil {
-			// If the PeerId is empty, there was a promblem unmarshalling the peer
-			// return an error to avoid the raw panic and handle it from avobe
-			log.Debug("panic error detected unmarshalling peer from Json")
-		}
-	}()
-
-	// for some fields we need to perform a check and parsing
-	m_addrs := make([]ma.Multiaddr, 0) // where to store the unmarshalled
-	err := errors.New("")
-	if m["MAddrs"] != nil {
-		m_addrs, err = utils.ParseInterfaceAddrArray(m["MAddrs"].([]interface{}))
-		if err != nil {
-			log.Errorf(err.Error())
-		}
-	}
-
-	negConns := make([]time.Time, 0)
-	if m["NegativeConnAttempts"] != nil {
-		negConns, _ = utils.ParseInterfaceTimeArray(m["NegativeConnAttempts"].([]interface{}))
-
-	}
-
-	connTimes := make([]time.Time, 0)
-	if m["ConnectionTimes"] != nil {
-		connTimes, _ = utils.ParseInterfaceTimeArray(m["ConnectionTimes"].([]interface{}))
-	}
-
-	disconnTimes := make([]time.Time, 0)
-	if m["DisconnectionTimes"] != nil {
-		disconnTimes, _ = utils.ParseInterfaceTimeArray(m["DisconnectionTimes"].([]interface{}))
-	}
-
-	protocolList := make([]string, 0)
-	if m["Protocols"] != nil {
-		protocolList = utils.ParseInterfaceStringArray(m["Protocols"].([]interface{}))
-	}
-
-	directionList := make([]string, 0)
-	if m["ConnectedDirection"] != nil {
-		directionList = utils.ParseInterfaceStringArray(m["ConnectedDirection"].([]interface{}))
-	}
-
-	errorList := make([]string, 0)
-	if m["Error"] != nil {
-		errorList = utils.ParseInterfaceStringArray(m["Error"].([]interface{}))
-	}
-
-	protocolVersionNew := ""
-	if m["ProtocolVersion"] != nil {
-		protocolVersionNew = m["ProtocolVersion"].(string)
-	}
-
-	msgMetrics := make(map[string]MessageMetric)
-	if m["MessageMetrics"] != nil {
-		msgMetrics, err = ParseInterfaceMapMessageMetrics(m["MessageMetrics"].(map[string]interface{}))
-		if err != nil {
-			log.Warnf("unable to cast full gossip msg metrics while unmarshaling. %s", err.Error())
-		}
-	}
-
-	beaconStatus := BeaconStatusStamped{}
-	if m["BeaconStatus"] != nil {
-		beaconStatus, err = ParseBeaconStatusFromInterface(m["BeaconStatus"])
-		if err != nil {
-			log.Warnf("unable to cast beaconStatus while unmarshaling. %s", err.Error())
-		}
-	}
-
-	lastError, err := time.Parse(time.RFC3339, m["LastErrorTimestamp"].(string))
-	if err != nil {
-		lastError = time.Time{}
-	}
-
-	lastIdentify, err := time.Parse(time.RFC3339, m["LastIdentifyTimestamp"].(string))
-	if err != nil {
-		lastIdentify = time.Time{}
-	}
-
-	// TODO: use constants for names
-	p = Peer{
-		PeerId:                m["PeerId"].(string),
-		Pubkey:                m["Pubkey"].(string),
-		NodeId:                m["NodeId"].(string),
-		UserAgent:             m["UserAgent"].(string),
-		ClientName:            m["ClientName"].(string),
-		ClientOS:              m["ClientOS"].(string),
-		ClientVersion:         m["ClientVersion"].(string),
-		BlockchainNodeENR:     m["BlockchainNodeENR"].(string),
-		Ip:                    m["Ip"].(string),
-		Country:               m["Country"].(string),
-		CountryCode:           m["CountryCode"].(string),
-		City:                  m["City"].(string),
-		Latency:               m["Latency"].(float64),
-		MAddrs:                m_addrs, // correct
-		Protocols:             protocolList,
-		ProtocolVersion:       protocolVersionNew,
-		ConnectedDirection:    directionList,
-		IsConnected:           m["IsConnected"].(bool),
-		Attempted:             m["Attempted"].(bool),
-		Succeed:               m["Succeed"].(bool),
-		Attempts:              uint64(m["Attempts"].(float64)),
-		Error:                 errorList,
-		LastErrorTimestamp:    lastError,
-		LastIdentifyTimestamp: lastIdentify,
-		Deprecated:            m["Deprecated"].(bool),
-		NegativeConnAttempts:  negConns,
-		ConnectionTimes:       connTimes,
-		DisconnectionTimes:    disconnTimes,
-		MetadataRequest:       m["MetadataRequest"].(bool),
-		MetadataSucceed:       m["MetadataSucceed"].(bool),
-		LastExport:            int64(m["LastExport"].(float64)),
-		MessageMetrics:        msgMetrics,
-		BeaconStatus:          beaconStatus,
-		// BeaconMetadata:       m["BeaconMetadata"].(BeaconMetadataStamped),
-	}
-	return p, nil
-}
-
 // ParseInterfaceMapMessageMetrics:
 // Parse the inputMap into the MessageMetric format
 // @param inputMap: a map of string interface
@@ -1029,5 +904,57 @@ func ParseBeaconStatusFromInterface(input interface{}) (BeaconStatusStamped, err
 	}
 	result.Status.HeadSlot = common.Slot(uint64(s))
 	return result, nil
+}
 
+func ParseBeaconStatusFromBasicTypes(
+	t time.Time,
+	forkdigest string,
+	finaRoot string,
+	finaEpoch int64,
+	headRoot string,
+	headSlot int64) (BeaconStatusStamped, error) {
+
+	var result BeaconStatusStamped
+	var err error
+
+	// timestamp
+	result.Timestamp = t
+
+	err = result.Status.ForkDigest.UnmarshalText(utils.BytesFromString(forkdigest))
+	if err != nil {
+		return result, fmt.Errorf("unable to compose BeaconStatus.ForkDigest from readed interface")
+	}
+
+	// FINALIZED ROOT
+	// remove 0x if exists from the root string
+	if strings.Contains(finaRoot, "0x") {
+		finaRoot = strings.Replace(finaRoot, "0x", "", 1)
+	}
+	// conver strig to hex bytes
+	fr, err := hex.DecodeString(finaRoot)
+	if err != nil {
+		return result, fmt.Errorf("unable to decode finalizedRoot %s", err.Error())
+	}
+	// copy the bytes of the root into a [32]byte varible (otherwis, commmon.Root complains)
+	var frBytes [32]byte
+	copy(frBytes[:], fr[:32])
+	result.Status.FinalizedRoot = common.Root(frBytes)
+	result.Status.FinalizedEpoch = common.Epoch(uint64(finaEpoch))
+	// HEAD ROOT
+	// remove 0x if exists from the root string
+	if strings.Contains(headRoot, "0x") {
+		headRoot = strings.Replace(headRoot, "0x", "", 1)
+	}
+	// conver strig to hex bytes
+	hr, err := hex.DecodeString(headRoot)
+	if err != nil {
+		return result, fmt.Errorf("unable to decode finalizedRoot %s", err.Error())
+	}
+	var hrBytes [32]byte
+	copy(hrBytes[:], hr[:32])
+	// copy the bytes of the root into a [32]byte varible (otherwis, commmon.Root complains)
+	result.Status.HeadRoot = common.Root(hrBytes)
+
+	result.Status.HeadSlot = common.Slot(uint64(headSlot))
+	return result, nil
 }

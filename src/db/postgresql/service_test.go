@@ -7,14 +7,31 @@ import (
 
 	"github.com/migalabs/armiarma/src/db/models"
 	"github.com/migalabs/armiarma/src/utils"
+	//"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 )
 
 func TestPeerLoadAndStore(t *testing.T) {
+	//logrus.SetLevel(logrus.DebugLevel)
 	url := "postgres://armiarmacrawler:ar_Mi_arm4@localhost:5432/armiarmadb"
 	psqlDB, err := ConnectToDB(context.Background(), url)
 	require.Equal(t, nil, err)
 
+	msgMet := models.MessageMetric{
+		Count:            12,
+		FirstMessageTime: parseTime("2021-08-23T01:00:00.000Z", t),
+		LastMessageTime:  parseTime("2021-08-23T01:00:00.000Z", t),
+	}
+
+	bStatus, err := models.ParseBeaconStatusFromBasicTypes(
+		parseTime("2021-08-23T01:00:00.000Z", t),
+		"0xafcaaba0",
+		"0x7ed9458a2c9d6af4741e26df3410e87de37dfbdc5ac68aa810be7b94ff13328c",
+		int64(123),
+		"0x7ed9458a2c9d6af4741e26df3410e87de37dfbdc5ac68aa810be7b94ff13328c",
+		int64(12345),
+	)
+	require.Equal(t, nil, err)
 	// generate first peer
 	peer1 := models.Peer{
 		PeerId:                "Peer1",
@@ -47,6 +64,8 @@ func TestPeerLoadAndStore(t *testing.T) {
 		MetadataRequest:       true,
 		MetadataSucceed:       true,
 		LastExport:            123123123,
+		MessageMetrics:        make(map[string]models.MessageMetric),
+		BeaconStatus:          bStatus,
 	}
 	// generate multiaddres
 	addreses := []string{"/ip4/51.89.42.176/tcp/9000", "/ip4/123.123.123.123/tcp/9000"}
@@ -58,6 +77,10 @@ func TestPeerLoadAndStore(t *testing.T) {
 		}
 		peer1.MAddrs = append(peer1.MAddrs, maddres)
 	}
+
+	// Generate message metrics
+	peer1.MessageMetrics["testTopic"] = msgMet
+	peer1.MessageMetrics["testTopic2"] = msgMet
 
 	psqlDB.StorePeer(peer1.PeerId, peer1)
 
@@ -99,6 +122,12 @@ func TestPeerLoadAndStore(t *testing.T) {
 
 	require.Equal(t, readPeer.LastExport, peer1.LastExport)
 
+	require.Equal(t, bStatus, readPeer.BeaconStatus)
+
+	require.Equal(t, len(readPeer.MessageMetrics), 2)
+	require.Equal(t, readPeer.MessageMetrics["testTopic"], msgMet)
+	require.Equal(t, readPeer.MessageMetrics["testTopic2"], msgMet)
+
 	// Update the peerInfo
 	peer1.UserAgent = "TestPeer"
 	psqlDB.StorePeer(peer1.PeerId, peer1)
@@ -107,10 +136,92 @@ func TestPeerLoadAndStore(t *testing.T) {
 	require.Equal(t, true, ok)
 
 	require.Equal(t, readPeer.UserAgent, peer1.UserAgent)
+
+	// Delete peers from the test db
+	psqlDB.DeletePeer(peer1.PeerId)
+	peers := psqlDB.GetPeers()
+	require.Equal(t, 0, len(peers))
 }
 
 func parseTime(strTime string, t *testing.T) time.Time {
 	parsedTime, err := time.Parse(time.RFC3339, strTime)
 	require.NoError(t, err)
 	return parsedTime
+}
+
+func TestLastToolActivity(t *testing.T) {
+	//logrus.SetLevel(logrus.DebugLevel)
+	url := "postgres://armiarmacrawler:ar_Mi_arm4@localhost:5432/armiarmadb"
+	psqlDB, err := ConnectToDB(context.Background(), url)
+	require.Equal(t, nil, err)
+
+	// generate first peer
+	peer1 := models.Peer{
+		PeerId:               "Peer1",
+		NegativeConnAttempts: []time.Time{parseTime("2022-01-21T01:00:01.000Z", t), parseTime("2022-01-21T01:00:04.000Z", t)},
+		ConnectionTimes:      []time.Time{parseTime("2022-01-21T01:00:02.000Z", t), parseTime("2022-01-21T01:00:05.000Z", t)},
+		DisconnectionTimes:   []time.Time{parseTime("2022-01-21T01:00:03.000Z", t), parseTime("2022-01-21T01:00:06.000Z", t)},
+	}
+	psqlDB.StorePeer(peer1.PeerId, peer1)
+
+	// generate first peer
+	peer2 := models.Peer{
+		PeerId:               "Peer2",
+		NegativeConnAttempts: []time.Time{parseTime("2022-01-22T01:00:01.000Z", t), parseTime("2022-03-22T01:00:04.000Z", t)},
+		ConnectionTimes:      []time.Time{parseTime("2022-01-22T01:00:02.000Z", t), parseTime("2022-01-22T01:00:05.000Z", t)},
+		DisconnectionTimes:   []time.Time{parseTime("2022-01-22T01:00:03.000Z", t), parseTime("2022-01-22T01:00:06.000Z", t)},
+	}
+	psqlDB.StorePeer(peer2.PeerId, peer2)
+
+	//peers := psqlDB.GetPeers()
+	//require.Equal(t, 2, len(peers))
+	lastActivity, err := psqlDB.GetLastActivityTime()
+	require.Equal(t, nil, err)
+	require.Equal(t, parseTime("2022-03-22T01:00:04.000Z", t), lastActivity)
+
+	// Delete peers from the test db
+	psqlDB.DeletePeer(peer1.PeerId)
+	psqlDB.DeletePeer(peer2.PeerId)
+
+	peers := psqlDB.GetPeers()
+	require.Equal(t, 0, len(peers))
+
+}
+
+func TestPeerConnectedCheck(t *testing.T) {
+	//logrus.SetLevel(logrus.DebugLevel)
+	url := "postgres://armiarmacrawler:ar_Mi_arm4@localhost:5432/armiarmadb"
+	psqlDB, err := ConnectToDB(context.Background(), url)
+	require.Equal(t, nil, err)
+
+	// generate first peer
+	peer1 := models.Peer{
+		PeerId:          "Peer1",
+		IsConnected:     true,
+		ConnectionTimes: []time.Time{parseTime("2022-01-21T01:00:01.000Z", t)},
+	}
+	psqlDB.StorePeer(peer1.PeerId, peer1)
+
+	// generate first peer
+	peer2 := models.Peer{
+		PeerId:               "Peer2",
+		IsConnected:          false,
+		NegativeConnAttempts: []time.Time{parseTime("2022-01-22T01:00:01.000Z", t), parseTime("2022-03-22T01:00:04.000Z", t)},
+	}
+	psqlDB.StorePeer(peer2.PeerId, peer2)
+
+	ok := psqlDB.CheckPeersSummaryTableStatus()
+	require.Equal(t, true, ok)
+
+	readPeer, ok := psqlDB.LoadPeer(peer1.PeerId)
+	require.Equal(t, true, ok)
+	require.Equal(t, 1, len(readPeer.DisconnectionTimes))
+	require.Equal(t, false, readPeer.IsConnected)
+
+	// Delete peers from the test db
+	psqlDB.DeletePeer(peer1.PeerId)
+	psqlDB.DeletePeer(peer2.PeerId)
+
+	peers := psqlDB.GetPeers()
+	require.Equal(t, 0, len(peers))
 }
