@@ -1,7 +1,7 @@
 package postgres
 
 import (
-	"fmt"
+	"os"
 	"time"
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
@@ -402,9 +402,6 @@ func (p *PostgresDBService) LoadPeer(peerID string) (models.Peer, bool) {
 		}
 	}
 	log.Debugf("load success of peer %s", peerID)
-	fmt.Println()
-	fmt.Println(peer.BeaconStatus.Status.FinalizedRoot)
-	fmt.Println()
 	return peer, true
 }
 
@@ -564,6 +561,33 @@ func (p *PostgresDBService) GetLastActivityTime() (time.Time, error) {
 }
 
 func (p *PostgresDBService) ExportToCSV(filePath string) error {
-	log.Info("Exporting to CSV")
+	log.Info("Exporting metrics to csv: ", filePath)
+	csvFile, err := os.Create(filePath)
+	if err != nil {
+		return errors.Wrap(err, "error opening the file "+filePath)
+	}
+	defer csvFile.Close()
+
+	// First raw of the file will be the Titles of the columns
+	_, err = csvFile.WriteString("Peer Id,Node Id,Fork Digest,User Agent,Client,Version,Pubkey,Address,Ip,Country,City,ENR,Request Metadata,Success Metadata,Attempted,Succeed,Deprecated,ConnStablished,IsConnected,Attempts,Error,Last Error Timestamp,Last Identify Timestamp,Latency,Connections,Disconnections,Last Connection,Conn Direction,Connected Time,Beacon Blocks,Beacon Aggregations,Voluntary Exits,Proposer Slashings,Attester Slashings,Total Messages\n")
+	if err != nil {
+		errors.Wrap(err, "error while writing the titles on the csv "+filePath)
+	}
+
+	// get the list of all the peers
+	peers := p.GetPeers()
+
+	for _, nextPeer := range peers {
+		nPeer, ok := p.LoadPeer(nextPeer.String())
+		if !ok {
+			log.Errorf("error reading peer %s for metrics export. %s", nextPeer.String(), err.Error())
+			continue
+		}
+		_, err := csvFile.WriteString(nPeer.ToCsvLine())
+		if err != nil {
+			log.Errorf("error reading peer %s for metrics export. %s", nextPeer.String(), err.Error())
+			continue
+		}
+	}
 	return nil
 }

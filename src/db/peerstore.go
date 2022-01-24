@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"fmt"
 	"runtime"
 	"time"
 
@@ -146,6 +147,7 @@ func (c *PeerStore) GetPeerENR(peerID string) (*enode.Node, error) {
 // ExportCsvService will export to csv regularly, therefoe this service will execute the export every X seconds (ExportLoopTime)
 // @param folderpath: the folder to export the csv file (always named metrics.csv)
 func (ps *PeerStore) ExportCsvService(folderpath string) {
+	fmt.Println("------")
 	Log.Info("Peerstore CSV exporting service launched")
 	go func() {
 		ctx := ps.Ctx()
@@ -153,10 +155,10 @@ func (ps *PeerStore) ExportCsvService(folderpath string) {
 		for {
 			select {
 			case <-ticker.C:
-				ps.Storage.ExportToCSV(folderpath + "/metrics.csv")
+				_ = ps.Storage.ExportToCSV(folderpath + "/metrics.csv")
 			case <-ctx.Done():
 				ticker.Stop()
-				ps.Storage.ExportToCSV(folderpath + "/metrics.csv")
+				_ = ps.Storage.ExportToCSV(folderpath + "/metrics.csv")
 				Log.Info("Closing DB CSV exporter")
 				return
 			}
