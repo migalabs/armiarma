@@ -22,7 +22,6 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/migalabs/armiarma/src/config"
-	"github.com/migalabs/armiarma/src/db"
 	"github.com/migalabs/armiarma/src/gossipsub/blockchaintopics"
 	"github.com/migalabs/armiarma/src/utils"
 	"github.com/sirupsen/logrus"
@@ -47,7 +46,6 @@ var (
 	DefaultUserAgent     string = "bsc_crawler"
 	DefaultLogLevel      string = "info"
 	DefaultOutputPath    string = "./peerstore"
-	DefaultDBType        string = "bolt"
 	DefaultBootNodesFile string = "./src/discovery/bootnodes_mainnet.json"
 
 	MinPort           int      = 0
@@ -69,7 +67,6 @@ type InfoData struct {
 	privateKey    *crypto.Secp256k1PrivateKey
 	bootNodesFile string
 	OutputPath    string
-	dBType        string
 }
 
 // NewDefaultInfoData:
@@ -256,15 +253,6 @@ func (i *InfoData) importFromConfig(inputConfig config.ConfigData) {
 			Log.Fatal(err)
 		}
 	}
-
-	if _, ok := db.DBTypes[inputConfig.GetDBType()]; !ok {
-		// type not okay, does not exist in our local hasmap
-		i.SetDBType(DefaultDBType)
-		Log.Warnf("Setting default DB Type: %s", DefaultDBType)
-	} else {
-		i.SetDBType(inputConfig.GetDBType())
-	}
-
 	Log.Infof("Imported!")
 }
 
@@ -446,11 +434,4 @@ func (i InfoData) GetOutputPath() string {
 }
 func (i *InfoData) SetOutputPath(inputString string) {
 	i.OutputPath = inputString
-}
-
-func (i InfoData) GetDBType() string {
-	return i.dBType
-}
-func (i *InfoData) SetDBType(inputString string) {
-	i.dBType = inputString
 }

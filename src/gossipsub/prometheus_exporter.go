@@ -5,8 +5,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	promth "github.com/migalabs/armiarma/src/exporters"
 	"github.com/migalabs/armiarma/src/gossipsub/blockchaintopics"
-	promth "github.com/migalabs/armiarma/src/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 )

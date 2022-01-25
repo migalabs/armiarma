@@ -24,15 +24,6 @@ var (
 
 	// TODO: put it into a config-variable
 	ExportLoopTime time.Duration = 30 * time.Minute
-	// DB config-options (TODO: unnecessary so far, we just have 2 of them)
-	BoltDBKey string            = "bolt"
-	MemoryKey string            = "memory"
-	PsqlKey   string            = "postgresql"
-	DBTypes   map[string]string = map[string]string{
-		BoltDBKey: "bolt",
-		MemoryKey: "memory",
-		PsqlKey:   "postgresql",
-	}
 )
 
 type ErrorHandling func(*models.Peer)
@@ -42,32 +33,17 @@ type PeerStore struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	Storage PeerStoreStorage
+	Storage postgresql.PostgresDBService
 }
 
-func NewPeerStore(ctx context.Context, dbtype string, path string, endpoint string) PeerStore {
+func NewPeerStore(ctx context.Context, path string, endpoint string) PeerStore {
 	mainCtx, cancel := context.WithCancel(ctx)
-	var db PeerStoreStorage
+	var db postgresql.PostgresDBService
 	var err error
 
-	switch dbtype {
-	case DBTypes[BoltDBKey]:
-		if len(path) <= 0 {
-			path = default_db_path
-		}
-		db = NewBoltPeerDB(path)
-	case DBTypes[MemoryKey]:
-		db = NewMemoryDB()
-	case DBTypes[PsqlKey]:
-		db, err = postgresql.ConnectToDB(mainCtx, endpoint)
-		if err != nil {
-			Log.Panic(err.Error())
-		}
-	default:
-		if len(path) <= 0 {
-			path = default_db_path
-		}
-		db = NewBoltPeerDB(path)
+	db, err = postgresql.ConnectToDB(mainCtx, endpoint)
+	if err != nil {
+		Log.Panic(err.Error())
 	}
 	ps := PeerStore{
 		ctx:     mainCtx,

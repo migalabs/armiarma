@@ -15,7 +15,6 @@ import (
 	"github.com/migalabs/armiarma/src/hosts"
 	"github.com/migalabs/armiarma/src/info"
 	"github.com/migalabs/armiarma/src/peering"
-	"github.com/migalabs/armiarma/src/prometheus"
 	"github.com/migalabs/armiarma/src/utils/apis"
 	"github.com/sirupsen/logrus"
 )
@@ -53,7 +52,7 @@ func NewCrawler(ctx context.Context, config config.ConfigData) (*Crawler, error)
 	mainCtx, cancel := context.WithCancel(ctx)
 	infoObj := info.NewCustomInfoData(config)
 	// Generate new DB for the peerstore
-	db := db.NewPeerStore(mainCtx, infoObj.GetDBType(), infoObj.GetOutputPath(), infoObj.GetDBEndpoint())
+	db := db.NewPeerStore(mainCtx, infoObj.GetOutputPath(), infoObj.GetDBEndpoint())
 	// IpLocalizer
 	ipLocalizer := apis.NewPeerLocalizer(mainCtx, IpCacheSize)
 	// generate libp2pHost

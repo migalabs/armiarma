@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
-
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/pkg/errors"
+
 	"github.com/migalabs/armiarma/src/db/models"
 	"github.com/migalabs/armiarma/src/utils"
 	bolt "go.etcd.io/bbolt"
@@ -24,7 +24,7 @@ var (
 )
 
 // PeerStoreDb save the peer's data in a persistant Db.
-type BoltPeerDB struct {
+type BoltDB struct {
 	db        *boltDB
 	startTime time.Time
 }
@@ -32,13 +32,13 @@ type BoltPeerDB struct {
 // New BoltPeerDB creates an new MemoryDB ready to accept new peers.
 // Fulfills PeerStoreStorage interface
 // @param folderpath: folder where to open / create the db (always named peerstore)
-func NewBoltPeerDB(folderpath string) BoltPeerDB {
+func NewBoltPeerDB(folderpath string) BoltDB {
 	// Generate a new one
 	db, err := openBoltDB(folderpath+"/peerstore.db", "peerstore", 0600, nil)
 	if err != nil {
 		Log.Panicf(err.Error())
 	}
-	dbObj := BoltPeerDB{
+	dbObj := BoltDB{
 		db:        db,
 		startTime: time.Now(),
 	}
@@ -122,7 +122,7 @@ func NewBoltPeerDB(folderpath string) BoltPeerDB {
 // Stores a Peer with the given key.
 // @param key: the key to access the object.
 // @param Peer: the value to store.
-func (b BoltPeerDB) StorePeer(key string, value models.Peer) {
+func (b BoltDB) StorePeer(key string, value models.Peer) {
 	value_marshalled, err := json.Marshal(value)
 	if err != nil {
 		Log.Error(err)
@@ -136,7 +136,7 @@ func (b BoltPeerDB) StorePeer(key string, value models.Peer) {
 // @param key: the string to use to get the object.
 // @return Peer: the resulting object.
 // @return ok: whether the operation was successful or not.
-func (b BoltPeerDB) LoadPeer(key string) (models.Peer, bool) {
+func (b BoltDB) LoadPeer(key string) (models.Peer, bool) {
 	value_marshalled, ok := b.db.load([]byte(key))
 	if !ok {
 		return models.Peer{}, false
@@ -157,11 +157,11 @@ func (b BoltPeerDB) LoadPeer(key string) (models.Peer, bool) {
 
 // Deletes the object for the given key in the db.
 // @param key: the string to access the desired object.
-func (p BoltPeerDB) DeletePeer(key string) {
+func (p BoltDB) DeletePeer(key string) {
 	p.db.delete([]byte(key))
 }
 
-func (b BoltPeerDB) Range(f func(key string, value models.Peer) bool) {
+func (b BoltDB) Range(f func(key string, value models.Peer) bool) {
 
 	b.db.Range(func(key, value []byte) bool {
 
@@ -184,20 +184,16 @@ func (b BoltPeerDB) Range(f func(key string, value models.Peer) bool) {
 
 }
 
-// Type
-func (b BoltPeerDB) Type() string {
-	return BoltDBType
-}
-
 // TODO: pending return / print some kind of error if it was the case
 // Resturns a list of peerIDs existing in the db
 // @return the list of peerID in peer.ID format
-func (b BoltPeerDB) GetPeers() []peer.ID {
+func (b BoltDB) GetPeers() []peer.ID {
 	peers := make([]peer.ID, 0)
 	b.Range(func(key string, value models.Peer) bool {
 		peerID_obj, err := peer.Decode(string(key))
 
 		if err != nil {
+			fmt.Println("error decoding peer id", err)
 			return false
 		}
 		peers = append(peers, peerID_obj)
@@ -211,7 +207,7 @@ func (b BoltPeerDB) GetPeers() []peer.ID {
 // @param peerID: the peerID of which to get the Node.
 // @return the resulting Node.
 // @return error if applicable, nil in any other case.
-func (b BoltPeerDB) GetPeerENR(peerID string) (*enode.Node, error) {
+func (b BoltDB) GetPeerENR(peerID string) (*enode.Node, error) {
 	p, ok := b.LoadPeer(peerID)
 	if !ok {
 		return nil, fmt.Errorf("No peer was found under ID %s", peerID)
@@ -223,7 +219,7 @@ func (b BoltPeerDB) GetPeerENR(peerID string) (*enode.Node, error) {
 // This method will export the whole peerstore into a CSV file.
 // @param filePath file where to dump the CSV lines (create if it does not exist).
 // @return an error if there was.
-func (b BoltPeerDB) ExportToCSV(filePath string) error {
+func (b BoltDB) ExportToCSV(filePath string) error {
 	Log.Info("Exporting metrics to csv: ", filePath)
 	csvFile, err := os.Create(filePath)
 	if err != nil {
@@ -249,8 +245,13 @@ func (b BoltPeerDB) ExportToCSV(filePath string) error {
 	return nil
 }
 
-func (b BoltPeerDB) Close() {
+func (b BoltDB) Close() {
 	b.db.close()
+}
+
+// Type
+func (b BoltDB) Type() string {
+	return BoltDBType
 }
 
 // --- Low level interaction with boltdb

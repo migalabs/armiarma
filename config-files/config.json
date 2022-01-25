@@ -5,12 +5,11 @@
     "TopicArray": [],
     "Network": "mainnet",
     "Eth2Endpoint": "",
-    "DBEndpoint": "",
+    "DBEndpoint": "postgresql://armiarmacrawler:ar_Mi_arm4@localhost:5432/armiarmadb",
+    "OutputPath": "./peerstore",
     "ForkDigest": "afcaaba0",
     "UserAgent": "BSC-Eth2-Crawler",
     "LogLevel": "info",
     "PrivateKey": "",
-    "BootNodesFile": "./src/discovery/official-eth2-bootnodes.json",
-    "OutputPath": "./peerstore",
-    "DBType": "bolt"
+    "BootNodesFile": "./src/discovery/official-eth2-bootnodes.json"
 }

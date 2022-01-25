@@ -42,7 +42,6 @@ type ConfigData struct {
 	PrivateKey    string   `json:"PrivateKey"`
 	BootNodesFile string   `json:"BootNodesFile"`
 	OutputPath    string   `json:"OutputPath"`
-	DBType        string   `json:"DBType"`
 }
 
 // NewEmptyConfig
@@ -200,11 +199,4 @@ func (c *ConfigData) GetOutputPath() string {
 }
 func (c *ConfigData) SetOutputPath(input_string string) {
 	c.OutputPath = input_string
-}
-
-func (c *ConfigData) GetDBType() string {
-	return c.DBType
-}
-func (c *ConfigData) SetDBType(input_string string) {
-	c.DBType = input_string
 }

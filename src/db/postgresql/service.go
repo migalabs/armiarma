@@ -1,4 +1,4 @@
-package postgres
+package postgresql
 
 import (
 	"context"
@@ -29,6 +29,8 @@ type PostgresDBService struct {
 	// 		 like: location, IP, ID, etc
 }
 
+// Connect to the PostgreSQL Database and get the multithread-proof connection
+// from the given url-composed credentials
 func ConnectToDB(ctx context.Context, url string) (*PostgresDBService, error) {
 	mainCtx, cancel := context.WithCancel(ctx)
 	// spliting the url to don't share any confidential information on logs
@@ -57,16 +59,9 @@ func ConnectToDB(ctx context.Context, url string) (*PostgresDBService, error) {
 	return psqlDB, err
 }
 
-// TODO: missing:
-// 				- create tables
-//				- insert/store item
-// 				- read/load item
-
 // Initialize all the DBs creating tables and making sure that everything is ready to start crawling
 func (p *PostgresDBService) init() (err error) {
-
-	// IMPORTANT: !!!!! When the table is initialized, the peer connected need to be disconnected
-	// TODO:
+	// ---- Peer Table ----
 	err = p.createPeerTable()
 	if err != nil {
 		return err
@@ -76,18 +71,21 @@ func (p *PostgresDBService) init() (err error) {
 		return errors.New("unable to check existing connected peers in the postgres db")
 	}
 
+	// ---- Message Metrics Table ----
 	err = p.createPeerMessageMetricsTable()
 	if err != nil {
 		return err
 	}
+
+	// ---- Client Diversity Table ----
+	err = p.createClientDiversityTable()
+	if err != nil {
+		return err
+	}
 	return nil
-
 }
 
-func (p *PostgresDBService) Type() string {
-	return PsqlType
-}
-
+// Close the connection with the PostgreSQL
 func (p *PostgresDBService) Close() {
 	log.Debug("Closing ProstgresDB")
 	p.psqlPool.Close()
