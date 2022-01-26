@@ -8,7 +8,7 @@ import (
 )
 
 var (
-	NewExporterCheckInterval = 10 * time.Second //2 * time.Minute
+	NewExporterCheckInterval = 2 * time.Minute
 	ModuleName               = "EXPORTER"
 	log                      = logrus.WithField(
 		"module", ModuleName,
@@ -93,8 +93,8 @@ func (s *ExporterService) AddNewExporter(exptr Exporter) {
 }
 
 // Close all the running metrics exposers
-func (s *ExporterService) CloseExporterRoutines() {
-	log.Info("closing metrics exporters")
+func (s *ExporterService) Close() {
+	log.Infof("closing %d metrics exporters", len(s.ExporterRoutines))
 	for name, export := range s.ExporterRoutines {
 		log.Infof("closing exporter %s", name)
 		export.Close()

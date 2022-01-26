@@ -3,7 +3,9 @@ package db
 import (
 	"fmt"
 	"math"
+	"time"
 
+	"github.com/migalabs/armiarma/src/db/models"
 	"github.com/migalabs/armiarma/src/exporters"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
@@ -13,7 +15,7 @@ import (
 // * This method will serve the global peerstore values to the
 // * local prometheus instance
 func (ps *PeerStore) ServeMetrics() {
-	// generate the exporter
+	// generate the Prometheus exporter
 	exptr, _ := exporters.NewMetricsExporter(
 		ps.ctx,
 		"Peer-Metrics-Prometheus",
@@ -26,7 +28,22 @@ func (ps *PeerStore) ServeMetrics() {
 	// add the new exptr to the ExporterService
 	ps.ExporterService.AddNewExporter(exptr)
 
+	// generate the Prometheus exporter
+	exptr, _ = exporters.NewMetricsExporter(
+		ps.ctx,
+		"Client Diversity DB Exporter",
+		"Expose Client Distribution to PostgreSQL",
+		ps.initClientDistributionSQL,
+		ps.runClientDistributionSQL,
+		func() {},
+		6*time.Second,
+	)
+	// add the new exptr to the ExporterService
+	ps.ExporterService.AddNewExporter(exptr)
+
 }
+
+// ------ Prometheus Peer Metrics Summary ------
 
 func (ps *PeerStore) initPeerPrometheusMetrics() {
 	// register variables
@@ -119,4 +136,49 @@ func (ps *PeerStore) runPeerPrometheusMetrics() {
 		"NOfConnectedPeers":  nOfConnectedPeers,
 		"NOfDeprecatedPeers": nOfDeprecatedPeers,
 	}).Info("peerstore metrics summary")
+}
+
+// ------ SQL Client Diversity Exporter ------
+
+func (ps *PeerStore) initClientDistributionSQL() {
+	// register variables
+
+}
+
+func (ps *PeerStore) runClientDistributionSQL() {
+	// get client distribution
+	clients := NewClientDist()
+	// Iterate the peerstore to generate the exporting metrics
+	peerList := ps.GetPeerList()
+	for _, pID := range peerList {
+		peerData, err := ps.GetPeerData(pID.String())
+		if err != nil {
+			continue
+		}
+		if !peerData.IsDeprecated() {
+			//if t.Sub(peerData.LastIdentifyTimestamp) < 1024*time.Minute {
+			if peerData.MetadataRequest {
+				if peerData.ClientName != "" {
+					clients.AddClientVersion(peerData.ClientName, peerData.ClientVersion)
+				}
+			}
+		}
+	}
+	// Count the client names
+	clientCount := make(map[string]int)
+	for clientName, clientObj := range clients.Clients {
+		count := clientObj.ReturnTotalCount()
+		clientCount[clientName] = count
+	}
+	// create the ClientDiversity obj for adding it to the SQL
+	diversity := models.NewClientDiversity()
+	diversity.Prysm = clientCount["Prysm"]
+	diversity.Lighthouse = clientCount["Lighthouse"]
+	diversity.Teku = clientCount["Teku"]
+	diversity.Nimbus = clientCount["Nimbus"]
+	diversity.Lodestar = clientCount["Lodestar"]
+	diversity.Grandine = clientCount["Grandine"]
+	diversity.Others = clientCount["Others"]
+
+	ps.Storage.StoreClientDiversitySnapshot(diversity)
 }

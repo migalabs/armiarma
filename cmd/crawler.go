@@ -68,7 +68,7 @@ func NewCrawler(ctx context.Context, config config.ConfigData) (*Crawler, error)
 	//node_tmp.AddEntries()
 	dv5_tmp := discovery.NewDiscovery(mainCtx, node_tmp, &db, &ipLocalizer, infoObj, 9006)
 	// GossipSup
-	gs_tmp := gossipsub.NewGossipSub(mainCtx, host, &db)
+	gs_tmp := gossipsub.NewGossipSub(mainCtx, exporterService, host, &db)
 	// generate the peering strategy
 	pStrategy, err := peering.NewPruningStrategy(mainCtx, &db)
 	if err != nil {
@@ -112,7 +112,7 @@ func (c *Crawler) Run() {
 		c.Gs.JoinAndSubscribe(topic)
 	}
 	c.Peering.Run()
-	c.Gs.ServePrometheusMetrics()
+	c.Gs.ServeMetrics()
 	c.DB.ServeMetrics()
 	c.DB.ExportCsvService(c.Info.GetOutputPath())
 }
@@ -128,4 +128,5 @@ func (c *Crawler) Close() {
 	c.Peering.Close()
 	c.Host.Stop()
 	c.IpLocalizer.Close()
+	c.ExporterService.Close()
 }

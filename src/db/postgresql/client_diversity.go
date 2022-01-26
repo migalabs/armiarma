@@ -10,7 +10,7 @@ import (
 
 var (
 	createClientDiversity = `
-	CREATE IF NOT EXIST t_client_diversity(
+	CREATE TABLE IF NOT EXISTS t_client_diversity(
 		f_snapshot_timestamp TIMESTAMP,
 		f_prysm BIGINT,
 		f_lighthouse BIGINT,
@@ -24,7 +24,7 @@ var (
 	);
 	`
 	insertClientDiversitySnapshot = `
-	INSER INTO t_client_diversity(
+	INSERT INTO t_client_diversity(
 		f_snapshot_timestamp,
 		f_prysm,
 		f_lighthouse,
@@ -33,8 +33,8 @@ var (
 		f_grandine,
 		f_lodestar,
 		f_others)
-	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-	ON CONFLICT (t_client_diversity)
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+	ON CONFLICT (f_snapshot_timestamp)
 	DO UPDATE SET
 		f_snapshot_timestamp=EXCLUDED.f_snapshot_timestamp,
 		f_prysm=EXCLUDED.f_prysm,
