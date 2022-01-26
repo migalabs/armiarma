@@ -76,12 +76,13 @@ func (p *PostgresDBService) init() (err error) {
 	if err != nil {
 		return err
 	}
-
-	// ---- Client Diversity Table ----
-	err = p.createClientDiversityTable()
-	if err != nil {
-		return err
-	}
+	/*
+		// ---- Client Diversity Table ----
+		err = p.createClientDiversityTable()
+		if err != nil {
+			return err
+		}
+	*/
 	return nil
 }
 

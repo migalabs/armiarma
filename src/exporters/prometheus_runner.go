@@ -6,14 +6,9 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/sirupsen/logrus"
 )
 
 var (
-	ModuleName = "PROMETHEUS"
-	Log        = logrus.WithField(
-		"module", ModuleName,
-	)
 
 	// TODO: Just hardcoded, move to config
 	ExposedPort string = "9080"
@@ -36,10 +31,9 @@ func NewPrometheusRunner() PrometheusRunner {
 }
 
 func (c *PrometheusRunner) Start() error {
-	http.Handle("/metrics", promhttp.Handler())
-
+	http.Handle("/"+c.EndpointUrl, promhttp.Handler())
 	go func() {
-		Log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", c.ExposePort), nil))
+		log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", c.ExposePort), nil))
 	}()
 
 	return nil

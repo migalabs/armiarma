@@ -2,13 +2,13 @@ package db
 
 import (
 	"context"
-	"fmt"
 	"runtime"
 	"time"
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/migalabs/armiarma/src/db/models"
 	postgresql "github.com/migalabs/armiarma/src/db/postgresql"
+	"github.com/migalabs/armiarma/src/exporters"
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/pkg/errors"
@@ -33,12 +33,13 @@ type PeerStore struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	Storage postgresql.PostgresDBService
+	Storage         *postgresql.PostgresDBService
+	ExporterService *exporters.ExporterService
 }
 
-func NewPeerStore(ctx context.Context, path string, endpoint string) PeerStore {
+func NewPeerStore(ctx context.Context, exporter *exporters.ExporterService, path string, endpoint string) PeerStore {
 	mainCtx, cancel := context.WithCancel(ctx)
-	var db postgresql.PostgresDBService
+	var db *postgresql.PostgresDBService
 	var err error
 
 	db, err = postgresql.ConnectToDB(mainCtx, endpoint)
@@ -46,9 +47,10 @@ func NewPeerStore(ctx context.Context, path string, endpoint string) PeerStore {
 		Log.Panic(err.Error())
 	}
 	ps := PeerStore{
-		ctx:     mainCtx,
-		cancel:  cancel,
-		Storage: db,
+		ctx:             mainCtx,
+		cancel:          cancel,
+		Storage:         db,
+		ExporterService: exporter,
 	}
 	return ps
 }
@@ -123,7 +125,6 @@ func (c *PeerStore) GetPeerENR(peerID string) (*enode.Node, error) {
 // ExportCsvService will export to csv regularly, therefoe this service will execute the export every X seconds (ExportLoopTime)
 // @param folderpath: the folder to export the csv file (always named metrics.csv)
 func (ps *PeerStore) ExportCsvService(folderpath string) {
-	fmt.Println("------")
 	Log.Info("Peerstore CSV exporting service launched")
 	go func() {
 		ctx := ps.Ctx()

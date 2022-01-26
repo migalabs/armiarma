@@ -10,6 +10,7 @@ import (
 	"github.com/migalabs/armiarma/src/db"
 	"github.com/migalabs/armiarma/src/discovery"
 	"github.com/migalabs/armiarma/src/enode"
+	"github.com/migalabs/armiarma/src/exporters"
 	"github.com/migalabs/armiarma/src/gossipsub"
 	"github.com/migalabs/armiarma/src/gossipsub/blockchaintopics"
 	"github.com/migalabs/armiarma/src/hosts"
@@ -37,22 +38,24 @@ type Crawler struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	Host             *hosts.BasicLibp2pHost
-	Node             *enode.LocalNode
-	DB               *db.PeerStore
-	Dv5              *discovery.Discovery
-	Peering          peering.PeeringService
-	Gs               *gossipsub.GossipSub
-	Info             *info.InfoData
-	IpLocalizer      apis.PeerLocalizer
-	PrometheusRunner *prometheus.PrometheusRunner
+	Host            *hosts.BasicLibp2pHost
+	Node            *enode.LocalNode
+	DB              *db.PeerStore
+	Dv5             *discovery.Discovery
+	Peering         peering.PeeringService
+	Gs              *gossipsub.GossipSub
+	Info            *info.InfoData
+	IpLocalizer     apis.PeerLocalizer
+	ExporterService *exporters.ExporterService
 }
 
 func NewCrawler(ctx context.Context, config config.ConfigData) (*Crawler, error) {
 	mainCtx, cancel := context.WithCancel(ctx)
 	infoObj := info.NewCustomInfoData(config)
+	// generate the central exporting service
+	exporterService := exporters.NewExporterService(mainCtx)
 	// Generate new DB for the peerstore
-	db := db.NewPeerStore(mainCtx, infoObj.GetOutputPath(), infoObj.GetDBEndpoint())
+	db := db.NewPeerStore(mainCtx, exporterService, infoObj.GetOutputPath(), infoObj.GetDBEndpoint())
 	// IpLocalizer
 	ipLocalizer := apis.NewPeerLocalizer(mainCtx, IpCacheSize)
 	// generate libp2pHost
@@ -78,21 +81,20 @@ func NewCrawler(ctx context.Context, config config.ConfigData) (*Crawler, error)
 	if err != nil {
 		return nil, err
 	}
-	prometheusRunner := prometheus.NewPrometheusRunner()
 
 	// generate the CrawlerBase
 	crawler := &Crawler{
-		ctx:              mainCtx,
-		cancel:           cancel,
-		Host:             host,
-		Info:             infoObj,
-		DB:               &db,
-		Node:             node_tmp,
-		Dv5:              dv5_tmp,
-		Peering:          peeringServ,
-		Gs:               gs_tmp,
-		IpLocalizer:      ipLocalizer,
-		PrometheusRunner: &prometheusRunner,
+		ctx:             mainCtx,
+		cancel:          cancel,
+		Host:            host,
+		Info:            infoObj,
+		DB:              &db,
+		Node:            node_tmp,
+		Dv5:             dv5_tmp,
+		Peering:         peeringServ,
+		Gs:              gs_tmp,
+		IpLocalizer:     ipLocalizer,
+		ExporterService: exporterService,
 	}
 	return crawler, nil
 }
@@ -100,7 +102,7 @@ func NewCrawler(ctx context.Context, config config.ConfigData) (*Crawler, error)
 // generate new CrawlerBase
 func (c *Crawler) Run() {
 	// initialization secuence for the crawler
-	c.PrometheusRunner.Start()
+	c.ExporterService.Run()
 	c.IpLocalizer.Run()
 	c.Host.Start()
 	c.Dv5.Start()
@@ -111,7 +113,7 @@ func (c *Crawler) Run() {
 	}
 	c.Peering.Run()
 	c.Gs.ServePrometheusMetrics()
-	c.DB.ServePrometheusMetrics()
+	c.DB.ServeMetrics()
 	c.DB.ExportCsvService(c.Info.GetOutputPath())
 }
 
