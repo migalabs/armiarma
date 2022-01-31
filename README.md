@@ -17,6 +17,7 @@ To use the tool, the following requirements need to be installed in the machine:
 - git
 - gcc - C compiler
 - [go](https://go.dev/doc/install) on its 1.17 version or above. Go needs to be executable from the terminal. Lower versions will report a dependency import error for the package `io/fs`.
+- PostgreSQL DB 
 
 Alternatively, the tool can also be executed from:
 - [docker](https://docs.docker.com/get-docker/)
@@ -71,7 +72,8 @@ NOTE: you might need to run `docker-compose up` with `sudo` privileges if the Li
 ### Supported networks
 Currently supported protocols:
 ```
-Ethereum 2      Different networks or forks can be crawled by defining the 'ForkDigest' in the 'config.json' file    
+Ethereum 2      Different networks or forks can be crawled by defining the 'ForkDigest' in the 'config.json' file  
+Gnosis          Gnosis fork from the Eth2 Network. Add '56fdb5e0' Gnosis ForkDigest in 'config.file' to discover and crawl the network.
 ```
 
 ### Custom configuration of the tool
@@ -83,6 +85,7 @@ TcpPort:        Port that will be used to establish TCP connections (default = 9
 UdpPort:        Port that will be used to establish UDP connections (default = 9020)
 TopicArray:     List of GossipSub topics that the tool will be subscribed to. Leave empty [] to get default ones (Eth2 topics)
 Network:        Name of the Eth2 Network that the crawler will join (default = "mainnet")
+DBEndpoint:     Psql endpoint with the credentials and DB name information. (Example: 'postgresql://user:password@localhost:5432/dbname')
 Eth2Endpoint:   Endpoint to an Eth2 beacon node such as Infura. Used to dynamically calculate the fork-digest of the Eth2 mainnet (default = "" since default fork-digest = Eth2 Altair)
 ForkDigest:     4 byte hexadecimal code of the Network's ForkDigest (default = "afcaaba0")
 UserAgent:      Name that will identify the crawler in the joined network (default = "bsc-crawler")
@@ -90,7 +93,6 @@ LogLevel:       Level of logs that will be printed in the terminal ("trace", "de
 PrivateKey:     hexadecimal encoded libp2p privkey that will be used to create a peerID for the crawler in the network (will generate a new one by default, can be copy-pasted from the printed one in the terminal)
 BootNodesFile:  List of boot-nodes that will be used for the peer discovery service (recommended = "./src/discovery/official-eth2-bootnodes.json")
 OutputPath:     Output folder that will contain the CSV and DB of the crawler (default = "./peerstore")
-DBType:         Database options offered by the tool. Currently soported DBs = "bolt", "memory" (default = "bolt")
 ```
 
 ## Data visualization
