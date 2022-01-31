@@ -97,3 +97,7 @@ func ExistsInMapValue(inputMap map[string]string, inputValue string) bool {
 	}
 	return false
 }
+
+func BytesFromString(s string) []byte {
+	return []byte(s)
+}

@@ -4,7 +4,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	promth "github.com/migalabs/armiarma/src/prometheus"
+	promth "github.com/migalabs/armiarma/src/exporters"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 )

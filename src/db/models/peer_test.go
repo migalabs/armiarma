@@ -1,4 +1,4 @@
-package db
+package models
 
 import (
 	//log "github.com/sirupsen/logrus"

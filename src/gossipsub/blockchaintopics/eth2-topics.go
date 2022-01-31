@@ -23,11 +23,15 @@ var (
 	ForkDigestSize   int    = 8 // without the ForkDigestPrefix
 	BlockchainName   string = "eth2"
 
-	MainnetKey  string = "Mainnet"
-	AltairKey   string = "Altair"
-	ForkDigests        = map[string]string{
-		MainnetKey: "b5303f2a",
-		AltairKey:  "afcaaba0",
+	MainnetKey      string = "Mainnet"
+	AltairKey       string = "Altair"
+	GnosisKey       string = "Gnosis"
+	GnosisAltairKey string = "GnosisAltair"
+	ForkDigests            = map[string]string{
+		MainnetKey:      "b5303f2a",
+		AltairKey:       "afcaaba0",
+		GnosisKey:       "f925ddc5",
+		GnosisAltairKey: "56fdb5e0",
 	}
 	DefaultForkDigest string = ForkDigests[AltairKey]
 

@@ -2,7 +2,6 @@ package db
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -11,27 +10,35 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/pkg/errors"
+
+	"github.com/migalabs/armiarma/src/db/models"
 	"github.com/migalabs/armiarma/src/utils"
 	bolt "go.etcd.io/bbolt"
 )
 
+var (
+	BoltDBType = "BoltDB"
+)
+
 // PeerStoreDb save the peer's data in a persistant Db.
-type BoltPeerDB struct {
-	db        *BoltDB
+type BoltDB struct {
+	db        *boltDB
 	startTime time.Time
 }
 
 // New BoltPeerDB creates an new MemoryDB ready to accept new peers.
 // Fulfills PeerStoreStorage interface
 // @param folderpath: folder where to open / create the db (always named peerstore)
-func NewBoltPeerDB(folderpath string) BoltPeerDB {
+func NewBoltPeerDB(folderpath string) BoltDB {
 	// Generate a new one
-	db, err := OpenBoltDB(folderpath+"/peerstore.db", "peerstore", 0600, nil)
+	db, err := openBoltDB(folderpath+"/peerstore.db", "peerstore", 0600, nil)
 	if err != nil {
 		Log.Panicf(err.Error())
 	}
-	dbObj := BoltPeerDB{
+	dbObj := BoltDB{
 		db:        db,
 		startTime: time.Now(),
 	}
@@ -39,11 +46,11 @@ func NewBoltPeerDB(folderpath string) BoltPeerDB {
 	// check if there is something inside the bolt database
 	// if so, fill the disconnection for these peers that were connected
 	// when the crawler was shutdown
-	connectedPeers := make([]Peer, 0) // keep the Peers that were still connected, meaning that Disconnection was not registered.
+	connectedPeers := make([]models.Peer, 0) // keep the Peers that were still connected, meaning that Disconnection was not registered.
 	peercnt := 0
 	lastCrawlerActivity := time.Time{} // representation of least possible time
 	dbReadingError := false
-	dbObj.Range(func(key string, value Peer) bool {
+	dbObj.Range(func(key string, value models.Peer) bool {
 		// TEMPORARY FIX - check if the peer is empty (error reading the existing DB)
 		if value.IsEmpty() {
 			// the peer is empty, therefore, there was an error reading the DB
@@ -87,7 +94,7 @@ func NewBoltPeerDB(folderpath string) BoltPeerDB {
 			os.Exit(0)
 		}
 		// Generate new file for the new Bolt DB
-		db, err = OpenBoltDB(folderpath+"/peerstore.db", "peerstore", 0600, nil)
+		db, err = openBoltDB(folderpath+"/peerstore.db", "peerstore", 0600, nil)
 		if err != nil {
 			Log.Panicf(err.Error())
 		}
@@ -105,7 +112,7 @@ func NewBoltPeerDB(folderpath string) BoltPeerDB {
 		// last, lets add the disconnection event to those peers that remained connected
 		for _, connectedPeerTmp := range connectedPeers {
 			connectedPeerTmp.DisconnectionEvent(lastCrawlerActivity)
-			dbObj.Store(connectedPeerTmp.PeerId, connectedPeerTmp)
+			dbObj.StorePeer(connectedPeerTmp.PeerId, connectedPeerTmp)
 		}
 	}
 
@@ -115,13 +122,13 @@ func NewBoltPeerDB(folderpath string) BoltPeerDB {
 // Stores a Peer with the given key.
 // @param key: the key to access the object.
 // @param Peer: the value to store.
-func (p BoltPeerDB) Store(key string, value Peer) {
+func (b BoltDB) StorePeer(key string, value models.Peer) {
 	value_marshalled, err := json.Marshal(value)
 	if err != nil {
 		Log.Error(err)
 		return
 	}
-	p.db.Store([]byte(key), value_marshalled)
+	b.db.store([]byte(key), value_marshalled)
 
 }
 
@@ -129,34 +136,34 @@ func (p BoltPeerDB) Store(key string, value Peer) {
 // @param key: the string to use to get the object.
 // @return Peer: the resulting object.
 // @return ok: whether the operation was successful or not.
-func (p BoltPeerDB) Load(key string) (Peer, bool) {
-	value_marshalled, ok := p.db.Load([]byte(key))
+func (b BoltDB) LoadPeer(key string) (models.Peer, bool) {
+	value_marshalled, ok := b.db.load([]byte(key))
 	if !ok {
-		return Peer{}, false
+		return models.Peer{}, false
 	}
 	var obj map[string]interface{}
 	err := json.Unmarshal(value_marshalled, &obj)
 
 	if err != nil {
 		Log.Error(err)
-		return Peer{}, false
+		return models.Peer{}, false
 	}
-	pObj, err := PeerUnMarshal(obj)
+	pObj, err := models.PeerUnMarshal(obj)
 	if err != nil {
-		return Peer{}, false
+		return models.Peer{}, false
 	}
 	return pObj, true
 }
 
 // Deletes the object for the given key in the db.
 // @param key: the string to access the desired object.
-func (p BoltPeerDB) Delete(key string) {
-	p.db.Delete([]byte(key))
+func (p BoltDB) DeletePeer(key string) {
+	p.db.delete([]byte(key))
 }
 
-func (p BoltPeerDB) Range(f func(key string, value Peer) bool) {
+func (b BoltDB) Range(f func(key string, value models.Peer) bool) {
 
-	p.db.Range(func(key, value []byte) bool {
+	b.db.Range(func(key, value []byte) bool {
 
 		var obj map[string]interface{}
 
@@ -169,7 +176,7 @@ func (p BoltPeerDB) Range(f func(key string, value Peer) bool) {
 		// unmarshal the peer
 		// If the peer wasn't able to be unmarshalled, we will return an empty peer to the given func
 		// handle in the fn that empty peers as it requires
-		pObj, _ := PeerUnMarshal(obj)
+		pObj, _ := models.PeerUnMarshal(obj)
 		ok := f(string(key), pObj)
 		return ok
 
@@ -180,12 +187,13 @@ func (p BoltPeerDB) Range(f func(key string, value Peer) bool) {
 // TODO: pending return / print some kind of error if it was the case
 // Resturns a list of peerIDs existing in the db
 // @return the list of peerID in peer.ID format
-func (p BoltPeerDB) Peers() []peer.ID {
+func (b BoltDB) GetPeers() []peer.ID {
 	peers := make([]peer.ID, 0)
-	p.Range(func(key string, value Peer) bool {
+	b.Range(func(key string, value models.Peer) bool {
 		peerID_obj, err := peer.Decode(string(key))
 
 		if err != nil {
+			fmt.Println("error decoding peer id", err)
 			return false
 		}
 		peers = append(peers, peerID_obj)
@@ -195,12 +203,61 @@ func (p BoltPeerDB) Peers() []peer.ID {
 	return peers
 }
 
-func (p BoltPeerDB) Close() {
-	p.db.Close()
+// GetENR returns the Node after parsing the ENR.
+// @param peerID: the peerID of which to get the Node.
+// @return the resulting Node.
+// @return error if applicable, nil in any other case.
+func (b BoltDB) GetPeerENR(peerID string) (*enode.Node, error) {
+	p, ok := b.LoadPeer(peerID)
+	if !ok {
+		return nil, fmt.Errorf("No peer was found under ID %s", peerID)
+	}
+	return p.GetBlockchainNode()
 }
 
+// ExportToCSV
+// This method will export the whole peerstore into a CSV file.
+// @param filePath file where to dump the CSV lines (create if it does not exist).
+// @return an error if there was.
+func (b BoltDB) ExportToCSV(filePath string) error {
+	Log.Info("Exporting metrics to csv: ", filePath)
+	csvFile, err := os.Create(filePath)
+	if err != nil {
+		return errors.Wrap(err, "error opening the file "+filePath)
+	}
+	defer csvFile.Close()
+
+	// First raw of the file will be the Titles of the columns
+	_, err = csvFile.WriteString("Peer Id,Node Id,Fork Digest,User Agent,Client,Version,Pubkey,Address,Ip,Country,City,ENR,Request Metadata,Success Metadata,Attempted,Succeed,Deprecated,ConnStablished,IsConnected,Attempts,Error,Last Error Timestamp,Last Identify Timestamp,Latency,Connections,Disconnections,Last Connection,Conn Direction,Connected Time,Beacon Blocks,Beacon Aggregations,Voluntary Exits,Proposer Slashings,Attester Slashings,Total Messages\n")
+	if err != nil {
+		errors.Wrap(err, "error while writing the titles on the csv "+filePath)
+	}
+
+	err = nil
+	b.Range(func(key string, value models.Peer) bool {
+		_, err = csvFile.WriteString(value.ToCsvLine())
+		return true
+	})
+
+	if err != nil {
+		return errors.Wrap(err, "could not export peer metrics")
+	}
+	return nil
+}
+
+func (b BoltDB) Close() {
+	b.db.close()
+}
+
+// Type
+func (b BoltDB) Type() string {
+	return BoltDBType
+}
+
+// --- Low level interaction with boltdb
+
 // BoltDB implements basic operations to provide a key-value DB for any kind of
-type BoltDB struct {
+type boltDB struct {
 	db     *bolt.DB
 	bucket string
 }
@@ -208,24 +265,25 @@ type BoltDB struct {
 // Opens the existing db and creates a bucket is not existing. The busket is where we will store the information.
 // @param path: path to db to open.
 //@param bucketName: the bucket we are opening / creating (in our case, we always use the same)
-func OpenBoltDB(path string, bucketName string, mode fs.FileMode, options *bolt.Options) (*BoltDB, error) {
-	boltDB, err := bolt.Open(path, mode, options)
+func openBoltDB(path string, bucketName string, mode fs.FileMode, options *bolt.Options) (*boltDB, error) {
+	bDB, err := bolt.Open(path, mode, options)
 	if err != nil {
-		return &BoltDB{}, err
+		return &boltDB{}, err
 	}
 
-	err = boltDB.Update(func(tx *bolt.Tx) error {
+	err = bDB.Update(func(tx *bolt.Tx) error {
 
 		_, err := tx.CreateBucketIfNotExists([]byte(bucketName))
 		return err
 	})
 
-	db := &BoltDB{boltDB, bucketName}
+	db := &boltDB{bDB, bucketName}
 
 	return db, err
 }
 
-func (db *BoltDB) Close() {
+// close closes the Boltdb database in a secure way
+func (db *boltDB) close() {
 	db.db.Close()
 }
 
@@ -233,7 +291,7 @@ func (db *BoltDB) Close() {
 // @param key: the key in byte format to access the data.
 // @return the bytes as a result, marshaled.
 // @return a boolean whether the operation was successful or not.
-func (db *BoltDB) Load(key []byte) ([]byte, bool) {
+func (db *boltDB) load(key []byte) ([]byte, bool) {
 
 	var got []byte
 	err := db.db.View(func(tx *bolt.Tx) error {
@@ -255,7 +313,7 @@ func (db *BoltDB) Load(key []byte) ([]byte, bool) {
 // Stores a given data in the db.
 // @param key: the key to access the desired object in the db.
 // @param value: the data to store.
-func (db *BoltDB) Store(key, value []byte) {
+func (db *boltDB) store(key, value []byte) {
 
 	db.db.Update(func(t *bolt.Tx) error {
 		b := t.Bucket([]byte(db.bucket))
@@ -266,7 +324,7 @@ func (db *BoltDB) Store(key, value []byte) {
 
 // Deletes a given object from the db.
 // @param key: the key to locate the object in the db.
-func (db *BoltDB) Delete(key []byte) {
+func (db *boltDB) delete(key []byte) {
 
 	db.db.Update(func(t *bolt.Tx) error {
 		b := t.Bucket([]byte(db.bucket))
@@ -277,7 +335,7 @@ func (db *BoltDB) Delete(key []byte) {
 
 // Iterates and executes a function over the db for each value.
 // @param f: the function to apply to each item in the db.
-func (db *BoltDB) Range(f func(key, value []byte) bool) {
+func (db *boltDB) Range(f func(key, value []byte) bool) {
 
 	db.db.View(func(t *bolt.Tx) error {
 		b := t.Bucket([]byte(db.bucket))

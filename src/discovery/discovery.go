@@ -19,6 +19,7 @@ import (
 
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/migalabs/armiarma/src/db"
+	"github.com/migalabs/armiarma/src/db/models"
 	"github.com/migalabs/armiarma/src/enode"
 	"github.com/migalabs/armiarma/src/gossipsub/blockchaintopics"
 	"github.com/migalabs/armiarma/src/info"
@@ -187,7 +188,7 @@ func (d *Discovery) HandleENR(node *eth_enode.Node) error {
 		return fmt.Errorf("error extracting peer.ID from node %s", node.ID())
 	}
 	// Gerearte the Multiaddres of the New Peer taht will be Updated or Stored
-	peer := db.NewPeer(peerID.String())
+	peer := models.NewPeer(peerID.String())
 	ipScheme := "ip4"
 	if len(node.IP()) == net.IPv6len {
 		ipScheme = "ip6"
@@ -203,7 +204,7 @@ func (d *Discovery) HandleENR(node *eth_enode.Node) error {
 	mAddrs := make([]ma.Multiaddr, 0)
 	mAddrs = append(mAddrs, multiAddr)
 
-	// Fill db.Peer with given info
+	// Fill models.Peer with given info
 	pubBytes, _ := x509.MarshalPKIXPublicKey(pubkey) // get the []bytes of the pubkey
 	peer.Pubkey = hex.EncodeToString(pubBytes)
 	peer.NodeId = node.ID().String()

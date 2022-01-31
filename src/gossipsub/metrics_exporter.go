@@ -3,10 +3,9 @@ package gossipsub
 import (
 	"fmt"
 	"sync/atomic"
-	"time"
 
+	"github.com/migalabs/armiarma/src/exporters"
 	"github.com/migalabs/armiarma/src/gossipsub/blockchaintopics"
-	promth "github.com/migalabs/armiarma/src/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 )
@@ -105,52 +104,50 @@ func (c *MessageMetrics) GetTotalMessages() int64 {
 // ServePrometheusMetrics:
 // This method will generate the metrics from GossipSub msg Metrics
 // and serve the values to the local prometheus instance.
-func (gs *GossipSub) ServePrometheusMetrics() {
-	gsCtx := gs.Ctx()
-	// tenerate a ticker
-	ticker := time.NewTicker(promth.MetricLoopInterval)
+func (gs *GossipSub) ServeMetrics() {
+	exptr, _ := exporters.NewMetricsExporter(
+		gs.ctx,
+		"Gossip-Metrics-Prometheus",
+		"Expose in Prometheus the gossip metrics of the tools DB",
+		gs.initGossipPrometheusMetrics,
+		gs.runGossipPrometheusMetrics,
+		func() {},
+		exporters.MetricLoopInterval,
+	)
+	gs.ExporterService.AddNewExporter(exptr)
+}
+
+func (gs *GossipSub) initGossipPrometheusMetrics() {
 	// register variables
 	prometheus.MustRegister(ReceivedTotalMessages)
 	prometheus.MustRegister(ReceivedMessages)
+}
 
-	// routine to loop
-	go func() {
-		for {
-			select {
-			case <-ticker.C:
-				var totMsg int64
-				msgPerMin := make(map[string]float64, 0)
-				// get the total of the messages
-				for k, _ := range gs.MessageMetrics.topicList {
-					r := gs.MessageMetrics.GetTopicMsgs(k)
-					if r < int32(0) {
-						Log.Warnf("Unable to get message count for topic %s", k)
-						continue
-					}
-					msgC := (float64(r) / (promth.MetricLoopInterval.Seconds())) * 60 // messages per minute
-					totMsg += int64(r)
-					ReceivedMessages.WithLabelValues(blockchaintopics.Eth2TopicPretty(k)).Set(msgC)
-					msgPerMin[blockchaintopics.Eth2TopicPretty(k)] = msgC
-				}
-				// get total of msgs
-				tot := (float64(totMsg) / (promth.MetricLoopInterval.Seconds())) * 60 // messages per minute
-				ReceivedTotalMessages.Set(tot)
-				// reset the values
-				err := gs.MessageMetrics.ResetAllTopics()
-				if err != nil {
-					Log.Warnf("Unable to reset the gossip topic metrics. ", err.Error())
-				}
-				Log.WithFields(logrus.Fields{
-					"TopicMsg/min": msgPerMin,
-					"TotalMsg/min": tot,
-				}).Info("gossip metrics summary")
-
-			case <-gsCtx.Done():
-				// closing the routine in a ordened way
-				ticker.Stop()
-				Log.Info("Closing GossipSub prometheus exporter")
-				return
-			}
+func (gs *GossipSub) runGossipPrometheusMetrics() {
+	var totMsg int64
+	msgPerMin := make(map[string]float64, 0)
+	// get the total of the messages
+	for k, _ := range gs.MessageMetrics.topicList {
+		r := gs.MessageMetrics.GetTopicMsgs(k)
+		if r < int32(0) {
+			Log.Warnf("Unable to get message count for topic %s", k)
+			continue
 		}
-	}()
+		msgC := (float64(r) / (exporters.MetricLoopInterval.Seconds())) * 60 // messages per minute
+		totMsg += int64(r)
+		ReceivedMessages.WithLabelValues(blockchaintopics.Eth2TopicPretty(k)).Set(msgC)
+		msgPerMin[blockchaintopics.Eth2TopicPretty(k)] = msgC
+	}
+	// get total of msgs
+	tot := (float64(totMsg) / (exporters.MetricLoopInterval.Seconds())) * 60 // messages per minute
+	ReceivedTotalMessages.Set(tot)
+	// reset the values
+	err := gs.MessageMetrics.ResetAllTopics()
+	if err != nil {
+		Log.Warnf("Unable to reset the gossip topic metrics. ", err.Error())
+	}
+	Log.WithFields(logrus.Fields{
+		"TopicMsg/min": msgPerMin,
+		"TotalMsg/min": tot,
+	}).Info("gossip metrics summary")
 }

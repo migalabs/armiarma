@@ -16,6 +16,7 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/migalabs/armiarma/src/db"
+	"github.com/migalabs/armiarma/src/exporters"
 	"github.com/migalabs/armiarma/src/hosts"
 	"github.com/migalabs/armiarma/src/info"
 	"github.com/minio/sha256-simd"
@@ -33,12 +34,13 @@ var (
 // sumarizes the control fields necesary to manage and
 // govern the GossipSub internal service.
 type GossipSub struct {
-	ctx           context.Context
-	cancel        context.CancelFunc
-	InfoObj       *info.InfoData
-	BasicHost     *hosts.BasicLibp2pHost
-	PeerStore     *db.PeerStore
-	PubsubService *pubsub.PubSub
+	ctx             context.Context
+	cancel          context.CancelFunc
+	InfoObj         *info.InfoData
+	BasicHost       *hosts.BasicLibp2pHost
+	PeerStore       *db.PeerStore
+	PubsubService   *pubsub.PubSub
+	ExporterService *exporters.ExporterService
 	// map where the key are the topic names in string, and the values are the TopicSubscription
 	TopicArray     map[string]*TopicSubscription
 	MessageMetrics *MessageMetrics
@@ -60,7 +62,7 @@ func NewEmptyGossipSub() *GossipSub {
 // @param peerstore: the peerstore where to sotre the data.
 // @param stdOpts: list of options to generate the base of the gossipsub service.
 // @return: pointer to GossipSub struct.
-func NewGossipSub(ctx context.Context, h *hosts.BasicLibp2pHost, peerstore *db.PeerStore) *GossipSub {
+func NewGossipSub(ctx context.Context, exporter *exporters.ExporterService, h *hosts.BasicLibp2pHost, peerstore *db.PeerStore) *GossipSub {
 	mainCtx, cancel := context.WithCancel(ctx)
 
 	// define gossipsub option
@@ -79,14 +81,15 @@ func NewGossipSub(ctx context.Context, h *hosts.BasicLibp2pHost, peerstore *db.P
 	msgMetrics := NewMessageMetrics()
 	// return the GossipSub object
 	return &GossipSub{
-		ctx:            mainCtx,
-		cancel:         cancel,
-		InfoObj:        h.GetInfoObj(),
-		BasicHost:      h,
-		PeerStore:      peerstore,
-		PubsubService:  ps,
-		TopicArray:     make(map[string]*TopicSubscription),
-		MessageMetrics: &msgMetrics,
+		ctx:             mainCtx,
+		cancel:          cancel,
+		InfoObj:         h.GetInfoObj(),
+		BasicHost:       h,
+		PeerStore:       peerstore,
+		PubsubService:   ps,
+		ExporterService: exporter,
+		TopicArray:      make(map[string]*TopicSubscription),
+		MessageMetrics:  &msgMetrics,
 	}
 }
 
@@ -131,12 +134,4 @@ func (gs *GossipSub) JoinAndSubscribe(topicName string) {
 func (gs *GossipSub) Close() {
 	Log.Info("gossipsub close has been detected, closing dependant go-routines")
 	gs.cancel()
-}
-
-func (gs *GossipSub) Ctx() context.Context {
-	return gs.ctx
-}
-
-func (gs *GossipSub) GetCtxCancel() context.CancelFunc {
-	return gs.cancel
 }

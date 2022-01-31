@@ -9,6 +9,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/host"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/migalabs/armiarma/src/db"
+	"github.com/migalabs/armiarma/src/db/models"
 )
 
 // TopicSubscription
@@ -77,7 +78,7 @@ func (c *TopicSubscription) MessageReadingLoop(h host.Host, peerstore *db.PeerSt
 			// To avoid getting track of our own messages, check if we are the senders
 			if msg.ReceivedFrom != h.ID() {
 				Log.Debugf("new message on %s from %s", c.Sub.Topic(), msg.ReceivedFrom)
-				newPeer := db.NewPeer(msg.ReceivedFrom.String())
+				newPeer := models.NewPeer(msg.ReceivedFrom.String())
 				newPeer.MessageEvent(c.Sub.Topic(), time.Now())
 				peerstore.StoreOrUpdatePeer(newPeer)
 				// Add message to msg metrics counter
