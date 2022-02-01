@@ -11,6 +11,7 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/migalabs/armiarma/src/db"
+	"github.com/migalabs/armiarma/src/db/models"
 	db_utils "github.com/migalabs/armiarma/src/db/utils"
 	"github.com/migalabs/armiarma/src/hosts"
 	"github.com/sirupsen/logrus"
@@ -32,7 +33,7 @@ var (
 )
 
 // Pruning Strategy is a Peering Strategy that applies penalties to peers that haven't shown activity when attempting to connect them.
-// Combined with the Deprecated flag in the db.Peer struct, it produces more accurate metrics when exporting pruning peers that are no longer active.
+// Combined with the Deprecated flag in the models.Peer struct, it produces more accurate metrics when exporting pruning peers that are no longer active.
 type PruningStrategy struct {
 	ctx          context.Context
 	cancel       context.CancelFunc
@@ -41,7 +42,7 @@ type PruningStrategy struct {
 
 	// Peer Stream and Return ConnectionStatus channels (communication between modules)
 	// both empty by default (need for initialization)
-	peerStreamChan chan db.Peer
+	peerStreamChan chan models.Peer
 	nextPeerChan   chan struct{}
 	connAttemptNot chan ConnectionAttemptStatus
 	connEventNot   chan hosts.ConnectionEvent
@@ -60,8 +61,8 @@ type PruningStrategy struct {
 }
 
 // NewPruningStrategy:
-// Pruning strategy constructor, that will offer a db.Peer stream for the
-// peering service. The provided db.Peer stream are ready to connect.
+// Pruning strategy constructor, that will offer a models.Peer stream for the
+// peering service. The provided models.Peer stream are ready to connect.
 // @param ctx: parent context.
 // @param peerstore: db.PeerStore.
 // @param opts: base and logging option.
@@ -79,7 +80,7 @@ func NewPruningStrategy(ctx context.Context, peerstore *db.PeerStore) (PruningSt
 		strategyType:   PeerStratModuleName,
 		PeerStore:      peerstore,
 		PeerQueue:      NewPeerQueue(),
-		peerStreamChan: make(chan db.Peer, DefaultWorkers),
+		peerStreamChan: make(chan models.Peer, DefaultWorkers),
 		nextPeerChan:   make(chan struct{}, DefaultWorkers),
 		connAttemptNot: make(chan ConnectionAttemptStatus),
 		connEventNot:   make(chan hosts.ConnectionEvent),
@@ -99,11 +100,11 @@ func (c PruningStrategy) Type() string {
 }
 
 // Run:
-// Initializes the db.Peer stream on the returning db.Peer chan
+// Initializes the models.Peer stream on the returning models.Peer chan
 // stores locally an auxiliary map wuth an array that will keep
 // track of the next connection time.
-// @return db.Peer channel with the next peer to connect.
-func (c *PruningStrategy) Run() chan db.Peer {
+// @return models.Peer channel with the next peer to connect.
+func (c *PruningStrategy) Run() chan models.Peer {
 	// start go routine that will notify of the full peerstore iteration and notifies it to the main strategy loop
 	go c.peerstoreIteratorRoutine()
 	go c.eventRecorderRoutine()
@@ -160,11 +161,11 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 					pinfo, err := c.PeerStore.GetPeerData(nextPeer.PeerID)
 					if err != nil {
 						slog.Warn(err)
-						pinfo = db.NewPeer(nextPeer.PeerID)
+						pinfo = models.NewPeer(nextPeer.PeerID)
 					}
 					// compose all the detailed info for the given peer
 					// Generating New peer to fetch info
-					npeer := db.NewPeer(nextPeer.PeerID)
+					npeer := models.NewPeer(nextPeer.PeerID)
 					peerEnr, err := pinfo.GetBlockchainNode()
 					if err == nil && peerEnr != nil {
 						npeer.NodeId = peerEnr.ID().String()

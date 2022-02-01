@@ -14,6 +14,7 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/migalabs/armiarma/src/db"
+	"github.com/migalabs/armiarma/src/db/models"
 	"github.com/migalabs/armiarma/src/hosts"
 	"github.com/migalabs/armiarma/src/info"
 	ma "github.com/multiformats/go-multiaddr"
@@ -114,7 +115,7 @@ func (c *PeeringService) Run() {
 // Peering routine that will be launched several times (several workers).
 // @param workerID: id of the worker.
 // @param peerStreamChan: used to receive the next peer.
-func (c *PeeringService) peeringWorker(workerID string, peerStreamChan chan db.Peer) {
+func (c *PeeringService) peeringWorker(workerID string, peerStreamChan chan models.Peer) {
 	Log.Infof("launching %s", workerID)
 	peeringCtx := c.ctx
 	h := c.host.Host()
@@ -164,7 +165,7 @@ func (c *PeeringService) peeringWorker(workerID string, peerStreamChan chan db.P
 				Addrs: make([]ma.Multiaddr, 0, 1),
 			}
 			addrInfo.Addrs = append(addrInfo.Addrs, transport)
-			nPeer := db.NewPeer(nextPeer.PeerId)
+			nPeer := models.NewPeer(nextPeer.PeerId)
 			connAttStat := ConnectionAttemptStatus{
 				Peer: nPeer,
 			}

@@ -16,7 +16,7 @@ import (
 )
 
 var (
-	Version      = "v0.0.0\n"
+	Version      = "v1.0.0\n"
 	WellcomeText = "Welcome to the Armiarma network monitoring tool."
 	SpecifyText  = "List of available flags:"
 )

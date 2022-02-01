@@ -35,13 +35,13 @@ type ConfigData struct {
 	UserAgent     string   `json:"UserAgent"`
 	TopicArray    []string `json:"TopicArray"`
 	Network       string   `json:"Network"`
-	Eth2Endpoint  string   `json:"Eth2Endpoint`
+	Eth2Endpoint  string   `json:"Eth2Endpoint"`
+	DBEndpoint    string   `json:"DBEndpoint"`
 	ForkDigest    string   `json:"ForkDigest"`
 	LogLevel      string   `json:"LogLevel"`
 	PrivateKey    string   `json:"PrivateKey"`
 	BootNodesFile string   `json:"BootNodesFile"`
 	OutputPath    string   `json:"OutputPath"`
-	DBType        string   `json:"DBType"`
 }
 
 // NewEmptyConfig
@@ -159,6 +159,13 @@ func (c *ConfigData) SetEth2Endpoint(input_string string) {
 	c.Eth2Endpoint = input_string
 }
 
+func (c *ConfigData) GetDBEndpoint() string {
+	return c.DBEndpoint
+}
+func (c *ConfigData) SetDBEndpoint(input_string string) {
+	c.DBEndpoint = input_string
+}
+
 func (c *ConfigData) GetForkDigest() string {
 	return c.ForkDigest
 }
@@ -192,11 +199,4 @@ func (c *ConfigData) GetOutputPath() string {
 }
 func (c *ConfigData) SetOutputPath(input_string string) {
 	c.OutputPath = input_string
-}
-
-func (c *ConfigData) GetDBType() string {
-	return c.DBType
-}
-func (c *ConfigData) SetDBType(input_string string) {
-	c.DBType = input_string
 }
