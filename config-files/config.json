@@ -5,7 +5,7 @@
     "TopicArray": [],
     "Network": "mainnet",
     "Eth2Endpoint": "",
-    "DBEndpoint": "postgresql://armiarmacrawler:ar_Mi_arm4@localhost:5432/armiarmadb",
+    "DBEndpoint": "postgresql://user:password@localhost:5432/database",
     "OutputPath": "./peerstore",
     "ForkDigest": "afcaaba0",
     "UserAgent": "BSC-Eth2-Crawler",
