@@ -1,7 +1,7 @@
 /*
 	Copyright © 2021 Miga Labs
 */
-package cmd
+package crawler
 
 import (
 	"context"
@@ -17,24 +17,10 @@ import (
 	"github.com/migalabs/armiarma/src/info"
 	"github.com/migalabs/armiarma/src/peering"
 	"github.com/migalabs/armiarma/src/utils/apis"
-	"github.com/sirupsen/logrus"
 )
-
-var (
-	IpCacheSize = 400
-
-	ModuleName = "CRAWLER"
-	log        = logrus.WithField(
-		"module", ModuleName,
-	)
-)
-
-func CrawlerHelp() string {
-	return "\t--config-file\tconfig-file with all the available configurations. Find an example at ./config-files/config.json"
-}
 
 // crawler status containing the main basemodule and info that the app will ConnectedF
-type Crawler struct {
+type Eth2Crawler struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
@@ -49,7 +35,7 @@ type Crawler struct {
 	ExporterService *exporters.ExporterService
 }
 
-func NewCrawler(ctx context.Context, config config.ConfigData) (*Crawler, error) {
+func NewEth2Crawler(ctx context.Context, config config.ConfigData) (*Eth2Crawler, error) {
 	mainCtx, cancel := context.WithCancel(ctx)
 	infoObj := info.NewCustomInfoData(config)
 	// generate the central exporting service
@@ -59,7 +45,7 @@ func NewCrawler(ctx context.Context, config config.ConfigData) (*Crawler, error)
 	// IpLocalizer
 	ipLocalizer := apis.NewPeerLocalizer(mainCtx, IpCacheSize)
 	// generate libp2pHost
-	host, err := hosts.NewBasicLibp2pHost(mainCtx, *infoObj, &ipLocalizer, &db)
+	host, err := hosts.NewBasicLibp2pEth2Host(mainCtx, *infoObj, &ipLocalizer, &db)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +69,7 @@ func NewCrawler(ctx context.Context, config config.ConfigData) (*Crawler, error)
 	}
 
 	// generate the CrawlerBase
-	crawler := &Crawler{
+	crawler := &Eth2Crawler{
 		ctx:             mainCtx,
 		cancel:          cancel,
 		Host:            host,
@@ -100,7 +86,7 @@ func NewCrawler(ctx context.Context, config config.ConfigData) (*Crawler, error)
 }
 
 // generate new CrawlerBase
-func (c *Crawler) Run() {
+func (c *Eth2Crawler) Run() {
 	// initialization secuence for the crawler
 	c.ExporterService.Run()
 	c.IpLocalizer.Run()
@@ -118,7 +104,7 @@ func (c *Crawler) Run() {
 }
 
 // generate new CrawlerBases
-func (c *Crawler) Close() {
+func (c *Eth2Crawler) Close() {
 	defer c.cancel()
 	// initialization secuence for the crawler
 	log.Info("stoping crawler client")

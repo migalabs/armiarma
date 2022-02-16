@@ -82,6 +82,12 @@ func (p *PostgresDBService) init() (err error) {
 	if err != nil {
 		return err
 	}
+
+	// --- Filecoin Peer table ----
+	err = p.createFilecoinPeerTable()
+	if err != nil {
+		return err
+	}
 	return nil
 }
 

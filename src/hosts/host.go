@@ -48,13 +48,13 @@ type BasicLibp2pHost struct {
 	peerID              peer.ID
 }
 
-// NewBasicLibp2pHost:
-// Generate a new Libp2p host from the given context and Options.
+// NewBasicLibp2pEth2Host:
+// Generate a new Libp2p host from the given context and Options, for Eth2 network (or similar).
 // @param ctx: the parent context
 // @param infoObj: the info object containig our source of information (user parameters).
 // @param ipLocator: object to get ip information.
 // @param ps: peerstore where to store information.
-func NewBasicLibp2pHost(ctx context.Context, infoObj info.InfoData, ipLocator *apis.PeerLocalizer, ps *db.PeerStore) (*BasicLibp2pHost, error) {
+func NewBasicLibp2pEth2Host(ctx context.Context, infoObj info.InfoData, ipLocator *apis.PeerLocalizer, ps *db.PeerStore) (*BasicLibp2pHost, error) {
 	mainCtx, cancel := context.WithCancel(ctx)
 
 	ip := infoObj.GetIPToString()
@@ -80,6 +80,72 @@ func NewBasicLibp2pHost(ctx context.Context, infoObj info.InfoData, ipLocator *a
 		libp2p.UserAgent(infoObj.GetUserAgent()),
 		libp2p.Transport(tcp_transport.NewTCPTransport),
 		libp2p.Security(noise.ID, noise.New),
+		libp2p.NATPortMap(),
+	)
+	if err != nil {
+		return nil, err
+	}
+	peerId := host.ID().String()
+	fmaddr := host.Addrs()[0].String() + "/p2p/" + host.ID().String()
+	localMultiaddr, _ := ma.NewMultiaddr(fmaddr)
+	Log.Debugf("full multiaddress %s", localMultiaddr)
+	// generate the identify service
+	ids, err := identify.NewIDService(host, identify.UserAgent(userAgent), identify.DisableSignedPeerRecord())
+	if err != nil {
+		return nil, err
+	}
+	// Gererate the struct that contains all the configuration and structs surrounding the Libp2p Host
+	basicHost := &BasicLibp2pHost{
+		ctx:                 mainCtx,
+		cancel:              cancel,
+		host:                host,
+		identify:            ids,
+		PeerStore:           ps,
+		IpLocator:           ipLocator,
+		infoObj:             &infoObj,
+		multiAddr:           muladdr,
+		fullMultiAddr:       localMultiaddr,
+		peerID:              peer.ID(peerId),
+		connEventNotChannel: make(chan ConnectionEvent, ConnNotChannSize),
+		identNotChannel:     make(chan IdentificationEvent, ConnNotChannSize),
+	}
+	Log.Debug("setting custom notification functions")
+	basicHost.SetCustomNotifications()
+
+	return basicHost, nil
+}
+
+// NewBasicLibp2pFilecoinHost:
+// Generate a new Libp2p host from the given context and Options, for Filecoin network.
+// @param ctx: the parent context
+// @param infoObj: the info object containig our source of information (user parameters).
+// @param ipLocator: object to get ip information.
+// @param ps: peerstore where to store information.
+func NewBasicLibp2pFilecoin2Host(ctx context.Context, infoObj info.InfoData, ipLocator *apis.PeerLocalizer, ps *db.PeerStore) (*BasicLibp2pHost, error) {
+	mainCtx, cancel := context.WithCancel(ctx)
+
+	ip := infoObj.GetIPToString()
+	tcp := infoObj.GetTcpPortString()
+	privkey := infoObj.GetPrivKey()
+	userAgent := infoObj.GetUserAgent()
+
+	// generate de multiaddress
+	multiaddr := fmt.Sprintf("/ip4/%s/tcp/%s", ip, tcp)
+	muladdr, err := ma.NewMultiaddr(multiaddr)
+	if err != nil {
+		Log.Debugf("couldn't generate multiaddress from ip %s and tcp %s", ip, tcp)
+		multiaddr = fmt.Sprintf("/ip4/%s/tcp/%s", DefaultIP, DefaultTCP)
+		muladdr, _ = ma.NewMultiaddr(multiaddr)
+	}
+	Log.Debugf("setting multiaddress to %s", muladdr)
+
+	// Generate the main Libp2p host that will be exposed to the network
+	host, err := libp2p.New(
+		mainCtx,
+		libp2p.Identity(privkey),
+		libp2p.ListenAddrs(muladdr),
+		libp2p.Ping(true),
+		libp2p.UserAgent(infoObj.GetUserAgent()),
 		libp2p.NATPortMap(),
 	)
 	if err != nil {

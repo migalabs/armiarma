@@ -9,8 +9,8 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/migalabs/armiarma/cmd"
 	"github.com/migalabs/armiarma/src/config"
+	"github.com/migalabs/armiarma/src/crawler"
 	"github.com/migalabs/armiarma/src/utils"
 	log "github.com/sirupsen/logrus"
 )
@@ -40,7 +40,7 @@ func main() {
 	log.SetLevel(utils.ParseLogLevel(crawlerConfig.GetLogLevel()))
 
 	// generate the crawler
-	crawler, err := cmd.NewCrawler(context.Background(), crawlerConfig)
+	crawler, err := crawler.NewFilecoinCrawler(context.Background(), crawlerConfig)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -64,7 +64,7 @@ func main() {
 func CliHelp() {
 	fmt.Println(WellcomeText)
 	fmt.Println(SpecifyText)
-	fmt.Println(cmd.CrawlerHelp())
+	fmt.Println(crawler.Help())
 }
 
 func PrintVersion() {
