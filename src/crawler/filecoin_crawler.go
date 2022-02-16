@@ -23,13 +23,15 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
 
+	ma "github.com/multiformats/go-multiaddr"
+
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	pb "github.com/libp2p/go-libp2p-kad-dht/pb"
 )
 
 // TEMPORARY data for the running the filecoin demo
 var (
-	workers = 20
+	workers = 10
 
 	bootstrapNodes = []string{
 		"/ip4/3.224.142.21/tcp/1347/p2p/12D3KooWCVe8MmsEMes2FzgTpt9fXtmCY7wrq91GRiaC8PHSCCBj",
@@ -166,7 +168,7 @@ func (c *FilecoinCrawler) crawlNetwork() {
 	}
 
 	// Peer Discovery
-	connectablePeers := sync.Map{}
+	connectablePeers := NewDiscoveryPeers(c.DB)
 
 	// Fill with bootstrap nodes
 	log.Info("connecting to the bootstrap nodes")
@@ -176,7 +178,6 @@ func (c *FilecoinCrawler) crawlNetwork() {
 		// Load it to the sync map
 		connectablePeers.Store(peerInfo.ID.String(), *peerInfo)
 	}
-	discoveredPeers := &sync.Map{}
 
 	for i := 0; i < workers; i++ {
 		workerid := i
@@ -189,34 +190,35 @@ func (c *FilecoinCrawler) crawlNetwork() {
 				}
 				// iterate through the peers
 				count := 0
-				connectablePeers.Range(func(key, value interface{}) bool {
-					peer := value.(peer.AddrInfo)
-					count++
-					log.Debugf(" connecting", peer.String())
-					if err := h.Connect(c.ctx, peer); err != nil {
-						log.Debug(err.Error())
-						// remove unreacheable node from the list
-						connectablePeers.Delete(key.(string))
-					} else {
-						log.Debug("Connection established with bootstrap node:" + peer.ID.String())
-						// If peer was connectable, req all the possible info from the peer and save it in the PSQL
-						fpeer := c.ExtractHostInfo(peer)
-						c.DB.StoreFilecoinPeer(fpeer.PeerId, fpeer)
-						// try to request neighbors to connected peer
-						neighborsRt, err := c.fetchNeighbors(c.ctx, peer)
-						if err != nil {
-							log.Debugf("unable to request neibors to peer. %s", err.Error())
-						}
-						// add peer to connectable list
-						for _, newPeer := range neighborsRt.Neighbors {
-							// neihbors is an array of AddrsInfo already have
-							// add them to the peerQ
-							connectablePeers.Store(newPeer.ID.String(), newPeer)
-							discoveredPeers.Store(newPeer.ID.String(), struct{}{})
-						}
+
+				peer, ok := connectablePeers.Next()
+				if !ok {
+					time.Sleep(1 * time.Second)
+					continue
+				}
+				count++
+				log.Debugf(" connecting", peer.ID.String())
+				if err := h.Connect(c.ctx, peer); err != nil {
+					log.Debug(err.Error())
+					// remove unreacheable node from the list
+					connectablePeers.Blacklist(peer.ID.String())
+				} else {
+					log.Debug("Connection established with bootstrap node:" + peer.ID.String())
+					// If peer was connectable, req all the possible info from the peer and save it in the PSQL
+					fpeer := c.ExtractHostInfo(peer)
+					c.DB.StoreFilecoinPeer(fpeer.PeerId, fpeer)
+					// try to request neighbors to connected peer
+					neighborsRt, err := c.fetchNeighbors(c.ctx, peer)
+					if err != nil {
+						log.Debugf("unable to request neibors to peer. %s", err.Error())
 					}
-					return true
-				})
+					// add peer to connectable list
+					for _, newPeer := range neighborsRt.Neighbors {
+						// neihbors is an array of AddrsInfo already have
+						// add them to the peerQ
+						connectablePeers.Store(newPeer.ID.String(), newPeer)
+					}
+				}
 				log.Infof("worker %d - peers %d in this iteration", workerid, count)
 			}
 		}()
@@ -228,13 +230,14 @@ func (c *FilecoinCrawler) crawlNetwork() {
 		for {
 			select {
 			case <-ticker.C:
-				pcounter := 0
-				discoveredPeers.Range(func(key, value interface{}) bool {
-					pcounter++
+				// count blacklisted peers
+				blacklisted := 0
+				connectablePeers.blacklist.Range(func(key, value interface{}) bool {
+					blacklisted++
 					return true
 				})
 				connpeers := c.DB.GetFilecoinPeers()
-				log.Infof("SUMMARY: %d discovered peers, %d connected", pcounter, len(connpeers))
+				log.Infof("SUMMARY: %d discovered peers, %d connectable, %d blacklisted", len(connectablePeers.pArray), len(connpeers), blacklisted)
 			case <-c.ctx.Done():
 				log.Info("closing routing")
 				return
@@ -258,4 +261,87 @@ func (c *FilecoinCrawler) crawlNetwork() {
 	// End up app, finishing everything
 	log.Info("SHUTDOWN DETECTED!")
 
+}
+
+// TODO: initialize struct from PSQL DB
+
+type discoveredPeers struct {
+	pMap      sync.Map
+	m         sync.Mutex
+	pArray    []*peer.AddrInfo
+	blacklist sync.Map
+	p         int64
+}
+
+func NewDiscoveryPeers(db *postgresql.PostgresDBService) discoveredPeers {
+	dp := discoveredPeers{
+		pArray: make([]*peer.AddrInfo, 0),
+	}
+	// poblate the dp with peers in the DB
+	peers := db.GetFilecoinPeers()
+	for _, pID := range peers {
+		p, ok := db.LoadFilecoinPeer(pID.String())
+		if !ok {
+			continue
+		}
+		// compose the addr info
+		maddr := peer.AddrInfo{
+			ID:    pID,
+			Addrs: make([]ma.Multiaddr, 0),
+		}
+		maddr.Addrs = append(maddr.Addrs, p.MAddrs[:]...)
+		dp.Store(pID.String(), maddr)
+	}
+	return dp
+}
+
+func (d *discoveredPeers) Next() (peer.AddrInfo, bool) {
+	log.Debugf("next peer requested")
+	if len(d.pArray) != 0 {
+		log.Debugf("getting next peer")
+		d.m.Lock()
+		pinfo := d.pArray[d.p]
+		d.p++
+		// check d.p
+		if d.p >= int64(len(d.pArray)) {
+			d.p = 0
+		}
+		d.m.Unlock()
+		if d.isBlacklisted(pinfo.ID.String()) {
+			log.Warnf("peer blacklisted, try again")
+			return peer.AddrInfo{}, false
+		}
+		log.Debugf("next peer: %d", pinfo.ID.String())
+		return *pinfo, true
+	} else {
+		log.Debugf("array not init")
+		return peer.AddrInfo{}, false
+	}
+}
+
+func (d *discoveredPeers) Store(peerID string, p peer.AddrInfo) {
+	log.Debugf("storing %d", peerID)
+	_, ok := d.pMap.Load(peerID)
+	// update results always
+	d.pMap.Store(peerID, &p)
+	if ok {
+		return
+	}
+	// only if peer is not already in the array, we add it
+	d.m.Lock()
+	d.pArray = append(d.pArray, &p)
+	d.m.Unlock()
+	log.Debugf("done storing %d", peerID)
+}
+
+func (d *discoveredPeers) Blacklist(peerID string) {
+	d.blacklist.Store(peerID, struct{}{})
+}
+
+func (d *discoveredPeers) isBlacklisted(peerID string) bool {
+	d.m.Lock()
+	// get pointer of the peerID
+	_, ok := d.blacklist.Load(peerID)
+	d.m.Unlock()
+	return ok
 }
