@@ -31,7 +31,7 @@ import (
 
 // TEMPORARY data for the running the filecoin demo
 var (
-	workers = 10
+	workers = 25
 
 	bootstrapNodes = []string{
 		"/ip4/3.224.142.21/tcp/1347/p2p/12D3KooWCVe8MmsEMes2FzgTpt9fXtmCY7wrq91GRiaC8PHSCCBj",
@@ -180,7 +180,6 @@ func (c *FilecoinCrawler) crawlNetwork() {
 	}
 
 	for i := 0; i < workers; i++ {
-		workerid := i
 		go func() {
 			// make sure that the
 			for {
@@ -219,7 +218,6 @@ func (c *FilecoinCrawler) crawlNetwork() {
 						connectablePeers.Store(newPeer.ID.String(), newPeer)
 					}
 				}
-				log.Infof("worker %d - peers %d in this iteration", workerid, count)
 			}
 		}()
 	}
@@ -237,6 +235,7 @@ func (c *FilecoinCrawler) crawlNetwork() {
 					return true
 				})
 				connpeers := c.DB.GetFilecoinPeers()
+				log.Infof("SUMMARY: pointer = %d", connectablePeers.p)
 				log.Infof("SUMMARY: %d discovered peers, %d connectable, %d blacklisted", len(connectablePeers.pArray), len(connpeers), blacklisted)
 			case <-c.ctx.Done():
 				log.Info("closing routing")
