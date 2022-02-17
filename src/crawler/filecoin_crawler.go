@@ -23,16 +23,15 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
 
-	ma "github.com/multiformats/go-multiaddr"
-
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	pb "github.com/libp2p/go-libp2p-kad-dht/pb"
+	ma "github.com/multiformats/go-multiaddr"
 )
 
 // TEMPORARY data for the running the filecoin demo
 var (
-	workers = 25
-
+	workers        = 100
+	minWaitTime    = 5 * time.Second
 	bootstrapNodes = []string{
 		"/ip4/3.224.142.21/tcp/1347/p2p/12D3KooWCVe8MmsEMes2FzgTpt9fXtmCY7wrq91GRiaC8PHSCCBj",
 		"/ip4/107.23.112.60/tcp/1347/p2p/12D3KooWCwevHg1yLCvktf2nvLu7L9894mcrJR4MsBCcm4syShVc",
@@ -168,7 +167,8 @@ func (c *FilecoinCrawler) crawlNetwork() {
 	}
 
 	// Peer Discovery
-	connectablePeers := NewDiscoveryPeers(c.DB)
+	connectablePeers := NewDiscoveryPeers(c.ctx, c.DB)
+	npeer := connectablePeers.Run()
 
 	// Fill with bootstrap nodes
 	log.Info("connecting to the bootstrap nodes")
@@ -176,47 +176,73 @@ func (c *FilecoinCrawler) crawlNetwork() {
 		maddr, _ := utils.UnmarshalMaddr(peerAddr)
 		peerInfo, _ := peer.AddrInfoFromP2pAddr(maddr)
 		// Load it to the sync map
-		connectablePeers.Store(peerInfo.ID.String(), *peerInfo)
+		p := c.ExtractHostInfo(*peerInfo)
+		c.DB.StoreFilecoinPeer(peerInfo.ID.String(), p)
 	}
 
 	for i := 0; i < workers; i++ {
 		go func() {
+			workerid := i
+			// request next peer
+			connectablePeers.ReqNextPeer()
 			// make sure that the
 			for {
-				if c.ctx.Err() != nil {
-					log.Info("closing kdth discovery")
-					return
-				}
-				// iterate through the peers
-				count := 0
-
-				peer, ok := connectablePeers.Next()
-				if !ok {
-					time.Sleep(1 * time.Second)
-					continue
-				}
-				count++
-				log.Debugf(" connecting", peer.ID.String())
-				if err := h.Connect(c.ctx, peer); err != nil {
-					log.Debug(err.Error())
-					// remove unreacheable node from the list
-					connectablePeers.Blacklist(peer.ID.String())
-				} else {
-					log.Debug("Connection established with bootstrap node:" + peer.ID.String())
-					// If peer was connectable, req all the possible info from the peer and save it in the PSQL
-					fpeer := c.ExtractHostInfo(peer)
-					c.DB.StoreFilecoinPeer(fpeer.PeerId, fpeer)
-					// try to request neighbors to connected peer
-					neighborsRt, err := c.fetchNeighbors(c.ctx, peer)
+				select {
+				case pid := <-npeer:
+					// read the next peer id
+					pID, _ := peer.Decode(pid)
 					if err != nil {
-						log.Debugf("unable to request neibors to peer. %s", err.Error())
+						log.Errorf("error decoding PeerID string into peer.ID %s", err.Error())
 					}
-					// add peer to connectable list
-					for _, newPeer := range neighborsRt.Neighbors {
-						// neihbors is an array of AddrsInfo already have
-						// add them to the peerQ
-						connectablePeers.Store(newPeer.ID.String(), newPeer)
+					// load the peer
+					p, ok := c.DB.LoadFilecoinPeer(pid)
+					if !ok {
+						log.Error("error loading peer from db")
 					}
+
+					// get the multiaddress
+					maddr := peer.AddrInfo{
+						ID:    pID,
+						Addrs: make([]ma.Multiaddr, 0),
+					}
+					maddr.Addrs = append(maddr.Addrs, p.MAddrs[:]...)
+					// try to connect
+
+					if len(maddr.Addrs) == 0 {
+						time.Sleep(1 * time.Second)
+						connectablePeers.ReqNextPeer()
+						continue
+					}
+					log.Debugf(" connecting", pid)
+					if err := h.Connect(c.ctx, maddr); err != nil {
+						log.Error(err.Error())
+						// remove unreacheable node from the list
+						connectablePeers.Blacklist(pid)
+
+					} else {
+						log.Debug("Connection established with bootstrap node:" + pid)
+						// If peer was connectable, req all the possible info from the peer and save it in the PSQL
+						fpeer := c.ExtractHostInfo(maddr)
+						c.DB.StoreFilecoinPeer(fpeer.PeerId, fpeer)
+						// try to request neighbors to connected peer
+						neighborsRt, err := c.fetchNeighbors(c.ctx, maddr)
+						if err != nil {
+							log.Debugf("unable to request neibors to peer. %s", err.Error())
+						}
+						// add peer to connectable list
+						for _, newPeer := range neighborsRt.Neighbors {
+							// neihbors is an array of AddrsInfo already have
+							// generate new peer struct from AddrInfo
+							fpeer := c.ExtractHostInfo(newPeer)
+							c.DB.StoreFilecoinPeer(fpeer.PeerId, fpeer)
+						}
+					}
+					// always after finishing, request new peer
+					connectablePeers.ReqNextPeer()
+
+				case <-c.ctx.Done():
+					log.Infof("closing kdth discovery, worker %d", workerid)
+					return
 				}
 			}
 		}()
@@ -235,8 +261,7 @@ func (c *FilecoinCrawler) crawlNetwork() {
 					return true
 				})
 				connpeers := c.DB.GetFilecoinPeers()
-				log.Infof("SUMMARY: pointer = %d", connectablePeers.p)
-				log.Infof("SUMMARY: %d discovered peers, %d connectable, %d blacklisted", len(connectablePeers.pArray), len(connpeers), blacklisted)
+				log.Infof("SUMMARY: %d discovered peers, %d blacklisted", len(connpeers), blacklisted)
 			case <-c.ctx.Done():
 				log.Info("closing routing")
 				return
@@ -244,9 +269,9 @@ func (c *FilecoinCrawler) crawlNetwork() {
 		}
 	}()
 
-	log.Info("announcing ourselves...")
+	//log.Info("announcing ourselves...")
 	//routingDiscovery := disc.NewRoutingDiscovery(kdht)
-	log.Debug("successfully announced!")
+	//log.Debug("successfully announced!")
 
 	// Now, look for others who have announced
 	// This is like your friend telling you the location to meet you.
@@ -265,72 +290,87 @@ func (c *FilecoinCrawler) crawlNetwork() {
 // TODO: initialize struct from PSQL DB
 
 type discoveredPeers struct {
-	pMap      sync.Map
-	m         sync.Mutex
-	pArray    []*peer.AddrInfo
+	ctx       context.Context
+	pArray    []string
 	blacklist sync.Map
-	p         int64
+	nPeerChan chan string
+	nPeerReq  chan struct{}
+
+	db *postgresql.PostgresDBService
 }
 
-func NewDiscoveryPeers(db *postgresql.PostgresDBService) discoveredPeers {
+func NewDiscoveryPeers(ctx context.Context, db *postgresql.PostgresDBService) discoveredPeers {
 	dp := discoveredPeers{
-		pArray: make([]*peer.AddrInfo, 0),
+		ctx:       ctx,
+		pArray:    make([]string, 0),
+		nPeerChan: make(chan string, workers),
+		nPeerReq:  make(chan struct{}, workers),
+		db:        db,
 	}
-	// poblate the dp with peers in the DB
-	peers := db.GetFilecoinPeers()
-	for _, pID := range peers {
-		p, ok := db.LoadFilecoinPeer(pID.String())
-		if !ok {
-			continue
-		}
-		// compose the addr info
-		maddr := peer.AddrInfo{
-			ID:    pID,
-			Addrs: make([]ma.Multiaddr, 0),
-		}
-		maddr.Addrs = append(maddr.Addrs, p.MAddrs[:]...)
-		dp.Store(pID.String(), maddr)
-	}
+	dp.refreshPeerList()
 	return dp
 }
 
-func (d *discoveredPeers) Next() (peer.AddrInfo, bool) {
-	log.Debugf("next peer requested")
-	if len(d.pArray) != 0 {
-		log.Debugf("getting next peer")
-		d.m.Lock()
-		pinfo := d.pArray[d.p]
-		d.p++
-		// check d.p
-		if d.p >= int64(len(d.pArray)) {
-			d.p = 0
+func (d *discoveredPeers) refreshPeerList() {
+	log.Debug("refreshing peer list")
+	cnt := 0
+	// poblate the dp with peers in the DB
+	peers := d.db.GetFilecoinPeers()
+	for _, pID := range peers {
+		_, ok := d.db.LoadFilecoinPeer(pID.String())
+		if !ok {
+			continue
 		}
-		d.m.Unlock()
-		if d.isBlacklisted(pinfo.ID.String()) {
-			log.Warnf("peer blacklisted, try again")
-			return peer.AddrInfo{}, false
-		}
-		log.Debugf("next peer: %d", pinfo.ID.String())
-		return *pinfo, true
-	} else {
-		log.Debugf("array not init")
-		return peer.AddrInfo{}, false
+		// add the
+		d.pArray = append(d.pArray, pID.String())
+		cnt++
 	}
+	log.Debugf("refreshed peerstore with %d peers", cnt)
 }
 
-func (d *discoveredPeers) Store(peerID string, p peer.AddrInfo) {
-	log.Debugf("storing %d", peerID)
-	_, ok := d.pMap.Load(peerID)
-	// update results always
-	d.pMap.Store(peerID, &p)
-	if ok {
-		return
-	}
-	// only if peer is not already in the array, we add it
-	d.m.Lock()
-	d.pArray = append(d.pArray, &p)
-	d.m.Unlock()
-	log.Debugf("done storing %d", peerID)
+func (d *discoveredPeers) Run() chan string {
+	pointer := 0
+	refreshFlag := false
+	go func() {
+		for {
+			select {
+
+			case <-d.nPeerReq:
+				log.Debugf("peer requested")
+				// check if array is empty
+				if len(d.pArray) != 0 {
+					pid := d.pArray[pointer]
+					pointer++
+					if d.isBlacklisted(pid) {
+						d.nPeerReq <- struct{}{}
+						continue
+					}
+					// return the pid to the worker
+					log.Debugf("next peer: %d", pid)
+					d.nPeerChan <- pid
+				} else {
+					log.Debugf("empty array")
+					time.Sleep(minWaitTime)
+					d.ReqNextPeer()
+					refreshFlag = true
+				}
+				if refreshFlag || pointer >= len(d.pArray) {
+					d.refreshPeerList()
+				}
+
+			case <-d.ctx.Done():
+				log.Info("shutting down peer feeder")
+				close(d.nPeerChan)
+				close(d.nPeerReq)
+				return
+			}
+		}
+	}()
+	return d.nPeerChan
+}
+
+func (d *discoveredPeers) ReqNextPeer() {
+	d.nPeerReq <- struct{}{}
 }
 
 func (d *discoveredPeers) Blacklist(peerID string) {
@@ -338,9 +378,7 @@ func (d *discoveredPeers) Blacklist(peerID string) {
 }
 
 func (d *discoveredPeers) isBlacklisted(peerID string) bool {
-	d.m.Lock()
 	// get pointer of the peerID
 	_, ok := d.blacklist.Load(peerID)
-	d.m.Unlock()
 	return ok
 }

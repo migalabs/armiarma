@@ -111,7 +111,7 @@ func (c *FilecoinCrawler) ExtractHostInfo(p peer.AddrInfo) models.FilecoinPeer {
 	}
 	err := ReqFilecoinHostInfo(c.ctx, h, &c.IpLocalizer, p.ID, &fpeer)
 	if err != nil {
-		log.Errorf("unable to fetch peer info. %s", err.Error())
+		log.Debugf("unable to fetch peer info. %s", err.Error())
 	}
 	return fpeer
 }
