@@ -15,7 +15,6 @@ import (
 	"github.com/migalabs/armiarma/src/exporters"
 	"github.com/migalabs/armiarma/src/hosts"
 	"github.com/migalabs/armiarma/src/info"
-	"github.com/migalabs/armiarma/src/utils"
 
 	"github.com/migalabs/armiarma/src/db/postgresql"
 	"github.com/migalabs/armiarma/src/utils/apis"
@@ -30,38 +29,11 @@ import (
 
 // TEMPORARY data for the running the filecoin demo
 var (
-	workers        = 100
-	minWaitTime    = 5 * time.Second
-	bootstrapNodes = []string{
-		"/ip4/3.224.142.21/tcp/1347/p2p/12D3KooWCVe8MmsEMes2FzgTpt9fXtmCY7wrq91GRiaC8PHSCCBj",
-		"/ip4/107.23.112.60/tcp/1347/p2p/12D3KooWCwevHg1yLCvktf2nvLu7L9894mcrJR4MsBCcm4syShVc",
-		"/ip4/100.25.69.197/tcp/1347/p2p/12D3KooWEWVwHGn2yR36gKLozmb4YjDJGerotAPGxmdWZx2nxMC4",
-		"/ip4/3.123.163.135/tcp/1347/p2p/12D3KooWKhgq8c7NQ9iGjbyK7v7phXvG6492HQfiDaGHLHLQjk7R",
-		"/ip4/18.198.196.213/tcp/1347/p2p/12D3KooWL6PsFNPhYftrJzGgF5U18hFoaVhfGk7xwzD8yVrHJ3Uc",
-		"/ip4/18.195.111.146/tcp/1347/p2p/12D3KooWLFynvDQiUpXoHroV1YxKHhPJgysQGH2k3ZGwtWzR4dFH",
-		"/ip4/52.77.116.139/tcp/1347/p2p/12D3KooWP5MwCiqdMETF9ub1P3MbCvQCcfconnYHbWg6sUJcDRQQ",
-		"/ip4/18.136.2.101/tcp/1347/p2p/12D3KooWRs3aY1p3juFjPy8gPN95PEQChm2QKGUCAdcDCC4EBMKf",
-		"/ip4/13.250.155.222/tcp/1347/p2p/12D3KooWScFR7385LTyR4zU1bYdzSiiAb5rnNABfVahPvVSzyTkR",
-		"/ip4/47.115.22.33/tcp/41778/p2p/12D3KooWDqaZkm3oSczUm3dvAJ5aL2rdSeQ5VQbnHRTQNEFShhmc",
-		"/ip4/61.147.123.111/tcp/12757/p2p/12D3KooWGhufNmZHF3sv48aQeS13ng5XVJZ9E6qy2Ms4VzqeUsHk",
-		"/ip4/61.147.123.121/tcp/12757/p2p/12D3KooWDgQrcyZpcMAkbEFSJJYV2qXEMwXX67WTbqpNdbifHaEq",
-		"/ip4/3.129.112.217/tcp/1235/p2p/12D3KooWBF8cpp65hp2u9LK5mh19x67ftAam84z9LsfaquTDSBpt",
-		"/ip4/36.103.232.198/tcp/34721/p2p/12D3KooWQnwEGNqcM2nAcPtRR9rAX8Hrg4k9kJLCHoTR5chJfz6d",
-		"/ip4/36.103.232.198/tcp/34723/p2p/12D3KooWMKxMkD5DMpSWsW7dBddKxKT7L2GgbNuckz9otxvkvByP",
-		"/ip4/104.131.131.82/tcp/4001/ipfs/QmaCpDMGvV2BGHeYERUEnRQAwe3N8SzbUtfsmvsqQLuvuJ",
-		"/ip4/104.236.151.122/tcp/4001/ipfs/QmSoLju6m7xTh3DuokvT3886QRYqxAzb1kShaanJgW36yx",
-		"/ip4/104.236.176.52/tcp/4001/ipfs/QmSoLnSGccFuZQJzRadHn95W2CrSFmZuTdDWP8HXaHca9z",
-		"/ip4/104.236.179.241/tcp/4001/ipfs/QmSoLpPVmHKQ4XTPdz8tjDFgdeRFkpV8JgYq8JVJ69RrZm",
-		"/ip4/104.236.76.40/tcp/4001/ipfs/QmSoLV4Bbm51jM9C4gDYZQ9Cy3U6aXMJDAbzgu2fzaDs64",
-		"/ip4/128.199.219.111/tcp/4001/ipfs/QmSoLSafTMBsPKadTEgaXctDQVcqN88CNLHXMkTNwMKPnu",
-		"/ip4/162.243.248.213/tcp/4001/ipfs/QmSoLueR4xBeUbY9WZ9xGUUxunbKWcrNFTDAadQJmocnWm",
-		"/ip4/178.62.158.247/tcp/4001/ipfs/QmSoLer265NRgSp2LA3dPaeykiS1J6DifTC88f5uVQKNAd",
-		"/ip4/178.62.61.185/tcp/4001/ipfs/QmSoLMeWqB7YGVLJN3pNLQpmmEk35v6wYtsMGLzSr5QBU3",
-	}
-	protocols = []string{
+	workers     = 100
+	minWaitTime = 5 * time.Second
+	protocols   = []string{
 		"/ipfs/kad/1.0.0",
 		"/ipfs/kad/2.0.0",
-		"/dnsaddr/bootstrap.libp2p.io",
 	}
 )
 
@@ -170,13 +142,14 @@ func (c *FilecoinCrawler) crawlNetwork() {
 	connectablePeers := NewDiscoveryPeers(c.ctx, c.DB)
 	npeer := connectablePeers.Run()
 
+	// get official bootstrap peers
+	bootstrapNodes := dht.GetDefaultBootstrapPeerAddrInfos()
+
 	// Fill with bootstrap nodes
 	log.Info("connecting to the bootstrap nodes")
-	for _, peerAddr := range bootstrapNodes {
-		maddr, _ := utils.UnmarshalMaddr(peerAddr)
-		peerInfo, _ := peer.AddrInfoFromP2pAddr(maddr)
+	for _, peerInfo := range bootstrapNodes {
 		// Load it to the sync map
-		p := c.ExtractHostInfo(*peerInfo)
+		p := c.ExtractHostInfo(peerInfo)
 		c.DB.StoreFilecoinPeer(peerInfo.ID.String(), p)
 	}
 
