@@ -1,4 +1,4 @@
-package crawler
+package kdht
 
 import (
 	"context"
@@ -8,7 +8,6 @@ import (
 
 	"github.com/migalabs/armiarma/src/db/models"
 	"github.com/migalabs/armiarma/src/utils"
-	"github.com/migalabs/armiarma/src/utils/apis"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 
@@ -18,11 +17,10 @@ import (
 	kbucket "github.com/libp2p/go-libp2p-kbucket"
 )
 
-// TEMPORARY
 // fetchNeighbors sends RPC messages to the given peer and asks for its closest peers to an artificial set
 // of 15 random peer IDs with increasing common prefix lengths (CPL). The returned peers are streamed
 // to the results channel.
-func (c *FilecoinCrawler) fetchNeighbors(ctx context.Context, pi peer.AddrInfo) (*RoutingTable, error) {
+func (disc *IPFSDiscService) fetchNeighbors(ctx context.Context, pi peer.AddrInfo) (*RoutingTable, error) {
 	rt, err := kbucket.NewRoutingTable(20, kbucket.ConvertPeerID(pi.ID), time.Hour, nil, time.Hour, nil)
 	if err != nil {
 		return nil, err
@@ -48,7 +46,7 @@ func (c *FilecoinCrawler) fetchNeighbors(ctx context.Context, pi peer.AddrInfo) 
 				return errors.Wrapf(err, "generating random peer ID with CPL %d", count)
 			}
 
-			neighbors, err := c.pm.GetClosestPeers(ctx, pi.ID, rpi)
+			neighbors, err := disc.pm.GetClosestPeers(ctx, pi.ID, rpi)
 			if err != nil {
 				atomic.StoreUint32(&errorBits, 1<<count)
 				return errors.Wrapf(err, "getting closest peer with CPL %d", count)
@@ -95,9 +93,8 @@ type RoutingTable struct {
 }
 
 // extract info from the peer and compose
-func (c *FilecoinCrawler) ExtractHostInfo(p peer.AddrInfo) models.FilecoinPeer {
-	h := c.Host.Host()
-	fpeer := models.NewFilecoinPeer(p.ID.String())
+func (c *IPFSDiscService) extractHostInfo(p peer.AddrInfo) models.Peer {
+	fpeer := models.NewPeer(p.ID.String())
 	// look for the Public single IP
 	for _, addr := range p.Addrs {
 		// extract ip from mAddrs
@@ -109,14 +106,14 @@ func (c *FilecoinCrawler) ExtractHostInfo(p peer.AddrInfo) models.FilecoinPeer {
 			fpeer.MAddrs = p.Addrs
 		}
 	}
-	err := ReqFilecoinHostInfo(c.ctx, h, &c.IpLocalizer, p.ID, &fpeer)
+	err := ReqFilecoinHostInfo(c.ctx, c.h, p.ID, &fpeer)
 	if err != nil {
 		log.Debugf("unable to fetch peer info. %s", err.Error())
 	}
 	return fpeer
 }
 
-func ReqFilecoinHostInfo(ctx context.Context, h host.Host, ipLoc *apis.PeerLocalizer, peerID peer.ID, p *models.FilecoinPeer) error {
+func ReqFilecoinHostInfo(ctx context.Context, h host.Host, peerID peer.ID, p *models.Peer) error {
 	// final error
 	var finErr error
 
@@ -132,15 +129,6 @@ func ReqFilecoinHostInfo(ctx context.Context, h host.Host, ipLoc *apis.PeerLocal
 	pv, err := h.Peerstore().Get(peerID, "ProtocolVersion")
 	if err == nil {
 		p.ProtocolVersion = pv.(string)
-	}
-	locResp, err := ipLoc.LocateIP(p.Ip)
-	if err != nil {
-		// TODO: think about a better idea to integrate a logger into this functions
-		log.Warnf("error when fetching country/city from ip %s. %s", peerID.String(), err.Error())
-	} else {
-		p.Country = locResp.Country
-		p.City = locResp.City
-		p.CountryCode = locResp.CountryCode
 	}
 	// Extract protocols
 	if protocols, err := h.Peerstore().GetProtocols(peerID); err == nil {

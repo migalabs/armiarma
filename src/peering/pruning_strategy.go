@@ -9,11 +9,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/migalabs/armiarma/src/db"
 	"github.com/migalabs/armiarma/src/db/models"
-	db_utils "github.com/migalabs/armiarma/src/db/utils"
 	"github.com/migalabs/armiarma/src/hosts"
+	db_utils "github.com/migalabs/armiarma/src/utils"
+
+	"github.com/ethereum/go-ethereum/p2p/enode"
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/sirupsen/logrus"
 )
 
@@ -35,8 +37,9 @@ var (
 // Pruning Strategy is a Peering Strategy that applies penalties to peers that haven't shown activity when attempting to connect them.
 // Combined with the Deprecated flag in the models.Peer struct, it produces more accurate metrics when exporting pruning peers that are no longer active.
 type PruningStrategy struct {
-	ctx          context.Context
-	cancel       context.CancelFunc
+	ctx context.Context
+
+	network      string
 	strategyType string
 	PeerStore    *db.PeerStore
 
@@ -68,15 +71,12 @@ type PruningStrategy struct {
 // @param opts: base and logging option.
 // @return peering strategy interface with the prunning service.
 // @return error.
-func NewPruningStrategy(ctx context.Context, peerstore *db.PeerStore) (PruningStrategy, error) {
-	// TODO: cancel is still not implemented in the BaseCreation
-	pruningCtx, cancel := context.WithCancel(ctx)
-
+func NewPruningStrategy(ctx context.Context, network string, peerstore *db.PeerStore) (PruningStrategy, error) {
 	// Generate the ConnStatus notification channel
 	// TODO: consider making the ConnStatus channel larger
 	pr := PruningStrategy{
-		ctx:            pruningCtx,
-		cancel:         cancel,
+		ctx:            ctx,
+		network:        network,
 		strategyType:   PeerStratModuleName,
 		PeerStore:      peerstore,
 		PeerQueue:      NewPeerQueue(),
@@ -166,20 +166,28 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 					// compose all the detailed info for the given peer
 					// Generating New peer to fetch info
 					npeer := models.NewPeer(nextPeer.PeerID)
-					peerEnr, err := pinfo.GetBlockchainNode()
-					if err == nil && peerEnr != nil {
-						npeer.NodeId = peerEnr.ID().String()
-						// TODO:
-						npeer.Ip = peerEnr.IP().String()
-					}
+
+					// get IP
 					pID, _ := peer.Decode(nextPeer.PeerID)
 					if err != nil {
 						slog.Errorf("error decoding PeerID string into peer.ID %s", err.Error())
 					}
 					npeer.PeerId = pID.String()
-					k, _ := pID.ExtractPublicKey()
-					pubk, _ := k.Raw()
-					npeer.Pubkey = hex.EncodeToString(pubk)
+
+					// Eth2 network
+					if c.network == "eth2" {
+						peerEnr, ok := pinfo.GetAtt("enr")
+						enr := enode.MustParse(peerEnr.(string))
+						if ok && peerEnr != nil {
+							npeer.SetAtt("nodeid", enr.ID().String())
+							// TODO:
+							npeer.Ip = enr.IP().String()
+						}
+						k, _ := pID.ExtractPublicKey()
+						pubk, _ := k.Raw()
+						npeer.SetAtt("pubkey", hex.EncodeToString(pubk))
+					}
+
 					npeer.MAddrs = pinfo.MAddrs
 					// Update metadata of peer
 					c.PeerStore.StoreOrUpdatePeer(npeer)
@@ -236,6 +244,9 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 		// detect if the context has been shut down to end the go routine
 		case <-c.ctx.Done():
 			slog.Debug("closing peerstore iterator")
+			close(c.peerStreamChan)
+			close(c.nextPeerChan)
+			close(c.connEventNot)
 			return
 		}
 	}
@@ -379,19 +390,6 @@ func (c *PruningStrategy) ControlDistribution() map[string]*int64 {
 
 func (c *PruningStrategy) GetErrorAttemptDistribution() map[string]*int64 {
 	return c.ErrorAttemptDistribution
-}
-
-// ClosePeerStream:
-// Closes in a controled sequence the module related go routines and channels.
-// Ending with the Base.Ctx cancellation.
-func (c *PruningStrategy) Close() {
-	slog.Infof("closing pruning strategy")
-	// close the involved channels
-	close(c.peerStreamChan)
-	close(c.nextPeerChan)
-	close(c.connEventNot)
-	// shutdown the base context of the pruning
-	c.cancel()
 }
 
 // PeerQueue:

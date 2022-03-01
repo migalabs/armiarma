@@ -7,7 +7,10 @@ import (
 	"net"
 	"strings"
 
+	"github.com/pkg/errors"
+
 	"github.com/libp2p/go-libp2p-core/crypto"
+	"github.com/libp2p/go-libp2p-core/peer"
 	ma "github.com/multiformats/go-multiaddr"
 )
 
@@ -45,6 +48,19 @@ func IsIPPublic(ip net.IP) bool {
 		}
 	}
 	return true
+}
+
+func CompAddrInfo(pid string, maddrs []ma.Multiaddr) (peer.AddrInfo, error) {
+	peerid, err := peer.Decode(pid)
+	if err != nil {
+		return peer.AddrInfo{}, errors.Wrap(err, "unable to compose addr info related to peer")
+	}
+	addrinfo := peer.AddrInfo{
+		ID:    peerid,
+		Addrs: make([]ma.Multiaddr, 0),
+	}
+	addrinfo.Addrs = append(addrinfo.Addrs, maddrs...)
+	return addrinfo, nil
 }
 
 func ExtractIPFromMAddr(input_addr ma.Multiaddr) net.IP {

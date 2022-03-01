@@ -12,17 +12,16 @@ import (
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/migalabs/armiarma/src/db/models"
-	db_utils "github.com/migalabs/armiarma/src/db/utils"
 	"github.com/migalabs/armiarma/src/rpc/methods"
 	"github.com/migalabs/armiarma/src/rpc/reqresp"
 	"github.com/migalabs/armiarma/src/utils"
+	db_utils "github.com/migalabs/armiarma/src/utils"
 	"github.com/migalabs/armiarma/src/utils/apis"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p/p2p/protocol/identify"
-	log "github.com/sirupsen/logrus"
 )
 
 var ()
@@ -211,7 +210,7 @@ func ReqHostInfo(ctx context.Context, wg *sync.WaitGroup, h host.Host, ipLoc *ap
 	}
 	pubk, err := conn.RemotePublicKey().Raw()
 	if err == nil {
-		peer.Pubkey = hex.EncodeToString(pubk)
+		peer.SetAtt("pubkey", hex.EncodeToString(pubk))
 	}
 	// return the erro defined in the top
 	// nil if we could identify it, ident error if we couldnt line 181

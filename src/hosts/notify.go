@@ -32,11 +32,11 @@ type IdentificationEvent struct {
 }
 
 func (c *BasicLibp2pHost) standardListenF(net network.Network, addr ma.Multiaddr) {
-	Log.Debug("Listen")
+	log.Debug("Listen")
 }
 
 func (c *BasicLibp2pHost) standardListenCloseF(net network.Network, addr ma.Multiaddr) {
-	Log.Debug("Close listen")
+	log.Debug("Close listen")
 }
 
 func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Conn) {
@@ -55,7 +55,7 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 
 	c.RecConnEvent(cs)
 
-	Log.WithFields(logrus.Fields{
+	log.WithFields(logrus.Fields{
 		"EVENT":     "Connection detected",
 		"DIRECTION": conn.Stat().Direction.String(),
 	}).Debug("Peer: ", conn.RemotePeer().String())
@@ -72,24 +72,31 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 	// set sync group and error groups to handle different requests
 	var wg sync.WaitGroup
 
-	wg.Add(3) // there will be 3
-
 	// Error channels
 	hinfoErr := make(chan error, 1)
-	metadataErr := make(chan error, 1)
-	statusErr := make(chan error, 1)
 
 	// Request the Host Metadata
 	h := c.Host()
+
+	// for Eth2
+	var bStatus common.Status
+	var bMetadata common.MetaData
+	metadataErr := make(chan error, 1)
+	statusErr := make(chan error, 1)
+
+	wg.Add(1)
 	go ReqHostInfo(mainCtx, &wg, h, c.IpLocator, conn, &peer, hinfoErr)
 
-	var bMetadata common.MetaData
-	// Request the BeaconMetadata
-	go ReqBeaconMetadata(mainCtx, &wg, h, conn.RemotePeer(), &bMetadata, metadataErr)
+	if c.Network == "eth2" {
 
-	var bStatus common.Status
-	// request BeaconStatus metadata as we connect to a peer
-	go ReqBeaconStatus(mainCtx, &wg, h, conn.RemotePeer(), &bStatus, statusErr)
+		// Request the BeaconMetadata
+		wg.Add(1)
+		go ReqBeaconMetadata(mainCtx, &wg, h, conn.RemotePeer(), &bMetadata, metadataErr)
+
+		// request BeaconStatus metadata as we connect to a peer
+		wg.Add(1)
+		go ReqBeaconStatus(mainCtx, &wg, h, conn.RemotePeer(), &bStatus, statusErr)
+	}
 
 	wg.Wait()
 	// Parse the errors from the different go routines,
@@ -99,40 +106,44 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 	// if if there is an error  in the channel, print error
 	if err, _ := <-hinfoErr; err != nil {
 		// if error, cancel the timeout and stop ReqMetadata and ReqStatus
-		Log.WithFields(logrus.Fields{
+		log.WithFields(logrus.Fields{
 			"ERROR": err.Error(),
 		}).Debug("ReqHostInfo Peer: ", conn.RemotePeer().String())
 	} else {
-		Log.Debug("peer identified, succeed")
+		log.Debug("peer identified, succeed")
 	}
 
-	// Beacon Status request error check
-	// if if there is an error  in the channel, print error
-	if err := <-metadataErr; err != nil {
-		Log.WithFields(logrus.Fields{
-			"ERROR": err.Error(),
-		}).Debug("ReqMetadata Peer: ", conn.RemotePeer().String())
-	} else {
-		Log.Debug("peer metadata req, succeed")
-		peer.UpdateBeaconMetadata(bMetadata)
+	// If the network was eth2, wait for the metadata echange to reply
+	if c.Network == "eth2" {
+		// Beacon Status request error check
+		// if if there is an error  in the channel, print error
+		if err := <-metadataErr; err != nil {
+			log.WithFields(logrus.Fields{
+				"ERROR": err.Error(),
+			}).Debug("ReqMetadata Peer: ", conn.RemotePeer().String())
+		} else {
+			log.Debug("peer metadata req, succeed")
+			peer.SetAtt("beaconmetadata", models.NewBeaconMetadata(bMetadata))
+		}
+
+		// Beacon Status request error check
+		// if if there is an error  in the channel, print error
+		if err := <-statusErr; err != nil {
+			log.WithFields(logrus.Fields{
+				"ERROR": err.Error(),
+			}).Debug("ReqStatus Peer: ", conn.RemotePeer().String())
+		} else {
+			log.Debug("peer status req, succeed")
+			peer.SetAtt("beaconstatus", models.NewBeaconStatus(bStatus))
+		}
+		close(metadataErr)
+		close(statusErr)
 	}
 
-	// Beacon Status request error check
-	// if if there is an error  in the channel, print error
-	if err := <-statusErr; err != nil {
-		Log.WithFields(logrus.Fields{
-			"ERROR": err.Error(),
-		}).Debug("ReqStatus Peer: ", conn.RemotePeer().String())
-	} else {
-		Log.Debug("peer status req, succeed")
-		peer.UpdateBeaconStatus(bStatus)
-	}
 	// close channels
 	close(hinfoErr)
-	close(metadataErr)
-	close(statusErr)
 
-	Log.Debug("sending identification event of peer", peer.PeerId)
+	log.Debug("sending identification event of peer", peer.PeerId)
 	identStat := IdentificationEvent{
 		Peer:      peer,
 		Timestamp: t,
@@ -144,7 +155,7 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 }
 
 func (c *BasicLibp2pHost) standardDisconnectF(net network.Network, conn network.Conn) {
-	Log.Debugf("disconnected from peer %s", conn.RemotePeer().String())
+	log.Debugf("disconnected from peer %s", conn.RemotePeer().String())
 	// TEMP
 
 	peer := models.NewPeer(conn.RemotePeer().String())
@@ -160,11 +171,11 @@ func (c *BasicLibp2pHost) standardDisconnectF(net network.Network, conn network.
 }
 
 func (c *BasicLibp2pHost) standardOpenedStreamF(net network.Network, str network.Stream) {
-	Log.Debug("Open Stream")
+	log.Debug("Open Stream")
 }
 
 func (c *BasicLibp2pHost) standardClosedF(net network.Network, str network.Stream) {
-	Log.Debug("Close")
+	log.Debug("Close")
 }
 
 // SetCustomNotifications:

@@ -130,7 +130,7 @@ func (gs *GossipSub) runGossipPrometheusMetrics() {
 	for k, _ := range gs.MessageMetrics.topicList {
 		r := gs.MessageMetrics.GetTopicMsgs(k)
 		if r < int32(0) {
-			Log.Warnf("Unable to get message count for topic %s", k)
+			log.Warnf("Unable to get message count for topic %s", k)
 			continue
 		}
 		msgC := (float64(r) / (exporters.MetricLoopInterval.Seconds())) * 60 // messages per minute
@@ -144,9 +144,9 @@ func (gs *GossipSub) runGossipPrometheusMetrics() {
 	// reset the values
 	err := gs.MessageMetrics.ResetAllTopics()
 	if err != nil {
-		Log.Warnf("Unable to reset the gossip topic metrics. ", err.Error())
+		log.Warnf("Unable to reset the gossip topic metrics. ", err.Error())
 	}
-	Log.WithFields(logrus.Fields{
+	log.WithFields(logrus.Fields{
 		"TopicMsg/min": msgPerMin,
 		"TotalMsg/min": tot,
 	}).Info("gossip metrics summary")

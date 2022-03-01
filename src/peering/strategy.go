@@ -12,7 +12,6 @@ import (
 type PeeringStrategy interface {
 	// one channel to give the next peer, one to request the second one
 	Run() chan models.Peer
-	Close()
 	Type() string
 	// Peering Strategy interaction
 	NextPeer()

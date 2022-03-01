@@ -16,7 +16,6 @@ import (
 	"github.com/migalabs/armiarma/src/db"
 	"github.com/migalabs/armiarma/src/db/models"
 	"github.com/migalabs/armiarma/src/hosts"
-	"github.com/migalabs/armiarma/src/info"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/sirupsen/logrus"
 )
@@ -34,16 +33,11 @@ var (
 
 type PeeringOption func(*PeeringService) error
 
-type PeeringOpts struct {
-	InfoObj *info.InfoData
-}
-
 // PeeringService is the main service that will connect peers from the given peerstore and using the given Host.
 // It will use the specified peering strategy, which might difer/change from the testing or desired purposes of the run.
 type PeeringService struct {
-	ctx       context.Context
-	cancel    context.CancelFunc
-	InfoObj   *info.InfoData
+	ctx context.Context
+
 	host      *hosts.BasicLibp2pHost
 	PeerStore *db.PeerStore
 	strategy  PeeringStrategy
@@ -57,15 +51,10 @@ func NewPeeringService(
 	ctx context.Context,
 	h *hosts.BasicLibp2pHost,
 	peerstore *db.PeerStore,
-	infoObj *info.InfoData,
 	opts ...PeeringOption) (PeeringService, error) {
 
-	peeringCtx, cancel := context.WithCancel(ctx)
-
 	pServ := PeeringService{
-		ctx:        peeringCtx,
-		cancel:     cancel,
-		InfoObj:    infoObj,
+		ctx:        ctx,
 		host:       h,
 		PeerStore:  peerstore,
 		Timeout:    ConnectionRefuseTimeout,
@@ -243,14 +232,4 @@ func (c *PeeringService) eventRecorderRoutine() {
 			return
 		}
 	}
-}
-
-// Close
-// Stops the Peering Service, closing with it the peering strategy and their context
-func (c *PeeringService) Close() {
-	Log.Info("stoping the peering service")
-	// Stop the strategy
-	c.strategy.Close()
-	// finish the module context
-	c.cancel()
 }
