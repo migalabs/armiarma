@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/migalabs/armiarma/src/db/models"
+	"github.com/migalabs/armiarma/src/utils"
 	"github.com/migalabs/armiarma/src/utils/apis"
 
 	"github.com/libp2p/go-libp2p-core/host"
@@ -166,7 +167,8 @@ func (disc *IPFSDiscService) Peer() (models.Peer, bool) {
 	// build the DiscoveredPeer from the PeerInfo
 	p := models.NewPeer("")
 	p.PeerId = addrinfo.ID.String()
-	p.MAddrs = addrinfo.Addrs[:]
+	pubAddrs := utils.GetPublicAddrsFromAddrArray(addrinfo.Addrs)
+	p.MAddrs = append(p.MAddrs, pubAddrs)
 
 	// TODO: Not sure if there is actually an iterest to return IP / UserAgent / Protocols... /
 	return p, true

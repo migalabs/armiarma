@@ -63,28 +63,25 @@ func CompAddrInfo(pid string, maddrs []ma.Multiaddr) (peer.AddrInfo, error) {
 	return addrinfo, nil
 }
 
-func ExtractIPFromMAddr(input_addr ma.Multiaddr) net.IP {
-	string_addr := input_addr.String() // extract in string
+func ExtractIPFromMAddr(maddr ma.Multiaddr) net.IP {
+	straddr := maddr.String() // extract in string
 	// remember that the first position is "", as for having an initial /
 	// /ipX/<ip>/<transport_protocol>/<port>/p2p/<peerID>
-	string_addr_splitted := strings.Split(string_addr, MADDR_SEPARATOR)
-	if len(string_addr_splitted) < 3 {
+	spltAddr := strings.Split(straddr, MADDR_SEPARATOR)
+	if len(spltAddr) < 3 {
 		return nil // finish returning nil
 	}
 
-	extracted_ip := string_addr_splitted[2] // the IP is in the third position
+	ip := spltAddr[2] // the IP is in the third position
 
-	return net.ParseIP(extracted_ip)
+	return net.ParseIP(ip)
 }
 
 // checkvalidIP
 // * This method checks whether the IP can be parsed or not
-func CheckValidIP(input_IP string) bool {
-	parse_IP := net.ParseIP(input_IP)
-	if parse_IP != nil {
-		return true
-	}
-	return false
+func CheckValidIP(ip string) bool {
+	parsedIP := net.ParseIP(ip)
+	return parsedIP != nil
 }
 
 func ParsePubkey(v string) (*ecdsa.PublicKey, error) {
@@ -101,4 +98,20 @@ func ParsePubkey(v string) (*ecdsa.PublicKey, error) {
 		return nil, fmt.Errorf("cannot parse public key, invalid public key (Secp256k1): %v", err)
 	}
 	return (*ecdsa.PublicKey)((pub).(*crypto.Secp256k1PublicKey)), nil
+}
+
+func GetPublicAddrsFromAddrArray(mAddrs []ma.Multiaddr) ma.Multiaddr {
+	// loop to check if which is the public ip
+	var finalAddr ma.Multiaddr
+	for _, addr := range mAddrs {
+		ip := ExtractIPFromMAddr(addr)
+		if IsIPPublic(ip) {
+			finalAddr = addr
+			break
+		}
+	}
+	if len(mAddrs) > 0 && finalAddr.String() == "" {
+		finalAddr = mAddrs[0]
+	}
+	return finalAddr
 }
