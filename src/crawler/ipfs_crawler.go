@@ -86,6 +86,7 @@ func NewIpfsCrawler(ctx *cli.Context, infObj info.IpfsInfoData) (*IpfsCrawler, e
 		ipfslog.Warnf("network not recognized. network=%s. setting ipfs by default", infObj.Network)
 		protocols = info.Ipfsprotocols
 	}
+	ipfslog.Infoln("running peer discovery with protocols:", protocols)
 
 	// generate KDHT peer discovery
 	kdhtd := kdht.NewIPFSDiscService(ctx.Context, host.Host(), protocols, timeout)
