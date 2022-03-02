@@ -31,30 +31,35 @@ func (c *PeeringService) ServeMetrics() {
 				peersPeriter := c.strategy.AttemptedPeersSinceLastIter()
 
 				controlDist := c.strategy.ControlDistribution()
+				cntDist := make(map[string]int64)
 				errorAttemptDist := c.strategy.GetErrorAttemptDistribution()
+				errAttdist := make(map[string]int64)
+
 				// get new values
 				PeerstoreIterTime.Set(iterTime) // Float in seconds
 				PeersAttemptedInLastIteration.Set(float64(peersPeriter))
 
 				// generate the distribution
 				for key, value := range controlDist {
+					cntDist[key] = atomic.LoadInt64(value)
 					PrunedErrorDistribution.WithLabelValues(key).Set(float64(atomic.LoadInt64(value)))
 				}
 				// generate the distribution
 				for key, value := range errorAttemptDist {
+					errAttdist[key] = atomic.LoadInt64(value)
 					ErrorAttemptDistribution.WithLabelValues(key).Set(float64(atomic.LoadInt64(value)))
 				}
 
-				Log.WithFields(logrus.Fields{
+				log.WithFields(logrus.Fields{
 					"LastIterTime(secs)":          iterTime,
 					"AttemptedPeersSinceLastIter": peersPeriter,
 					//"IterForcingNextConnTime":         peerIterForcingTime,
-					"ControlDistribution":        controlDist,
-					"ControlAttemptDistribution": errorAttemptDist,
+					"ControlDistribution":        cntDist,
+					"ControlAttemptDistribution": errAttdist,
 				}).Info("peering metrics summary")
 
 			case <-c.ctx.Done():
-				Log.Info("Closing the prometheus metrics export service")
+				log.Info("Closing the prometheus metrics export service")
 				// closing the routine in a ordened way
 				ticker.Stop()
 				return

@@ -109,7 +109,8 @@ func IPFSinfoFromConfig(inputConfig config.ConfigData) IpfsInfoData {
 
 	// Network
 	if inputConfig.Network == "" {
-		log.Warnf("no network displayed")
+		i.Network = DefaultIpfsNetwork
+		log.Warnf("Setting default network: %d", DefaultIpfsNetwork)
 	} else {
 		i.Network = inputConfig.Network
 	}
