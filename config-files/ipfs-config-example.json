@@ -4,10 +4,10 @@
     "UdpPort": 9020,
     "TopicArray": [],
     "Network": "ipfs",
-    "DBEndpoint": "postgresql://dcrawler:my_Dev.Crawler@localhost:5433/crawlerdb",
+    "DBEndpoint": "postgresql://user:password@localhost:5433/databasename",
     "OutputPath": "./peerstore",
     "UserAgent": "BSC-IPFS-Crawler",
-    "LogLevel": "debug",
+    "LogLevel": "info",
     "PrivateKey": "",
     "BootNodesFile": "./bootstrap_nodes/ipfs-bootnodes.json"
 }

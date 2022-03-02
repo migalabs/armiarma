@@ -15,7 +15,6 @@ import (
 	"github.com/migalabs/armiarma/src/rpc/methods"
 	"github.com/migalabs/armiarma/src/rpc/reqresp"
 	"github.com/migalabs/armiarma/src/utils"
-	db_utils "github.com/migalabs/armiarma/src/utils"
 	"github.com/migalabs/armiarma/src/utils/apis"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
@@ -200,7 +199,7 @@ func ReqHostInfo(ctx context.Context, wg *sync.WaitGroup, h host.Host, ipLoc *ap
 	if err == nil {
 		peer.UserAgent = ua.(string)
 		// Extract Client type and version
-		peer.ClientName, peer.ClientVersion = db_utils.FilterClientType(peer.UserAgent)
+		peer.ClientName, peer.ClientVersion = utils.FilterClientType(peer.UserAgent)
 		peer.ClientOS = "TODO"
 	} else {
 		// EDGY CASE: when peers refuse the connection, the callback gets called and the identify protocol

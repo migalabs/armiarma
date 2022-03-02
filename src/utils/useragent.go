@@ -28,24 +28,24 @@ func FilterClientType(userAgent string) (string, string) {
 	} else if strings.Contains(userAgentLower, "teku") {
 		return "Teku", cleanVersion(getVersionIfAny(fields, 2))
 	} else if strings.Contains(userAgentLower, "nimbus") {
-		return "Nimbus", "Unknown"
+		return "Nimbus", cleanVersion(getVersionIfAny(fields, 1))
 	} else if strings.Contains(userAgentLower, "js-libp2p") {
 		return "Lodestar", cleanVersion(getVersionIfAny(fields, 1))
 	} else if strings.Contains(userAgentLower, "rust-libp2p") {
 		return "Grandine", cleanVersion(getVersionIfAny(fields, 1))
 	} else if strings.Contains(userAgentLower, "eth2-crawler") {
 		return "NodeWatch", ""
-	} else if strings.Contains(userAgentLower, "BSC-Eth2-Crawler") || strings.Contains(userAgentLower, "BSC-Armiarma") {
-		return "BSC-Eth2-Crawler", ""
+	} else if strings.Contains(userAgentLower, "bsc") || strings.Contains(userAgentLower, "armiarma") {
+		return "BSC-Crawler", ""
 	} else if strings.Contains(userAgentLower, "go-ipfs") { // IPFS
-		return "go-ipgs", ""
+		return "go-ipgs", cleanVersion(getVersionIfAny(fields, 1))
 	} else if strings.Contains(userAgentLower, "hydra") { // IPFS
-		return "hydra-boost", ""
+		return "hydra-boost", cleanVersion(getVersionIfAny(fields, 1))
 	} else if strings.Contains(userAgentLower, "storm") { // IPFS
-		return "storm", ""
+		return "storm", cleanVersion(getVersionIfAny(fields, 1))
 	} else if strings.Contains(userAgentLower, "lotus") { // IPFS
 		// TODO: wont work, needs to be fixed to get the real Version
-		return "lotus", ""
+		return "lotus", cleanVersionAux(getVersionIfAny(fields, 0))
 	} else if userAgentLower == "" {
 		return "NotIdentified", ""
 	} else {
@@ -65,5 +65,11 @@ func getVersionIfAny(fields []string, index int) string {
 func cleanVersion(version string) string {
 	cleaned := strings.Split(version, "+")[0]
 	cleaned = strings.Split(cleaned, "-")[0]
+	return cleaned
+}
+
+func cleanVersionAux(version string) string {
+	cleaned := strings.Split(version, "+")[0]
+	cleaned = strings.Split(cleaned, "-")[1]
 	return cleaned
 }

@@ -127,7 +127,6 @@ func NewIpfsCrawler(ctx *cli.Context, infObj info.IpfsInfoData) (*IpfsCrawler, e
 // generate new CrawlerBase
 func (c *IpfsCrawler) Run() {
 	// initialization secuence for the crawler
-	// initialization secuence for the crawler
 	c.ExporterService.Run()
 	c.IpLocalizer.Run()
 	c.Host.Start()

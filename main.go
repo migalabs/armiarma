@@ -37,7 +37,7 @@ func main() {
 
 	app := &cli.App{
 		Name:      "armiarma",
-		Usage:     "A libp2p DHT crawler, monitor, and measurement tool that exposes timely information about DHT networks.",
+		Usage:     "Distributed libp2p crawler that monitors, measures, and exposes information about libp2p p2p networks.",
 		UsageText: "armiarma [commands] [arguments...]",
 		Authors: []*cli.Author{
 			{
@@ -58,16 +58,42 @@ func main() {
 		os.Exit(1)
 	}
 
-	// check the shutdown signal
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, syscall.SIGTERM)
+	// only leave the app up running if the command was empty or help
+	if len(os.Args) <= 1 || helpInArgs(os.Args) {
+		os.Exit(0)
+	} else {
+		// check the shutdown signal
+		sigs := make(chan os.Signal, 1)
+		signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, syscall.SIGTERM)
 
-	// keep the app running until syscall.SIGTERM
-	sig := <-sigs
-	log.Printf("Received %s signal - Stopping...\n", sig.String())
-	signal.Stop(sigs)
-	cancel()
+		// keep the app running until syscall.SIGTERM
+		sig := <-sigs
+		log.Printf("Received %s signal - Stopping...\n", sig.String())
+		signal.Stop(sigs)
+		cancel()
+	}
 
+}
+
+func helpInArgs(args []string) bool {
+	help := false
+	for _, b := range args {
+		switch b {
+		case "--help":
+			help = true
+			break
+		case "-h":
+			help = true
+			break
+		case "h":
+			help = true
+			break
+		case "help":
+			help = true
+			break
+		}
+	}
+	return help
 }
 
 func PrintVersion() {

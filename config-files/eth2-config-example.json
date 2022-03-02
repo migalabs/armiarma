@@ -5,11 +5,11 @@
     "TopicArray": [],
     "Network": "mainnet",
     "Eth2Endpoint": "",
-    "DBEndpoint": "postgresql://dcrawler:my_Dev.Crawler@localhost:5433/crawlerdb",
+    "DBEndpoint": "postgresql://user:password@localhost:5433/databasename",
     "OutputPath": "./peerstore",
     "ForkDigest": "afcaaba0",
     "UserAgent": "BSC-Eth2-Crawler",
-    "LogLevel": "debug",
+    "LogLevel": "info",
     "PrivateKey": "",
     "BootNodesFile": "./bootstrap_nodes/official-eth2-bootnodes.json"
 }
