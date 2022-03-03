@@ -34,7 +34,7 @@ var (
 	graceTime = 3 * time.Second
 	timeout   = 10 * time.Second
 
-	workers = 1
+	workers = 4
 
 	ModuleName = "KDHT-DISC"
 	log        = logrus.WithField(
