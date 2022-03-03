@@ -6,6 +6,8 @@ package crawler
 import (
 	"time"
 
+	"github.com/pkg/errors"
+
 	"github.com/migalabs/armiarma/src/db"
 	"github.com/migalabs/armiarma/src/db/postgresql"
 	"github.com/migalabs/armiarma/src/discovery"
@@ -88,8 +90,13 @@ func NewIpfsCrawler(ctx *cli.Context, infObj info.IpfsInfoData) (*IpfsCrawler, e
 	}
 	ipfslog.Infoln("running peer discovery with protocols:", protocols)
 
+	// discovery nodes
+	bootnodes, err := kdht.ReadIpfsBootnodeFile(infObj.BootNodesFile)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to retreive the bootnodes")
+	}
 	// generate KDHT peer discovery
-	kdhtd := kdht.NewIPFSDiscService(ctx.Context, host.Host(), protocols, timeout)
+	kdhtd := kdht.NewIPFSDiscService(ctx.Context, host.Host(), protocols, bootnodes, timeout)
 
 	// Peer discovery
 	disc := discovery.NewDiscovery(ctx.Context, &kdhtd, &db, &ipLocalizer)

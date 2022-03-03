@@ -1,7 +1,6 @@
 package peering
 
 import (
-	"sync/atomic"
 	"time"
 
 	promth "github.com/migalabs/armiarma/src/exporters"
@@ -31,24 +30,27 @@ func (c *PeeringService) ServeMetrics() {
 				peersPeriter := c.strategy.AttemptedPeersSinceLastIter()
 
 				controlDist := c.strategy.ControlDistribution()
-				cntDist := make(map[string]int64)
+				cntDist := make(map[string]int)
 				errorAttemptDist := c.strategy.GetErrorAttemptDistribution()
-				errAttdist := make(map[string]int64)
+				errAttdist := make(map[string]int)
 
 				// get new values
 				PeerstoreIterTime.Set(iterTime) // Float in seconds
 				PeersAttemptedInLastIteration.Set(float64(peersPeriter))
 
 				// generate the distribution
-				for key, value := range controlDist {
-					cntDist[key] = atomic.LoadInt64(value)
-					PrunedErrorDistribution.WithLabelValues(key).Set(float64(atomic.LoadInt64(value)))
-				}
+				controlDist.Range(func(key, value interface{}) bool {
+					cntDist[key.(string)] = value.(int)
+					PrunedErrorDistribution.WithLabelValues(key.(string)).Set(float64(value.(int)))
+					return true
+				})
+
 				// generate the distribution
-				for key, value := range errorAttemptDist {
-					errAttdist[key] = atomic.LoadInt64(value)
-					ErrorAttemptDistribution.WithLabelValues(key).Set(float64(atomic.LoadInt64(value)))
-				}
+				errorAttemptDist.Range(func(key, value interface{}) bool {
+					errAttdist[key.(string)] = value.(int)
+					ErrorAttemptDistribution.WithLabelValues(key.(string)).Set(float64(value.(int)))
+					return true
+				})
 
 				log.WithFields(logrus.Fields{
 					"LastIterTime(secs)":          iterTime,

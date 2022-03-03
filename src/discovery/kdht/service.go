@@ -5,12 +5,19 @@ package kdht
 
 import (
 	"context"
+	"encoding/json"
+	"io/ioutil"
 	"math/rand"
+	"os"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/pkg/errors"
+
+	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/migalabs/armiarma/src/db/models"
+	"github.com/migalabs/armiarma/src/discovery"
 	"github.com/migalabs/armiarma/src/utils"
 	"github.com/migalabs/armiarma/src/utils/apis"
 
@@ -24,7 +31,8 @@ import (
 )
 
 var (
-	graceTime = 2 * time.Second
+	graceTime = 3 * time.Second
+	timeout   = 10 * time.Second
 
 	workers = 1
 
@@ -37,8 +45,7 @@ var (
 // IPFS discovery service with Kademlia DHT https://github.com/libp2p/go-libp2p-kad-dht
 // Fulfilling the basic PeerDiscovery interfce for the Armiarma Crawler
 type IPFSDiscService struct {
-	ctx    context.Context
-	cancel context.CancelFunc
+	ctx context.Context
 
 	h     host.Host
 	ipLoc *apis.PeerLocalizer
@@ -52,57 +59,56 @@ type IPFSDiscService struct {
 	bootnodes []peer.AddrInfo
 }
 
-func NewIPFSDiscService(ctx context.Context, h host.Host, protocols []string, timeout time.Duration) IPFSDiscService {
-	mainctx, cancel := context.WithCancel(ctx)
+func NewIPFSDiscService(ctx context.Context, h host.Host, protocols []string, bootstrapnodes []peer.AddrInfo, timeout time.Duration) IPFSDiscService {
 
-	// Generate necessary messenger for requesting near peers
-	pm, err := pb.NewProtocolMessenger(&msgSender{
+	ms := &msgSender{
 		h:         h,
 		protocols: protocol.ConvertFromStrings(protocols),
-		timeout:   10 * time.Second,
-	})
+		timeout:   timeout,
+	}
+
+	pm, err := pb.NewProtocolMessenger(ms)
 	if err != nil {
-		return IPFSDiscService{}
+		log.Panicf("unable to generate protocol messenger for kdht", err)
 	}
 
 	// Generate the new Kademlia DHT
-	peerkdht, err := kdht.New(mainctx, h)
+	peerkdht, err := kdht.New(ctx, h)
 	if err != nil {
-		log.Error(err)
+		log.Panicf("unable to generate the kdht", err)
 	}
 
 	// bootstrap
 	log.Info("setting the bootstrap to dht")
-	err = peerkdht.Bootstrap(mainctx)
+	err = peerkdht.Bootstrap(ctx)
 	if err != nil {
-		log.Error(err)
+		log.Panicf("unable to generate the bootstrap", err)
 	}
 
 	// Peer Discovery
-	connectablePeers := NewDiscoveryPeers(mainctx)
+	connectablePeers := NewDiscoveryPeers(ctx)
 
-	// get official bootstrap peers
-	bootstrapNodes := kdht.GetDefaultBootstrapPeerAddrInfos()
-
+	// get official bootstrap peers reading from the bootstrapnodes file
+	// Alternatively, user 'bootstrapNodes := kdht.GetDefaultBootstrapPeerAddrInfos()' for IPFS ones
+	log.Infof("Bootnodes: %s", bootstrapnodes)
 	ipfsDisc := IPFSDiscService{
-		ctx:       mainctx,
-		cancel:    cancel,
+		ctx:       ctx,
 		h:         h,
 		timeout:   timeout,
 		pm:        pm,
 		ipfsDHT:   peerkdht,
 		discPeers: &connectablePeers,
-		bootnodes: bootstrapNodes,
+		bootnodes: bootstrapnodes,
 	}
 	return ipfsDisc
 }
 
 func (disc *IPFSDiscService) Start() {
 	// get official bootstrap peers
-	bootstrapNodes := kdht.GetDefaultBootstrapPeerAddrInfos()
+	//bootstrapNodes := kdht.GetDefaultBootstrapPeerAddrInfos()
 	// add the bootnodes to the list of known peers
 	bnCnt := 0
-	for _, bootnode := range bootstrapNodes {
+	for _, bootnode := range disc.bootnodes {
 		disc.discPeers.addPeer(bootnode)
 		bnCnt++
 	}
@@ -117,16 +123,20 @@ func (disc *IPFSDiscService) Start() {
 		go func() {
 			for {
 				// get a new random peer to connect and request new peers
-				nextp, ok := disc.discPeers.getRandomPeer()
+				//nextp, ok := disc.discPeers.getRandomPeer()
+				nextp, ok := disc.discPeers.getBootstrapPeer()
 				if !ok {
-					workerlog.Tracef("there is no new peer to dial")
+					workerlog.Debugf("there is no new peer to dial")
 					time.Sleep(graceTime)
 					continue
 				}
+				ctx := network.WithDialPeerTimeout(disc.ctx, timeout)
+				// Force direct dials will prevent swarm to run into dial backoff errors. It also prevents proxied connections.
+				ctx = network.WithForceDirectDial(ctx, "prevent backoff")
 
-				workerlog.Debugf(" connecting", nextp.ID.String())
-				if err := disc.h.Connect(disc.ctx, nextp); err != nil {
-					workerlog.Error(err.Error())
+				workerlog.Debugf("connecting", nextp.ID.String())
+				if err := disc.h.Connect(ctx, nextp); err != nil {
+					workerlog.Errorf("unable to connect peer", err.Error())
 				} else {
 					workerlog.Debugf("Connection established with bootstrap node:", nextp.ID.String())
 					// If peer was connectable, req all the possible info
@@ -137,9 +147,14 @@ func (disc *IPFSDiscService) Start() {
 						workerlog.Debugf("unable to request neibors to peer. %s", err.Error())
 					}
 					// add peer to connectable list
+					log.Debugf("%d neighbours for peer", len(neighborsRt.Neighbors))
 					for _, newPeer := range neighborsRt.Neighbors {
 						// add neihbors to the peer list
 						disc.discPeers.addPeer(newPeer)
+					}
+					// Free connection resources
+					if err := disc.h.Network().ClosePeer(nextp.ID); err != nil {
+						log.Warnf("Could not close connection to peer %s", err)
 					}
 				}
 				// check if the context has died to cancel the routine
@@ -181,38 +196,42 @@ type discoveredPeers struct {
 	pArray []*peer.AddrInfo
 	rp     *uint64
 	wp     *uint64
+	bp     *uint64
 }
 
 func NewDiscoveryPeers(ctx context.Context) discoveredPeers {
 	var rp uint64 = 0
 	var wp uint64 = 0
+	var bp uint64 = 0
 	log.Trace("generating new DiscoveryPeers")
 	dp := discoveredPeers{
 		ctx:    ctx,
 		pArray: make([]*peer.AddrInfo, 0),
 		rp:     &rp,
 		wp:     &wp,
+		bp:     &bp,
 	}
 	return dp
 }
 
 // adds a new peer to the sync.Map and the array
 func (d *discoveredPeers) addPeer(p peer.AddrInfo) {
-	log.Tracef("Adding new Peer %s", p.ID.String())
+	log.Debugf("Adding new Peer %s", p.ID.String())
 	// check if the peer is already in the list
-	_, ok := d.pMap.Load(p.ID.String())
-	if ok {
-		log.Tracef("peer %s already in peer list", p.ID.String())
+	v, _ := d.pMap.Load(p.ID.String())
+	if v != nil {
+		log.Debugf("peer %s already in peer list", p.ID.String())
 		return
 	}
 	// Add peer to the sync Map
 	d.pMap.Store(p.ID.String(), &p)
 	// mutex and add it to the array
-	log.Tracef("Lock adding peer to array. Peer: %s", p.ID.String())
+	log.Debugf("Lock adding peer to array. Peer: %s", p.ID.String())
 	d.m.Lock()
 	d.pArray = append(d.pArray, &p)
+	log.Debugf("len array:", len(d.pArray))
 	d.m.Unlock()
-	log.Tracef("Unlock adding peer to array. Peer: %s", p.ID.String())
+	log.Debugf("Unlock adding peer to array. Peer: %s", p.ID.String())
 	// increase the writer pointer
 	atomic.AddUint64(d.wp, 1)
 }
@@ -227,18 +246,18 @@ func (d *discoveredPeers) next() bool {
 // returns the addrinfo of the next discovered peer, only if there a new one to read
 // empty addrinfo otherwise
 func (d *discoveredPeers) getNextPeer() peer.AddrInfo {
-	log.Tracef("getting next peer")
+	log.Debugf("getting next peer")
 	// check if there is actually a new peer to read
 	if !d.next() {
-		log.Tracef("no next peer, returning empty peer")
+		log.Debugf("no next peer, returning empty peer")
 		return peer.AddrInfo{}
 	}
 	// get the next peer found from the array
-	log.Tracef("Lock reading peer from array")
+	log.Debugf("Lock reading peer from array")
 	d.m.Lock()
 	addinfo := d.pArray[*d.rp]
 	d.m.Unlock()
-	log.Tracef("Unlock reading peer from array")
+	log.Debugf("Unlock reading peer from array")
 	// Increase the pointer and check
 	atomic.AddUint64(d.rp, 1)
 
@@ -249,6 +268,7 @@ func (d *discoveredPeers) getNextPeer() peer.AddrInfo {
 func (d *discoveredPeers) getLen() int {
 	d.m.Lock()
 	l := len(d.pArray)
+	log.Debugf("len array:", len(d.pArray))
 	d.m.Unlock()
 	return l
 }
@@ -259,23 +279,102 @@ func (d *discoveredPeers) isEmpty() bool {
 
 // returns the addrinfo of the next discovered peer, only if there a new one to read
 // empty addrinfo otherwise
-func (d *discoveredPeers) getRandomPeer() (peer.AddrInfo, bool) {
-	log.Tracef("getting random peer to request")
+func (d *discoveredPeers) getBootstrapPeer() (peer.AddrInfo, bool) {
+	log.Debugf("getting random peer to request")
 	// check if there list of peers is empty
 	if d.isEmpty() {
-		log.Tracef("empty list of peers to bootstrap")
+		log.Debugf("empty list of peers to bootstrap")
+		return peer.AddrInfo{}, false
+	}
+
+	log.Debugf("len of pArray: %d", d.getLen())
+	// cehck if bootstrap pointer is bigger than d.getLen()
+	if atomic.LoadUint64(d.bp) >= uint64(d.getLen()) {
+		atomic.StoreUint64(d.bp, 0)
+	}
+
+	// get the next peer found from the array
+	log.Debugf("Lock reading peer from array")
+	d.m.Lock()
+	addinfo := d.pArray[atomic.LoadUint64(d.bp)]
+	d.m.Unlock()
+	log.Debugf("Unlock reading peer from array")
+	return *addinfo, true
+}
+
+// returns the addrinfo of the next discovered peer, only if there a new one to read
+// empty addrinfo otherwise
+func (d *discoveredPeers) getRandomPeer() (peer.AddrInfo, bool) {
+	log.Debugf("getting random peer to request")
+	// check if there list of peers is empty
+	if d.isEmpty() {
+		log.Debugf("empty list of peers to bootstrap")
 		return peer.AddrInfo{}, false
 	}
 	// get random number
 	rand.Seed(time.Now().Unix())
 	randpointer := rand.Intn(d.getLen())
+	log.Debugf("len of pArray: %d", d.getLen())
 	log.Debugf("random pointer = %d", randpointer)
 
 	// get the next peer found from the array
-	log.Tracef("Lock reading peer from array")
+	log.Debugf("Lock reading peer from array")
 	d.m.Lock()
 	addinfo := d.pArray[randpointer]
 	d.m.Unlock()
-	log.Tracef("Unlock reading peer from array")
+	log.Debugf("Unlock reading peer from array")
 	return *addinfo, true
+}
+
+// ImportBootNodeList
+// This method will read the bootnodes list in string format and create an
+// enode array with the parsed ENRs of the bootnodes.
+// @param import_json_file represents the file where to read the bootnodes from.
+// This file is configured in the config file.
+func ReadIpfsBootnodeFile(jfile string) ([]peer.AddrInfo, error) {
+
+	// where we will store the result
+	bootNodeList := make([]peer.AddrInfo, 0)
+
+	// where we will unmarshal from file
+	bootNodeListString := discovery.BootNodeListString{}
+
+	// check if file exists
+	if _, err := os.Stat(jfile); os.IsNotExist(err) {
+		return bootNodeList, errors.New("Bootnodes file does not exist")
+	} else {
+		// exists
+		file, err := ioutil.ReadFile(jfile)
+		if err == nil {
+			err := json.Unmarshal([]byte(file), &bootNodeListString)
+			if err != nil {
+				return bootNodeList, errors.Wrap(err, "Could not Unmarshal BootNodes file: "+jfile)
+			}
+		} else {
+			return bootNodeList, errors.Wrap(err, "Could not read BootNodes file: %s"+jfile)
+		}
+	}
+
+	// parse bootnode strings into enodes
+	for _, element := range bootNodeListString.BootNodes {
+		// unmarshall MAddrs
+		maddr, err := utils.UnmarshalMaddr(element)
+		if err != nil {
+			return bootNodeList, err
+		}
+		// comopose AddrInfo
+		addinfo, err := peer.AddrInfosFromP2pAddrs(maddr)
+		if err != nil {
+			return bootNodeList, err
+		}
+		if len(addinfo) <= 0 {
+			return bootNodeList, errors.New("error empty generating AddrInfo from bootnode MAddrs")
+		}
+		bootNodeList = append(bootNodeList, addinfo[0])
+	}
+
+	log.Debugf("bootnodes in File: %d", len(bootNodeListString.BootNodes))
+	log.Debugf("imported: %d", len(bootNodeList))
+	return bootNodeList, nil
+
 }

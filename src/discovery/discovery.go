@@ -64,6 +64,7 @@ func (d *Discovery) Start() {
 		log.Info("launching peer reader")
 		// check if the DiscPeer Obj has a new peer to read
 		for d.DiscService.Next() {
+			log.Debugf("next peer avail")
 			// check if the ctx has been closed
 			if d.ctx.Err() != nil {
 				log.Info("closing the peer reader")

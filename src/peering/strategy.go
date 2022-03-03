@@ -1,6 +1,7 @@
 package peering
 
 import (
+	"sync"
 	"time"
 
 	"github.com/migalabs/armiarma/src/db/models"
@@ -22,8 +23,8 @@ type PeeringStrategy interface {
 	LastIterTime() float64
 	IterForcingNextConnTime() string
 	AttemptedPeersSinceLastIter() int64
-	ControlDistribution() map[string]*int64
-	GetErrorAttemptDistribution() map[string]*int64
+	ControlDistribution() sync.Map
+	GetErrorAttemptDistribution() sync.Map
 }
 
 // ConnectionAttemptStatus
