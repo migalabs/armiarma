@@ -64,10 +64,13 @@ func CompAddrInfo(pid string, maddrs []ma.Multiaddr) (peer.AddrInfo, error) {
 }
 
 func ExtractIPFromMAddr(maddr ma.Multiaddr) net.IP {
-	straddr := maddr.String() // extract in string
+	// check if MAddrs is empty
+	if maddr == nil {
+		return nil
+	}
 	// remember that the first position is "", as for having an initial /
 	// /ipX/<ip>/<transport_protocol>/<port>/p2p/<peerID>
-	spltAddr := strings.Split(straddr, MADDR_SEPARATOR)
+	spltAddr := strings.Split(maddr.String(), MADDR_SEPARATOR)
 	if len(spltAddr) < 3 {
 		return nil // finish returning nil
 	}
