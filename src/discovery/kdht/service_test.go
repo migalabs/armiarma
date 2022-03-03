@@ -15,7 +15,7 @@ import (
 func TestDiscoveredPeers(t *testing.T) {
 	testMAddrs := []string{
 		"/ip4/192.168.0.11/tcp/9000/p2p/12D3KooWLoj95HPXW8omPESoLiEMDLskASha7kK3uGfAvrLS1xtN",
-		"/ip4/192.168.0.12/tcp/9000/p2p/12D3KooWLoj95HPXW8omPESoLiEMDLskASha7kK3uGfAvrLS1xtN",
+		"/ip4/192.168.0.12/tcp/9000/p2p/12D3KooWLoj95HPXW8omPESoLiEMDLskASha7kK3uGwrewerwerw",
 		"/ip4/192.168.0.13/tcp/9000/p2p/12D3KooWQnwEGNqcM2nAcPtRR9rAX8Hrg4k9kJLCHoTR5chJfz6d",
 	}
 	logrus.SetLevel(logrus.DebugLevel)

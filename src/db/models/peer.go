@@ -123,6 +123,11 @@ func (pm *Peer) FetchBasicHostInfoFromNewPeer(newPeer Peer) {
 
 	// Check User Agent and derivated client type/version/OS
 	pm.UserAgent = getNonEmpty(pm.UserAgent, newPeer.UserAgent)
+	pm.ClientOS = getNonEmpty(pm.ClientOS, newPeer.ClientOS)
+	if newPeer.ClientName != "" || pm.ClientName == "" {
+		pm.ClientName = newPeer.ClientName
+		pm.ClientVersion = newPeer.ClientVersion
+	}
 }
 
 // FetchConnectionsFromNewPeer:

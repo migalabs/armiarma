@@ -110,8 +110,5 @@ func GetPublicAddrsFromAddrArray(mAddrs []ma.Multiaddr) ma.Multiaddr {
 			break
 		}
 	}
-	if len(mAddrs) > 0 && finalAddr.String() == "" {
-		finalAddr = mAddrs[0]
-	}
 	return finalAddr
 }

@@ -34,7 +34,7 @@ var (
 	graceTime = 3 * time.Second
 	timeout   = 10 * time.Second
 
-	workers = 4
+	workers = 1
 
 	ModuleName = "KDHT-DISC"
 	log        = logrus.WithField(
@@ -69,20 +69,20 @@ func NewIPFSDiscService(ctx context.Context, h host.Host, protocols []string, bo
 
 	pm, err := pb.NewProtocolMessenger(ms)
 	if err != nil {
-		log.Panicf("unable to generate protocol messenger for kdht", err)
+		log.Panicf("unable to generate protocol messenger for kdht %s", err)
 	}
 
 	// Generate the new Kademlia DHT
 	peerkdht, err := kdht.New(ctx, h)
 	if err != nil {
-		log.Panicf("unable to generate the kdht", err)
+		log.Panicf("unable to generate the kdht %s", err)
 	}
 
 	// bootstrap
 	log.Info("setting the bootstrap to dht")
 	err = peerkdht.Bootstrap(ctx)
 	if err != nil {
-		log.Panicf("unable to generate the bootstrap", err)
+		log.Panicf("unable to generate the bootstrap %s", err)
 	}
 
 	// Peer Discovery
@@ -123,8 +123,7 @@ func (disc *IPFSDiscService) Start() {
 		go func() {
 			for {
 				// get a new random peer to connect and request new peers
-				//nextp, ok := disc.discPeers.getRandomPeer()
-				nextp, ok := disc.discPeers.getBootstrapPeer()
+				nextp, ok := disc.discPeers.getRandomPeer()
 				if !ok {
 					workerlog.Debugf("there is no new peer to dial")
 					time.Sleep(graceTime)
@@ -134,11 +133,11 @@ func (disc *IPFSDiscService) Start() {
 				// Force direct dials will prevent swarm to run into dial backoff errors. It also prevents proxied connections.
 				ctx = network.WithForceDirectDial(ctx, "prevent backoff")
 
-				workerlog.Debugf("connecting", nextp.ID.String())
+				workerlog.Debugf("connecting %s", nextp.ID.String())
 				if err := disc.h.Connect(ctx, nextp); err != nil {
-					workerlog.Errorf("unable to connect peer", err.Error())
+					workerlog.Errorf("unable to connect peer %s", err.Error())
 				} else {
-					workerlog.Debugf("Connection established with bootstrap node:", nextp.ID.String())
+					workerlog.Debugf("Connection established with bootstrap node: %s", nextp.ID.String())
 					// If peer was connectable, req all the possible info
 					// try to request neighbors to connected peer
 					//addinfo, _ := utils.CompAddrInfo(nextp.ID.String(), nextp.MAddrs)
@@ -218,8 +217,8 @@ func NewDiscoveryPeers(ctx context.Context) discoveredPeers {
 func (d *discoveredPeers) addPeer(p peer.AddrInfo) {
 	log.Debugf("Adding new Peer %s", p.ID.String())
 	// check if the peer is already in the list
-	v, _ := d.pMap.Load(p.ID.String())
-	if v != nil {
+	_, ok := d.pMap.Load(p.ID.String())
+	if ok {
 		log.Debugf("peer %s already in peer list", p.ID.String())
 		return
 	}
@@ -229,7 +228,7 @@ func (d *discoveredPeers) addPeer(p peer.AddrInfo) {
 	log.Debugf("Lock adding peer to array. Peer: %s", p.ID.String())
 	d.m.Lock()
 	d.pArray = append(d.pArray, &p)
-	log.Debugf("len array:", len(d.pArray))
+	log.Debugf("len array: %d", len(d.pArray))
 	d.m.Unlock()
 	log.Debugf("Unlock adding peer to array. Peer: %s", p.ID.String())
 	// increase the writer pointer
@@ -268,7 +267,7 @@ func (d *discoveredPeers) getNextPeer() peer.AddrInfo {
 func (d *discoveredPeers) getLen() int {
 	d.m.Lock()
 	l := len(d.pArray)
-	log.Debugf("len array:", len(d.pArray))
+	log.Debugf("len array: %d", len(d.pArray))
 	d.m.Unlock()
 	return l
 }

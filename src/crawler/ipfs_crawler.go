@@ -105,6 +105,7 @@ func NewIpfsCrawler(ctx *cli.Context, infObj info.IpfsInfoData) (*IpfsCrawler, e
 	gs := gossipsub.NewGossipSub(ctx.Context, exporterService, host, &db)
 
 	// generate the peering strategy
+
 	pStrategy, err := peering.NewPruningStrategy(ctx.Context, "ipfs", &db)
 	if err != nil {
 		return nil, err

@@ -2,6 +2,7 @@ package discovery
 
 import (
 	"context"
+	"time"
 
 	"github.com/migalabs/armiarma/src/db"
 
@@ -63,20 +64,25 @@ func (d *Discovery) Start() {
 	go func() {
 		log.Info("launching peer reader")
 		// check if the DiscPeer Obj has a new peer to read
-		for d.DiscService.Next() {
-			log.Debugf("next peer avail")
-			// check if the ctx has been closed
-			if d.ctx.Err() != nil {
-				log.Info("closing the peer reader")
-				return
+		for {
+			if d.DiscService.Next() {
+				log.Debugf("next peer avail")
+				// check if the ctx has been closed
+				if d.ctx.Err() != nil {
+					log.Info("closing the peer reader")
+					log.Error("ERRRRRRRRROR with the context")
+					return
+				}
+				// retrieve the next peer and check if it fine
+				p, ok := d.DiscService.Peer()
+				if !ok {
+					continue
+				}
+				log.Debugf("new peer discovered: %s\n", p.PeerId)
+				d.peerHandler(&p)
+			} else {
+				time.Sleep(1 * time.Second)
 			}
-			// retrieve the next peer and check if it fine
-			p, ok := d.DiscService.Peer()
-			if !ok {
-				continue
-			}
-			log.Debugf("new peer discovered: %s\n", p.PeerId)
-			d.peerHandler(&p)
 		}
 	}()
 
