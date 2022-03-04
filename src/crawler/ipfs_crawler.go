@@ -33,8 +33,7 @@ var (
 		"/ipfs/kad/2.0.0",
 	}
 	filecoinprotocols = []string{
-		"/ipfs/kad/1.0.0",
-		"/ipfs/kad/2.0.0",
+		"/fil/kad/testnetnet/kad/1.0.0",
 	}
 	// logging variables
 	ipfslog = logrus.WithField(

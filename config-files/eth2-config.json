@@ -5,7 +5,7 @@
     "TopicArray": [],
     "Network": "mainnet",
     "Eth2Endpoint": "",
-    "DBEndpoint": "postgresql://dcrawler:my_Dev.Crawler@localhost:5433/crawlerdb",
+    "DBEndpoint": "postgresql://user:password@localhost:5432/database",
     "OutputPath": "./peerstore",
     "ForkDigest": "afcaaba0",
     "UserAgent": "BSC-Eth2-Crawler",

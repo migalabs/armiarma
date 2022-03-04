@@ -4,10 +4,10 @@
     "UdpPort": 9020,
     "TopicArray": [],
     "Network": "filecoin",
-    "DBEndpoint": "postgresql://armiarmausr:4r_mi_Arma@localhost:5433/armiarmadb",
+    "DBEndpoint": "postgresql://user:password@localhost:5432/database",
     "OutputPath": "./peerstore",
     "UserAgent": "BSC-IPFS-Crawler",
-    "LogLevel": "info",
+    "LogLevel": "debug",
     "PrivateKey": "",
     "BootNodesFile": "./bootstrap_nodes/filecoin-bootnodes.json"
 }
