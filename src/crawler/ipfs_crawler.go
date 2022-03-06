@@ -146,7 +146,6 @@ func (c *IpfsCrawler) Run() {
 		}
 	*/
 	c.Peering.Run()
-	c.Peering.ServeMetrics()
 	c.Gs.ServeMetrics()
 	c.DB.ServeMetrics()
 }
