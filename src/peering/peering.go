@@ -179,7 +179,9 @@ func (c *PeeringService) peeringWorker(workerID string, peerStreamChan chan mode
 					connAttStat.Timestamp = time.Now()
 					connAttStat.Successful = true
 					connAttStat.RecError = nil
-					// break the loop
+					if err := h.Network().ClosePeer(addrInfo.ID); err != nil {
+						log.Warnf("Could not close connection to peer %s", err)
+					}
 					break
 				}
 			}

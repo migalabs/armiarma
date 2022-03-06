@@ -151,6 +151,10 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 
 	// Send the new connection status
 	c.RecIdentEvent(identStat)
+	// Close peer connection
+	if err := h.Network().ClosePeer(conn.RemotePeer()); err != nil {
+		log.Warnf("Could not close connection to peer %s", err)
+	}
 
 }
 
