@@ -70,7 +70,6 @@ func (d *Discovery) Start() {
 				// check if the ctx has been closed
 				if d.ctx.Err() != nil {
 					log.Info("closing the peer reader")
-					log.Error("ERRRRRRRRROR with the context")
 					return
 				}
 				// retrieve the next peer and check if it fine

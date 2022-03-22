@@ -4,6 +4,7 @@
 package crawler
 
 import (
+	"os"
 	"time"
 
 	"github.com/pkg/errors"
@@ -134,6 +135,10 @@ func NewIpfsCrawler(ctx *cli.Context, infObj info.IpfsInfoData) (*IpfsCrawler, e
 
 // generate new CrawlerBase
 func (c *IpfsCrawler) Run() {
+	// IMPORTANT
+	// Set the VENV Variable for handling too many opened connections
+	os.Setenv("LIBP2P_SWARM_FD_LIMIT", "10000")
+
 	// initialization secuence for the crawler
 	c.ExporterService.Run()
 	c.IpLocalizer.Run()

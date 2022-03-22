@@ -41,6 +41,8 @@ func FilterError(err string) string {
 		errorPretty = "none"
 	} else if strings.Contains(err, "error requesting metadata") {
 		errorPretty = "metadata error"
+	} else if strings.Contains(err, "no good addresses") {
+		errorPretty = "no good addresses"
 	} else {
 		// Uncertain (not tracked one)
 		log.Errorf("uncertain error: %s", err)

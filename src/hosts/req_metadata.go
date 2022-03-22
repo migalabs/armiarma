@@ -181,30 +181,31 @@ func ReqHostInfo(ctx context.Context, wg *sync.WaitGroup, h host.Host, ipLoc *ap
 
 	// Update, request location from a peer only when the connection is inbound
 	// if the connection is outbound, we already had the IP located from the ENR
-	/*
-		if conn.Stat().Direction.String() == "Inbound" {
-			peer.Ip = utils.ExtractIPFromMAddr(multiAddr).String()
-			locResp, err := ipLoc.LocateIP(peer.Ip)
-			if err != nil {
-				// TODO: think about a better idea to integrate a logger into this functions
-				log.Warnf("error when fetching country/city from ip %s. %s", peer.Ip, err.Error())
-			} else {
-				peer.Country = locResp.Country
-				peer.City = locResp.City
-				peer.CountryCode = locResp.CountryCode
-			}
+
+	if conn.Stat().Direction.String() == "Inbound" {
+		peer.Ip = utils.ExtractIPFromMAddr(multiAddr).String()
+		locResp, err := ipLoc.LocateIP(peer.Ip)
+		if err != nil {
+			// TODO: think about a better idea to integrate a logger into this functions
+			log.Warnf("error when fetching country/city from ip %s. %s", peer.Ip, err.Error())
+		} else {
+			peer.Country = locResp.Country
+			peer.City = locResp.City
+			peer.CountryCode = locResp.CountryCode
 		}
-	*/
-	peer.Ip = utils.ExtractIPFromMAddr(multiAddr).String()
-	locResp, err := ipLoc.LocateIP(peer.Ip)
-	if err != nil {
-		// TODO: think about a better idea to integrate a logger into this functions
-		log.Warnf("error when fetching country/city from ip %s. %s", peer.Ip, err.Error())
-	} else {
-		peer.Country = locResp.Country
-		peer.City = locResp.City
-		peer.CountryCode = locResp.CountryCode
 	}
+
+	peer.Ip = utils.ExtractIPFromMAddr(multiAddr).String()
+
+	// locResp, err := ipLoc.LocateIP(peer.Ip)
+	// if err != nil {
+	// 	// TODO: think about a better idea to integrate a logger into this functions
+	// 	log.Warnf("error when fetching country/city from ip %s. %s", peer.Ip, err.Error())
+	// } else {
+	// 	peer.Country = locResp.Country
+	// 	peer.City = locResp.City
+	// 	peer.CountryCode = locResp.CountryCode
+	// }
 
 	// Fulfill the hInfo struct
 	ua, err := h.Peerstore().Get(peerID, "AgentVersion")

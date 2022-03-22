@@ -106,14 +106,14 @@ func (c *IPFSDiscService) extractHostInfo(p peer.AddrInfo) models.Peer {
 			fpeer.MAddrs = p.Addrs
 		}
 	}
-	err := ReqFilecoinHostInfo(c.ctx, c.h, p.ID, &fpeer)
+	err := ReqIpfsHostInfo(c.h, p.ID, &fpeer)
 	if err != nil {
 		log.Debugf("unable to fetch peer info. %s", err.Error())
 	}
 	return fpeer
 }
 
-func ReqFilecoinHostInfo(ctx context.Context, h host.Host, peerID peer.ID, p *models.Peer) error {
+func ReqIpfsHostInfo(h host.Host, peerID peer.ID, p *models.Peer) error {
 	// final error
 	var finErr error
 
@@ -122,7 +122,7 @@ func ReqFilecoinHostInfo(ctx context.Context, h host.Host, peerID peer.ID, p *mo
 	if err == nil {
 		p.UserAgent = ua.(string)
 	} else {
-		finErr = errors.Errorf("unable to identify peer")
+		finErr = errors.Errorf("unable to identify peer. %s", err.Error())
 	}
 
 	// Into the new peer to fetch

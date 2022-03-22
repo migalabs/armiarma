@@ -25,7 +25,7 @@ import (
 )
 
 var (
-	IpCacheSize = 400
+	IpCacheSize = 5000
 	// logging variables
 	eth2log = logrus.WithField(
 		"module", "ETH2_CRAWLER",

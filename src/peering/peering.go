@@ -28,7 +28,7 @@ var (
 
 	ConnectionRefuseTimeout = 10 * time.Second
 	MaxRetries              = 1
-	DefaultWorkers          = 10
+	DefaultWorkers          = 50
 )
 
 type PeeringOption func(*PeeringService) error
@@ -179,9 +179,6 @@ func (c *PeeringService) peeringWorker(workerID string, peerStreamChan chan mode
 					connAttStat.Timestamp = time.Now()
 					connAttStat.Successful = true
 					connAttStat.RecError = nil
-					if err := h.Network().ClosePeer(addrInfo.ID); err != nil {
-						log.Warnf("Could not close connection to peer %s", err)
-					}
 					break
 				}
 			}

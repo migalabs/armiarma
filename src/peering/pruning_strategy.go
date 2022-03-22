@@ -665,7 +665,7 @@ func ErrorToDelayType(errString string) string {
 		return PositiveDelayType
 	case "connection reset by peer", "connection refused", "context deadline exceeded", "dial backoff", "metadata error":
 		return NegativeWithHopeDelayType
-	case "no route to host", "unreachable network", "peer id mismatch", "dial to self attempted":
+	case "no route to host", "unreachable network", "peer id mismatch", "dial to self attempted", "no good addresses":
 		return NegativeWithNoHopeDelayType
 	case "i/o timeout":
 		return TimeoutDelayType

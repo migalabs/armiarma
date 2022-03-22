@@ -34,8 +34,7 @@ var (
 	graceTime = 3 * time.Second
 	timeout   = 10 * time.Second
 
-	workers = 1
-
+	workers    = 25
 	ModuleName = "KDHT-DISC"
 	log        = logrus.WithField(
 		"module", ModuleName,
@@ -114,9 +113,66 @@ func (disc *IPFSDiscService) Start() {
 	}
 	log.Infof("Adding %d bootstrap nodes", bnCnt)
 
+	workerTask := func(workerlog logrus.FieldLogger, nextp peer.AddrInfo) {
+		ctx := network.WithDialPeerTimeout(disc.ctx, timeout)
+		// Force direct dials will prevent swarm to run into dial backoff errors. It also prevents proxied connections.
+		ctx = network.WithForceDirectDial(ctx, "prevent backoff")
+
+		workerlog.Debugf("connecting %s", nextp.ID.String())
+		if err := disc.h.Connect(ctx, nextp); err != nil {
+			workerlog.Debugf("unable to connect peer %s - %s", nextp.ID.String(), err.Error())
+		} else {
+			workerlog.Debugf("Connection established with bootstrap node: %s", nextp.ID.String())
+			// If peer was connectable, req all the possible info
+			// try to request neighbors to connected peer
+			//addinfo, _ := utils.CompAddrInfo(nextp.ID.String(), nextp.MAddrs)
+			neighborsRt, err := disc.fetchNeighbors(disc.ctx, nextp)
+			if err != nil {
+				workerlog.Debugf("unable to request neibors to peer. %s", err.Error())
+			}
+			// add peer to connectable list
+			log.Debugf("%d neighbours for peer", len(neighborsRt.Neighbors))
+			for _, newPeer := range neighborsRt.Neighbors {
+				// add neihbors to the peer list
+				disc.discPeers.addPeer(newPeer)
+			}
+			// Free connection resources
+			if err := disc.h.Network().ClosePeer(nextp.ID); err != nil {
+				log.Warnf("Could not close connection to peer %s", err)
+			}
+		}
+	}
+
 	for i := 0; i < workers; i++ {
 		log.Debugf("launching worker %d", i)
 		workerid := i
+		workerlog := log.WithField(
+			"worker", workerid,
+		)
+		go func() {
+			for {
+				// get a new random peer to connect and request new peers
+				nextp, ok := disc.discPeers.getBootstrapPeer() //getRandomPeer()
+				if !ok {
+					workerlog.Debugf("there is no new peer to dial")
+					time.Sleep(graceTime)
+					continue
+				}
+
+				workerTask(workerlog, nextp)
+
+				// check if the context has died to cancel the routine
+				if disc.ctx.Err() != nil {
+					workerlog.Info("closing discover peer worker")
+					return
+				}
+			}
+		}()
+	}
+	// Random Peers
+	for i := 0; i < workers; i++ {
+		log.Debugf("launching worker %d", i)
+		workerid := workers + i
 		workerlog := log.WithField(
 			"worker", workerid,
 		)
@@ -129,33 +185,9 @@ func (disc *IPFSDiscService) Start() {
 					time.Sleep(graceTime)
 					continue
 				}
-				ctx := network.WithDialPeerTimeout(disc.ctx, timeout)
-				// Force direct dials will prevent swarm to run into dial backoff errors. It also prevents proxied connections.
-				ctx = network.WithForceDirectDial(ctx, "prevent backoff")
 
-				workerlog.Debugf("connecting %s", nextp.ID.String())
-				if err := disc.h.Connect(ctx, nextp); err != nil {
-					workerlog.Errorf("unable to connect peer %s", err.Error())
-				} else {
-					workerlog.Debugf("Connection established with bootstrap node: %s", nextp.ID.String())
-					// If peer was connectable, req all the possible info
-					// try to request neighbors to connected peer
-					//addinfo, _ := utils.CompAddrInfo(nextp.ID.String(), nextp.MAddrs)
-					neighborsRt, err := disc.fetchNeighbors(disc.ctx, nextp)
-					if err != nil {
-						workerlog.Debugf("unable to request neibors to peer. %s", err.Error())
-					}
-					// add peer to connectable list
-					log.Debugf("%d neighbours for peer", len(neighborsRt.Neighbors))
-					for _, newPeer := range neighborsRt.Neighbors {
-						// add neihbors to the peer list
-						disc.discPeers.addPeer(newPeer)
-					}
-					// Free connection resources
-					if err := disc.h.Network().ClosePeer(nextp.ID); err != nil {
-						log.Warnf("Could not close connection to peer %s", err)
-					}
-				}
+				workerTask(workerlog, nextp)
+
 				// check if the context has died to cancel the routine
 				if disc.ctx.Err() != nil {
 					workerlog.Info("closing discover peer worker")
@@ -183,7 +215,6 @@ func (disc *IPFSDiscService) Peer() (models.Peer, bool) {
 	p.PeerId = addrinfo.ID.String()
 	pubAddrs := utils.GetPublicAddrsFromAddrArray(addrinfo.Addrs)
 	p.MAddrs = append(p.MAddrs, pubAddrs)
-
 	// TODO: Not sure if there is actually an iterest to return IP / UserAgent / Protocols... /
 	return p, true
 }
@@ -279,7 +310,7 @@ func (d *discoveredPeers) isEmpty() bool {
 // returns the addrinfo of the next discovered peer, only if there a new one to read
 // empty addrinfo otherwise
 func (d *discoveredPeers) getBootstrapPeer() (peer.AddrInfo, bool) {
-	log.Debugf("getting random peer to request")
+	log.Debugf("getting next peer to request")
 	// check if there list of peers is empty
 	if d.isEmpty() {
 		log.Debugf("empty list of peers to bootstrap")
@@ -293,9 +324,12 @@ func (d *discoveredPeers) getBootstrapPeer() (peer.AddrInfo, bool) {
 	}
 
 	// get the next peer found from the array
-	log.Debugf("Lock reading peer from array")
+
 	d.m.Lock()
-	addinfo := d.pArray[atomic.LoadUint64(d.bp)]
+	log.Debugf("Lock reading peer from array")
+	addinfo := d.pArray[*d.bp]
+	log.Debugf("next pointer = %d", *d.bp)
+	*d.bp++
 	d.m.Unlock()
 	log.Debugf("Unlock reading peer from array")
 	return *addinfo, true
