@@ -39,7 +39,7 @@ git clone https://github.com/migalabs/armiarma.git && cd armiarma
 go build -o armiarma
 
 # Ready to call the tool
-./armiarma [options]
+./armiarma [options] [FLAGS]
 
 ```
 
@@ -48,11 +48,16 @@ At the moment, the tool only offers a single command for the crawler. Check the 
 ```
 
 EXECUTION:
-    ./armiarma [options]
+    ./armiarma [OPTIONS] [FLAGS]
 
 OPTIONS:
+    eth2   to launch the crawler on the given eth2 network (mainnet, subnets, gnosis, ... all by setting the eth2 parameters in the <eth2-config-file>)     
+	
+    ipfs   to launch the crawler on any ipfs-based network (ipfs, filecoin, ... all by setting the eth2 prameters in the <ipfs-config-file>)
+
+FLAGS
     --config-file   Load the configuration from the file into the executable.
-                    Find a config.json example in ./config-files/config.json
+                    Find a config.json example in ./config-files/eth2-config.json or ./config-files/ipfs-config.json
 
 ```
 ## Docker installation
@@ -74,11 +79,15 @@ Currently supported protocols:
 ```
 Ethereum 2      Different networks or forks can be crawled by defining the 'ForkDigest' in the 'config.json' file  
 Gnosis          Gnosis fork from the Eth2 Network. Add '56fdb5e0' Gnosis ForkDigest in 'config.file' to discover and crawl the network.
+
+IPFS		The crawler can directly join and discover the IPFS network, as any other Kademlia-DHT based network  
+Filecoin	
 ```
 
 ### Custom configuration of the tool
 The crawler, by default, reads the configuration file located in `config-files/config.json`. The file contains several fields that can be customized anytime before the launch of the crawler. The fields correspond to the following features:
 
+Eth2-based networks
 ```
 IP:             IP that wants to be assigned to the crawler (default = "0.0.0.0") 
 TcpPort:        Port that will be used to establish TCP connections (default = 9020)
@@ -92,8 +101,23 @@ UserAgent:      Name that will identify the crawler in the joined network (defau
 LogLevel:       Level of logs that will be printed in the terminal ("trace", "debug", "info", "warn", "error") (default = "info")
 PrivateKey:     hexadecimal encoded libp2p privkey that will be used to create a peerID for the crawler in the network (will generate a new one by default, can be copy-pasted from the printed one in the terminal)
 BootNodesFile:  List of boot-nodes that will be used for the peer discovery service (recommended = "./src/discovery/official-eth2-bootnodes.json")
-OutputPath:     Output folder that will contain the CSV and DB of the crawler (default = "./peerstore")
 ```
+
+IPFS-based networks
+```
+IP:             IP that wants to be assigned to the crawler (default = "0.0.0.0") 
+TcpPort:        Port that will be used to establish TCP connections (default = 9020)
+UdpPort:        Port that will be used to establish UDP connections (default = 9020)
+TopicArray:     List of GossipSub topics that the tool will be subscribed to. Leave empty [] to get default ones (Eth2 topics)
+Network:        Name of the Eth2 Network that the crawler will join (default = "mainnet")
+DBEndpoint:     Psql endpoint with the credentials and DB name information. (Example: 'postgresql://user:password@localhost:5432/dbname')
+UserAgent:      Name that will identify the crawler in the joined network (default = "bsc-crawler")
+LogLevel:       Level of logs that will be printed in the terminal ("trace", "debug", "info", "warn", "error") (default = "info")
+PrivateKey:     hexadecimal encoded libp2p privkey that will be used to create a peerID for the crawler in the network (will generate a new one by default, can be copy-pasted from the printed one in the terminal)
+BootNodesFile:  List of boot-nodes that will be used for the peer discovery service (recommended = "./src/discovery/official-eth2-bootnodes.json")
+```
+
+
 
 ## Data visualization
 The combination of Prometheus and Grafana is the one that we have chosen to display the network data. In the repository, both configuration files are provided. In addition, the crawler, by default, exports all the metrics to Prometheus in port 9080. 
