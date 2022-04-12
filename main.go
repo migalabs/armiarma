@@ -8,65 +8,94 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"syscall"
+
+	"github.com/migalabs/armiarma/src/utils"
+	"github.com/sirupsen/logrus"
+	cli "github.com/urfave/cli/v2"
 
 	"github.com/migalabs/armiarma/cmd"
-	"github.com/migalabs/armiarma/src/config"
-	"github.com/migalabs/armiarma/src/utils"
-	log "github.com/sirupsen/logrus"
 )
 
 var (
-	Version      = "v1.0.0\n"
-	WellcomeText = "Welcome to the Armiarma network monitoring tool."
-	SpecifyText  = "List of available flags:"
+	Version = "v1.1.0\n"
+	// logging variables
+	log = logrus.WithField(
+		"module", "ARMIARMA",
+	)
 )
 
 func main() {
 	// read arguments from the command line
 	PrintVersion()
 
-	// generate new config for the crawler
-	crawlerConfig, help := config.NewConfigFromArgs()
-	if help {
-		CliHelp()
-		os.Exit(0)
-	}
-	// read the log settings from the config
+	ctx, cancel := context.WithCancel(context.Background())
 
 	// Set the general log configurations for the entire tool
-	log.SetFormatter(utils.ParseLogFormatter("text"))
-	log.SetOutput(utils.ParseLogOutput("terminal"))
-	// read the log level from the config-file / default = info
-	log.SetLevel(utils.ParseLogLevel(crawlerConfig.GetLogLevel()))
+	logrus.SetFormatter(utils.ParseLogFormatter("text"))
+	logrus.SetOutput(utils.ParseLogOutput("terminal"))
+
+	app := &cli.App{
+		Name:      "armiarma",
+		Usage:     "Distributed libp2p crawler that monitors, measures, and exposes information about libp2p p2p networks.",
+		UsageText: "armiarma [commands] [arguments...]",
+		Authors: []*cli.Author{
+			{
+				Name:  "Miga Labs",
+				Email: "migalabs@protonmail.com",
+			},
+		},
+		EnableBashCompletion: true,
+		Commands: []*cli.Command{
+			cmd.Eth2CrawlerCommand,
+			cmd.IpfsCrawlerCommand,
+		},
+	}
 
 	// generate the crawler
-	crawler, err := cmd.NewCrawler(context.Background(), crawlerConfig)
-	if err != nil {
-		fmt.Println(err)
+	if err := app.RunContext(ctx, os.Args); err != nil {
+		log.Errorf("error: %v\n", err)
 		os.Exit(1)
 	}
-	// launch crawler service
-	crawler.Run()
 
-	// register the shutdown signal
-	signal_channel := make(chan os.Signal, 1)
-	signal.Notify(signal_channel, os.Interrupt)
-	<-signal_channel
-	// End up app, finishing everything
-	log.Info("SHUTDOWN DETECTED!")
-	// TODO: Shutdown all the services (manually to let them exit in a controled way)
-	crawler.Close()
+	// only leave the app up running if the command was empty or help
+	if len(os.Args) <= 1 || helpInArgs(os.Args) {
+		os.Exit(0)
+	} else {
+		// check the shutdown signal
+		sigs := make(chan os.Signal, 1)
+		signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, syscall.SIGTERM)
 
-	os.Exit(0)
+		// keep the app running until syscall.SIGTERM
+		sig := <-sigs
+		log.Printf("Received %s signal - Stopping...\n", sig.String())
+		signal.Stop(sigs)
+		cancel()
+	}
 
 }
 
-func CliHelp() {
-	fmt.Println(WellcomeText)
-	fmt.Println(SpecifyText)
-	fmt.Println(cmd.CrawlerHelp())
+func helpInArgs(args []string) bool {
+	help := false
+	for _, b := range args {
+		switch b {
+		case "--help":
+			help = true
+			break
+		case "-h":
+			help = true
+			break
+		case "h":
+			help = true
+			break
+		case "help":
+			help = true
+			break
+		}
+	}
+	return help
 }
 
 func PrintVersion() {
-	fmt.Println("Armirma " + Version)
+	fmt.Println("Armirma_" + Version)
 }

@@ -18,14 +18,13 @@ import (
 	"github.com/migalabs/armiarma/src/db"
 	"github.com/migalabs/armiarma/src/exporters"
 	"github.com/migalabs/armiarma/src/hosts"
-	"github.com/migalabs/armiarma/src/info"
 	"github.com/minio/sha256-simd"
 	"github.com/sirupsen/logrus"
 )
 
 var (
 	ModuleName = "GOSSIP-SUB"
-	Log        = logrus.WithField(
+	log        = logrus.WithField(
 		"module", ModuleName,
 	)
 )
@@ -34,9 +33,8 @@ var (
 // sumarizes the control fields necesary to manage and
 // govern the GossipSub internal service.
 type GossipSub struct {
-	ctx             context.Context
-	cancel          context.CancelFunc
-	InfoObj         *info.InfoData
+	ctx context.Context
+
 	BasicHost       *hosts.BasicLibp2pHost
 	PeerStore       *db.PeerStore
 	PubsubService   *pubsub.PubSub
@@ -63,7 +61,6 @@ func NewEmptyGossipSub() *GossipSub {
 // @param stdOpts: list of options to generate the base of the gossipsub service.
 // @return: pointer to GossipSub struct.
 func NewGossipSub(ctx context.Context, exporter *exporters.ExporterService, h *hosts.BasicLibp2pHost, peerstore *db.PeerStore) *GossipSub {
-	mainCtx, cancel := context.WithCancel(ctx)
 
 	// define gossipsub option
 	// Signature is not used in Eth2, therefore it is needed
@@ -74,16 +71,14 @@ func NewGossipSub(ctx context.Context, exporter *exporters.ExporterService, h *h
 		pubsub.WithStrictSignatureVerification(false),
 		pubsub.WithMessageIdFn(MsgIDFunction),
 	}
-	ps, err := pubsub.NewGossipSub(mainCtx, h.Host(), psOptions...)
+	ps, err := pubsub.NewGossipSub(ctx, h.Host(), psOptions...)
 	if err != nil {
-		Log.Panic(err)
+		log.Panic(err)
 	}
 	msgMetrics := NewMessageMetrics()
 	// return the GossipSub object
 	return &GossipSub{
-		ctx:             mainCtx,
-		cancel:          cancel,
-		InfoObj:         h.GetInfoObj(),
+		ctx:             ctx,
 		BasicHost:       h,
 		PeerStore:       peerstore,
 		PubsubService:   ps,
@@ -112,14 +107,14 @@ func (gs *GossipSub) JoinAndSubscribe(topicName string) {
 	// Join topic
 	topic, err := gs.PubsubService.Join(topicName)
 	if err != nil {
-		Log.Errorf("Could not join topic: %s", topicName)
-		Log.Errorf(err.Error())
+		log.Errorf("Could not join topic: %s", topicName)
+		log.Errorf(err.Error())
 	}
 	// Subscribe to the topic
 	sub, err := topic.Subscribe()
 	if err != nil {
-		Log.Errorf("Could not subscribe to topic: %s", topicName)
-		Log.Errorf(err.Error())
+		log.Errorf("Could not subscribe to topic: %s", topicName)
+		log.Errorf(err.Error())
 	}
 	// Add the topic to the metrics list
 	_ = gs.MessageMetrics.NewTopic(topicName)
@@ -129,9 +124,4 @@ func (gs *GossipSub) JoinAndSubscribe(topicName string) {
 	gs.TopicArray[topicName] = new_topic_handler
 
 	go gs.TopicArray[topicName].MessageReadingLoop(gs.BasicHost.Host(), gs.PeerStore)
-}
-
-func (gs *GossipSub) Close() {
-	Log.Info("gossipsub close has been detected, closing dependant go-routines")
-	gs.cancel()
 }

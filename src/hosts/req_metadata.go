@@ -12,7 +12,6 @@ import (
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/migalabs/armiarma/src/db/models"
-	db_utils "github.com/migalabs/armiarma/src/db/utils"
 	"github.com/migalabs/armiarma/src/rpc/methods"
 	"github.com/migalabs/armiarma/src/rpc/reqresp"
 	"github.com/migalabs/armiarma/src/utils"
@@ -22,7 +21,6 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p/p2p/protocol/identify"
-	log "github.com/sirupsen/logrus"
 )
 
 var ()
@@ -183,6 +181,7 @@ func ReqHostInfo(ctx context.Context, wg *sync.WaitGroup, h host.Host, ipLoc *ap
 
 	// Update, request location from a peer only when the connection is inbound
 	// if the connection is outbound, we already had the IP located from the ENR
+
 	if conn.Stat().Direction.String() == "Inbound" {
 		peer.Ip = utils.ExtractIPFromMAddr(multiAddr).String()
 		locResp, err := ipLoc.LocateIP(peer.Ip)
@@ -196,12 +195,24 @@ func ReqHostInfo(ctx context.Context, wg *sync.WaitGroup, h host.Host, ipLoc *ap
 		}
 	}
 
+	peer.Ip = utils.ExtractIPFromMAddr(multiAddr).String()
+
+	// locResp, err := ipLoc.LocateIP(peer.Ip)
+	// if err != nil {
+	// 	// TODO: think about a better idea to integrate a logger into this functions
+	// 	log.Warnf("error when fetching country/city from ip %s. %s", peer.Ip, err.Error())
+	// } else {
+	// 	peer.Country = locResp.Country
+	// 	peer.City = locResp.City
+	// 	peer.CountryCode = locResp.CountryCode
+	// }
+
 	// Fulfill the hInfo struct
 	ua, err := h.Peerstore().Get(peerID, "AgentVersion")
 	if err == nil {
 		peer.UserAgent = ua.(string)
 		// Extract Client type and version
-		peer.ClientName, peer.ClientVersion = db_utils.FilterClientType(peer.UserAgent)
+		peer.ClientName, peer.ClientVersion = utils.FilterClientType(peer.UserAgent)
 		peer.ClientOS = "TODO"
 	} else {
 		// EDGY CASE: when peers refuse the connection, the callback gets called and the identify protocol
@@ -211,7 +222,7 @@ func ReqHostInfo(ctx context.Context, wg *sync.WaitGroup, h host.Host, ipLoc *ap
 	}
 	pubk, err := conn.RemotePublicKey().Raw()
 	if err == nil {
-		peer.Pubkey = hex.EncodeToString(pubk)
+		peer.SetAtt("pubkey", hex.EncodeToString(pubk))
 	}
 	// return the erro defined in the top
 	// nil if we could identify it, ident error if we couldnt line 181

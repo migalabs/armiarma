@@ -5,7 +5,6 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/migalabs/armiarma/src/db/models"
 	postgresql "github.com/migalabs/armiarma/src/db/postgresql"
 	"github.com/migalabs/armiarma/src/exporters"
@@ -30,25 +29,22 @@ type ErrorHandling func(*models.Peer)
 
 type PeerStore struct {
 	// control variables for the exporting routines
-	ctx    context.Context
-	cancel context.CancelFunc
+	ctx context.Context
 
 	Storage         *postgresql.PostgresDBService
 	ExporterService *exporters.ExporterService
 }
 
-func NewPeerStore(ctx context.Context, exporter *exporters.ExporterService, path string, endpoint string) PeerStore {
-	mainCtx, cancel := context.WithCancel(ctx)
+func NewPeerStore(ctx context.Context, exporter *exporters.ExporterService, path string, endpoint string, netModel postgresql.NetworkModel) PeerStore {
 	var db *postgresql.PostgresDBService
 	var err error
 
-	db, err = postgresql.ConnectToDB(mainCtx, endpoint)
+	db, err = postgresql.ConnectToDB(ctx, endpoint, netModel)
 	if err != nil {
 		Log.Panic(err.Error())
 	}
 	ps := PeerStore{
-		ctx:             mainCtx,
-		cancel:          cancel,
+		ctx:             ctx,
 		Storage:         db,
 		ExporterService: exporter,
 	}
@@ -59,14 +55,6 @@ func NewPeerStore(ctx context.Context, exporter *exporters.ExporterService, path
 // Retreives the context asigned to the Peerstore
 func (c *PeerStore) Ctx() context.Context {
 	return c.ctx
-}
-
-// GetCtxCancel
-// Retreives the cancel function to kill the Peerstore ctx
-func (c *PeerStore) Close() {
-	Log.Info("Closing Peerstore")
-	c.Storage.Close()
-	c.cancel()
 }
 
 // StoreOrUpdatePeer:
@@ -116,29 +104,4 @@ func (c *PeerStore) GetPeerData(peerId string) (models.Peer, error) {
 // @return the list of PeerIDs in string format.
 func (c *PeerStore) GetPeerList() []peer.ID {
 	return c.Storage.GetPeers()
-}
-
-func (c *PeerStore) GetPeerENR(peerID string) (*enode.Node, error) {
-	return c.Storage.GetPeerENR(peerID)
-}
-
-// ExportCsvService will export to csv regularly, therefoe this service will execute the export every X seconds (ExportLoopTime)
-// @param folderpath: the folder to export the csv file (always named metrics.csv)
-func (ps *PeerStore) ExportCsvService(folderpath string) {
-	Log.Info("Peerstore CSV exporting service launched")
-	go func() {
-		ctx := ps.Ctx()
-		ticker := time.NewTicker(ExportLoopTime)
-		for {
-			select {
-			case <-ticker.C:
-				_ = ps.Storage.ExportToCSV(folderpath + "/metrics.csv")
-			case <-ctx.Done():
-				ticker.Stop()
-				_ = ps.Storage.ExportToCSV(folderpath + "/metrics.csv")
-				Log.Info("Closing DB CSV exporter")
-				return
-			}
-		}
-	}()
 }

@@ -11,10 +11,8 @@ package config
 
 import (
 	"encoding/json"
-	"flag"
 	"io/ioutil"
 	"os"
-	"strings"
 
 	"github.com/sirupsen/logrus"
 )
@@ -44,33 +42,13 @@ type ConfigData struct {
 	OutputPath    string   `json:"OutputPath"`
 }
 
-// NewEmptyConfig
-// * This method will create a ConfigData empty object
-// @return A ConfigData object
-func NewEmptyConfig() ConfigData {
-	return ConfigData{}
-}
-
 // NewConfigFromArgs
 // * This method will create a ConfigData from the given args flags
 // @return A ConfigData object
 // @return whether the help was requested or not
-func NewConfigFromArgs() (ConfigData, bool) {
-	// Parse the arguments looking for the config-file
-	var help bool
-	var configFile string
-	flag.BoolVar(&help, "help", false, "display available commands and flags to run the armiarma crawler")
-	flag.StringVar(&configFile, "config-file", "./config-files/config.json", "config-file with all the available configurations. Find an example at ./config-files/config.json")
-	flag.Parse()
-
+func NewConfigFromFile(configFile string) ConfigData {
 	// generate an empty configuration
-	config := NewEmptyConfig()
-
-	// check if the help was requested
-	if help {
-		log.Debug("help flag was active")
-		return config, help
-	}
+	config := ConfigData{}
 
 	// check if a file was given
 	if configFile != "" {
@@ -78,7 +56,7 @@ func NewConfigFromArgs() (ConfigData, bool) {
 		config.ReadFromJSON(configFile)
 	}
 
-	return config, help
+	return config
 }
 
 // ReadFromJSON
@@ -102,101 +80,4 @@ func (c *ConfigData) ReadFromJSON(input_file string) {
 			log.Warnf("Could not read Config file: %s", err)
 		}
 	}
-}
-
-// getters and setters
-func (c *ConfigData) GetTcpPort() int {
-	return c.TcpPort
-}
-func (c *ConfigData) SetTcpPort(input_port int) {
-	c.TcpPort = input_port
-}
-
-func (c *ConfigData) GetUdpPort() int {
-	return c.UdpPort
-}
-
-func (c *ConfigData) SetUdpPort(input_port int) {
-	c.UdpPort = input_port
-}
-
-func (c *ConfigData) GetIP() string {
-	return c.IP
-}
-
-func (c *ConfigData) SetIP(input_ip string) {
-	c.IP = input_ip
-}
-
-func (c *ConfigData) GetUserAgent() string {
-	return c.UserAgent
-}
-func (c *ConfigData) SetUserAgent(input_string string) {
-	c.UserAgent = input_string
-}
-
-func (c *ConfigData) GetTopicArray() []string {
-	return c.TopicArray
-}
-func (c *ConfigData) SetTopicArray(input_list []string) {
-	c.TopicArray = input_list
-}
-func (c *ConfigData) SetTopicArrayFromString(input_list string) {
-	c.TopicArray = strings.Split(input_list, ",")
-}
-
-func (c *ConfigData) GetNetwork() string {
-	return c.Network
-}
-func (c *ConfigData) SetNetwork(input_string string) {
-	c.Network = input_string
-}
-
-func (c *ConfigData) GetEth2Endpoint() string {
-	return c.Eth2Endpoint
-}
-func (c *ConfigData) SetEth2Endpoint(input_string string) {
-	c.Eth2Endpoint = input_string
-}
-
-func (c *ConfigData) GetDBEndpoint() string {
-	return c.DBEndpoint
-}
-func (c *ConfigData) SetDBEndpoint(input_string string) {
-	c.DBEndpoint = input_string
-}
-
-func (c *ConfigData) GetForkDigest() string {
-	return c.ForkDigest
-}
-func (c *ConfigData) SetForkDigest(input_string string) {
-	c.ForkDigest = input_string
-}
-
-func (c *ConfigData) GetLogLevel() string {
-	return c.LogLevel
-}
-func (c *ConfigData) SetLogLevel(input_string string) {
-	c.LogLevel = input_string
-}
-
-func (c *ConfigData) GetPrivKey() string {
-	return c.PrivateKey
-}
-func (c *ConfigData) SetPrivKey(input_string string) {
-	c.PrivateKey = input_string
-}
-
-func (c *ConfigData) GetBootNodesFile() string {
-	return c.BootNodesFile
-}
-func (c *ConfigData) SetBootNodesFile(input_string string) {
-	c.BootNodesFile = input_string
-}
-
-func (c *ConfigData) GetOutputPath() string {
-	return c.OutputPath
-}
-func (c *ConfigData) SetOutputPath(input_string string) {
-	c.OutputPath = input_string
 }

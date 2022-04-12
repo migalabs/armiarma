@@ -43,8 +43,28 @@ func Test_FilterClientType(t *testing.T) {
 	require.Equal(t, client, "NodeWatch")
 	require.Equal(t, version, "")
 
+	client, version = FilterClientType("go-ipfs/0.8.0/48f94e2")
+	require.Equal(t, client, "go-ipgs")
+	require.Equal(t, version, "0.8.0")
+
+	client, version = FilterClientType("hydra-booster/0.7.4")
+	require.Equal(t, client, "hydra-boost")
+	require.Equal(t, version, "0.7.4")
+
+	client, version = FilterClientType("storm")
+	require.Equal(t, client, "storm")
+	require.Equal(t, version, "Unknown")
+
+	client, version = FilterClientType("lotus-1.13.0+mainnet+git.7a55e8e8")
+	require.Equal(t, client, "lotus")
+	require.Equal(t, version, "1.13.0")
+
 	client, version = FilterClientType("armiarma-crawler")
-	require.Equal(t, client, "Others")
+	require.Equal(t, client, "BSC-Crawler")
+	require.Equal(t, version, "")
+
+	client, version = FilterClientType("bsc-crawler")
+	require.Equal(t, client, "BSC-Crawler")
 	require.Equal(t, version, "")
 
 	// Check it doesn't break for an unexpected agent

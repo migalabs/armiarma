@@ -3,13 +3,11 @@
     "TcpPort": 9020,
     "UdpPort": 9020,
     "TopicArray": [],
-    "Network": "mainnet",
-    "Eth2Endpoint": "",
+    "Network": "ipfs",
     "DBEndpoint": "postgresql://user:password@localhost:5432/database",
     "OutputPath": "./peerstore",
-    "ForkDigest": "afcaaba0",
-    "UserAgent": "BSC-Eth2-Crawler",
-    "LogLevel": "info",
+    "UserAgent": "BSC-IPFS-Crawler",
+    "LogLevel": "debug",
     "PrivateKey": "",
-    "BootNodesFile": "./src/discovery/official-eth2-bootnodes.json"
+    "BootNodesFile": "./bootstrap_nodes/ipfs-bootnodes.json"
 }

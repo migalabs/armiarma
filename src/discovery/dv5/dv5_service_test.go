@@ -1,4 +1,4 @@
-package discovery
+package dv5
 
 import (
 	"testing"

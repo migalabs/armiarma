@@ -1,19 +1,15 @@
 package models
 
 import (
-	"encoding/hex"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/ethereum/go-ethereum/p2p/enode"
 	bc_topics "github.com/migalabs/armiarma/src/gossipsub/blockchaintopics"
 	"github.com/migalabs/armiarma/src/utils"
-	all_utils "github.com/migalabs/armiarma/src/utils"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
-	"github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/sirupsen/logrus"
 )
 
@@ -29,18 +25,11 @@ var (
 type Peer struct {
 
 	// PeerBASICS
-	PeerId string
-	Pubkey string
-
-	// PeerEth2Node
-	NodeId        string
+	PeerId        string
 	UserAgent     string
 	ClientName    string
 	ClientOS      string //TODO:
 	ClientVersion string
-	// TODO: Store Enr
-	// Latest ENR
-	BlockchainNodeENR string
 
 	// PeerNetwork
 	Ip              string
@@ -71,9 +60,8 @@ type Peer struct {
 
 	LastExport int64 // Timestamp in seconds of the last exported time (backup for when we are loading the Peer).
 
-	// Beacon
-	BeaconStatus   BeaconStatusStamped
-	BeaconMetadata BeaconMetadataStamped
+	// Application layer / extra attributes
+	Att map[string]interface{}
 
 	// Message
 	// Counters for the different topics
@@ -91,6 +79,7 @@ func NewPeer(peerId string) Peer {
 		NegativeConnAttempts: make([]time.Time, 0),
 		ConnectionTimes:      make([]time.Time, 0),
 		DisconnectionTimes:   make([]time.Time, 0),
+		Att:                  make(map[string]interface{}),
 		MessageMetrics:       make(map[string]MessageMetric),
 	}
 	return pm
@@ -107,7 +96,7 @@ func (pm *Peer) FetchPeerInfoFromNewPeer(newPeer Peer) {
 
 	pm.FetchBasicHostInfoFromNewPeer(newPeer)
 	pm.FetchConnectionsFromNewPeer(newPeer)
-	pm.FetchChainNodeFromNewPeer(newPeer)
+	pm.FetchAttFromNewPeer(newPeer)
 
 }
 
@@ -116,10 +105,8 @@ func (pm *Peer) FetchPeerInfoFromNewPeer(newPeer Peer) {
 // into our peer (pm).
 // @param newPeer: the peer where to extract new information.
 func (pm *Peer) FetchBasicHostInfoFromNewPeer(newPeer Peer) {
-
 	// Somehow weird to update the peerID, since it is going to be the same one
 	pm.PeerId = getNonEmpty(pm.PeerId, newPeer.PeerId)
-	pm.Pubkey = getNonEmpty(pm.Pubkey, newPeer.Pubkey)
 	pm.MAddrs = getNonEmptyMAddrArray(pm.MAddrs, newPeer.MAddrs)
 	pm.ProtocolVersion = getNonEmpty(pm.ProtocolVersion, newPeer.ProtocolVersion)
 	if len(newPeer.Protocols) != 0 {
@@ -141,7 +128,6 @@ func (pm *Peer) FetchBasicHostInfoFromNewPeer(newPeer Peer) {
 		pm.ClientName = newPeer.ClientName
 		pm.ClientVersion = newPeer.ClientVersion
 	}
-
 }
 
 // FetchConnectionsFromNewPeer:
@@ -173,9 +159,7 @@ func (pm *Peer) FetchConnectionsFromNewPeer(newPeer Peer) {
 			pm.NegativeConnAttempts = make([]time.Time, 0)
 		} else {
 			// copy the negative attempts
-			for _, negAttTmp := range newPeer.NegativeConnAttempts {
-				pm.NegativeConnAttempts = append(pm.NegativeConnAttempts, negAttTmp)
-			}
+			pm.NegativeConnAttempts = append(pm.NegativeConnAttempts, newPeer.NegativeConnAttempts...)
 		}
 	}
 
@@ -221,9 +205,8 @@ func (pm *Peer) FetchConnectionsFromNewPeer(newPeer Peer) {
 		pm.DisconnectionEvent(time)
 	}
 
-	for _, errorTmp := range newPeer.Error {
-		pm.Error = append(pm.Error, errorTmp)
-	}
+	pm.Error = append(pm.Error, newPeer.Error...)
+
 	if len(pm.Error) > MaxArraySize {
 		tmpError := pm.Error[len(pm.Error)-MaxArraySize-1 : len(pm.Error)-1]
 		pm.Error = tmpError
@@ -239,28 +222,30 @@ func (pm *Peer) FetchConnectionsFromNewPeer(newPeer Peer) {
 
 }
 
-// FetchChainNodeFromNewPeer:
-// This method will read chain node information from the new peer and import it
+// FetchAttFromNewPeer:
+// This method will read the custom attributes from the new peer and import them
 // into our peer (pm).
 // @param newPeer: the peer where to extract new information.
-
-func (pm *Peer) FetchChainNodeFromNewPeer(newPeer Peer) {
-	pm.NodeId = getNonEmpty(pm.NodeId, newPeer.NodeId)
-
-	// Beacon Metadata and Status
-	if newPeer.BeaconMetadata != (BeaconMetadataStamped{}) {
-		pm.BeaconMetadata = newPeer.BeaconMetadata
+func (pm *Peer) FetchAttFromNewPeer(newPeer Peer) {
+	for attName, attValue := range newPeer.Att {
+		pm.SetAtt(attName, attValue)
 	}
-	if newPeer.BeaconStatus != (BeaconStatusStamped{}) {
-		pm.BeaconStatus = newPeer.BeaconStatus
-	}
-
-	if newPeer.BlockchainNodeENR != "" {
-		pm.BlockchainNodeENR = newPeer.BlockchainNodeENR
-	}
-
 }
 
+// SetAtt adds a new custom attribute to the att map
+func (pm *Peer) SetAtt(key string, value interface{}) {
+	pm.Att[key] = value
+}
+
+// GetAtt reads custom attribute from the att map, returns interface and status of the read
+func (pm *Peer) GetAtt(key string) (interface{}, bool) {
+	value, ok := pm.Att[key]
+	return value, ok
+}
+
+// ---- Deprecated for peer.GetAtt("enr") --- with the necessary string -> enode processing
+//
+/*
 // GetBlockchainNode:
 // Parses and returns the stored BlockchainNode. It uses the stored ENR to get the data.
 // @return Node: the resulting node of parsing the ENR.
@@ -275,6 +260,7 @@ func (pm *Peer) GetBlockchainNode() (*enode.Node, error) {
 	}
 	return pointer, nil
 }
+*/
 
 // AddAddr:
 // This method adds a new multiaddress in string format to the MAddrs array.
@@ -300,7 +286,7 @@ func (pm *Peer) ExtractPublicAddr() ma.Multiaddr {
 		temp_extracted_ip := utils.ExtractIPFromMAddr(temp_addr)
 
 		// check if IP is public
-		if utils.IsIPPublic(temp_extracted_ip) == true {
+		if utils.IsIPPublic(temp_extracted_ip) {
 			// the IP is public
 			return temp_addr
 		}
@@ -497,38 +483,6 @@ func (pm *Peer) MetadataEvent(success bool) {
 	pm.MetadataSucceed = success
 }
 
-// UpdateBeaconMetadata:
-// Update beacon Metadata of the peer.
-// @param bMetadata: the Metadata object used to update the data
-func (pm *Peer) UpdateBeaconMetadata(bMetadata common.MetaData) {
-	pm.BeaconMetadata = BeaconMetadataStamped{
-		Timestamp: time.Now(),
-		Metadata:  bMetadata,
-	}
-}
-
-// UpdateBeaconStatus:
-// Update beacon Status of the peer.
-// @param bStatus: the Status object used to update the data
-func (pm *Peer) UpdateBeaconStatus(bStatus common.Status) {
-	pm.BeaconStatus = BeaconStatusStamped{
-		Timestamp: time.Now(),
-		Status:    bStatus,
-	}
-}
-
-// Basic BeaconMetadata struct that includes the timestamp of the received beacon metadata
-type BeaconMetadataStamped struct {
-	Timestamp time.Time
-	Metadata  common.MetaData
-}
-
-//  Basic BeaconMetadata struct that includes The timestamp of the received beacon Status
-type BeaconStatusStamped struct {
-	Timestamp time.Time
-	Status    common.Status
-}
-
 // Information regarding the messages received on a given topic
 type MessageMetric struct {
 	Count            uint64
@@ -621,7 +575,7 @@ func (pm *Peer) ToCsvLine() string {
 			uniqueAddr = pm.MAddrs[0].String()
 		}
 	}
-
+	/* -- Deprecated --
 	node, err := pm.GetBlockchainNode()
 	forkDigest := ""
 	if err != nil {
@@ -634,23 +588,20 @@ func (pm *Peer) ToCsvLine() string {
 			forkDigest = eth2Dat.ForkDigest.String()
 		}
 	}
+	*/
 	lastConnectionTime := ""
 	if len(pm.ConnectionTimes) > 0 {
 		lastConnectionTime = pm.ConnectionTimes[len(pm.ConnectionTimes)-1].String()
 	}
 
 	csvRow := pm.PeerId + "," +
-		pm.NodeId + "," +
-		forkDigest + "," +
 		pm.UserAgent + "," +
 		pm.ClientName + "," +
 		pm.ClientVersion + "," +
-		pm.Pubkey + "," +
 		uniqueAddr + "," +
 		pm.Ip + "," +
 		pm.Country + "," +
 		pm.City + "," +
-		pm.BlockchainNodeENR + "," +
 		strconv.FormatBool(pm.MetadataRequest) + "," +
 		strconv.FormatBool(pm.MetadataSucceed) + "," +
 		strconv.FormatBool(pm.Attempted) + "," +
@@ -667,13 +618,7 @@ func (pm *Peer) ToCsvLine() string {
 		fmt.Sprintf("%d", len(pm.DisconnectionTimes)) + "," +
 		lastConnectionTime + "," +
 		strings.Join(pm.ConnectedDirection, "|") + "," +
-		fmt.Sprintf("%.6f", pm.GetConnectedTime()) + "," +
-		strconv.FormatUint(pm.GetNumOfMsgFromTopic("BeaconBlock"), 10) + "," +
-		strconv.FormatUint(pm.GetNumOfMsgFromTopic("BeaconAggregateProof"), 10) + "," +
-		strconv.FormatUint(pm.GetNumOfMsgFromTopic("VoluntaryExit"), 10) + "," +
-		strconv.FormatUint(pm.GetNumOfMsgFromTopic("ProposerSlashing"), 10) + "," +
-		strconv.FormatUint(pm.GetNumOfMsgFromTopic("AttesterSlashing"), 10) + "," +
-		strconv.FormatUint(pm.GetAllMessagesCount(), 10) + "\n"
+		fmt.Sprintf("%.6f", pm.GetConnectedTime()) + "\n"
 
 	return csvRow
 }
@@ -689,21 +634,19 @@ func (pm *Peer) IsEmpty() bool {
 // Log peer information
 func (pm *Peer) LogPeer() {
 	log.WithFields(logrus.Fields{
-		"PeerId":        pm.PeerId,
-		"NodeId":        pm.NodeId,
-		"UserAgent":     pm.UserAgent,
-		"ClientName":    pm.ClientName,
-		"ClientOS":      pm.ClientOS,
-		"ClientVersion": pm.ClientVersion,
-		"Pubkey":        pm.Pubkey,
-		"Addrs":         pm.MAddrs,
-		"Ip":            pm.Ip,
-		"Country":       pm.Country,
-		"City":          pm.City,
-		"Latency":       pm.Latency,
+		"PeerId":    pm.PeerId,
+		"UserAgent": pm.UserAgent,
+		"Addrs":     pm.MAddrs,
+		"Ip":        pm.Ip,
+		"Country":   pm.Country,
+		"City":      pm.City,
+		"Latency":   pm.Latency,
 	}).Info("Peer Info")
 }
 
+// ----- Deprecated Since the integration of PSQL as DB ----
+//
+/*
 // PeerUnMarshal:
 // This method will create a Peer object reading a map of (string -> interface).
 // @return the resulting Peer.
@@ -829,7 +772,10 @@ func PeerUnMarshal(m map[string]interface{}) (p Peer, finErr error) {
 	}
 	return p, nil
 }
+*/
 
+// ----- Deprecated Since the integration of PSQL as DB ----
+//
 // ParseInterfaceMapMessageMetrics:
 // Parse the inputMap into the MessageMetric format
 // @param inputMap: a map of string interface
@@ -856,105 +802,4 @@ func ParseInterfaceMapMessageMetrics(inputMap map[string]interface{}) (map[strin
 	}
 	return result, nil
 
-}
-
-// ParseBeaconStatusFromInterface:
-// Parse the inputMap into the BeaconStatusStamped format
-// @param inputMap: a map of string interface
-// @return a map of string BeaconStatusStamped
-func ParseBeaconStatusFromInterface(input interface{}) (BeaconStatusStamped, error) {
-	var result BeaconStatusStamped
-	var err error
-
-	inputMap := input.(map[string]interface{})
-
-	// timestamp
-	result.Timestamp, err = time.Parse(time.RFC3339, inputMap["Timestamp"].(string))
-	if err != nil {
-		return result, errors.Wrap(err, "unable to compose BeaconStatus.Timestamp from readed interface")
-	}
-	// BeaconStatus
-	status := inputMap["Status"].(map[string]interface{})
-	// if the forkdigest field is empty, return empty BeaconStatus
-	fd, _ := status["ForkDigest"].(string)
-	if len(fd) == 0 {
-		return result, nil
-	}
-	// otherwise, compose the readed beaconStatus
-	err = result.Status.ForkDigest.UnmarshalText([]byte(fd))
-	if err != nil {
-		return result, errors.Wrap(err, "unable to compose BeaconStatus.ForkDigest from readed interface")
-	}
-	fr, _ := status["FinalizedRoot"].(string)
-	var frByte [32]byte
-	copy(frByte[:], fr[:32])
-	result.Status.FinalizedRoot = common.Root(frByte)
-	e, err := strconv.ParseUint(status["Epoch"].(string), 0, 64)
-	if err != nil {
-		return result, errors.Wrap(err, "unable to compose BeaconStatus.Epoch from readed interface")
-	}
-	result.Status.FinalizedEpoch = common.Epoch(uint64(e))
-	hr, _ := status["HeadRoot"].(string)
-	var hrBytes [32]byte
-	copy(hrBytes[:], hr[:32])
-	result.Status.HeadRoot = common.Root(hrBytes)
-	s, err := strconv.ParseUint(status["HeadSlot"].(string), 0, 64)
-	if err != nil {
-		return result, errors.Wrap(err, "unable to compose BeaconStatus.HeadSlot from readed interface")
-	}
-	result.Status.HeadSlot = common.Slot(uint64(s))
-	return result, nil
-}
-
-func ParseBeaconStatusFromBasicTypes(
-	t time.Time,
-	forkdigest string,
-	finaRoot string,
-	finaEpoch int64,
-	headRoot string,
-	headSlot int64) (BeaconStatusStamped, error) {
-
-	var result BeaconStatusStamped
-	var err error
-
-	// timestamp
-	result.Timestamp = t
-
-	err = result.Status.ForkDigest.UnmarshalText(utils.BytesFromString(forkdigest))
-	if err != nil {
-		return result, fmt.Errorf("unable to compose BeaconStatus.ForkDigest from readed interface")
-	}
-
-	// FINALIZED ROOT
-	// remove 0x if exists from the root string
-	if strings.Contains(finaRoot, "0x") {
-		finaRoot = strings.Replace(finaRoot, "0x", "", 1)
-	}
-	// conver strig to hex bytes
-	fr, err := hex.DecodeString(finaRoot)
-	if err != nil {
-		return result, fmt.Errorf("unable to decode finalizedRoot %s", err.Error())
-	}
-	// copy the bytes of the root into a [32]byte varible (otherwis, commmon.Root complains)
-	var frBytes [32]byte
-	copy(frBytes[:], fr[:32])
-	result.Status.FinalizedRoot = common.Root(frBytes)
-	result.Status.FinalizedEpoch = common.Epoch(uint64(finaEpoch))
-	// HEAD ROOT
-	// remove 0x if exists from the root string
-	if strings.Contains(headRoot, "0x") {
-		headRoot = strings.Replace(headRoot, "0x", "", 1)
-	}
-	// conver strig to hex bytes
-	hr, err := hex.DecodeString(headRoot)
-	if err != nil {
-		return result, fmt.Errorf("unable to decode finalizedRoot %s", err.Error())
-	}
-	var hrBytes [32]byte
-	copy(hrBytes[:], hr[:32])
-	// copy the bytes of the root into a [32]byte varible (otherwis, commmon.Root complains)
-	result.Status.HeadRoot = common.Root(hrBytes)
-
-	result.Status.HeadSlot = common.Slot(uint64(headSlot))
-	return result, nil
 }

@@ -1,16 +1,18 @@
 package postgresql
 
 import (
+	"context"
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/migalabs/armiarma/src/db/models"
 	"github.com/pkg/errors"
 )
 
 var (
-	createClientDiversity = `
-	CREATE TABLE IF NOT EXISTS t_client_diversity(
+	createEth2ClientDiversity = `
+	CREATE TABLE IF NOT EXISTS t_eth2_client_diversity(
 		f_snapshot_timestamp TIMESTAMP,
 		f_prysm BIGINT,
 		f_lighthouse BIGINT,
@@ -23,8 +25,8 @@ var (
 		PRIMARY KEY (f_snapshot_timestamp)
 	);
 	`
-	insertClientDiversitySnapshot = `
-	INSERT INTO t_client_diversity(
+	insertEth2ClientDiversitySnapshot = `
+	INSERT INTO t_eth2_client_diversity(
 		f_snapshot_timestamp,
 		f_prysm,
 		f_lighthouse,
@@ -47,10 +49,10 @@ var (
 	`
 )
 
-func (p *PostgresDBService) createClientDiversityTable() error {
+func (p *Eth2Model) createEth2ClientDiversityTable(ctx context.Context, pool *pgxpool.Pool) error {
 	log.Debugf("creating client diversity table in psql")
-	_, err := p.psqlPool.Exec(p.ctx,
-		createClientDiversity,
+	_, err := pool.Exec(ctx,
+		createEth2ClientDiversity,
 	)
 	if err != nil {
 		return errors.Wrap(err, "unable to create client diversity table")
@@ -58,11 +60,11 @@ func (p *PostgresDBService) createClientDiversityTable() error {
 	return nil
 }
 
-func (p *PostgresDBService) StoreClientDiversitySnapshot(cliDiver models.ClientDiversity) error {
+func (p *Eth2Model) StoreClientDiversitySnapshot(ctx context.Context, pool *pgxpool.Pool, cliDiver models.ClientDiversity) error {
 	log.Debugf("adding new client diversity item in psql")
-	_, err := p.psqlPool.Exec(
-		p.ctx,
-		insertClientDiversitySnapshot,
+	_, err := pool.Exec(
+		ctx,
+		insertEth2ClientDiversitySnapshot,
 		cliDiver.Timestamp,
 		cliDiver.Prysm,
 		cliDiver.Lighthouse,
@@ -80,12 +82,12 @@ func (p *PostgresDBService) StoreClientDiversitySnapshot(cliDiver models.ClientD
 
 // So far not used since it's just for exporting
 // Doesn't make much sense to add it to the crawler (no idea why would we need to access the snapshot of a given time)
-func (p *PostgresDBService) LoadClientDiversitySnapshot(qTime time.Time) (models.ClientDiversity, error) {
+func (p *Eth2Model) LoadClientDiversitySnapshot(ctx context.Context, pool *pgxpool.Pool, qTime time.Time) (models.ClientDiversity, error) {
 	log.Debugf("Loading client diversity of time %s", qTime)
 	cliDist := models.NewClientDiversity()
-	err := p.psqlPool.QueryRow(
-		p.ctx,
-		"SELECT * FROM t_client_diversity WHERE f_snapshot_timestamp=$1",
+	err := pool.QueryRow(
+		ctx,
+		"SELECT * FROM t_eth2_client_diversity WHERE f_snapshot_timestamp=$1",
 		qTime,
 	).Scan(
 		&cliDist.Timestamp,

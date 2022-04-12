@@ -6,14 +6,17 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
+	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/migalabs/armiarma/src/db"
 	"github.com/migalabs/armiarma/src/db/models"
-	db_utils "github.com/migalabs/armiarma/src/db/utils"
 	"github.com/migalabs/armiarma/src/hosts"
+	db_utils "github.com/migalabs/armiarma/src/utils"
+
+	"github.com/ethereum/go-ethereum/p2p/enode"
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/sirupsen/logrus"
 )
 
@@ -35,8 +38,9 @@ var (
 // Pruning Strategy is a Peering Strategy that applies penalties to peers that haven't shown activity when attempting to connect them.
 // Combined with the Deprecated flag in the models.Peer struct, it produces more accurate metrics when exporting pruning peers that are no longer active.
 type PruningStrategy struct {
-	ctx          context.Context
-	cancel       context.CancelFunc
+	ctx context.Context
+
+	network      string
 	strategyType string
 	PeerStore    *db.PeerStore
 
@@ -55,9 +59,9 @@ type PruningStrategy struct {
 	lastIterTime             time.Duration
 	iterForcingNextConnTime  time.Time
 	attemptedPeers           int64
-	queueErroDistribution    map[string]*int64
+	queueErroDistribution    sync.Map
 	PeerQueueIterations      int
-	ErrorAttemptDistribution map[string]*int64
+	ErrorAttemptDistribution sync.Map
 }
 
 // NewPruningStrategy:
@@ -68,15 +72,12 @@ type PruningStrategy struct {
 // @param opts: base and logging option.
 // @return peering strategy interface with the prunning service.
 // @return error.
-func NewPruningStrategy(ctx context.Context, peerstore *db.PeerStore) (PruningStrategy, error) {
-	// TODO: cancel is still not implemented in the BaseCreation
-	pruningCtx, cancel := context.WithCancel(ctx)
-
+func NewPruningStrategy(ctx context.Context, network string, peerstore *db.PeerStore) (PruningStrategy, error) {
 	// Generate the ConnStatus notification channel
 	// TODO: consider making the ConnStatus channel larger
 	pr := PruningStrategy{
-		ctx:            pruningCtx,
-		cancel:         cancel,
+		ctx:            ctx,
+		network:        network,
 		strategyType:   PeerStratModuleName,
 		PeerStore:      peerstore,
 		PeerQueue:      NewPeerQueue(),
@@ -86,8 +87,6 @@ func NewPruningStrategy(ctx context.Context, peerstore *db.PeerStore) (PruningSt
 		connEventNot:   make(chan hosts.ConnectionEvent),
 		identEventNot:  make(chan hosts.IdentificationEvent),
 		// Metrics Variables
-		queueErroDistribution:    make(map[string]*int64),
-		ErrorAttemptDistribution: make(map[string]*int64),
 	}
 	return pr, nil
 }
@@ -126,22 +125,13 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 		slog.Error(err)
 	}
 
-	posDelay := int64(0)
-	negWHDelay := int64(0)
-	negWHTDelay := int64(0)
-	min1Delay := int64(0)
-	timeoutType := int64(0)
-	zerDelay := int64(0)
+	c.queueErroDistribution.Store(PositiveDelayType, 0)
+	c.queueErroDistribution.Store(NegativeWithHopeDelayType, 0)
+	c.queueErroDistribution.Store(NegativeWithNoHopeDelayType, 0)
+	c.queueErroDistribution.Store(Minus1DelayType, 0)
+	c.queueErroDistribution.Store(ZeroDelayType, 0)
+	c.queueErroDistribution.Store(TimeoutDelayType, 0)
 
-	errorAttemptCategories := map[string]*int64{
-		PositiveDelayType:           &posDelay,
-		NegativeWithHopeDelayType:   &negWHDelay,
-		NegativeWithNoHopeDelayType: &negWHTDelay,
-		Minus1DelayType:             &min1Delay,
-		ZeroDelayType:               &zerDelay,
-		TimeoutDelayType:            &timeoutType,
-	}
-	c.ErrorAttemptDistribution = errorAttemptCategories
 	peerCounter := 0
 	peerListLen := c.PeerQueue.Len()
 	validIterTimer := time.NewTimer(MinIterTime)
@@ -166,27 +156,37 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 					// compose all the detailed info for the given peer
 					// Generating New peer to fetch info
 					npeer := models.NewPeer(nextPeer.PeerID)
-					peerEnr, err := pinfo.GetBlockchainNode()
-					if err == nil && peerEnr != nil {
-						npeer.NodeId = peerEnr.ID().String()
-						// TODO:
-						npeer.Ip = peerEnr.IP().String()
-					}
+
+					// get IP
 					pID, _ := peer.Decode(nextPeer.PeerID)
 					if err != nil {
 						slog.Errorf("error decoding PeerID string into peer.ID %s", err.Error())
 					}
 					npeer.PeerId = pID.String()
-					k, _ := pID.ExtractPublicKey()
-					pubk, _ := k.Raw()
-					npeer.Pubkey = hex.EncodeToString(pubk)
+
+					// Eth2 network
+					if c.network == "eth2" {
+						peerEnr, ok := pinfo.GetAtt("enr")
+						enr := enode.MustParse(peerEnr.(string))
+						if ok && peerEnr != nil {
+							npeer.SetAtt("nodeid", enr.ID().String())
+							// TODO:
+							npeer.Ip = enr.IP().String()
+						}
+						k, _ := pID.ExtractPublicKey()
+						pubk, _ := k.Raw()
+						npeer.SetAtt("pubkey", hex.EncodeToString(pubk))
+					}
+
 					npeer.MAddrs = pinfo.MAddrs
 					// Update metadata of peer
 					c.PeerStore.StoreOrUpdatePeer(npeer)
 
 					// Send next peer to the peering service
 					slog.Debugf("pushing next peer %s into peer stream", pinfo.PeerId)
-					atomic.AddInt64(errorAttemptCategories[nextPeer.DelayObj.GetType()], 1)
+					v, _ := c.queueErroDistribution.Load(nextPeer.DelayObj.GetType())
+					val := v.(int)
+					c.queueErroDistribution.Store(nextPeer.DelayObj.GetType(), val+1)
 					c.peerStreamChan <- pinfo
 
 					// increment peerCounter to see if we finished iterating the peerstore
@@ -216,9 +216,8 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 				<-validIterTimer.C
 
 				// reset values
+				c.queueErroDistribution = ResetMapValues(c.queueErroDistribution)
 
-				c.ErrorAttemptDistribution = errorAttemptCategories
-				errorAttemptCategories = ResetMapValues(errorAttemptCategories)
 				// get the peer list from the peerstore
 				err := c.PeerQueue.UpdatePeerListFromPeerStore(c.PeerStore)
 				c.PeerQueueIterations++ // another iteration
@@ -236,6 +235,9 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 		// detect if the context has been shut down to end the go routine
 		case <-c.ctx.Done():
 			slog.Debug("closing peerstore iterator")
+			close(c.peerStreamChan)
+			close(c.nextPeerChan)
+			close(c.connEventNot)
 			return
 		}
 	}
@@ -373,25 +375,12 @@ func (c *PruningStrategy) AttemptedPeersSinceLastIter() int64 {
 	return atomic.LoadInt64(&c.attemptedPeers)
 }
 
-func (c *PruningStrategy) ControlDistribution() map[string]*int64 {
+func (c *PruningStrategy) ControlDistribution() sync.Map {
 	return c.PeerQueue.DelayDistribution()
 }
 
-func (c *PruningStrategy) GetErrorAttemptDistribution() map[string]*int64 {
+func (c *PruningStrategy) GetErrorAttemptDistribution() sync.Map {
 	return c.ErrorAttemptDistribution
-}
-
-// ClosePeerStream:
-// Closes in a controled sequence the module related go routines and channels.
-// Ending with the Base.Ctx cancellation.
-func (c *PruningStrategy) Close() {
-	slog.Infof("closing pruning strategy")
-	// close the involved channels
-	close(c.peerStreamChan)
-	close(c.nextPeerChan)
-	close(c.connEventNot)
-	// shutdown the base context of the pruning
-	c.cancel()
 }
 
 // PeerQueue:
@@ -400,14 +389,14 @@ func (c *PruningStrategy) Close() {
 // the values of each peer.
 type PeerQueue struct {
 	PeerList []*PrunedPeer
-	PeerMap  map[string]*PrunedPeer
+	PeerMap  sync.Map
 	// Metrics
-	queueErroDistribution map[string]*int64
+	queueErroDistribution sync.Map
 }
 
 // DelayDistribution:
 // @return the distribution of the delays in a map.
-func (c *PeerQueue) DelayDistribution() map[string]*int64 {
+func (c *PeerQueue) DelayDistribution() sync.Map {
 	return c.queueErroDistribution
 }
 
@@ -416,9 +405,7 @@ func (c *PeerQueue) DelayDistribution() map[string]*int64 {
 // @return new PeerQueue.
 func NewPeerQueue() PeerQueue {
 	pq := PeerQueue{
-		PeerList:              make([]*PrunedPeer, 0),
-		PeerMap:               make(map[string]*PrunedPeer),
-		queueErroDistribution: make(map[string]*int64),
+		PeerList: make([]*PrunedPeer, 0),
 	}
 	return pq
 }
@@ -428,7 +415,7 @@ func NewPeerQueue() PeerQueue {
 // @params peerID: string of the peerID that we want to find.
 // @return true is peer is already, false if not.
 func (c *PeerQueue) IsPeerAlready(peerID string) bool {
-	_, ok := c.PeerMap[peerID]
+	_, ok := c.PeerMap.Load(peerID)
 	return ok
 }
 
@@ -438,7 +425,7 @@ func (c *PeerQueue) IsPeerAlready(peerID string) bool {
 func (c *PeerQueue) AddPeer(pPeer *PrunedPeer) {
 	// append new item at the beginning of the array
 	c.PeerList = append([]*PrunedPeer{pPeer}, c.PeerList...)
-	c.PeerMap[pPeer.PeerID] = pPeer
+	c.PeerMap.Store(pPeer.PeerID, pPeer)
 }
 
 // GetPeer:
@@ -447,8 +434,11 @@ func (c *PeerQueue) AddPeer(pPeer *PrunedPeer) {
 // @return pointer to pruned peer.
 // @return bool, true if exists, false if doesn't.
 func (c *PeerQueue) GetPeer(peerID string) (*PrunedPeer, bool) {
-	p, ok := c.PeerMap[peerID]
-	return p, ok
+	p, ok := c.PeerMap.Load(peerID)
+	if !ok {
+		return &PrunedPeer{}, ok
+	}
+	return p.(*PrunedPeer), ok
 }
 
 // SortPeerList:
@@ -485,21 +475,13 @@ func (c *PeerQueue) UpdatePeerListFromPeerStore(peerstore *db.PeerStore) error {
 	totcnt := 0
 	new := 0
 
-	posType := int64(0)
-	negWHType := int64(0)
-	negWHTType := int64(0)
-	min1Type := int64(0)
-	timeoutType := int64(0)
-	zerType := int64(0)
+	c.queueErroDistribution.Store(PositiveDelayType, 0)
+	c.queueErroDistribution.Store(NegativeWithHopeDelayType, 0)
+	c.queueErroDistribution.Store(NegativeWithNoHopeDelayType, 0)
+	c.queueErroDistribution.Store(Minus1DelayType, 0)
+	c.queueErroDistribution.Store(ZeroDelayType, 0)
+	c.queueErroDistribution.Store(TimeoutDelayType, 0)
 
-	c.queueErroDistribution = map[string]*int64{
-		PositiveDelayType:           &posType,
-		NegativeWithHopeDelayType:   &negWHType,
-		NegativeWithNoHopeDelayType: &negWHTType,
-		Minus1DelayType:             &min1Type,
-		ZeroDelayType:               &zerType,
-		TimeoutDelayType:            &timeoutType,
-	}
 	// Fill the PeerQueue.PeerList with the missing peers from the
 	for _, peerID := range peerList {
 		totcnt++
@@ -569,10 +551,15 @@ func (c *PeerQueue) UpdatePeerListFromPeerStore(peerstore *db.PeerStore) error {
 
 			// add the new item to the list
 			c.AddPeer(newPrunnedPeer)
-			atomic.AddInt64(c.queueErroDistribution[delayType], 1)
+			v, _ := c.queueErroDistribution.Load(delayType)
+			val := v.(int)
+			c.queueErroDistribution.Store(delayType, val+1)
+
 		} else {
 			prunnedPeer, _ := c.GetPeer(peerID.String())
-			atomic.AddInt64(c.queueErroDistribution[prunnedPeer.DelayObj.GetType()], 1)
+			v, _ := c.queueErroDistribution.Load(prunnedPeer.DelayObj.GetType())
+			val := v.(int)
+			c.queueErroDistribution.Store(prunnedPeer.DelayObj.GetType(), val+1)
 		}
 	}
 	// Sort the list of peers based on the next connection
@@ -678,7 +665,7 @@ func ErrorToDelayType(errString string) string {
 		return PositiveDelayType
 	case "connection reset by peer", "connection refused", "context deadline exceeded", "dial backoff", "metadata error":
 		return NegativeWithHopeDelayType
-	case "no route to host", "unreachable network", "peer id mismatch", "dial to self attempted":
+	case "no route to host", "unreachable network", "peer id mismatch", "dial to self attempted", "no good addresses":
 		return NegativeWithNoHopeDelayType
 	case "i/o timeout":
 		return TimeoutDelayType
@@ -691,9 +678,11 @@ func ErrorToDelayType(errString string) string {
 // ResetMapValues
 // Iterates over a string int map and resets all values to 0.
 // @return the reset map
-func ResetMapValues(inputMap map[string]*int64) map[string]*int64 {
-	for k := range inputMap {
-		atomic.StoreInt64(inputMap[k], 0)
-	}
-	return inputMap
+func ResetMapValues(inputMap sync.Map) sync.Map {
+	var outMap sync.Map
+	inputMap.Range(func(key, value interface{}) bool {
+		outMap.Store(key, 0)
+		return true
+	})
+	return outMap
 }
