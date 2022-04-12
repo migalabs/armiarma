@@ -55,7 +55,7 @@ func (ps *PeerStore) initPeerPrometheusMetrics() {
 	prometheus.MustRegister(TotPeers)
 	prometheus.MustRegister(GeoDistribution)
 	prometheus.MustRegister(RttDistribution)
-	prometheus.MustRegister(TotcontimeDistribution)
+	//prometheus.MustRegister(TotcontimeDistribution)
 }
 
 func (ps *PeerStore) runPeerPrometheusMetrics() {
@@ -67,7 +67,7 @@ func (ps *PeerStore) runPeerPrometheusMetrics() {
 	geoDist := NewStringMapMetric()
 	ipDist := NewStringMapMetric()
 	rttDis := NewStringMapMetric()
-	tctDis := NewStringMapMetric()
+	//tctDis := NewStringMapMetric()
 
 	// TODO:	-remove the Storage.Range from the PrometheusExport workflow
 	//			for loop over the PeerList might not be the best idea, but should work for now
@@ -98,11 +98,13 @@ func (ps *PeerStore) runPeerPrometheusMetrics() {
 				// Generate RTT distribution
 				rtt := math.Round(peerData.Latency*2) / 2
 				rttDis.AddOneorCreate(fmt.Sprintf("%.1f", rtt))
+
+				// TODO: Commented for extra CPU usage when the crawler has a large number of nodes
 				// Generate Total connected Time Distribution
-				tc := peerData.GetConnectedTime()
+				//tc := peerData.GetConnectedTime()
 				// Round up to multiples of 5
-				tc = math.Round(tc*2) / 2
-				tctDis.AddOneorCreate(fmt.Sprintf("%.0f", tc))
+				//tc = math.Round(tc*2) / 2
+				//tctDis.AddOneorCreate(fmt.Sprintf("%.0f", tc))
 			}
 		} else {
 			nOfDeprecatedPeers++
@@ -130,7 +132,7 @@ func (ps *PeerStore) runPeerPrometheusMetrics() {
 	auxIpDist := ipDist.ObtainDistribution()
 	auxIpDist.SetValues(IpDistribution)
 	rttDis.SetValues(RttDistribution)
-	tctDis.SetValues(TotcontimeDistribution)
+	//tctDis.SetValues(TotcontimeDistribution)
 	Log.WithFields(logrus.Fields{
 		"NOfDiscoveredPeers": nOfDiscoveredPeers,
 		"NOfConnectedPeers":  nOfConnectedPeers,
