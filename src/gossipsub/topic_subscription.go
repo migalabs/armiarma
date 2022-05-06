@@ -18,8 +18,7 @@ import (
 // message logging or record.
 // Serves as a server for a singe topic subscription.
 type TopicSubscription struct {
-	ctx    context.Context
-	cancel context.CancelFunc
+	ctx context.Context
 
 	// Messages is a channel of messages received from other peers in the chat room
 	Messages       chan []byte
@@ -38,11 +37,8 @@ type TopicSubscription struct {
 // @param stdOpts: list of options to generate the base of the topic subscription service.
 // @return: pointer to TopicSubscription.
 func NewTopicSubscription(ctx context.Context, topic *pubsub.Topic, sub pubsub.Subscription, msgMetrics *MessageMetrics) *TopicSubscription {
-	mainCtx, cancel := context.WithCancel(ctx)
-
 	return &TopicSubscription{
-		ctx:            mainCtx,
-		cancel:         cancel,
+		ctx:            ctx,
 		Topic:          topic,
 		Sub:            &sub,
 		MessageMetrics: msgMetrics,
@@ -56,40 +52,40 @@ func NewTopicSubscription(ctx context.Context, topic *pubsub.Topic, sub pubsub.S
 // @param h: libp2p host.
 // @param peerstore: peerstore of the crawler app.
 func (c *TopicSubscription) MessageReadingLoop(h host.Host, peerstore *db.PeerStore) {
-	Log.Infof("topic subscription %s reading loop", c.Sub.Topic())
+	log.Infof("topic subscription %s reading loop", c.Sub.Topic())
 	subsCtx := c.ctx
 	for {
 		msg, err := c.Sub.Next(subsCtx)
 		if err != nil {
 			if err == subsCtx.Err() {
-				Log.Errorf("context of the subsciption %s has been canceled", c.Sub.Topic())
+				log.Errorf("context of the subsciption %s has been canceled", c.Sub.Topic())
 				break
 			}
-			Log.Errorf("error reading next message in topic %s. %slol", c.Sub.Topic(), err.Error())
+			log.Errorf("error reading next message in topic %s. %slol", c.Sub.Topic(), err.Error())
 		} else {
 			var msgData []byte
 			if strings.HasSuffix(c.Sub.Topic(), "_snappy") {
 				msgData, err = snappy.Decode(nil, msg.Data)
 				if err != nil {
-					Log.WithError(err).WithField("topic", c.Sub.Topic()).Error("Cannot decompress snappy message")
+					log.WithError(err).WithField("topic", c.Sub.Topic()).Error("Cannot decompress snappy message")
 					continue
 				}
 			}
 			// To avoid getting track of our own messages, check if we are the senders
 			if msg.ReceivedFrom != h.ID() {
-				Log.Debugf("new message on %s from %s", c.Sub.Topic(), msg.ReceivedFrom)
+				log.Debugf("new message on %s from %s", c.Sub.Topic(), msg.ReceivedFrom)
 				newPeer := models.NewPeer(msg.ReceivedFrom.String())
 				newPeer.MessageEvent(c.Sub.Topic(), time.Now())
 				peerstore.StoreOrUpdatePeer(newPeer)
 				// Add message to msg metrics counter
 				_ = c.MessageMetrics.AddMessgeToTopic(c.Sub.Topic())
 
-				Log.Debugf("msg content %s", msgData)
+				log.Debugf("msg content %s", msgData)
 			} else {
-				Log.Debugf("message sent by ourselfs received on %s", c.Sub.Topic())
+				log.Debugf("message sent by ourselfs received on %s", c.Sub.Topic())
 			}
 		}
 	}
 	<-subsCtx.Done()
-	Log.Debugf("ending %s reading loop", c.Sub.Topic())
+	log.Debugf("ending %s reading loop", c.Sub.Topic())
 }

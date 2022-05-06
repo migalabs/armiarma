@@ -19,9 +19,8 @@ var (
 
 type LocalNode struct {
 	ctx       context.Context
-	cancel    context.CancelFunc
 	LocalNode enode.LocalNode
-	info_data *info.InfoData
+	info_data *info.Eth2InfoData
 }
 
 // NewLocalNode:
@@ -30,8 +29,7 @@ type LocalNode struct {
 // @param info_obj the InfoData object where to get the configuration data from the user.
 // @param stdOpts the logging options object.
 // @return the LocalNode object.
-func NewLocalNode(ctx context.Context, info_obj *info.InfoData) *LocalNode {
-	mainCtx, cancel := context.WithCancel(ctx)
+func NewLocalNode(ctx context.Context, infObj *info.Eth2InfoData) *LocalNode {
 	// db where to store the ENRs
 	new_db, err := enode.OpenDB("")
 	if err != nil {
@@ -40,10 +38,9 @@ func NewLocalNode(ctx context.Context, info_obj *info.InfoData) *LocalNode {
 	Log.Infof("Creating Local Node")
 
 	return &LocalNode{
-		ctx:       mainCtx,
-		cancel:    cancel,
-		LocalNode: *enode.NewLocalNode(new_db, (*ecdsa.PrivateKey)(info_obj.GetPrivKey())),
-		info_data: info_obj,
+		ctx:       ctx,
+		LocalNode: *enode.NewLocalNode(new_db, (*ecdsa.PrivateKey)(infObj.PrivateKey)),
+		info_data: infObj,
 	}
 }
 

@@ -8,14 +8,6 @@ import (
 
 	gcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/libp2p/go-libp2p-core/crypto"
-	"github.com/sirupsen/logrus"
-)
-
-var (
-	ModuleName = "UTILS-KEY"
-	log        = logrus.WithField(
-		"module", ModuleName,
-	)
 )
 
 // Parse a Secp256k1PrivateKey from string, checking if it has the proper curve
@@ -57,7 +49,7 @@ func PrivKeyToString(input_key *crypto.Secp256k1PrivateKey) string {
 	return hex.EncodeToString(keyBytes)
 }
 
-func Generate_privKey() string {
+func GeneratePrivKey() string {
 
 	key, err := ecdsa.GenerateKey(gcrypto.S256(), rand.Reader)
 

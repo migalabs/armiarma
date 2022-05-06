@@ -16,34 +16,28 @@ import (
 	"github.com/migalabs/armiarma/src/db"
 	"github.com/migalabs/armiarma/src/db/models"
 	"github.com/migalabs/armiarma/src/hosts"
-	"github.com/migalabs/armiarma/src/info"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/sirupsen/logrus"
 )
 
 var (
 	ModuleName = "PEERING"
-	Log        = logrus.WithField(
+	log        = logrus.WithField(
 		"module", ModuleName,
 	)
 
 	ConnectionRefuseTimeout = 10 * time.Second
 	MaxRetries              = 1
-	DefaultWorkers          = 10
+	DefaultWorkers          = 50
 )
 
 type PeeringOption func(*PeeringService) error
 
-type PeeringOpts struct {
-	InfoObj *info.InfoData
-}
-
 // PeeringService is the main service that will connect peers from the given peerstore and using the given Host.
 // It will use the specified peering strategy, which might difer/change from the testing or desired purposes of the run.
 type PeeringService struct {
-	ctx       context.Context
-	cancel    context.CancelFunc
-	InfoObj   *info.InfoData
+	ctx context.Context
+
 	host      *hosts.BasicLibp2pHost
 	PeerStore *db.PeerStore
 	strategy  PeeringStrategy
@@ -57,15 +51,10 @@ func NewPeeringService(
 	ctx context.Context,
 	h *hosts.BasicLibp2pHost,
 	peerstore *db.PeerStore,
-	infoObj *info.InfoData,
 	opts ...PeeringOption) (PeeringService, error) {
 
-	peeringCtx, cancel := context.WithCancel(ctx)
-
 	pServ := PeeringService{
-		ctx:        peeringCtx,
-		cancel:     cancel,
-		InfoObj:    infoObj,
+		ctx:        ctx,
 		host:       h,
 		PeerStore:  peerstore,
 		Timeout:    ConnectionRefuseTimeout,
@@ -86,7 +75,7 @@ func WithPeeringStrategy(strategy PeeringStrategy) PeeringOption {
 		if strategy == nil {
 			return fmt.Errorf("given peering strategy is empty")
 		}
-		Log.Debugf("configuring peering with %s", strategy.Type())
+		log.Debugf("configuring peering with %s", strategy.Type())
 		p.strategy = strategy
 		return nil
 	}
@@ -97,7 +86,7 @@ func WithPeeringStrategy(strategy PeeringStrategy) PeeringOption {
 // For every next peer received from the strategy, attempt the connection and record the status of this one.
 // Notify the strategy of any conn/disconn recorded.
 func (c *PeeringService) Run() {
-	Log.Debug("starting the peering service")
+	log.Debug("starting the peering service")
 
 	// start the peering strategy
 	peerStreamChan := c.strategy.Run()
@@ -116,7 +105,7 @@ func (c *PeeringService) Run() {
 // @param workerID: id of the worker.
 // @param peerStreamChan: used to receive the next peer.
 func (c *PeeringService) peeringWorker(workerID string, peerStreamChan chan models.Peer) {
-	Log.Infof("launching %s", workerID)
+	log.Infof("launching %s", workerID)
 	peeringCtx := c.ctx
 	h := c.host.Host()
 
@@ -128,10 +117,10 @@ func (c *PeeringService) peeringWorker(workerID string, peerStreamChan chan mode
 		select {
 		// Next peer arrives
 		case nextPeer := <-peerStreamChan:
-			Log.Debugf("%s -> new peer %s to connect", workerID, nextPeer.PeerId)
+			log.Debugf("%s -> new peer %s to connect", workerID, nextPeer.PeerId)
 			peerID, err := peer.Decode(nextPeer.PeerId)
 			if err != nil {
-				Log.Warnf("%s -> coulnd't extract peer.ID from peer %s", workerID, nextPeer.PeerId)
+				log.Warnf("%s -> coulnd't extract peer.ID from peer %s", workerID, nextPeer.PeerId)
 				// Request the next peer when case is over
 				c.strategy.NextPeer()
 				continue
@@ -146,7 +135,7 @@ func (c *PeeringService) peeringWorker(workerID string, peerStreamChan chan mode
 				}
 			}
 			if connected {
-				Log.Infof("%s -> Peer %s was already connected", workerID, nextPeer.PeerId)
+				log.Infof("%s -> Peer %s was already connected", workerID, nextPeer.PeerId)
 				c.strategy.NextPeer()
 				continue
 			}
@@ -169,13 +158,13 @@ func (c *PeeringService) peeringWorker(workerID string, peerStreamChan chan mode
 			connAttStat := ConnectionAttemptStatus{
 				Peer: nPeer,
 			}
-			Log.Debugf("%s addrs %s attempting connection to peer", workerID, addrInfo.Addrs)
+			log.Debugf("%s addrs %s attempting connection to peer", workerID, addrInfo.Addrs)
 			// try to connect the peer
 			attempts := 0
 			timeoutctx, cancel := context.WithTimeout(peeringCtx, c.Timeout)
 			for attempts < c.MaxRetries {
 				if err := h.Connect(timeoutctx, addrInfo); err != nil {
-					Log.WithError(err).Debugf("%s attempts %d failed connection attempt", workerID, attempts+1)
+					log.WithError(err).Debugf("%s attempts %d failed connection attempt", workerID, attempts+1)
 					// the connetion failed
 					// fill the ConnectionStatus for the given peer connection
 					connAttStat.Timestamp = time.Now()
@@ -185,12 +174,11 @@ func (c *PeeringService) peeringWorker(workerID string, peerStreamChan chan mode
 					attempts++
 					continue
 				} else { // connection successfuly made
-					Log.Debugf("%s peer_id %s successful connection made", workerID, peerID.String())
+					log.Debugf("%s peer_id %s successful connection made", workerID, peerID.String())
 					// fill the ConnectionStatus for the given peer connection
 					connAttStat.Timestamp = time.Now()
 					connAttStat.Successful = true
 					connAttStat.RecError = nil
-					// break the loop
 					break
 				}
 			}
@@ -202,7 +190,7 @@ func (c *PeeringService) peeringWorker(workerID string, peerStreamChan chan mode
 
 		// Stoping go routine
 		case <-peeringCtx.Done():
-			Log.Debugf("closing %s", workerID)
+			log.Debugf("closing %s", workerID)
 			return
 		}
 	}
@@ -213,7 +201,7 @@ func (c *PeeringService) peeringWorker(workerID string, peerStreamChan chan mode
 // The event selector records the status of any incoming connection and disconnection and
 // notifies the strategy of any recorded conn/disconn.
 func (c *PeeringService) eventRecorderRoutine() {
-	Log.Debug("starting the event recorder service")
+	log.Debug("starting the event recorder service")
 	// get the connection and disconnection notification channels from the host
 	newConnEventChan := c.host.ConnEventNotChannel()
 	newIdentPeerChan := c.host.IdentEventNotChannel()
@@ -224,33 +212,23 @@ func (c *PeeringService) eventRecorderRoutine() {
 		case newConn := <-newConnEventChan:
 			switch newConn.ConnType {
 			case int8(1):
-				Log.Debugf("new conection from %s", newConn.Peer.PeerId)
+				log.Debugf("new conection from %s", newConn.Peer.PeerId)
 			case int8(2):
-				Log.Debugf("new disconnection from %s", newConn.Peer.PeerId)
+				log.Debugf("new disconnection from %s", newConn.Peer.PeerId)
 			default:
-				Log.Debugf("unrecognized event from peer %s", newConn.Peer.PeerId)
+				log.Debugf("unrecognized event from peer %s", newConn.Peer.PeerId)
 			}
 			c.strategy.NewConnectionEvent(newConn)
 
 		// New identification event has been recorded
 		case newIdent := <-newIdentPeerChan:
-			Log.Debugf("new identification %s from peer %s", strconv.FormatBool(newIdent.Peer.IsConnected), newIdent.Peer.PeerId)
+			log.Debugf("new identification %s from peer %s", strconv.FormatBool(newIdent.Peer.IsConnected), newIdent.Peer.PeerId)
 			c.strategy.NewIdentificationEvent(newIdent)
 
 			// Stoping go routine
 		case <-c.ctx.Done():
-			Log.Debug("closing peering go routine")
+			log.Debug("closing peering go routine")
 			return
 		}
 	}
-}
-
-// Close
-// Stops the Peering Service, closing with it the peering strategy and their context
-func (c *PeeringService) Close() {
-	Log.Info("stoping the peering service")
-	// Stop the strategy
-	c.strategy.Close()
-	// finish the module context
-	c.cancel()
 }

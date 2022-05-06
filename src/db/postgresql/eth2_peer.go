@@ -1,10 +1,10 @@
 package postgresql
 
 import (
-	"os"
+	"context"
 	"time"
 
-	"github.com/ethereum/go-ethereum/p2p/enode"
+	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/migalabs/armiarma/src/db/models"
 	"github.com/migalabs/armiarma/src/utils"
@@ -14,8 +14,8 @@ import (
 
 // Postgres intregration variables
 var (
-	createPeerTable = `
-	CREATE TABLE IF NOT EXISTS t_peers_summary(
+	createEth2PeerTable = `
+	CREATE TABLE IF NOT EXISTS t_eth2_summary(
 		f_peer_id TEXT,
 		f_pubkey TEXT,
 
@@ -67,8 +67,8 @@ var (
 		PRIMARY KEY (f_peer_id)
 	);
 	`
-	insertPeer = `
-	INSERT INTO t_peers_summary(
+	insertEth2Peer = `
+	INSERT INTO t_eth2_summary(
 		f_peer_id,
 		f_pubkey,
 		f_node_id,
@@ -154,8 +154,8 @@ var (
 		f_head_slot=EXCLUDED.f_head_slot
 		`
 
-	createPeerMessageMetrics = `
-	CREATE TABLE IF NOT EXISTS t_peers_msg_metrics(
+	createEth2PeerMessageMetrics = `
+	CREATE TABLE IF NOT EXISTS t_eth2_msg_metrics(
 		f_peer_id TEXT,
 		f_topic TEXT,
 		
@@ -167,8 +167,8 @@ var (
 	);
 	`
 
-	insertPeerMessageMetrics = `
-	INSERT INTO t_peers_msg_metrics(
+	insertEth2PeerMessageMetrics = `
+	INSERT INTO t_eth2_msg_metrics(
 		f_peer_id,
 		f_topic,
 		f_count,
@@ -185,35 +185,102 @@ var (
 	`
 )
 
+//
+type Eth2Model struct {
+	Network string
+}
+
+//
+func NewEth2Model(network string) Eth2Model {
+	return Eth2Model{
+		Network: network,
+	}
+}
+
+func (p *Eth2Model) init(ctx context.Context, pool *pgxpool.Pool) error {
+	// create the tables
+	err := p.createPeerTable(ctx, pool)
+	if err != nil {
+		return err
+	}
+	ok := p.CheckPeersSummaryTableStatus(ctx, pool)
+	if !ok {
+		return errors.New("unable to check existing connected peers in the postgres db")
+	}
+
+	// ---- Message Metrics Table ----
+	err = p.createPeerMessageMetricsTable(ctx, pool)
+	if err != nil {
+		return err
+	}
+
+	// ---- Client Diversity Table ----
+	err = p.createEth2ClientDiversityTable(ctx, pool)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // creates Peer table in the Postgres DB
-func (p *PostgresDBService) createPeerTable() error {
-	_, err := p.psqlPool.Exec(p.ctx, createPeerTable)
+func (p *Eth2Model) createPeerTable(ctx context.Context, pool *pgxpool.Pool) error {
+	_, err := pool.Exec(ctx, createEth2PeerTable)
 	if err != nil {
 		return errors.Wrap(err, "error creating peers summary table")
 	}
 	return nil
 }
 
-func (p *PostgresDBService) createPeerMessageMetricsTable() error {
-	_, err := p.psqlPool.Exec(p.ctx, createPeerMessageMetrics)
+func (p *Eth2Model) createPeerMessageMetricsTable(ctx context.Context, pool *pgxpool.Pool) error {
+	_, err := pool.Exec(ctx, createEth2PeerMessageMetrics)
 	if err != nil {
 		return errors.Wrap(err, "error creating peer-message-metrics table")
 	}
 	return nil
 }
 
-func (p *PostgresDBService) StorePeer(peerID string, peer models.Peer) {
-	_, err := p.psqlPool.Exec(
-		p.ctx,
-		insertPeer,
+func (p *Eth2Model) StorePeer(ctx context.Context, pool *pgxpool.Pool, peerID string, peer models.Peer) {
+	// load Attributes
+	var nodeid string
+	nid, ok := peer.GetAtt("nodeid")
+	if ok {
+		nodeid = nid.(string)
+	}
+	var pubkey string
+	pk, ok := peer.GetAtt("pubkey")
+	if ok {
+		pubkey = pk.(string)
+	}
+	var enr string
+	e, ok := peer.GetAtt("enr")
+	if ok {
+		enr = e.(string)
+	}
+	// check
+	var beaconmetadata models.BeaconMetadataStamped
+	bm, ok := peer.GetAtt("beaconmetadata")
+	if ok {
+		beaconmetadata = bm.(models.BeaconMetadataStamped)
+	}
+
+	var beaconstatus models.BeaconStatusStamped
+	bs, ok := peer.GetAtt("beaconstatus")
+	if ok {
+		beaconstatus = bs.(models.BeaconStatusStamped)
+	}
+
+	// store the peer
+	_, err := pool.Exec(
+		ctx,
+		insertEth2Peer,
 		peerID,
-		peer.Pubkey,
-		peer.NodeId,
+		pubkey,
+		nodeid,
 		peer.UserAgent,
 		peer.ClientName,
 		peer.ClientOS,
 		peer.ClientVersion,
-		peer.BlockchainNodeENR,
+		enr,
 		peer.Ip,
 		peer.Country,
 		peer.CountryCode,
@@ -237,15 +304,15 @@ func (p *PostgresDBService) StorePeer(peerID string, peer models.Peer) {
 		peer.MetadataRequest,
 		peer.MetadataSucceed,
 		peer.LastExport,
-		peer.BeaconMetadata.Timestamp,
-		peer.BeaconMetadata.Metadata.SeqNumber,
-		peer.BeaconMetadata.Metadata.Attnets,
-		peer.BeaconStatus.Timestamp,
-		peer.BeaconStatus.Status.ForkDigest.String(),
-		peer.BeaconStatus.Status.FinalizedRoot.String(),
-		peer.BeaconStatus.Status.FinalizedEpoch,
-		peer.BeaconStatus.Status.HeadRoot.String(),
-		peer.BeaconStatus.Status.HeadSlot,
+		beaconmetadata.Timestamp,
+		beaconmetadata.Metadata.SeqNumber,
+		beaconmetadata.Metadata.Attnets,
+		beaconstatus.Timestamp,
+		beaconstatus.Status.ForkDigest.String(),
+		beaconstatus.Status.FinalizedRoot.String(),
+		beaconstatus.Status.FinalizedEpoch,
+		beaconstatus.Status.HeadRoot.String(),
+		beaconstatus.Status.HeadSlot,
 	)
 
 	if err != nil {
@@ -254,9 +321,9 @@ func (p *PostgresDBService) StorePeer(peerID string, peer models.Peer) {
 	}
 	// Store the Peer-Messge-Metrics
 	for topic, metrics := range peer.MessageMetrics {
-		_, err = p.psqlPool.Exec(
-			p.ctx,
-			insertPeerMessageMetrics,
+		_, err = pool.Exec(
+			ctx,
+			insertEth2PeerMessageMetrics,
 			peerID,
 			topic,
 			metrics.Count,
@@ -271,35 +338,43 @@ func (p *PostgresDBService) StorePeer(peerID string, peer models.Peer) {
 
 }
 
-func (p *PostgresDBService) LoadPeer(peerID string) (models.Peer, bool) {
+func (p *Eth2Model) LoadPeer(ctx context.Context, pool *pgxpool.Pool, peerID string) (models.Peer, bool) {
 	log.Debugf("loading peer %s", peerID)
-	row := p.psqlPool.QueryRow(
-		p.ctx,
-		"SELECT *FROM t_peers_summary WHERE f_peer_id=$1",
+	row := pool.QueryRow(
+		ctx,
+		"SELECT *FROM t_eth2_summary WHERE f_peer_id=$1",
 		peerID,
 	)
 	peer := models.NewPeer("")
 
 	var multiAddrs []string
+	// App layer values
+	var nodeid string
+	var pubkey string
+	var enr string
+
 	// BeconMetadata
+	var beaconmetadata models.BeaconMetadataStamped
 	var seqNumber common.SeqNr
 	var attnet string
+
 	// BeaconStatus
-	var bStatusTS time.Time
+	var beaconstatus models.BeaconStatusStamped
 	var forkDigest string
 	var finalizedRoot string
 	var finalizedEpoch int64
 	var headRoot string
 	var headSlot int64
+
 	err := row.Scan(
 		&peer.PeerId,
-		&peer.Pubkey,
-		&peer.NodeId,
+		&pubkey,
+		&nodeid,
 		&peer.UserAgent,
 		&peer.ClientName,
 		&peer.ClientOS,
 		&peer.ClientVersion,
-		&peer.BlockchainNodeENR,
+		&enr,
 		&peer.Ip,
 		&peer.Country,
 		&peer.CountryCode,
@@ -323,10 +398,10 @@ func (p *PostgresDBService) LoadPeer(peerID string) (models.Peer, bool) {
 		&peer.MetadataRequest,
 		&peer.MetadataSucceed,
 		&peer.LastExport,
-		&peer.BeaconMetadata.Timestamp,
+		&beaconmetadata.Timestamp,
 		&seqNumber,
 		&attnet,
-		&bStatusTS,
+		&beaconstatus.Timestamp,
 		&forkDigest,
 		&finalizedRoot,
 		&finalizedEpoch,
@@ -338,19 +413,26 @@ func (p *PostgresDBService) LoadPeer(peerID string) (models.Peer, bool) {
 		log.Debugf("error loading info from peer %s. %s", peerID, err.Error())
 		return peer, false
 	}
+	//  Set the app attributes
+	peer.SetAtt("pubkey", pubkey)
+	peer.SetAtt("nodeid", nodeid)
+	peer.SetAtt("enr", enr)
+
 	// Compose BeaconMetadata
-	if peer.BeaconMetadata.Timestamp.IsZero() {
-		peer.BeaconMetadata.Metadata.SeqNumber = seqNumber
-		err = peer.BeaconMetadata.Metadata.Attnets.UnmarshalText(utils.BytesFromString(attnet))
+	if !beaconmetadata.Timestamp.IsZero() {
+		beaconmetadata.Metadata.SeqNumber = seqNumber
+		err = beaconmetadata.Metadata.Attnets.UnmarshalText(utils.BytesFromString(attnet))
 		if err != nil {
-			log.Debugf("error loading info from peer %s. %s", peerID, err.Error())
+			log.Debugf("unable to compose Metadata from given parameters. %s", err.Error())
 			return peer, false
 		}
 	}
+	peer.SetAtt("beaconmetadata", beaconmetadata)
+
 	// Compose Beacon Status
-	if peer.BeaconStatus.Timestamp.IsZero() {
+	if !beaconstatus.Timestamp.IsZero() {
 		bStatus, err := models.ParseBeaconStatusFromBasicTypes(
-			bStatusTS,
+			beaconstatus.Timestamp,
 			forkDigest,
 			finalizedRoot,
 			finalizedEpoch,
@@ -361,8 +443,9 @@ func (p *PostgresDBService) LoadPeer(peerID string) (models.Peer, bool) {
 			log.Debugf("unable to compose BeaconStatus from given parameters. %s", err.Error())
 			return peer, false
 		}
-		peer.BeaconStatus = bStatus
+		beaconstatus = bStatus
 	}
+	peer.SetAtt("beaconstatus", beaconstatus)
 
 	// recompose the multiaddresses from []string
 	for _, ma := range multiAddrs {
@@ -375,8 +458,8 @@ func (p *PostgresDBService) LoadPeer(peerID string) (models.Peer, bool) {
 	}
 
 	// Compose MessageMetrics from different table
-	rows, err := p.psqlPool.Query(
-		p.ctx,
+	rows, err := pool.Query(
+		ctx,
 		"SELECT *FROM t_peers_msg_metrics WHERE f_peer_id=$1",
 		peerID,
 	)
@@ -405,25 +488,25 @@ func (p *PostgresDBService) LoadPeer(peerID string) (models.Peer, bool) {
 	return peer, true
 }
 
-func (p *PostgresDBService) DeletePeer(peerID string) {
+func (p *Eth2Model) DeletePeer(ctx context.Context, pool *pgxpool.Pool, peerID string) {
 	log.Debugf("deleting item")
 	// Delete peer item from the table
-	_, _ = p.psqlPool.Exec(
-		p.ctx,
-		"DELETE FROM t_peers_summary WHERE f_peer_id=$1",
+	_, _ = pool.Exec(
+		ctx,
+		"DELETE FROM t_eth2_summary WHERE f_peer_id=$1",
 		peerID,
 	)
 	// Delete any related msg-metrics
-	_, _ = p.psqlPool.Exec(
-		p.ctx,
-		"DELETE FROM t_peers_msg_metrics WEHRE f_peer_id=$1",
+	_, _ = pool.Exec(
+		ctx,
+		"DELETE FROM t_eth2_msg_metrics WEHRE f_peer_id=$1",
 		peerID,
 	)
 }
 
-func (p *PostgresDBService) GetPeers() []peer.ID {
-	rows, err := p.psqlPool.Query(p.ctx,
-		"SELECT f_peer_id FROM t_peers_summary")
+func (p *Eth2Model) GetPeers(ctx context.Context, pool *pgxpool.Pool) []peer.ID {
+	rows, err := pool.Query(ctx,
+		"SELECT f_peer_id FROM t_eth2_summary")
 	var peerList []peer.ID
 	if err != nil {
 		return peerList
@@ -444,22 +527,15 @@ func (p *PostgresDBService) GetPeers() []peer.ID {
 	return peerList
 }
 
-func (p *PostgresDBService) GetPeerENR(peerID string) (enr *enode.Node, err error) {
-	err = p.psqlPool.QueryRow(p.ctx,
-		"SELECT f_enr FROM t_peers_summary WHERE f_peer_id=$1",
-		peerID).Scan(&enr)
-	return enr, err
-}
-
-func (p *PostgresDBService) CheckPeersSummaryTableStatus() bool {
+func (p *Eth2Model) CheckPeersSummaryTableStatus(ctx context.Context, pool *pgxpool.Pool) bool {
 	// check the last activity of the tool
-	lastActivity, err := p.GetLastActivityTime()
+	lastActivity, err := p.GetLastActivityTime(ctx, pool)
 	if err != nil {
 		log.Error(err, "unable to get last activity of the tool")
 		return false
 	}
 	log.Info("Last Activity of the tool has been recorded to be", lastActivity)
-	connectedPeers, err := p.GetConnectedPeers()
+	connectedPeers, err := p.GetConnectedPeers(ctx, pool)
 	if err != nil {
 		log.Errorf("unable to get connected peers. %s", err.Error())
 		return false
@@ -467,20 +543,20 @@ func (p *PostgresDBService) CheckPeersSummaryTableStatus() bool {
 
 	var cnt int = 0
 	for _, peerID := range connectedPeers {
-		peer, ok := p.LoadPeer(peerID)
+		peer, ok := p.LoadPeer(ctx, pool, peerID)
 		if !ok {
 			log.Errorf("unable to load info from peer %s", peerID)
 			return false
 		}
 		peer.DisconnectionEvent(lastActivity)
-		p.StorePeer(peerID, peer)
+		p.StorePeer(ctx, pool, peerID, peer)
 		if !ok {
 			log.Errorf("unable to store info from peer %s", peerID)
 			return false
 		}
 		cnt++
 	}
-	nPeers, err := p.GetNumberOfPeers()
+	nPeers, err := p.GetNumberOfPeers(ctx, pool)
 	if err != nil {
 		log.Errorf("unable to get number of peers in db. %s", err.Error())
 		return false
@@ -489,10 +565,10 @@ func (p *PostgresDBService) CheckPeersSummaryTableStatus() bool {
 	return true
 }
 
-func (p *PostgresDBService) GetConnectedPeers() ([]string, error) {
+func (p *Eth2Model) GetConnectedPeers(ctx context.Context, pool *pgxpool.Pool) ([]string, error) {
 	var connPeers []string
-	rows, err := p.psqlPool.Query(p.ctx,
-		"SELECT f_peer_id FROM t_peers_summary WHERE f_is_connected='true'",
+	rows, err := pool.Query(ctx,
+		"SELECT f_peer_id FROM t_eth2_summary WHERE f_is_connected='true'",
 	)
 	if err != nil {
 		return connPeers, errors.Wrap(err, "unable to query peers with IsConnected flag = true")
@@ -512,9 +588,9 @@ func (p *PostgresDBService) GetConnectedPeers() ([]string, error) {
 	return connPeers, nil
 }
 
-func (p *PostgresDBService) GetNumberOfPeers() (int, error) {
-	rows, err := p.psqlPool.Query(p.ctx,
-		"SELECT f_peer_id FROM t_peers_summary")
+func (p *Eth2Model) GetNumberOfPeers(ctx context.Context, pool *pgxpool.Pool) (int, error) {
+	rows, err := pool.Query(ctx,
+		"SELECT f_peer_id FROM t_eth2_summary")
 	if err != nil {
 		return -1, errors.Wrap(err, "unable to query the total amount of peers in the table")
 	}
@@ -525,18 +601,18 @@ func (p *PostgresDBService) GetNumberOfPeers() (int, error) {
 	return peerCounter, nil
 }
 
-func (p *PostgresDBService) GetLastActivityTime() (time.Time, error) {
+func (p *Eth2Model) GetLastActivityTime(ctx context.Context, pool *pgxpool.Pool) (time.Time, error) {
 	var lastActivity time.Time
 	query := `
 		WITH foo as (
 			SELECT UNNEST(f_negative_conn_attempts) AS a_last_activity
-			FROM t_peers_summary
+			FROM t_eth2_summary
 		)
 		SELECT MAX(a_last_activity) as a_last_activity
 		FROM foo;
 	`
 
-	rows, err := p.psqlPool.Query(p.ctx, query)
+	rows, err := pool.Query(ctx, query)
 	if err != nil {
 		return lastActivity, errors.Wrap(err, "unable to get Last Activity of the tool from postgresql db")
 	}
@@ -545,7 +621,7 @@ func (p *PostgresDBService) GetLastActivityTime() (time.Time, error) {
 		err := rows.Scan(&t)
 		if err != nil {
 			// check if DB is empty or if there are actual values
-			peers := p.GetPeers()
+			peers := p.GetPeers(ctx, pool)
 			if len(peers) == 0 {
 				log.Info("Empty loaded DB")
 				return time.Time{}, nil
@@ -558,36 +634,4 @@ func (p *PostgresDBService) GetLastActivityTime() (time.Time, error) {
 		}
 	}
 	return lastActivity, nil
-}
-
-func (p *PostgresDBService) ExportToCSV(filePath string) error {
-	log.Info("Exporting metrics to csv: ", filePath)
-	csvFile, err := os.Create(filePath)
-	if err != nil {
-		return errors.Wrap(err, "error opening the file "+filePath)
-	}
-	defer csvFile.Close()
-
-	// First raw of the file will be the Titles of the columns
-	_, err = csvFile.WriteString("Peer Id,Node Id,Fork Digest,User Agent,Client,Version,Pubkey,Address,Ip,Country,City,ENR,Request Metadata,Success Metadata,Attempted,Succeed,Deprecated,ConnStablished,IsConnected,Attempts,Error,Last Error Timestamp,Last Identify Timestamp,Latency,Connections,Disconnections,Last Connection,Conn Direction,Connected Time,Beacon Blocks,Beacon Aggregations,Voluntary Exits,Proposer Slashings,Attester Slashings,Total Messages\n")
-	if err != nil {
-		errors.Wrap(err, "error while writing the titles on the csv "+filePath)
-	}
-
-	// get the list of all the peers
-	peers := p.GetPeers()
-
-	for _, nextPeer := range peers {
-		nPeer, ok := p.LoadPeer(nextPeer.String())
-		if !ok {
-			log.Errorf("error reading peer %s for metrics export. %s", nextPeer.String(), err.Error())
-			continue
-		}
-		_, err := csvFile.WriteString(nPeer.ToCsvLine())
-		if err != nil {
-			log.Errorf("error reading peer %s for metrics export. %s", nextPeer.String(), err.Error())
-			continue
-		}
-	}
-	return nil
 }

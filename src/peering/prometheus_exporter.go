@@ -1,7 +1,6 @@
 package peering
 
 import (
-	"sync/atomic"
 	"time"
 
 	promth "github.com/migalabs/armiarma/src/exporters"
@@ -31,30 +30,38 @@ func (c *PeeringService) ServeMetrics() {
 				peersPeriter := c.strategy.AttemptedPeersSinceLastIter()
 
 				controlDist := c.strategy.ControlDistribution()
+				cntDist := make(map[string]int)
 				errorAttemptDist := c.strategy.GetErrorAttemptDistribution()
+				errAttdist := make(map[string]int)
+
 				// get new values
 				PeerstoreIterTime.Set(iterTime) // Float in seconds
 				PeersAttemptedInLastIteration.Set(float64(peersPeriter))
 
 				// generate the distribution
-				for key, value := range controlDist {
-					PrunedErrorDistribution.WithLabelValues(key).Set(float64(atomic.LoadInt64(value)))
-				}
-				// generate the distribution
-				for key, value := range errorAttemptDist {
-					ErrorAttemptDistribution.WithLabelValues(key).Set(float64(atomic.LoadInt64(value)))
-				}
+				controlDist.Range(func(key, value interface{}) bool {
+					cntDist[key.(string)] = value.(int)
+					PrunedErrorDistribution.WithLabelValues(key.(string)).Set(float64(value.(int)))
+					return true
+				})
 
-				Log.WithFields(logrus.Fields{
+				// generate the distribution
+				errorAttemptDist.Range(func(key, value interface{}) bool {
+					errAttdist[key.(string)] = value.(int)
+					ErrorAttemptDistribution.WithLabelValues(key.(string)).Set(float64(value.(int)))
+					return true
+				})
+
+				log.WithFields(logrus.Fields{
 					"LastIterTime(secs)":          iterTime,
 					"AttemptedPeersSinceLastIter": peersPeriter,
 					//"IterForcingNextConnTime":         peerIterForcingTime,
-					"ControlDistribution":        controlDist,
-					"ControlAttemptDistribution": errorAttemptDist,
+					"ControlDistribution":        cntDist,
+					"ControlAttemptDistribution": errAttdist,
 				}).Info("peering metrics summary")
 
 			case <-c.ctx.Done():
-				Log.Info("Closing the prometheus metrics export service")
+				log.Info("Closing the prometheus metrics export service")
 				// closing the routine in a ordened way
 				ticker.Stop()
 				return
