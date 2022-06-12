@@ -460,7 +460,7 @@ func (p *Eth2Model) LoadPeer(ctx context.Context, pool *pgxpool.Pool, peerID str
 	// Compose MessageMetrics from different table
 	rows, err := pool.Query(
 		ctx,
-		"SELECT *FROM t_peers_msg_metrics WHERE f_peer_id=$1",
+		"SELECT *FROM t_eth2_msg_metrics WHERE f_peer_id=$1",
 		peerID,
 	)
 	if err != nil {
