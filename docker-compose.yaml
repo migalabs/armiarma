@@ -24,7 +24,7 @@ services:
                         dockerfile: Dockerfile
                 network_mode: 'host'
                 ports: ["9020:9020/tcp", "9080:9080"]
-                volumes: ["./config-files:/armiarma/config-files", "./bootstrap_nodes/official-eth2-bootnodes.json:/armiarma/bootstrap_nodes/official-eth2-bootnodes.json"]
+                volumes: ["./peerstore:/armiarma/peerstore", "./config-files:/armiarma/config-files", "./bootstrap_nodes/official-eth2-bootnodes.json:/armiarma/bootstrap_nodes/official-eth2-bootnodes.json"]
                 environment:
                         - DB_URL=Api:5000
                 #restart: on-failure
@@ -38,14 +38,34 @@ services:
                                 # max_attempts: 5
                                 # window: 60s
         
-        
-        # metabase:
-        #         volumes:
-        #                 - ./metabase-data/metabase:/metabase.db
+        prometheus:
+                image: prom/prometheus:v2.36.2
+                volumes:
+                - ./prometheus/:/etc/prometheus/
+                # - prometheus_data:/prometheus
+                command:
+                - '--config.file=/etc/prometheus/prometheus.yml'
+                - '--storage.tsdb.path=/prometheus'
+                - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+                - '--web.console.templates=/usr/share/prometheus/consoles'
+                ports:
+                - 9090:9090
+                network_mode: 'host'
+                restart: always
+
+        # grafana:
+        #         image: grafana/grafana
+        #         user: "472"
+        #         depends_on:
+        #         - prometheus
         #         ports:
-        #                 - 3030:3030
-        #         # original docker image
-        #         image: metabase/metabase
-        #         # my docker image with the default users
-        #         # image: gregory/metabase
+        #         - 3000:3000
+        #         volumes:
+        #         - grafana_data:/var/lib/grafana
+        #         - ./grafana/provisioning/:/etc/grafana/provisioning/
+        #         env_file:
+        #         - ./grafana/config.monitoring
+        #         networks:
+        #         - back-tier
+        #         - front-tier
         #         restart: always
