@@ -9,7 +9,7 @@
     "OutputPath": "./peerstore",
     "ForkDigest": "afcaaba0",
     "UserAgent": "BSC-Eth2-Crawler",
-    "LogLevel": "debug",
+    "LogLevel": "info",
     "PrivateKey": "",
     "BootNodesFile": "./bootstrap_nodes/official-eth2-bootnodes.json"
 }
