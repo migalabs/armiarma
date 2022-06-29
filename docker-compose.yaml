@@ -1,18 +1,51 @@
 version: "3.7" 
 
-networks:
-        crawlernet:
-                driver: bridge
+# networks:
+#         crawlernet:
+#                 driver: bridge
 
 services:
+        db:
+                image: postgres:14.1-alpine
+                restart: always
+                environment:
+                        - POSTGRES_USER=user
+                        - POSTGRES_PASSWORD=password
+                ports:
+                        - '5432:5432'
+                volumes: 
+                        - ./1-init.sql:/docker-entrypoint-initdb.d/docker_postgres_init.sql
+                network_mode: 'host'
+
         eth2-crawler:
                 image: "armiarma-eth2-crawler:latest"
                 build:
                         context: .
                         dockerfile: Dockerfile
-                networks:
-                        crawlernet:
+                network_mode: 'host'
                 ports: ["9020:9020/tcp", "9080:9080"]
-                volumes: ["./peerstore:/armiarma/peerstore", "./config-files:/armiarma/config-files"]
+                volumes: ["./config-files:/armiarma/config-files", "./bootstrap_nodes/official-eth2-bootnodes.json:/armiarma/bootstrap_nodes/official-eth2-bootnodes.json"]
+                environment:
+                        - DB_URL=Api:5000
                 #restart: on-failure
-                entrypoint: "/armiarma/armiarma-client --config-file=./config-files/config.json"
+                entrypoint: "/armiarma/armiarma-client eth2 --config-file=./config-files/eth2-config.json"
+                depends_on:
+                        - "db"
+                deploy:
+                        restart_policy:
+                                condition: on-failure
+                                delay: 3s
+                                # max_attempts: 5
+                                # window: 60s
+        
+        
+        # metabase:
+        #         volumes:
+        #                 - ./metabase-data/metabase:/metabase.db
+        #         ports:
+        #                 - 3030:3030
+        #         # original docker image
+        #         image: metabase/metabase
+        #         # my docker image with the default users
+        #         # image: gregory/metabase
+        #         restart: always
