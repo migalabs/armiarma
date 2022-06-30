@@ -54,16 +54,6 @@ services:
                 restart: always
 
         grafana:
-                image: grafana/grafana
-                user: "472"
-                depends_on:
-                - prometheus
-                ports:
-                - 3000:3000
-                volumes:
-                - grafana_data:/var/lib/grafana
-                - ./grafana/provisioning/:/etc/grafana/provisioning/
-                env_file:
-                - ./grafana/config.monitoring
+                build: './grafana'
+                container_name: 'grafana'
                 network_mode: 'host'
-                restart: always
