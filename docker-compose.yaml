@@ -8,9 +8,9 @@ services:
                         - POSTGRES_USER=user
                         - POSTGRES_PASSWORD=password
                 volumes: 
-                        - ./1-init.sql:/docker-entrypoint-initdb.d/docker_postgres_init.sql
+                        - ./data/init-armiarma.sql:/docker-entrypoint-initdb.d/docker_postgres_init.sql
+                        - ./data:/var/lib/postgresql
                 network_mode: 'host'
-
         eth2-crawler:
                 image: "armiarma-eth2-crawler:latest"
                 build:
@@ -45,4 +45,5 @@ services:
                 container_name: 'grafana'
                 network_mode: 'host'
                 environment:
-                        - GF_INSTALL_PLUGINS=grafana-clock-panel
+                        - GF_INSTALL_PLUGINS=grafana-worldmap-panel
+                        - Datasource=Armiarma

@@ -16,7 +16,8 @@
   "editable": true,
   "gnetId": null,
   "graphTooltip": 0,
-  "iteration": 1657286698969,
+  "id": 1,
+  "iteration": 1657319535542,
   "links": [],
   "panels": [
     {
@@ -42,7 +43,7 @@
         "#3274D9",
         "#1F60C4"
       ],
-      "datasource": "${Datasource}",
+      "datasource": "Armiarma",
       "decimals": 0,
       "esMetric": "Count",
       "gridPos": {
@@ -86,7 +87,7 @@
       "valueName": "total"
     },
     {
-      "datasource": "${Datasource}",
+      "datasource": "Armiarma",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -163,7 +164,7 @@
       "type": "table"
     },
     {
-      "datasource": "${Datasource}",
+      "datasource": "Armiarma",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -238,7 +239,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${Datasource}",
+      "datasource": "Armiarma",
       "description": "Client distribution observed by the tool crawling the Eth2 Beaconchain network",
       "fieldConfig": {
         "defaults": {
@@ -455,7 +456,7 @@
       }
     },
     {
-      "datasource": "${Datasource}",
+      "datasource": "Armiarma",
       "description": "Client distribution observed by the tool crawling the Eth2 Beaconchain network",
       "fieldConfig": {
         "defaults": {
@@ -677,7 +678,7 @@
       "type": "row"
     },
     {
-      "datasource": "${Datasource}",
+      "datasource": "Armiarma",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -746,7 +747,7 @@
       "type": "stat"
     },
     {
-      "datasource": "${Datasource}",
+      "datasource": "Armiarma",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -821,7 +822,7 @@
       "type": "stat"
     },
     {
-      "datasource": "${Datasource}",
+      "datasource": "Armiarma",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -879,7 +880,7 @@
       "type": "stat"
     },
     {
-      "datasource": "${Datasource}",
+      "datasource": "Armiarma",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -966,7 +967,7 @@
       "type": "row"
     },
     {
-      "datasource": "${Datasource}",
+      "datasource": "Armiarma",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1023,7 +1024,7 @@
       "type": "bargauge"
     },
     {
-      "datasource": "${Datasource}",
+      "datasource": "Armiarma",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1103,7 +1104,7 @@
       "type": "row"
     },
     {
-      "datasource": "${Datasource}",
+      "datasource": "Armiarma",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1195,11 +1196,11 @@
           "refId": "A"
         }
       ],
-      "title": "Message/Minute/Topic",
+      "title": "Message/Second/Topic",
       "type": "stat"
     },
     {
-      "datasource": "${Datasource}",
+      "datasource": "Armiarma",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1239,16 +1240,17 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "crawler_received_messages_psec{instance=\"localhost:9080\", job=\"crawler\", topic=\"beacon_aggregate_and_proof\"}"
+              "options": "crawler_received_messages_psec{instance=\"localhost:9080\", job=\"crawler\", topic=\"beacon_block\"}"
             },
             "properties": [
               {
                 "id": "displayName",
-                "value": "Beacon Aggregations"
+                "value": "Beacon Block"
               },
               {
                 "id": "color",
                 "value": {
+                  "fixedColor": "semi-dark-purple",
                   "mode": "fixed"
                 }
               }
@@ -1285,17 +1287,18 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "{topic=\"beacon_blocks\"}",
+          "expr": "{topic=\"beacon_block\"}",
           "interval": "",
           "legendFormat": "",
           "refId": "A"
         }
       ],
-      "title": "Message/Minute/Topic",
+      "title": "Message/Second/Topic",
+      "transformations": [],
       "type": "stat"
     },
     {
-      "datasource": "${Datasource}",
+      "datasource": "Armiarma",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1402,7 +1405,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${Datasource}",
+      "datasource": "Armiarma",
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -1460,7 +1463,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Received Messages Per Minute",
+      "title": "Received Messages Per Second",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -1501,7 +1504,7 @@
       }
     }
   ],
-  "refresh": false,
+  "refresh": "10s",
   "schemaVersion": 30,
   "style": "dark",
   "tags": [],
@@ -1509,9 +1512,9 @@
     "list": [
       {
         "current": {
-          "selected": true,
-          "text": "(Mainnet) Frankfurt, Germany",
-          "value": "(Mainnet) Frankfurt, Germany"
+          "selected": false,
+          "text": "Armiarma",
+          "value": "Armiarma"
         },
         "description": null,
         "error": null,
@@ -1531,8 +1534,8 @@
     ]
   },
   "time": {
-    "from": "2022-07-08T11:12:05.885Z",
-    "to": "2022-07-08T11:15:11.407Z"
+    "from": "now/d",
+    "to": "now"
   },
   "timepicker": {
     "hidden": false,
@@ -1552,5 +1555,5 @@
   "timezone": "browser",
   "title": "Armiarma",
   "uid": "ml56R2Gnz",
-  "version": 10
+  "version": 1
 }
