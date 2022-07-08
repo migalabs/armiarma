@@ -1,9 +1,5 @@
 version: "3.7" 
 
-# networks:
-#         crawlernet:
-#                 driver: bridge
-
 services:
         db:
                 image: postgres:14.1-alpine
@@ -11,8 +7,6 @@ services:
                 environment:
                         - POSTGRES_USER=user
                         - POSTGRES_PASSWORD=password
-                ports:
-                        - '5432:5432'
                 volumes: 
                         - ./1-init.sql:/docker-entrypoint-initdb.d/docker_postgres_init.sql
                 network_mode: 'host'
@@ -23,11 +17,9 @@ services:
                         context: .
                         dockerfile: Dockerfile
                 network_mode: 'host'
-                ports: ["9020:9020/tcp", "9080:9080"]
                 volumes: ["./peerstore:/armiarma/peerstore", "./config-files:/armiarma/config-files", "./bootstrap_nodes/official-eth2-bootnodes.json:/armiarma/bootstrap_nodes/official-eth2-bootnodes.json"]
                 environment:
                         - DB_URL=Api:5000
-                #restart: on-failure
                 entrypoint: "/armiarma/armiarma-client eth2 --config-file=./config-files/eth2-config.json"
                 depends_on:
                         - "db"
@@ -35,21 +27,16 @@ services:
                         restart_policy:
                                 condition: on-failure
                                 delay: 3s
-                                # max_attempts: 5
-                                # window: 60s
         
         prometheus:
                 image: prom/prometheus:v2.36.2
                 volumes:
                 - ./prometheus/:/etc/prometheus/
-                # - prometheus_data:/prometheus
                 command:
                 - '--config.file=/etc/prometheus/prometheus.yml'
                 - '--storage.tsdb.path=/prometheus'
                 - '--web.console.libraries=/usr/share/prometheus/console_libraries'
                 - '--web.console.templates=/usr/share/prometheus/consoles'
-                ports:
-                - 9090:9090
                 network_mode: 'host'
                 restart: always
 
@@ -57,3 +44,5 @@ services:
                 build: './grafana'
                 container_name: 'grafana'
                 network_mode: 'host'
+                environment:
+                        - GF_INSTALL_PLUGINS=grafana-clock-panel

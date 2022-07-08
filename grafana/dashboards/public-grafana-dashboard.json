@@ -16,8 +16,7 @@
   "editable": true,
   "gnetId": null,
   "graphTooltip": 0,
-  "id": 5,
-  "iteration": 1643270016976,
+  "iteration": 1657286698969,
   "links": [],
   "panels": [
     {
@@ -249,7 +248,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "crawler_observed_client_distribution{client=\"lighthouse\", instance=\"localhost:9080\", job=\"crawler\"}"
+              "options": "crawler_observed_client_distribution{client=\"Lighthouse\", instance=\"localhost:9080\", job=\"crawler\"}"
             },
             "properties": [
               {
@@ -261,7 +260,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "crawler_observed_client_distribution{client=\"lodestar\", instance=\"localhost:9080\", job=\"crawler\"}"
+              "options": "crawler_observed_client_distribution{client=\"Lodestar\", instance=\"localhost:9080\", job=\"crawler\"}"
             },
             "properties": [
               {
@@ -273,7 +272,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "crawler_observed_client_distribution{client=\"nimbus\", instance=\"localhost:9080\", job=\"crawler\"}"
+              "options": "crawler_observed_client_distribution{client=\"Nimbus\", instance=\"localhost:9080\", job=\"crawler\"}"
             },
             "properties": [
               {
@@ -285,7 +284,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "crawler_observed_client_distribution{client=\"prysm\", instance=\"localhost:9080\", job=\"crawler\"}"
+              "options": "crawler_observed_client_distribution{client=\"Prysm\", instance=\"localhost:9080\", job=\"crawler\"}"
             },
             "properties": [
               {
@@ -297,7 +296,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "crawler_observed_client_distribution{client=\"teku\", instance=\"localhost:9080\", job=\"crawler\"}"
+              "options": "crawler_observed_client_distribution{client=\"Teku\", instance=\"localhost:9080\", job=\"crawler\"}"
             },
             "properties": [
               {
@@ -309,12 +308,24 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "crawler_observed_client_distribution{client=\"unknown\", instance=\"localhost:9080\", job=\"crawler\"}"
+              "options": "crawler_observed_client_distribution{client=\"Others\", instance=\"localhost:9080\", job=\"crawler\"}"
             },
             "properties": [
               {
                 "id": "displayName",
                 "value": "Unknown"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "crawler_observed_client_distribution{client=\"Grandine\", instance=\"localhost:9080\", job=\"crawler\"}"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Grandine"
               }
             ]
           }
@@ -465,26 +476,26 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "crawler_observed_client_distribution{client=\"lighthouse\", instance=\"localhost:9080\", job=\"crawler\"}"
+              "options": "crawler_observed_client_distribution{\"Lighthouse\", instance=\"localhost:9080\", job=\"crawler\"}"
             },
             "properties": [
-              {
-                "id": "displayName",
-                "value": "Lighthouse"
-              },
               {
                 "id": "color",
                 "value": {
                   "fixedColor": "dark-blue",
                   "mode": "fixed"
                 }
+              },
+              {
+                "id": "displayName",
+                "value": "Lighthouse"
               }
             ]
           },
           {
             "matcher": {
               "id": "byName",
-              "options": "crawler_observed_client_distribution{client=\"lodestar\", instance=\"localhost:9080\", job=\"crawler\"}"
+              "options": "crawler_observed_client_distribution{\"Lodestar\", instance=\"localhost:9080\", job=\"crawler\"}"
             },
             "properties": [
               {
@@ -503,7 +514,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "crawler_observed_client_distribution{client=\"nimbus\", instance=\"localhost:9080\", job=\"crawler\"}"
+              "options": "crawler_observed_client_distribution{\"Nimbus\", instance=\"localhost:9080\", job=\"crawler\"}"
             },
             "properties": [
               {
@@ -522,7 +533,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "crawler_observed_client_distribution{client=\"prysm\", instance=\"localhost:9080\", job=\"crawler\"}"
+              "options": "crawler_observed_client_distribution{\"Prysm\", instance=\"localhost:9080\", job=\"crawler\"}"
             },
             "properties": [
               {
@@ -541,7 +552,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "crawler_observed_client_distribution{client=\"teku\", instance=\"localhost:9080\", job=\"crawler\"}"
+              "options": "crawler_observed_client_distribution{\"Teku\", instance=\"localhost:9080\", job=\"crawler\"}"
             },
             "properties": [
               {
@@ -560,7 +571,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "crawler_observed_client_distribution{client=\"unknown\", instance=\"localhost:9080\", job=\"crawler\"}"
+              "options": "crawler_observed_client_distribution{\"Others\", instance=\"localhost:9080\", job=\"crawler\"}"
             },
             "properties": [
               {
@@ -571,6 +582,25 @@
                 "id": "color",
                 "value": {
                   "fixedColor": "rgba(95, 69, 69, 1)",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "crawler_observed_client_distribution{\"Grandine\", instance=\"localhost:9080\", job=\"crawler\"}"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Grandine"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "semi-dark-yellow",
                   "mode": "fixed"
                 }
               }
@@ -620,6 +650,15 @@
         }
       ],
       "title": "Current Observed Client Distribution (%)",
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "client=(.*)",
+            "renamePattern": "$1"
+          }
+        }
+      ],
       "transparent": true,
       "type": "piechart"
     },
@@ -636,6 +675,75 @@
       "panels": [],
       "title": "Peers Interaction",
       "type": "row"
+    },
+    {
+      "datasource": "${Datasource}",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 0,
+        "y": 27
+      },
+      "id": 45,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {},
+        "textMode": "auto"
+      },
+      "pluginVersion": "8.0.0",
+      "targets": [
+        {
+          "exemplar": true,
+          "expr": "crawler_observed_client_distribution",
+          "interval": "",
+          "legendFormat": "",
+          "queryType": "randomWalk",
+          "refId": "A"
+        }
+      ],
+      "title": "Total Active Peers",
+      "transformations": [
+        {
+          "id": "calculateField",
+          "options": {
+            "mode": "reduceRow",
+            "reduce": {
+              "reducer": "sum"
+            },
+            "replaceFields": true
+          }
+        }
+      ],
+      "transparent": true,
+      "type": "stat"
     },
     {
       "datasource": "${Datasource}",
@@ -680,7 +788,7 @@
       "gridPos": {
         "h": 5,
         "w": 6,
-        "x": 0,
+        "x": 6,
         "y": 27
       },
       "id": 14,
@@ -736,7 +844,7 @@
       "gridPos": {
         "h": 5,
         "w": 6,
-        "x": 6,
+        "x": 12,
         "y": 27
       },
       "id": 26,
@@ -769,6 +877,230 @@
       "timeShift": null,
       "title": "Total Discovered Peers",
       "type": "stat"
+    },
+    {
+      "datasource": "${Datasource}",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "crawler_deprecated_peers{instance=\"localhost:9080\", job=\"crawler\"}"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 18,
+        "y": 27
+      },
+      "id": 43,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^crawler_deprecated_peers\\{instance=\"localhost:9080\", job=\"crawler\"\\}$/",
+          "values": false
+        },
+        "text": {},
+        "textMode": "auto"
+      },
+      "pluginVersion": "8.0.0",
+      "targets": [
+        {
+          "exemplar": true,
+          "expr": "crawler_deprecated_peers",
+          "interval": "",
+          "legendFormat": "",
+          "queryType": "randomWalk",
+          "refId": "A"
+        }
+      ],
+      "title": "Total Deprecated Peers",
+      "transparent": true,
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "datasource": null,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 32
+      },
+      "id": 49,
+      "panels": [],
+      "title": "Network Measurements",
+      "type": "row"
+    },
+    {
+      "datasource": "${Datasource}",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 33
+      },
+      "id": 50,
+      "options": {
+        "displayMode": "basic",
+        "orientation": "vertical",
+        "reduceOptions": {
+          "calcs": [
+            "last"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "text": {}
+      },
+      "pluginVersion": "8.0.0",
+      "targets": [
+        {
+          "exemplar": true,
+          "expr": "crawler_observed_rtt_distribution{}",
+          "instant": false,
+          "interval": "",
+          "intervalFactor": 1,
+          "legendFormat": "{{secs}}",
+          "refId": "A"
+        }
+      ],
+      "timeFrom": null,
+      "timeShift": null,
+      "title": "RTT Distribution",
+      "type": "bargauge"
+    },
+    {
+      "datasource": "${Datasource}",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 42
+      },
+      "id": 34,
+      "options": {
+        "displayMode": "basic",
+        "orientation": "vertical",
+        "reduceOptions": {
+          "calcs": [
+            "last"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "text": {}
+      },
+      "pluginVersion": "8.0.0",
+      "targets": [
+        {
+          "exemplar": true,
+          "expr": "crawler_observed_ip_distribution{}",
+          "instant": false,
+          "interval": "",
+          "intervalFactor": 1,
+          "legendFormat": "{{secs}}",
+          "refId": "A"
+        }
+      ],
+      "timeFrom": null,
+      "timeShift": null,
+      "title": "IP Distribution",
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": ".*([0-9])\"}",
+            "renamePattern": "$1"
+          }
+        }
+      ],
+      "type": "bargauge"
+    },
+    {
+      "collapsed": false,
+      "datasource": null,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 51
+      },
+      "id": 47,
+      "panels": [],
+      "title": "GossipSub Messages",
+      "type": "row"
     },
     {
       "datasource": "${Datasource}",
@@ -829,10 +1161,10 @@
         ]
       },
       "gridPos": {
-        "h": 5,
-        "w": 6,
-        "x": 12,
-        "y": 27
+        "h": 6,
+        "w": 12,
+        "x": 0,
+        "y": 52
       },
       "id": 17,
       "options": {
@@ -925,10 +1257,10 @@
         ]
       },
       "gridPos": {
-        "h": 5,
-        "w": 6,
-        "x": 18,
-        "y": 27
+        "h": 6,
+        "w": 12,
+        "x": 12,
+        "y": 52
       },
       "id": 24,
       "options": {
@@ -1038,7 +1370,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 32
+        "y": 58
       },
       "id": 16,
       "options": {
@@ -1077,7 +1409,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 32
+        "y": 58
       },
       "hiddenSeries": false,
       "id": 32,
@@ -1167,63 +1499,6 @@
         "align": false,
         "alignLevel": null
       }
-    },
-    {
-      "datasource": "${Datasource}",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "blue",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 9,
-        "w": 24,
-        "x": 0,
-        "y": 40
-      },
-      "id": 34,
-      "options": {
-        "displayMode": "basic",
-        "orientation": "vertical",
-        "reduceOptions": {
-          "calcs": [
-            "last"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showUnfilled": true,
-        "text": {}
-      },
-      "pluginVersion": "8.0.0",
-      "targets": [
-        {
-          "exemplar": true,
-          "expr": "{secs=~\"0.1|0.2|0.3|0.4|0.5|0.6|0.7|0.8|0.9|1.0|1.1|1.3|1.5|1.7|1.9|2.1|2.5|2.9|3.3|3.7|4.1|4.5|4.9|5.3|5.9|6.3|6.7|7.3|8.1\"}",
-          "instant": false,
-          "interval": "",
-          "intervalFactor": 1,
-          "legendFormat": "{{secs}}",
-          "refId": "A"
-        }
-      ],
-      "timeFrom": null,
-      "timeShift": null,
-      "title": "RTT Distribution",
-      "type": "bargauge"
     }
   ],
   "refresh": false,
@@ -1234,9 +1509,9 @@
     "list": [
       {
         "current": {
-          "selected": false,
-          "text": " (Gnosis) Frankfurt1, Germany",
-          "value": " (Gnosis) Frankfurt1, Germany"
+          "selected": true,
+          "text": "(Mainnet) Frankfurt, Germany",
+          "value": "(Mainnet) Frankfurt, Germany"
         },
         "description": null,
         "error": null,
@@ -1256,8 +1531,8 @@
     ]
   },
   "time": {
-    "from": "now-3h",
-    "to": "now"
+    "from": "2022-07-08T11:12:05.885Z",
+    "to": "2022-07-08T11:15:11.407Z"
   },
   "timepicker": {
     "hidden": false,
@@ -1277,5 +1552,5 @@
   "timezone": "browser",
   "title": "Armiarma",
   "uid": "ml56R2Gnz",
-  "version": 7
+  "version": 10
 }
