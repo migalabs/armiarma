@@ -1,18 +1,49 @@
 version: "3.7" 
 
-networks:
-        crawlernet:
-                driver: bridge
-
 services:
+        db:
+                image: postgres:14.1-alpine
+                restart: always
+                environment:
+                        - POSTGRES_USER=user
+                        - POSTGRES_PASSWORD=password
+                volumes: 
+                        - ./data/init-armiarma.sql:/docker-entrypoint-initdb.d/docker_postgres_init.sql
+                        - ./data:/var/lib/postgresql
+                network_mode: 'host'
         eth2-crawler:
                 image: "armiarma-eth2-crawler:latest"
                 build:
                         context: .
                         dockerfile: Dockerfile
-                networks:
-                        crawlernet:
-                ports: ["9020:9020/tcp", "9080:9080"]
-                volumes: ["./peerstore:/armiarma/peerstore", "./config-files:/armiarma/config-files"]
-                #restart: on-failure
-                entrypoint: "/armiarma/armiarma-client --config-file=./config-files/config.json"
+                network_mode: 'host'
+                volumes: ["./peerstore:/armiarma/peerstore", "./config-files:/armiarma/config-files", "./bootstrap_nodes/official-eth2-bootnodes.json:/armiarma/bootstrap_nodes/official-eth2-bootnodes.json"]
+                environment:
+                        - DB_URL=Api:5000
+                entrypoint: "/armiarma/armiarma-client eth2 --config-file=./config-files/eth2-config.json"
+                depends_on:
+                        - "db"
+                deploy:
+                        restart_policy:
+                                condition: on-failure
+                                delay: 3s
+        
+        prometheus:
+                image: prom/prometheus:v2.36.2
+                volumes:
+                - ./prometheus/:/etc/prometheus/
+                command:
+                - '--config.file=/etc/prometheus/prometheus.yml'
+                - '--storage.tsdb.path=/prometheus'
+                - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+                - '--web.console.templates=/usr/share/prometheus/consoles'
+                network_mode: 'host'
+                restart: always
+
+        grafana:
+                build: './grafana'
+                container_name: 'grafana'
+                network_mode: 'host'
+                environment:
+                        - GF_INSTALL_PLUGINS=grafana-worldmap-panel
+                        - Datasource=Armiarma
