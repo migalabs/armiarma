@@ -61,7 +61,29 @@ FLAGS
 
 ```
 ## Docker installation
-We also provide a Dockerfile that can be used to run the crawler without having to compile it manually.
+We also provide a Dockerfile and Docker-Compose file that can be used to run the crawler without having to compile it manually. The docker-compose file spaws the following docker images:
+- `Armiarma` instance with the configuration file provided by arguments
+- `PostgreSQL` instance to store crawling data
+- `Prometheus` instance to read the metrics exported by `Armiarma`
+- `Grafana` instance as a dashboard to monitor the crawl
+
+List of ports that are going to be used:
+
+| Instance | Port | Passwords | 
+| -------- | ---- | --------- |
+| Armiarma | `9020` & `9080` | - |
+| PostgreSQL | `5432` | default=`password` | 
+| Prometheus | `9090` | - | 
+| Grafana | `3030` | default=`admin` | 
+
+Tested Versions:
+| Instance | Version | 
+| -------- | ---- |
+| Docker | `20.10.17` |
+| Docker-Compose | `1.29.2` |
+
+To spawn up the entire set-up, just run the following command in the root directory
+
 ```
 # Call docker-compose in the root of the repository, and that's all
 docker-compose up 

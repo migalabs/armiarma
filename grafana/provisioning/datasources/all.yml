@@ -1,0 +1,7 @@
+apiVersion: 1
+ 
+datasources:
+  - name: Armiarma
+    type: prometheus
+    access: direct
+    url: http://localhost:9090
