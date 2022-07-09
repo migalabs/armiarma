@@ -68,7 +68,7 @@ We also provide a Dockerfile and Docker-Compose file that can be used to run the
 - `Armiarma` instance with the configuration file provided by arguments
 - `PostgreSQL` instance to store crawling data
 - `Prometheus` instance to read the metrics exported by `Armiarma`
-- `Grafana` instance as a dashboard to monitor the crawl
+- `Grafana` instance as a dashboard to monitor the crawl (Eth2 dashboard)
 
 List of ports that are going to be used:
 
