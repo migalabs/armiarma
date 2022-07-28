@@ -10,10 +10,14 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/migalabs/armiarma/src/db/models"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 var (
 	MemoryType = "MemoryDB"
+	log        = logrus.WithField(
+		"module", MemoryType,
+	)
 )
 
 // PeerStoreMemory save the peer's data in RAM.
@@ -31,7 +35,7 @@ func NewMemoryDB() MemoryDB {
 		m:         &m,
 		startTime: time.Now(),
 	}
-	Log.Infof("generated new MemoryDB")
+	log.Infof("generated new MemoryDB")
 	return mdb
 }
 
@@ -109,7 +113,11 @@ func (m MemoryDB) GetPeerENR(peerID string) (*enode.Node, error) {
 	if !ok {
 		return nil, fmt.Errorf("No peer was found under ID %s", peerID)
 	}
-	return p.GetBlockchainNode()
+	enr, ok := p.GetAtt("enr")
+	if !ok {
+		return nil, fmt.Errorf("No ENR was found for peer %s", peerID)
+	}
+	return enode.MustParse(enr.(string)), nil
 }
 
 // ExportToCSV
@@ -117,7 +125,7 @@ func (m MemoryDB) GetPeerENR(peerID string) (*enode.Node, error) {
 // @param filePath file where to dump the CSV lines (create if it does not exist).
 // @return an error if there was.
 func (m MemoryDB) ExportToCSV(filePath string) error {
-	Log.Info("Exporting metrics to csv: ", filePath)
+	log.Info("Exporting metrics to csv: ", filePath)
 	csvFile, err := os.Create(filePath)
 	if err != nil {
 		return errors.Wrap(err, "error opening the file "+filePath)

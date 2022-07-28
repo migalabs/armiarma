@@ -7,6 +7,7 @@ import (
 
 	"github.com/migalabs/armiarma/src/db/models"
 	"github.com/migalabs/armiarma/src/utils"
+
 	//"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 )
@@ -14,7 +15,8 @@ import (
 func TestPeerLoadAndStore(t *testing.T) {
 	//logrus.SetLevel(logrus.DebugLevel)
 	url := "postgres://armiarmacrawler:ar_Mi_arm4@localhost:5432/armiarmadb"
-	psqlDB, err := ConnectToDB(context.Background(), url)
+	ethmodel := NewEth2Model("eth2")
+	psqlDB, err := ConnectToDB(context.Background(), url, &ethmodel)
 	require.Equal(t, nil, err)
 
 	msgMet := models.MessageMetric{
@@ -35,13 +37,10 @@ func TestPeerLoadAndStore(t *testing.T) {
 	// generate first peer
 	peer1 := models.Peer{
 		PeerId:                "Peer1",
-		Pubkey:                "ASWDSFAWSF",
-		NodeId:                "Node1",
 		UserAgent:             "TestPeer",
 		ClientName:            "TestClient",
 		ClientOS:              "linux",
 		ClientVersion:         "v1.0.0",
-		BlockchainNodeENR:     "AWAW123111231J231K23JH123K12",
 		Ip:                    "123.12.12.12",
 		Country:               "Spain",
 		CountryCode:           "ES",
@@ -65,8 +64,12 @@ func TestPeerLoadAndStore(t *testing.T) {
 		MetadataSucceed:       true,
 		LastExport:            123123123,
 		MessageMetrics:        make(map[string]models.MessageMetric),
-		BeaconStatus:          bStatus,
 	}
+	peer1.SetAtt("enr", "AWAW123111231J231K23JH123K12")
+	peer1.SetAtt("pubkey", "ASWDSFAWSF")
+	peer1.SetAtt("nodeid", "Node1")
+	peer1.SetAtt("beaconstatus", bStatus)
+
 	// generate multiaddres
 	addreses := []string{"/ip4/51.89.42.176/tcp/9000", "/ip4/123.123.123.123/tcp/9000"}
 	for _, ma := range addreses {
@@ -88,13 +91,22 @@ func TestPeerLoadAndStore(t *testing.T) {
 	require.Equal(t, true, ok)
 
 	require.Equal(t, readPeer.PeerId, peer1.PeerId)
-	require.Equal(t, readPeer.Pubkey, peer1.Pubkey)
-	require.Equal(t, readPeer.NodeId, peer1.NodeId)
+
+	pubkey, ok := readPeer.GetAtt("pubkey")
+	require.True(t, ok)
+	require.Equal(t, pubkey, "ASWDSFAWSF")
+
+	nodeid, ok := readPeer.GetAtt("nodeid")
+	require.True(t, ok)
+	require.Equal(t, nodeid, "Node1")
+
 	require.Equal(t, readPeer.UserAgent, peer1.UserAgent)
 	require.Equal(t, readPeer.ClientName, peer1.ClientName)
 	require.Equal(t, readPeer.ClientOS, peer1.ClientOS)
 	require.Equal(t, readPeer.ClientVersion, peer1.ClientVersion)
-	require.Equal(t, readPeer.BlockchainNodeENR, peer1.BlockchainNodeENR)
+	enr, ok := readPeer.GetAtt("enr")
+	require.True(t, ok)
+	require.Equal(t, enr, "AWAW123111231J231K23JH123K12")
 
 	require.Equal(t, readPeer.Ip, peer1.Ip)
 	require.Equal(t, readPeer.Country, peer1.Country)
@@ -122,7 +134,9 @@ func TestPeerLoadAndStore(t *testing.T) {
 
 	require.Equal(t, readPeer.LastExport, peer1.LastExport)
 
-	require.Equal(t, bStatus, readPeer.BeaconStatus)
+	readStatus, ok := readPeer.GetAtt("beaconstatus")
+	require.True(t, ok)
+	require.Equal(t, readStatus, bStatus)
 
 	require.Equal(t, len(readPeer.MessageMetrics), 2)
 	require.Equal(t, readPeer.MessageMetrics["testTopic"], msgMet)
@@ -152,7 +166,8 @@ func parseTime(strTime string, t *testing.T) time.Time {
 func TestLastToolActivity(t *testing.T) {
 	//logrus.SetLevel(logrus.DebugLevel)
 	url := "postgres://armiarmacrawler:ar_Mi_arm4@localhost:5432/armiarmadb"
-	psqlDB, err := ConnectToDB(context.Background(), url)
+	ethmodel := NewEth2Model("eth2")
+	psqlDB, err := ConnectToDB(context.Background(), url, &ethmodel)
 	require.Equal(t, nil, err)
 
 	// generate first peer
@@ -191,7 +206,8 @@ func TestLastToolActivity(t *testing.T) {
 func TestPeerConnectedCheck(t *testing.T) {
 	//logrus.SetLevel(logrus.DebugLevel)
 	url := "postgres://armiarmacrawler:ar_Mi_arm4@localhost:5432/armiarmadb"
-	psqlDB, err := ConnectToDB(context.Background(), url)
+	ethmodel := NewEth2Model("eth2")
+	psqlDB, err := ConnectToDB(context.Background(), url, &ethmodel)
 	require.Equal(t, nil, err)
 
 	// generate first peer
