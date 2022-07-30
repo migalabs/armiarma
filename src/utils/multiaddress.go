@@ -9,6 +9,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	secp "github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
 	ma "github.com/multiformats/go-multiaddr"
@@ -17,15 +18,15 @@ import (
 const MADDR_SEPARATOR string = "/"
 
 var PrivateIPNetworks = []net.IPNet{
-	net.IPNet{
+	{
 		IP:   net.ParseIP("10.0.0.0"),
 		Mask: net.CIDRMask(8, 32),
 	},
-	net.IPNet{
+	{
 		IP:   net.ParseIP("172.16.0.0"),
 		Mask: net.CIDRMask(12, 32),
 	},
-	net.IPNet{
+	{
 		IP:   net.ParseIP("192.168.0.0"),
 		Mask: net.CIDRMask(16, 32),
 	},
@@ -100,7 +101,7 @@ func ParsePubkey(v string) (*ecdsa.PublicKey, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot parse public key, invalid public key (Secp256k1): %v", err)
 	}
-	return (*ecdsa.PublicKey)((pub).(*crypto.Secp256k1PublicKey)), nil
+	return (*secp.PublicKey)((pub).(*crypto.Secp256k1PublicKey)).ToECDSA(), nil
 }
 
 func GetPublicAddrsFromAddrArray(mAddrs []ma.Multiaddr) ma.Multiaddr {

@@ -4,8 +4,6 @@
 package crawler
 
 import (
-	"crypto/ecdsa"
-
 	cli "github.com/urfave/cli/v2"
 
 	"github.com/migalabs/armiarma/src/db"
@@ -19,6 +17,7 @@ import (
 	"github.com/migalabs/armiarma/src/hosts"
 	"github.com/migalabs/armiarma/src/info"
 	"github.com/migalabs/armiarma/src/peering"
+	"github.com/migalabs/armiarma/src/utils"
 	"github.com/migalabs/armiarma/src/utils/apis"
 
 	"github.com/sirupsen/logrus"
@@ -64,8 +63,13 @@ func NewEth2Crawler(ctx *cli.Context, infObj info.Eth2InfoData) (*Eth2Crawler, e
 		return nil, err
 	}
 
+	pk, err := utils.ConvertFromInterfacePrivKey(infObj.PrivateKey)
+	if err != nil {
+		return nil, err
+	}
+
 	// generate local Enode and DV5
-	node := enode.NewLocalNode(ctx.Context, &infObj)
+	node := enode.NewLocalNode(ctx.Context, &infObj, pk)
 
 	// read Eth2 bootnodes
 	dv5bootnodes, err := dv5.ReadEth2BootnodeFile(infObj.BootNodesFile)
@@ -76,7 +80,7 @@ func NewEth2Crawler(ctx *cli.Context, infObj info.Eth2InfoData) (*Eth2Crawler, e
 	dv5, err := dv5.NewDiscovery(
 		ctx.Context,
 		node,
-		(*ecdsa.PrivateKey)(infObj.PrivateKey),
+		pk,
 		dv5bootnodes,
 		infObj.ForkDigest,
 		9006)
