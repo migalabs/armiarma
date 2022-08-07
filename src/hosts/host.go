@@ -34,7 +34,7 @@ type BasicLibp2pHost struct {
 	Network string
 	// Basic sevices related with the libp2p host
 	host      host.Host
-	identify  *identify.IDService
+	identify  identify.IDService
 	PeerStore *db.PeerStore
 	IpLocator *apis.PeerLocalizer
 
@@ -72,7 +72,6 @@ func NewBasicLibp2pEth2Host(ctx context.Context, infObj info.Eth2InfoData, ipLoc
 
 	// Generate the main Libp2p host that will be exposed to the network
 	host, err := libp2p.New(
-		ctx,
 		libp2p.ListenAddrs(muladdr),
 		libp2p.Identity(privkey),
 		libp2p.UserAgent(userAgent),
@@ -136,7 +135,6 @@ func NewBasicLibp2pIpfsHost(ctx context.Context, infObj info.IpfsInfoData, ipLoc
 
 	// Generate the main Libp2p host that will be exposed to the network
 	host, err := libp2p.New(
-		ctx,
 		libp2p.Identity(privkey),
 		libp2p.ListenAddrs(muladdr),
 		libp2p.Ping(true),
