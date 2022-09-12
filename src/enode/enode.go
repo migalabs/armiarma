@@ -29,7 +29,7 @@ type LocalNode struct {
 // @param info_obj the InfoData object where to get the configuration data from the user.
 // @param stdOpts the logging options object.
 // @return the LocalNode object.
-func NewLocalNode(ctx context.Context, infObj *info.Eth2InfoData) *LocalNode {
+func NewLocalNode(ctx context.Context, infObj *info.Eth2InfoData, pk *ecdsa.PrivateKey) *LocalNode {
 	// db where to store the ENRs
 	new_db, err := enode.OpenDB("")
 	if err != nil {
@@ -39,7 +39,7 @@ func NewLocalNode(ctx context.Context, infObj *info.Eth2InfoData) *LocalNode {
 
 	return &LocalNode{
 		ctx:       ctx,
-		LocalNode: *enode.NewLocalNode(new_db, (*ecdsa.PrivateKey)(infObj.PrivateKey)),
+		LocalNode: *enode.NewLocalNode(new_db, pk),
 		info_data: infObj,
 	}
 }

@@ -12,7 +12,8 @@ import (
 func TestClientDiversityInsert(t *testing.T) {
 	logrus.SetLevel(logrus.DebugLevel)
 	url := "postgres://armiarmacrawler:ar_Mi_arm4@localhost:5432/armiarmadb"
-	psqlDB, err := ConnectToDB(context.Background(), url)
+	ethmodel := NewEth2Model("eth2")
+	psqlDB, err := ConnectToDB(context.Background(), url, &ethmodel)
 	require.Equal(t, nil, err)
 
 	// create the ClientDiversity obj for adding it to the SQL

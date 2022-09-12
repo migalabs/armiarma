@@ -108,7 +108,7 @@ func ReqBeaconMetadata(ctx context.Context, wg *sync.WaitGroup, h host.Host, pee
 // Identify the peer from the Libp2p Identify Service
 
 type HostWithIDService interface {
-	IDService() *identify.IDService
+	IDService() identify.IDService
 }
 
 // ReqBeaconMetadata:

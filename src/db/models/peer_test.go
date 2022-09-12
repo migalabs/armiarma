@@ -96,12 +96,12 @@ func Test_FetchPeerInfoFromNewPeer(t *testing.T) {
 
 	// peerHostInfo
 	peer2HostInfo := NewPeer("Peer2")
-	peer2HostInfo.NodeId = "Node2"
+	peer2HostInfo.SetAtt("nodeid", "Node2")
 	peer2HostInfo.UserAgent = "Prysm/v0.0.0"
 	peer2HostInfo.ClientName = "Prysm"
 	peer2HostInfo.ClientVersion = "v0.0.0"
 	peer2HostInfo.ClientOS = "Linux"
-	peer2HostInfo.Pubkey = "PubKey"
+	peer2HostInfo.SetAtt("pubkey", "PubKey")
 	peer2HostInfo.AddMAddr("/ip4/95.169.232.98/tcp/9000")
 	peer2HostInfo.Ip = "95.169.232.98"
 	peer2HostInfo.City = "City1"
@@ -112,13 +112,17 @@ func Test_FetchPeerInfoFromNewPeer(t *testing.T) {
 	peerBase.FetchPeerInfoFromNewPeer(peer2HostInfo)
 
 	require.Equal(t, peerBase.PeerId, "Peer2")
-	require.Equal(t, peerBase.NodeId, "Node2")
+	nodeid, ok := peerBase.GetAtt("nodeid")
+	require.True(t, ok)
+	require.Equal(t, nodeid, "Node2")
 	require.Equal(t, peerBase.UserAgent, "Prysm/v0.0.0")
 	require.Equal(t, peerBase.ExtractPublicAddr().String(), "/ip4/95.169.232.98/tcp/9000")
 	require.Equal(t, peerBase.Ip, "95.169.232.98")
 	require.Equal(t, peerBase.Country, "Country1")
 	require.Equal(t, peerBase.City, "City1")
-	require.Equal(t, peerBase.Pubkey, "PubKey")
+	pubkey, ok := peerBase.GetAtt("pubkey")
+	require.True(t, ok)
+	require.Equal(t, pubkey, "PubKey")
 	require.Equal(t, peerBase.ProtocolVersion, "TryProtocol")
 	require.Equal(t, peerBase.Protocols[0], "Protocol1")
 	require.Equal(t, len(peerBase.Protocols), 1)
@@ -175,12 +179,14 @@ func Test_FetchPeerInfoFromNewPeer(t *testing.T) {
 	peer5NotIdentified := NewPeer("Peer5")
 	peer5NotIdentified.MetadataSucceed = false
 	peer5NotIdentified.MetadataRequest = false
-	peer5NotIdentified.BlockchainNodeENR = "test"
+	peer5NotIdentified.SetAtt("enr", "test")
 
 	peerBase.FetchPeerInfoFromNewPeer(peer5NotIdentified)
 	require.Equal(t, peerBase.MetadataSucceed, true)
 	require.Equal(t, peerBase.MetadataRequest, true)
-	require.Equal(t, peerBase.BlockchainNodeENR, "test")
+	enr, ok := peerBase.GetAtt("enr")
+	require.True(t, ok)
+	require.Equal(t, enr, "test")
 
 	/*peerMod.MetadataRequest = true
 	peerMod.MetadataSucceed = false
@@ -203,10 +209,11 @@ func Test_FetchPeerInfoFromNewPeer(t *testing.T) {
 
 func Test_GetEnodeFromENR(t *testing.T) {
 	// generate base peer
-	peerBase := NewPeer("test")
-	peerBase.BlockchainNodeENR = "enr:-Ku4QP2xDnEtUXIjzJ_DhlCRN9SN99RYQPJL92TMlSv7U5C1YnYLjwOQHgZIUXw6c-BvRg2Yc2QsZxxoS_pPRVe0yK8Bh2F0dG5ldHOIAAAAAAAAAACEZXRoMpD1pf1CAAAAAP__________gmlkgnY0gmlwhBLf22SJc2VjcDI1NmsxoQMeFF5GrS7UZpAH2Ly84aLK-TyvH-dRo0JM1i8yygH50YN1ZHCCJxA"
+	enr := "enr:-Ku4QP2xDnEtUXIjzJ_DhlCRN9SN99RYQPJL92TMlSv7U5C1YnYLjwOQHgZIUXw6c-BvRg2Yc2QsZxxoS_pPRVe0yK8Bh2F0dG5ldHOIAAAAAAAAAACEZXRoMpD1pf1CAAAAAP__________gmlkgnY0gmlwhBLf22SJc2VjcDI1NmsxoQMeFF5GrS7UZpAH2Ly84aLK-TyvH-dRo0JM1i8yygH50YN1ZHCCJxA"
 
-	test_node, _ := peerBase.GetBlockchainNode()
-	require.Equal(t, test_node.String(), "enr:-Ku4QP2xDnEtUXIjzJ_DhlCRN9SN99RYQPJL92TMlSv7U5C1YnYLjwOQHgZIUXw6c-BvRg2Yc2QsZxxoS_pPRVe0yK8Bh2F0dG5ldHOIAAAAAAAAAACEZXRoMpD1pf1CAAAAAP__________gmlkgnY0gmlwhBLf22SJc2VjcDI1NmsxoQMeFF5GrS7UZpAH2Ly84aLK-TyvH-dRo0JM1i8yygH50YN1ZHCCJxA")
-	require.NotEqual(t, test_node.String(), "enr:-Ku4QP2xDnEtUXIjzJ_DhlCRN9SN99RYQPJL92TMlSv7U5C1YnYLjwOQHgZIUXw6c-BvRg2Yc2QsZxxoS_pPRVe0yK8Bh2F0dG5ldHOIAAAAAAAAAACEZXRoMpD1pf1CAAAAAP__________gmlkgnY0gmlwhBLf22SJc2VjcDI1NmsxoQMeFF5GrS7UZpAH2Ly84aLK-TyvH-dRo0JM1i8yygH50YN1ZHCCJxB")
+	peerBase := NewPeer("test")
+	peerBase.SetAtt("enr", enr)
+
+	test_node, _ := peerBase.GetAtt("enr")
+	require.Equal(t, test_node, enr)
 }

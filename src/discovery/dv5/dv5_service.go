@@ -19,7 +19,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/btcsuite/btcd/btcec"
 	"github.com/migalabs/armiarma/src/db/models"
 	"github.com/migalabs/armiarma/src/discovery"
 	"github.com/migalabs/armiarma/src/enode"
@@ -31,7 +30,6 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	ethenode "github.com/ethereum/go-ethereum/p2p/enode"
 
-	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
 	ma "github.com/multiformats/go-multiaddr"
 )
@@ -157,8 +155,9 @@ func (d *Discovery) handleENR(node *ethenode.Node) (models.Peer, error) {
 	}
 
 	// Get the public key and the peer.ID of the discovered peer
-	pubkey := node.Pubkey()
-	peerid, err := peer.IDFromPublicKey(crypto.PubKey((*crypto.Secp256k1PublicKey)((*btcec.PublicKey)(pubkey))))
+	pubkey, _ := utils.ConvertToInterfacePubkey(node.Pubkey())
+
+	peerid, err := peer.IDFromPublicKey(pubkey)
 	if err != nil {
 		return models.Peer{}, fmt.Errorf("error extracting peer.ID from node %s", node.ID())
 	}
@@ -179,7 +178,7 @@ func (d *Discovery) handleENR(node *ethenode.Node) (models.Peer, error) {
 	mAddrs = append(mAddrs, multiAddr)
 
 	// Fill models.Peer with given info
-	pubBytes, _ := x509.MarshalPKIXPublicKey(pubkey) // get the []bytes of the pubkey
+	pubBytes, _ := x509.MarshalPKIXPublicKey(node.Pubkey()) // get the []bytes of the pubkey
 	bp.SetAtt("pubkey", hex.EncodeToString(pubBytes))
 	bp.SetAtt("nodeid", node.ID().String())
 	bp.SetAtt("enr", (*node).String())

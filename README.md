@@ -18,6 +18,9 @@ To use the tool, the following requirements need to be installed in the machine:
 - gcc - C compiler
 - [go](https://go.dev/doc/install) on its 1.17 version or above. Go needs to be executable from the terminal. Lower versions will report a dependency import error for the package `io/fs`.
 - PostgreSQL DB 
+- Docker version 20.10.17 (tested and working)
+- Docker-Compose 1.29.2 (tested and working)
+
 
 Alternatively, the tool can also be executed from:
 - [docker](https://docs.docker.com/get-docker/)
@@ -65,7 +68,7 @@ We also provide a Dockerfile and Docker-Compose file that can be used to run the
 - `Armiarma` instance with the configuration file provided by arguments
 - `PostgreSQL` instance to store crawling data
 - `Prometheus` instance to read the metrics exported by `Armiarma`
-- `Grafana` instance as a dashboard to monitor the crawl
+- `Grafana` instance as a dashboard to monitor the crawl (Eth2 dashboard)
 
 List of ports that are going to be used:
 
@@ -76,11 +79,12 @@ List of ports that are going to be used:
 | Prometheus | `9090` | - | 
 | Grafana | `3030` | default=`admin` | 
 
-Tested Versions:
+Tested Requirements:
 | Instance | Version | 
 | -------- | ---- |
 | Docker | `20.10.17` |
 | Docker-Compose | `1.29.2` |
+
 
 To spawn up the entire set-up, just run the following command in the root directory
 
@@ -89,8 +93,8 @@ To spawn up the entire set-up, just run the following command in the root direct
 docker-compose up 
 
 ```
-Docker-compose will generate the Docker image for you and will run the crawler in your machine. 
-Please note that, by running the tool through the `docker-compose` command, the default config-file will serve as reference `config-files/config.json` for the tool configuration. The resulting `metrics.csv` and `peerstore.db` will be taken/generated from the folder `./peerstore`.
+Docker-compose will generate the Docker images for you and will run the crawler and its requirements in your machine. 
+Please note that, by running the tool through the `docker-compose up` command, the default config-file will serve as reference `config-files/eth2-config.json` for the tools' configuration.
 
 Remember that all these default configurations could be modified from the `docker-compose.yaml` file. 
 
@@ -139,8 +143,6 @@ PrivateKey:     hexadecimal encoded libp2p privkey that will be used to create a
 BootNodesFile:  List of boot-nodes that will be used for the peer discovery service (recommended = "./src/discovery/official-eth2-bootnodes.json")
 ```
 
-
-
 ## Data visualization
 The combination of Prometheus and Grafana is the one that we have chosen to display the network data. In the repository, both configuration files are provided. In addition, the crawler, by default, exports all the metrics to Prometheus in port 9080. 
 
@@ -151,7 +153,6 @@ To get in contact with us, feel free to reach us through our [email](migalabs@pr
 
 ## Notes
 Please, note that the tool is currently in a developing stage. Any bugs report and/or suggestions are very welcome.
-
 
 
 ## License
