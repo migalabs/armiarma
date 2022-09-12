@@ -29,9 +29,9 @@ func FilterClientType(userAgent string) (string, string) {
 		return "Teku", cleanVersion(getVersionIfAny(fields, 2))
 	} else if strings.Contains(userAgentLower, "nimbus") {
 		return "Nimbus", cleanVersion(getVersionIfAny(fields, 1))
-	} else if strings.Contains(userAgentLower, "js-libp2p") {
+	} else if strings.Contains(userAgentLower, "js-libp2p") || strings.Contains(userAgentLower, "lodestar") {
 		return "Lodestar", cleanVersion(getVersionIfAny(fields, 1))
-	} else if strings.Contains(userAgentLower, "rust-libp2p") {
+	} else if strings.Contains(userAgentLower, "rust-libp2p") || strings.Contains(userAgentLower, "grandine") {
 		return "Grandine", cleanVersion(getVersionIfAny(fields, 1))
 	} else if strings.Contains(userAgentLower, "eth2-crawler") {
 		return "NodeWatch", ""
