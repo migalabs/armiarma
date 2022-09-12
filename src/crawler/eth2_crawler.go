@@ -66,6 +66,7 @@ func NewEth2Crawler(ctx *cli.Context, infObj info.Eth2InfoData) (*Eth2Crawler, e
 
 	// generate local Enode and DV5
 	node := enode.NewLocalNode(ctx.Context, &infObj)
+	node.AddEntries()
 
 	// read Eth2 bootnodes
 	dv5bootnodes, err := dv5.ReadEth2BootnodeFile(infObj.BootNodesFile)

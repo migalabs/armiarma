@@ -49,7 +49,7 @@ func NewLocalNode(ctx context.Context, infObj *info.Eth2InfoData) *LocalNode {
 // TODO: confirm which data to add and structure appropiately
 func (l *LocalNode) AddEntries() {
 	l.LocalNode.Set(all_utils.NewAttnetsENREntry("ffffffffffffffff"))
-	l.LocalNode.Set(all_utils.NewEth2DataEntry("b5303f2a"))
+	l.LocalNode.Set(all_utils.NewEth2DataEntry(l.info_data.ForkDigest))
 }
 
 // getters and setters

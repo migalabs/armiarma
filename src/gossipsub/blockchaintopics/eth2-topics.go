@@ -25,11 +25,13 @@ var (
 
 	MainnetKey      string = "Mainnet"
 	AltairKey       string = "Altair"
+	Bellatrix       string = "Bellatrix"
 	GnosisKey       string = "Gnosis"
 	GnosisAltairKey string = "GnosisAltair"
 	ForkDigests            = map[string]string{
 		MainnetKey:      "b5303f2a",
 		AltairKey:       "afcaaba0",
+		Bellatrix:       "4a26c58b",
 		GnosisKey:       "f925ddc5",
 		GnosisAltairKey: "56fdb5e0",
 	}
