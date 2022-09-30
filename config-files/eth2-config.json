@@ -7,7 +7,7 @@
     "Eth2Endpoint": "",
     "DBEndpoint": "postgresql://user:password@localhost:5432/armiarmadb",
     "OutputPath": "./peerstore",
-    "ForkDigest": "afcaaba0",
+    "ForkDigest": "4a26c58b",
     "UserAgent": "BSC-Eth2-Crawler",
     "LogLevel": "info",
     "PrivateKey": "",

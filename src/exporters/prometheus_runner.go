@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"time"
-
+	_ "net/http/pprof"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 

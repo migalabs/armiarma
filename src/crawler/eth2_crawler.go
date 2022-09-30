@@ -15,7 +15,7 @@ import (
 	"github.com/migalabs/armiarma/src/enode"
 	"github.com/migalabs/armiarma/src/exporters"
 	"github.com/migalabs/armiarma/src/gossipsub"
-	"github.com/migalabs/armiarma/src/gossipsub/blockchaintopics"
+	//"github.com/migalabs/armiarma/src/gossipsub/blockchaintopics"
 	"github.com/migalabs/armiarma/src/hosts"
 	"github.com/migalabs/armiarma/src/info"
 	"github.com/migalabs/armiarma/src/peering"
@@ -123,10 +123,10 @@ func (c *Eth2Crawler) Run() {
 	c.IpLocalizer.Run()
 	c.Host.Start()
 	c.Disc.Start()
-	topics := blockchaintopics.ReturnTopics(c.Info.ForkDigest, c.Info.TopicArray)
-	for _, topic := range topics {
-		c.Gs.JoinAndSubscribe(topic)
-	}
+	//topics := blockchaintopics.ReturnTopics(c.Info.ForkDigest, c.Info.TopicArray)
+	//for _, topic := range topics {
+	//	c.Gs.JoinAndSubscribe(topic)
+	//}
 	c.Peering.Run()
 	c.Gs.ServeMetrics()
 	c.DB.ServeMetrics()

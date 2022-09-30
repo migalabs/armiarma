@@ -28,7 +28,7 @@ var (
 
 	ConnectionRefuseTimeout = 10 * time.Second
 	MaxRetries              = 1
-	DefaultWorkers          = 50
+	DefaultWorkers          = 20
 )
 
 type PeeringOption func(*PeeringService) error

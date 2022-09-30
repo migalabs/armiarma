@@ -626,7 +626,7 @@ func (p *Eth2Model) GetLastActivityTime(ctx context.Context, pool *pgxpool.Pool)
 				log.Info("Empty loaded DB")
 				return time.Time{}, nil
 			} else {
-				return time.Time{}, errors.Wrap(err, "unable to parse Last Activity of the tool from postgresql db")
+				continue
 			}
 		}
 		if t.After(lastActivity) {
