@@ -7,10 +7,8 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/signal"
-	"syscall"
 
-	"github.com/migalabs/armiarma/src/utils"
+	"github.com/migalabs/armiarma/pkg/utils"
 	"github.com/sirupsen/logrus"
 	cli "github.com/urfave/cli/v2"
 
@@ -28,8 +26,6 @@ var (
 func main() {
 	// read arguments from the command line
 	PrintVersion()
-
-	ctx, cancel := context.WithCancel(context.Background())
 
 	// Set the general log configurations for the entire tool
 	logrus.SetFormatter(utils.ParseLogFormatter("text"))
@@ -53,26 +49,10 @@ func main() {
 	}
 
 	// generate the crawler
-	if err := app.RunContext(ctx, os.Args); err != nil {
+	if err := app.RunContext(context.Background(), os.Args); err != nil {
 		log.Errorf("error: %v\n", err)
 		os.Exit(1)
 	}
-
-	// only leave the app up running if the command was empty or help
-	if len(os.Args) <= 1 || helpInArgs(os.Args) {
-		os.Exit(0)
-	} else {
-		// check the shutdown signal
-		sigs := make(chan os.Signal, 1)
-		signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, syscall.SIGTERM)
-
-		// keep the app running until syscall.SIGTERM
-		sig := <-sigs
-		log.Printf("Received %s signal - Stopping...\n", sig.String())
-		signal.Stop(sigs)
-		cancel()
-	}
-
 }
 
 func helpInArgs(args []string) bool {

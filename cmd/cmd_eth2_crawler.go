@@ -4,11 +4,15 @@
 package cmd
 
 import (
+	"os"
+	"os/signal"
+	"syscall"
+
 	log "github.com/sirupsen/logrus"
 	cli "github.com/urfave/cli/v2"
 
-	"github.com/migalabs/armiarma/src/crawler"
-	"github.com/migalabs/armiarma/src/info"
+	"github.com/migalabs/armiarma/pkg/crawler"
+	"github.com/migalabs/armiarma/pkg/info"
 )
 
 // CrawlCommand contains the crawl sub-command configuration.
@@ -44,5 +48,16 @@ func LaunchEth2Crawler(c *cli.Context) error {
 
 	// launch the subroutines
 	eth2c.Run()
+
+	// check the shutdown signal
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, syscall.SIGTERM)
+
+	// keep the app running until syscall.SIGTERM
+	sig := <-sigs
+	log.Printf("Received %s signal - Stopping...\n", sig.String())
+	signal.Stop(sigs)
+	eth2c.Close()
+
 	return nil
 }

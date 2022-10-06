@@ -7,8 +7,8 @@ import (
 	log "github.com/sirupsen/logrus"
 	cli "github.com/urfave/cli/v2"
 
-	"github.com/migalabs/armiarma/src/crawler"
-	"github.com/migalabs/armiarma/src/info"
+	"github.com/migalabs/armiarma/pkg/crawler"
+	"github.com/migalabs/armiarma/pkg/info"
 )
 
 // CrawlCommand contains the crawl sub-command configuration.
