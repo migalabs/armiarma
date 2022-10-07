@@ -2,8 +2,9 @@ package reqresp
 
 import (
 	"fmt"
-	"github.com/golang/snappy"
 	"io"
+
+	"github.com/golang/snappy"
 )
 
 type Compression interface {

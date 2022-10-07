@@ -3,6 +3,7 @@ package reqresp
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 )
@@ -32,11 +33,11 @@ func (handleChunk ResponseChunkHandler) MakeResponseHandler(maxChunkCount uint64
 		for chunkIndex := uint64(0); chunkIndex < maxChunkCount; chunkIndex++ {
 			blr.N = 1
 			resByte, err := blr.ReadByte()
-			if err == io.EOF { // no more chunks left.
+			if errors.Is(err, io.EOF) { // no more chunks left.
 				return nil
 			}
 			if err != nil {
-				return fmt.Errorf("failed to read chunk %d result byte: %v", chunkIndex, err)
+				return fmt.Errorf("failed to read chunk %d result byte: %w", chunkIndex, err)
 			}
 			// varints need to be read byte by byte.
 			blr.N = 1
@@ -47,11 +48,11 @@ func (handleChunk ResponseChunkHandler) MakeResponseHandler(maxChunkCount uint64
 			if err != nil {
 				return err
 			}
-			if resByte == InvalidReqCode || resByte == ServerErrCode {
-				if chunkSize > MAX_ERR_SIZE {
-					return fmt.Errorf("chunk size %d of chunk %d exceeds error size limit %d", chunkSize, chunkIndex, MAX_ERR_SIZE)
+			if resByte == byte(InvalidReqCode) || resByte == byte(ServerErrCode) {
+				if chunkSize > MaxErrSize {
+					return fmt.Errorf("chunk size %d of chunk %d exceeds error size limit %d", chunkSize, chunkIndex, MaxErrSize)
 				}
-				blr.N = MAX_ERR_SIZE
+				blr.N = MaxErrSize
 			} else {
 				if chunkSize > maxChunkContentSize {
 					return fmt.Errorf("chunk size %d of chunk %d exceeds chunk limit %d", chunkSize, chunkIndex, maxChunkContentSize)

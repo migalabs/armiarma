@@ -26,7 +26,7 @@ import (
 var ()
 
 // ReqBeaconStatus:
-// Function that opens a new Stream from the given host to send a RPC requesting the BeaconStatus of the given peer.ID.
+// Function that opens a new Stream from the given host to send a RPC reqresping the BeaconStatus of the given peer.ID.
 // Returns the BeaconStatus of the given peer if succeed, error if failed.
 // @param ctx: parent context.
 // @param wg: wait group to notify when function has been done.
@@ -34,15 +34,27 @@ var ()
 // @param peerID: who to connect to.
 // @param stat: where to deserialize the content of the beacon status: output.
 // @param finErr: error channel.
-func ReqBeaconStatus(ctx context.Context, wg *sync.WaitGroup, h host.Host, peerID peer.ID, stat *common.Status, finErr chan error) {
+func ReqBeaconStatus(ctx context.Context, wg *sync.WaitGroup, h host.Host, peerID peer.ID, resultStatus *common.Status, finErr *error) {
+
 	defer wg.Done()
-	// Generate the compression
-	comp := reqresp.SnappyCompression{}
-	// Generate the Server Error Code
+
+	frkDgst := new(common.ForkDigest)
+	b, err := hex.DecodeString("4a26c58b")
+	if err != nil {
+		log.Panic("unable to decode ForkDigest", err.Error())
+	}
+	frkDgst.UnmarshalText(b)
+
+	status := &common.Status{
+		ForkDigest:     *frkDgst,
+		FinalizedRoot:  common.Root{},
+		FinalizedEpoch: 0,
+		HeadRoot:       common.Root{},
+		HeadSlot:       0,
+	}
 	var resCode reqresp.ResponseCode // error by default
-	// record the error into the error channel
-	finErr <- methods.StatusRPCv1.RunRequest(ctx, h.NewStream, peerID, comp,
-		reqresp.RequestSSZInput{Obj: stat}, 1,
+	err = methods.StatusRPCv1.RunRequest(ctx, h.NewStream, peerID, new(reqresp.SnappyCompression),
+		reqresp.RequestSSZInput{Obj: status}, 1,
 		func() error {
 			return nil
 		},
@@ -52,22 +64,25 @@ func ReqBeaconStatus(ctx context.Context, wg *sync.WaitGroup, h host.Host, peerI
 			case reqresp.ServerErrCode, reqresp.InvalidReqCode:
 				msg, err := chunk.ReadErrMsg()
 				if err != nil {
+					return fmt.Errorf("%s: %w", msg, err)
+				}
+			case reqresp.SuccessCode:
+				var stat common.Status
+				if err := chunk.ReadObj(&stat); err != nil {
 					return err
 				}
-				return errors.Errorf("error requesting BeaconStatus RPC: %s", msg)
-			case reqresp.SuccessCode:
-				if err := chunk.ReadObj(stat); err != nil {
-					return errors.Wrap(err, "from requesting BeaconMetadata RPC")
-				}
+				fmt.Println(stat)
+				*resultStatus = stat
 			default:
-				return errors.New("unexpected result code for BeaconStatus RPC request")
+				return errors.New("unexpected result code")
 			}
 			return nil
 		})
+	*finErr = err
 }
 
 // ReqBeaconMetadata:
-// Function that opens a new Stream from the given host to send a RPC requesting the BeaconStatus of the given peer.ID.
+// Function that opens a new Stream from the given host to send a RPC reqresping the BeaconStatus of the given peer.ID.
 // Returns the BeaconStatus of the given peer if succeed, error if failed.
 // @param ctx: parent context.
 // @param wg: wait group to notify when function has been done.
@@ -75,14 +90,12 @@ func ReqBeaconStatus(ctx context.Context, wg *sync.WaitGroup, h host.Host, peerI
 // @param peerID: who to connect to.
 // @param meta: where to deserialize the content of the beacon metadata: output.
 // @param finErr: error channel.
-func ReqBeaconMetadata(ctx context.Context, wg *sync.WaitGroup, h host.Host, peerID peer.ID, meta *common.MetaData, finErr chan error) {
+func ReqBeaconMetadata(ctx context.Context, wg *sync.WaitGroup, h host.Host, peerID peer.ID, meta *common.MetaData, finErr *error) {
 	defer wg.Done()
-	// Generate the compression
-	comp := reqresp.SnappyCompression{}
 	// Generate the Server Error Code
 	var resCode reqresp.ResponseCode // error by default
 	// record the error into the error channel
-	finErr <- methods.MetaDataRPCv1.RunRequest(ctx, h.NewStream, peerID, comp, reqresp.RequestSSZInput{Obj: nil}, 1,
+	err := methods.MetaDataRPCv1.RunRequest(ctx, h.NewStream, peerID, reqresp.SnappyCompression{}, reqresp.RequestSSZInput{Obj: nil}, 1,
 		func() error {
 			return nil
 		},
@@ -92,17 +105,18 @@ func ReqBeaconMetadata(ctx context.Context, wg *sync.WaitGroup, h host.Host, pee
 			case reqresp.ServerErrCode, reqresp.InvalidReqCode:
 				msg, err := chunk.ReadErrMsg()
 				if err != nil {
-					return errors.Errorf("error requesting BeaconMetadata RPC: %s", msg)
+					return errors.Errorf("error reqresping BeaconMetadata RPC: %s", msg)
 				}
 			case reqresp.SuccessCode:
 				if err := chunk.ReadObj(meta); err != nil {
-					return errors.Wrap(err, "from requesting BeaconMetadata RPC")
+					return errors.Wrap(err, "from reqresping BeaconMetadata RPC")
 				}
 			default:
-				return errors.New("unexpected result code for BeaconMetadata RPC request")
+				return errors.New("unexpected result code for BeaconMetadata RPC reqresp")
 			}
 			return nil
 		})
+	*finErr = err
 }
 
 // Identify the peer from the Libp2p Identify Service
@@ -123,7 +137,7 @@ type HostWithIDService interface {
 // @param meta: where to deserialize the content of the beacon metadata: output.
 // @param finErr: error channel.
 
-func ReqHostInfo(ctx context.Context, wg *sync.WaitGroup, h host.Host, ipLoc *apis.PeerLocalizer, conn network.Conn, peer *models.Peer, errIdent chan error) {
+func ReqHostInfo(ctx context.Context, wg *sync.WaitGroup, h host.Host, ipLoc *apis.PeerLocalizer, conn network.Conn, peer *models.Peer, errIdent *error) {
 	defer wg.Done()
 
 	peerID := conn.RemotePeer()
@@ -133,13 +147,15 @@ func ReqHostInfo(ctx context.Context, wg *sync.WaitGroup, h host.Host, ipLoc *ap
 	// convert host to IDService
 	withIdentify, ok := h.(HostWithIDService)
 	if !ok {
-		errIdent <- errors.Errorf("host does not support libp2p identify protocol")
+		finErr = errors.Errorf("host does not support libp2p identify protocol")
+		*errIdent = finErr
 		return
 	}
 	t := time.Now()
 	idService := withIdentify.IDService()
 	if idService == nil {
-		errIdent <- errors.Errorf("libp2p identify not enabled on this host")
+		finErr = errors.Errorf("libp2p identify not enabled on this host")
+		*errIdent = finErr
 		return
 	}
 	peer.MetadataRequest = true
@@ -150,7 +166,8 @@ func ReqHostInfo(ctx context.Context, wg *sync.WaitGroup, h host.Host, ipLoc *ap
 		peer.LastIdentifyTimestamp = time.Now()
 		rtt = time.Since(t)
 	case <-ctx.Done():
-		errIdent <- errors.Errorf("identification error caused by timed out")
+		finErr = errors.Errorf("identification error caused by timed out")
+		*errIdent = finErr
 		return
 	}
 	// Fill the the metrics
@@ -170,7 +187,8 @@ func ReqHostInfo(ctx context.Context, wg *sync.WaitGroup, h host.Host, ipLoc *ap
 	multiAddrStr := conn.RemoteMultiaddr().String() + "/p2p/" + peerID.String()
 	multiAddr, err := ma.NewMultiaddr(multiAddrStr)
 	if err != nil {
-		errIdent <- errors.Wrap(err, "unable to compose the maddrs")
+		finErr = errors.Wrap(err, "unable to compose the maddrs")
+		*errIdent = finErr
 		fmt.Println("unable to extract multiaddrs")
 		return
 	}
@@ -179,7 +197,7 @@ func ReqHostInfo(ctx context.Context, wg *sync.WaitGroup, h host.Host, ipLoc *ap
 	mAddrs = append(mAddrs, multiAddr)
 	peer.MAddrs = mAddrs
 
-	// Update, request location from a peer only when the connection is inbound
+	// Update, reqresp location from a peer only when the connection is inbound
 	// if the connection is outbound, we already had the IP located from the ENR
 
 	if conn.Stat().Direction.String() == "Inbound" {
@@ -226,5 +244,5 @@ func ReqHostInfo(ctx context.Context, wg *sync.WaitGroup, h host.Host, ipLoc *ap
 	}
 	// return the erro defined in the top
 	// nil if we could identify it, ident error if we couldnt line 181
-	errIdent <- finErr
+	*errIdent = finErr
 }

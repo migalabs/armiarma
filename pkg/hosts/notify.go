@@ -60,7 +60,7 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 		"DIRECTION": conn.Stat().Direction.String(),
 	}).Debug("Peer: ", conn.RemotePeer().String())
 
-	//  Make synchrony among the different requests that we have to do
+	//  Make synchrony among the different reqresps that we have to do
 
 	// identify everything that we can about the peer
 	// not adding the connection 2 times
@@ -69,33 +69,34 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 	// Aggregate timeout context for the different
 	mainCtx, cancel := context.WithTimeout(c.Ctx(), 5*time.Second)
 	defer cancel()
-	// set sync group and error groups to handle different requests
+	// set sync group and error groups to handle different reqresps
 	var wg sync.WaitGroup
 
-	// Error channels
-	hinfoErr := make(chan error, 1)
-
-	// Request the Host Metadata
+	// request the Host Metadata
 	h := c.Host()
 
 	// for Eth2
 	var bStatus common.Status
 	var bMetadata common.MetaData
-	metadataErr := make(chan error, 1)
-	statusErr := make(chan error, 1)
+	var hinfoErr error
+	var statusErr, metadataErr error
+
+	_ = bMetadata
+	_ = metadataErr
 
 	wg.Add(1)
-	go ReqHostInfo(mainCtx, &wg, h, c.IpLocator, conn, &peer, hinfoErr)
+	go ReqHostInfo(mainCtx, &wg, h, c.IpLocator, conn, &peer, &hinfoErr)
 
 	if c.Network == "eth2" {
 
-		// Request the BeaconMetadata
-		wg.Add(1)
-		go ReqBeaconMetadata(mainCtx, &wg, h, conn.RemotePeer(), &bMetadata, metadataErr)
+		// request the BeaconMetadata
+		// wg.Add(1)
+		// go ReqBeaconMetadata(mainCtx, &wg, h, conn.RemotePeer(), &bMetadata, metadataErr)
 
 		// request BeaconStatus metadata as we connect to a peer
 		wg.Add(1)
-		go ReqBeaconStatus(mainCtx, &wg, h, conn.RemotePeer(), &bStatus, statusErr)
+		go ReqBeaconStatus(mainCtx, &wg, h, conn.RemotePeer(), &bStatus, &statusErr)
+
 	}
 
 	wg.Wait()
@@ -104,10 +105,10 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 	// check if an error was sent into the channel,
 	// if there wasn't anything in the channel, or if the err is nil fetch peer info
 	// if if there is an error  in the channel, print error
-	if err, _ := <-hinfoErr; err != nil {
+	if hinfoErr != nil {
 		// if error, cancel the timeout and stop ReqMetadata and ReqStatus
 		log.WithFields(logrus.Fields{
-			"ERROR": err.Error(),
+			"ERROR": hinfoErr.Error(),
 		}).Debug("ReqHostInfo Peer: ", conn.RemotePeer().String())
 	} else {
 		log.Debug("peer identified, succeed")
@@ -115,33 +116,28 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 
 	// If the network was eth2, wait for the metadata echange to reply
 	if c.Network == "eth2" {
-		// Beacon Status request error check
-		// if if there is an error  in the channel, print error
-		if err := <-metadataErr; err != nil {
-			log.WithFields(logrus.Fields{
-				"ERROR": err.Error(),
-			}).Debug("ReqMetadata Peer: ", conn.RemotePeer().String())
-		} else {
-			log.Debug("peer metadata req, succeed")
-			peer.SetAtt("beaconmetadata", models.NewBeaconMetadata(bMetadata))
-		}
+		// // Beacon Status reqresp error check
+		// // if if there is an error  in the channel, print error
+		// if metadataErr != nil {
+		// 	log.WithFields(logrus.Fields{
+		// 		"ERROR": err.Error(),
+		// 	}).Error("ReqMetadata Peer: ", conn.RemotePeer().String())
+		// } else {
+		// 	log.Info("peer metadata req, succeed")
+		// 	peer.SetAtt("beaconmetadata", models.NewBeaconMetadata(bMetadata))
+		// }
 
-		// Beacon Status request error check
-		// if if there is an error  in the channel, print error
-		if err := <-statusErr; err != nil {
+		// Beacon Status reqresp error check
+		// if there is an error  in the channel, print error
+		if statusErr != nil {
 			log.WithFields(logrus.Fields{
-				"ERROR": err.Error(),
+				"ERROR": statusErr.Error(),
 			}).Debug("ReqStatus Peer: ", conn.RemotePeer().String())
 		} else {
-			log.Debug("peer status req, succeed")
+			log.Debug("peer status req, succeed", bStatus)
 			peer.SetAtt("beaconstatus", models.NewBeaconStatus(bStatus))
 		}
-		close(metadataErr)
-		close(statusErr)
 	}
-
-	// close channels
-	close(hinfoErr)
 
 	log.Debug("sending identification event of peer", peer.PeerId)
 	identStat := IdentificationEvent{

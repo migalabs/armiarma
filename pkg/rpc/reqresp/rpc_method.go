@@ -1,3 +1,4 @@
+// Package request holds stream request service
 package reqresp
 
 import (
@@ -95,13 +96,13 @@ type RPCMethod struct {
 type ResponseCode uint8
 
 const (
-	SuccessCode    ResponseCode = 0
-	InvalidReqCode              = 1
-	ServerErrCode               = 2
+	SuccessCode ResponseCode = iota
+	InvalidReqCode
+	ServerErrCode
 )
 
-// 256 bytes max error size
-const MAX_ERR_SIZE = 256
+// MaxErrSize holds maximum err size
+const MaxErrSize = 256
 
 type OnResponseListener func(chunk ChunkedResponseHandler) error
 
@@ -165,7 +166,7 @@ func (c *chRespHandler) ReadRaw() ([]byte, error) {
 func (c *chRespHandler) ReadErrMsg() (string, error) {
 	var buf bytes.Buffer
 	_, err := buf.ReadFrom(io.LimitReader(c.r, int64(c.chunkSize)))
-	return string(buf.Bytes()), err
+	return buf.String(), err
 }
 
 func (c *chRespHandler) ReadObj(dest codec.Deserializable) error {
@@ -173,9 +174,8 @@ func (c *chRespHandler) ReadObj(dest codec.Deserializable) error {
 }
 
 func (m *RPCMethod) RunRequest(ctx context.Context, newStreamFn NewStreamFn,
-	peerId peer.ID, comp Compression, req RequestInput, maxRespChunks uint64, madeRequest func() error,
+	peerID peer.ID, comp Compression, req RequestInput, maxRespChunks uint64, madeRequest func() error,
 	onResponse OnResponseListener) error {
-
 	handleChunks := ResponseChunkHandler(func(ctx context.Context, chunkIndex uint64, chunkSize uint64, result ResponseCode, r io.Reader, w io.Writer) error {
 		return onResponse(&chRespHandler{
 			m:          m,
@@ -206,14 +206,14 @@ func (m *RPCMethod) RunRequest(ctx context.Context, newStreamFn NewStreamFn,
 
 	handler := ResponseHandler(func(ctx context.Context, r io.Reader, w io.WriteCloser) error {
 		if err := madeRequest(); err != nil {
-			return fmt.Errorf("made request, but could not continue: %v", err)
+			return fmt.Errorf("made request, but could not continue: %w", err)
 		}
 		return respHandler(ctx, r, w)
 	})
 
 	// Runs the request in sync, which processes responses,
 	// and then finally closes the channel through the earlier deferred close.
-	return newStreamFn.Request(ctx, peerId, protocolId, reqR, comp, handler)
+	return newStreamFn.Request(ctx, peerID, protocolId, reqR, comp, handler)
 }
 
 type ReadRequestFn func(dest interface{}) error
@@ -221,7 +221,6 @@ type WriteSuccessChunkFn func(data interface{}) error
 type WriteMsgFn func(msg string) error
 
 type RequestReader interface {
-	// nil if not an invalid input
 	InvalidInput() error
 	ReadRequest(dest codec.Deserializable) error
 	RawRequest() ([]byte, error)
@@ -297,8 +296,8 @@ func (h *chReqHandler) StreamResponseChunk(code ResponseCode, size uint64, r io.
 }
 
 func (h *chReqHandler) WriteErrorChunk(code ResponseCode, msg string) error {
-	if len(msg) > MAX_ERR_SIZE {
-		msg = msg[:MAX_ERR_SIZE-3]
+	if len(msg) > MaxErrSize {
+		msg = msg[:MaxErrSize-3]
 		msg += "..."
 	}
 	b := []byte(msg)

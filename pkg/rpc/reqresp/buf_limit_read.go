@@ -6,7 +6,7 @@ import (
 	"io"
 )
 
-// Reader implements buffering for an io.Reader object.
+// BufLimitReader implements buffering for an io.Reader object.
 type BufLimitReader struct {
 	buf     []byte
 	rd      io.Reader // reader provided by the client
@@ -19,7 +19,7 @@ type BufLimitReader struct {
 // The reader will return an error if Read crosses the limit.
 func NewBufLimitReader(rd io.Reader, size int, limit int) *BufLimitReader {
 	r := &BufLimitReader{
-		buf: make([]byte, size, size),
+		buf: make([]byte, size),
 		rd:  rd,
 		N:   limit,
 	}
