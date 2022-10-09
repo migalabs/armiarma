@@ -81,21 +81,18 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 	var hinfoErr error
 	var statusErr, metadataErr error
 
-	_ = bMetadata
-	_ = metadataErr
-
 	wg.Add(1)
 	go ReqHostInfo(mainCtx, &wg, h, c.IpLocator, conn, &peer, &hinfoErr)
 
 	if c.Network == "eth2" {
 
-		// request the BeaconMetadata
-		// wg.Add(1)
-		// go ReqBeaconMetadata(mainCtx, &wg, h, conn.RemotePeer(), &bMetadata, metadataErr)
-
 		// request BeaconStatus metadata as we connect to a peer
 		wg.Add(1)
 		go ReqBeaconStatus(mainCtx, &wg, h, conn.RemotePeer(), &bStatus, &statusErr)
+
+		// request the BeaconMetadata
+		wg.Add(1)
+		go ReqBeaconMetadata(mainCtx, &wg, h, conn.RemotePeer(), &bMetadata, &metadataErr)
 
 	}
 
@@ -116,17 +113,6 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 
 	// If the network was eth2, wait for the metadata echange to reply
 	if c.Network == "eth2" {
-		// // Beacon Status reqresp error check
-		// // if if there is an error  in the channel, print error
-		// if metadataErr != nil {
-		// 	log.WithFields(logrus.Fields{
-		// 		"ERROR": err.Error(),
-		// 	}).Error("ReqMetadata Peer: ", conn.RemotePeer().String())
-		// } else {
-		// 	log.Info("peer metadata req, succeed")
-		// 	peer.SetAtt("beaconmetadata", models.NewBeaconMetadata(bMetadata))
-		// }
-
 		// Beacon Status reqresp error check
 		// if there is an error  in the channel, print error
 		if statusErr != nil {
@@ -137,6 +123,17 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 			log.Debug("peer status req, succeed", bStatus)
 			peer.SetAtt("beaconstatus", models.NewBeaconStatus(bStatus))
 		}
+		// // Beacon Metadata reqresp error check
+		// // if if there is an error  in the channel, print error
+		if metadataErr != nil {
+			log.WithFields(logrus.Fields{
+				"ERROR": metadataErr.Error(),
+			}).Error("ReqMetadata Peer: ", conn.RemotePeer().String())
+		} else {
+			log.Info("peer metadata req, succeed")
+			peer.SetAtt("beaconmetadata", models.NewBeaconMetadata(bMetadata))
+		}
+
 	}
 
 	log.Debug("sending identification event of peer", peer.PeerId)
