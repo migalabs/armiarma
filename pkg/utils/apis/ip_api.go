@@ -7,78 +7,81 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"time"
 
+	"github.com/migalabs/armiarma/pkg/db/postgresql"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
-var (
-	ModuleName string = "PEER-LOCALIZER"
-
-	Log = logrus.WithField(
-		"module", ModuleName,
-	)
-
-	ipApiEndpoint       = "http://ip-api.com/json/"
+const (
+	defaultIpTTL        = 30 * 24 * time.Hour // 30 days
+	ipReqBuffSize       = 1024                // number of ip queries that can be buffered in the channel
+	ipApiEndpoint       = "http://ip-api.com/json/?fields=status,continent,continentCode,country,countryCode,region,regionName,city,zip,lat,lon,isp,org,as,asname,mobile,proxy,hosting,query&query={__ip__}"
 	TooManyRequestError = "error HTTP 429"
 )
 
 // PEER LOCALIZER
 
-type PeerLocalizer struct {
-	ctx      context.Context
-	cancel   context.CancelFunc
-	reqCache requestCache
+type IpLocator struct {
+	ctx context.Context
 	// Request channels
-	locationRequest chan locReq
+	locationRequest chan string
+	// dbClient
+	dbClient *postgresql.DBClient
+
 	// control variables for IP-API request
 	// Control flags from prometheus
 	apiCalls *int32
 }
 
-func NewPeerLocalizer(ctx context.Context, cacheSize int) PeerLocalizer {
-	locContext, cancelFunc := context.WithCancel(ctx)
-	// generate the cache list
-	reqCache := newRequestCache(cacheSize)
-
+func NewIpLocator(ctx context.Context, dbCli *postgresql.DBClient) IpLocator {
 	calls := int32(0)
-	return PeerLocalizer{
-		ctx:             locContext,
-		cancel:          cancelFunc,
-		reqCache:        reqCache,
-		locationRequest: make(chan locReq),
+	return IpLocator{
+		ctx:             ctx,
+		locationRequest: make(chan string, ipReqBuffSize),
+		dbClient:        dbCli,
 		apiCalls:        &calls,
 	}
 }
 
 // Run the necessary routines to locate the IPs
-func (c *PeerLocalizer) Run() {
-	//l.SetLevel(Log.DebugLevel)
+func (c *IpLocator) Run() {
+	//l.SetLevel(Logrus.DebugLevel)
 	c.locatorRoutine()
 }
 
 // locatorRoutine is the main routine that will wait until an request to identify an IP arrives
 // or if the routine gets canceled
-func (c *PeerLocalizer) locatorRoutine() {
-	Log.Info("IP locator routine started")
-	apiCallChan := make(chan locReq) // Give it a size of 20 just in case there are many inbound requests at the same time
+func (c *IpLocator) locatorRoutine() {
+	log.Info("IP locator routine started")
+	apiCallChan := make(chan string, ipRequestSize) // Give it a size of 20 just in case there are many inbound requests at the same time
 	go func() {
 		for {
 			select {
 			// New request to identify an IP
-			case request := <-c.locationRequest:
-				Log.Debug("new request has been received for ip:", request.ip)
+			case reqIp := <-c.locationRequest:
+				log.Debug("new request has been received for ip:", reqIp)
 				// Check if the IP is already in the cache
-				cacheResp, ok := c.reqCache.checkIpInCache(request.ip)
+				exists, expired, err := c.dbClient.CheckIpRecords(reqIp)
+				if err != nil {
+					log.Error("unable to check if IP already exists -", err.Error()) // Should it be a Panic?
+				}
+				// if exists and it didn't expired, don't do anything
+				if exists && !expired {
+					continue
+				}
+
+				// old
 				if ok { // the response was alreadi in the cache.
-					Log.Debugf("ip %s was in cache", request.ip)
+					log.Debugf("ip %s was in cache", reqIp)
 					response := *cacheResp
 					// TODO: might be interesting to check if the error is due to an invalid IP
 					// 		or if the reported error is due to a connection with the server (too many requests in the last minute)
 					if response.err != nil {
-						Log.Warn("readed response from cache includes an error:", response.err.Error())
+						log.Warn("readed response from cache includes an error:", response.err.Error())
 					}
 					// put the received response in the channel to reply the external request
 
@@ -113,7 +116,7 @@ func (c *PeerLocalizer) locatorRoutine() {
 
 				response.ip = request.ip
 				// new API call needs to be done
-				Log.Debugf("call %d-> ip %s not in cache, making API call", call, response.ip)
+				log.Debugf("call %d-> ip %s not in cache, making API call", call, response.ip)
 				for !breakCallLoop {
 					// if req delay is setted to true, make new request
 					// make the API call, and receive the apiResponse, the nextDelayRequest and the error from the connection
@@ -121,7 +124,7 @@ func (c *PeerLocalizer) locatorRoutine() {
 					if response.err != nil {
 						if response.err.Error() == TooManyRequestError {
 							// if the error reports that we tried too many calls on the API, sleep given time and try again
-							Log.Debug("call", call, "-> error received:", response.err.Error(), "\nwaiting ", nextDelayRequest+(5*time.Second))
+							log.Debug("call", call, "-> error received:", response.err.Error(), "\nwaiting ", nextDelayRequest+(5*time.Second))
 							// set req delay to true, noone can make requests
 							// TODO: Change all the sleeps for
 							/*
@@ -133,11 +136,11 @@ func (c *PeerLocalizer) locatorRoutine() {
 							time.Sleep(nextDelayRequest + (5 * time.Second))
 							continue
 						} else {
-							Log.Debug("call", call, "-> diff error received:", response.err.Error())
+							log.Debug("call", call, "-> diff error received:", response.err.Error())
 							break
 						}
 					} else {
-						Log.Debugf("call %d-> api req success", call)
+						log.Debugf("call %d-> api req success", call)
 						// if the error is different from TooManyRequestError break loop and store the request
 						break
 					}
@@ -145,12 +148,12 @@ func (c *PeerLocalizer) locatorRoutine() {
 				}
 				// check if there is any waiting time that we have to respect before next connection
 				if nextDelayRequest != time.Duration(0) {
-					Log.Debugf("call %d-> number of allowed requests has been exceed, waiting %#v", call, nextDelayRequest+(5*time.Second))
+					log.Debugf("call %d-> number of allowed requests has been exceed, waiting %#v", call, nextDelayRequest+(5*time.Second))
 					// set req delay to true, noone can make requests
 					time.Sleep(nextDelayRequest + (5 * time.Second))
 				}
 
-				Log.Debugf("call %d-> saving new request and return it")
+				log.Debugf("call %d-> saving new request and return it")
 				// add the response into the responseCache
 				c.reqCache.addRequest(&response)
 
@@ -168,138 +171,59 @@ func (c *PeerLocalizer) locatorRoutine() {
 }
 
 // LocateIP is an externa request that any module could do to identify an IP
-func (c *PeerLocalizer) LocateIP(ip string) (IpApiMessage, error) {
-	// generate a new locRequest
-	req := newLocReq(ip)
-	// close opened channel at the end of the function
-	defer close(req.respChan)
+func (c *IpLocator) LocateIP(ip string) {
 	// put the request in the Queue
-	c.locationRequest <- req
-
-	// wait until the opened response channel receives the response
-	response := <-req.respChan
-	// check content of the response
-	if response.err != nil {
-		err := errors.Wrap(response.err, "unable to locate IP"+response.ip)
-		return IpApiMessage{}, err
-	}
-	return response.resp, nil
+	c.locationRequest <- ip
 }
 
 //
-func (c *PeerLocalizer) Close() {
-	Log.Info("closing ", ModuleName)
+func (c *IpLocator) Close() {
+	log.Info("closing IP-API service")
 	// close the context for ending up the routine
-	c.cancel()
-}
 
-// internal request between the external request and the internal locator routine
-// includes a channel where to put the IpMsg and the received error
-type locReq struct {
-	ip       string
-	respChan chan ipResponse
-}
-
-func newLocReq(ip string) locReq {
-	return locReq{
-		ip:       ip,
-		respChan: make(chan ipResponse, 1), // give depth of 1 response to the channel
-	}
-}
-
-// REQUES CACHE LIST
-
-type requestCache struct {
-	maxCacheLen int
-	reqList     []*ipResponse
-	reqMap      map[string]*ipResponse
-}
-
-// Generate new requestCache defining the max len that this one can take
-func newRequestCache(maxLen int) requestCache {
-	return requestCache{
-		maxCacheLen: maxLen,
-		reqList:     make([]*ipResponse, 0),
-		reqMap:      make(map[string]*ipResponse),
-	}
-}
-
-// checkIpInCache returns the location for the given IP if it is in cache, !ok if the ip is not in the cache
-func (c *requestCache) checkIpInCache(ip string) (*ipResponse, bool) {
-	resp, ok := c.reqMap[ip]
-	return resp, ok
-}
-
-// addRequest includes a new IP and its location into the requestCache.
-// If the cache is its limit, remove first request from the list and
-// store the new one
-func (c *requestCache) addRequest(response *ipResponse) error {
-	Log.Debug("adding new response to the cache from IP:" + response.ip)
-	// check if the IP is empty
-	if response.ip == "" {
-		return errors.New("the given IP is empty")
-	}
-	// check if the cache is full
-	if c.len() >= c.maxCacheLen {
-		// if the cache is full, remove the first item from the list and from the map
-		c.delFirstRequest()
-	}
-	// add the new item to the last position of the array and to the map
-	c.reqList = append(c.reqList, response)
-	c.reqMap[response.ip] = response
-	return nil
-}
-
-// getFirstRequest returns pointer to the first ipResponse located in the cache, nil if list is empty
-func (c *requestCache) getFirstRequest() *ipResponse {
-	if c.len() <= 0 {
-		return nil
-	}
-	return c.reqList[0]
-}
-
-// delFirstRequest deletes the first item from the array and from the map respectively
-func (c *requestCache) delFirstRequest() {
-	// if the cache is full, remove the first item from the list and from the map
-	fReq := c.getFirstRequest()
-	// del from the map
-	delete(c.reqMap, fReq.ip)
-	// copy last array without first item into c.reqList
-	c.reqList = c.reqList[1:]
-}
-
-// len returns the len of the cache array
-func (c *requestCache) len() int {
-	return len(c.reqList)
 }
 
 type ipResponse struct {
 	ip   string
 	err  error
-	resp IpApiMessage
+	resp IpInfo
 }
 
 // IP-API message structure
-type IpApiMessage struct {
-	Query       string  `json:"query"`
-	Status      string  `json:"status"`
-	Country     string  `json:"country"`
-	CountryCode string  `json:"countryCode"`
-	Region      string  `json:"region"`
-	RegionName  string  `json:"regionName"`
-	City        string  `json:"city"`
-	Zip         string  `json:"zip"`
-	Lat         float64 `json:"lat"`
-	Lon         float64 `json:"lon"`
-	Timezone    string  `json:"timezone"`
-	Isp         string  `json:"isp"`
-	Org         string  `json:"org"`
-	As          string  `json:"as"`
+type IpApiMsg struct {
+	Query         string  `json:"query"`
+	Status        string  `json:"status"`
+	Continent     string  `json:"continent"`
+	ContinentCode string  `json:"continentCode"`
+	Country       string  `json:"country"`
+	CountryCode   string  `json:"countryCode"`
+	Region        string  `json:"region"`
+	RegionName    string  `json:"regionName"`
+	City          string  `json:"city"`
+	Zip           string  `json:"zip"`
+	Lat           float64 `json:"lat"`
+	Lon           float64 `json:"lon"`
+	Isp           string  `json:"isp"`
+	Org           string  `json:"org"`
+	As            string  `json:"as"`
+	AsName        string  `json:"asname"`
+	Mobile        bool    `json:"mobile"`
+	Proxy         bool    `json:"proxy"`
+	Hosting       bool    `json:"hosting"`
+}
+
+type IpInfo struct {
+	IpApiMsg
+	ExpirationTime time.Time
 }
 
 // get location country and City from the multiaddress of the peer on the peerstore
-func (c *PeerLocalizer) getLocationFromIp(ip string) (apiMsg IpApiMessage, delayTime time.Duration, retErr error) {
-	url := ipApiEndpoint + ip
+func (c *IpLocator) getLocationFromIp(ip string) (IpInfo, time.Duration, error) {
+	url := strings.Replace(ipApiEndpoint, "{__ip__}", ip, 1)
+
+	var ipInfo IpInfo
+	var delayTime time.Duration
+	var retErr error
 
 	// Make the IP-APi request
 	resp, err := http.Get(url)
@@ -307,15 +231,15 @@ func (c *PeerLocalizer) getLocationFromIp(ip string) (apiMsg IpApiMessage, delay
 	atomic.AddInt32(c.apiCalls, 1)
 	if err != nil {
 		retErr = errors.Wrap(err, "unable to locate IP"+ip)
-		return
+		return ipInfo, delayTime, retErr
 	}
 	timeLeft, _ := strconv.Atoi(resp.Header["X-Ttl"][0])
 	// check if the error that we are receiving means that we exeeded the request limit
 	if resp.StatusCode == 429 {
-		Log.Warnf("limit of requests per minute has been exeeded, wait for next call %s secs", resp.Header["X-Ttl"][0])
+		log.Warnf("limit of requests per minute has been exeeded, wait for next call %s secs", resp.Header["X-Ttl"][0])
 		retErr = errors.New(TooManyRequestError)
 		delayTime = time.Duration(timeLeft) * time.Second
-		return
+		return ipInfo, delayTime, retErr
 	}
 
 	// Check the attempts left that we have to call the api
@@ -332,19 +256,22 @@ func (c *PeerLocalizer) getLocationFromIp(ip string) (apiMsg IpApiMessage, delay
 	bodyBytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		retErr = errors.Wrap(err, "could not read response body")
-		return
+		return ipInfo, delayTime, retErr
 	}
 
+	var apiMsg IpApiMsg
 	// Convert response body to struct
 	err = json.Unmarshal(bodyBytes, &apiMsg)
 	if err != nil {
 		retErr = errors.Wrap(err, "could not unmarshall response")
-		return
+		return ipInfo, delayTime, retErr
 	}
 	// Check if the status of the request has been succesful
 	if apiMsg.Status != "success" {
 		retErr = errors.New(fmt.Sprintf("status from ip different than success, resp header:\n %#v", *resp))
-		return
+		return ipInfo, delayTime, retErr
 	}
-	return
+	ipInfo.ExpirationTime = time.Now().UTC().Add(defaultIpTTL)
+	ipInfo.IpApiMsg = apiMsg
+	return ipInfo, delayTime, retErr
 }

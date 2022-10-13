@@ -4,6 +4,26 @@ import (
 	"strings"
 )
 
+type ConnError string
+
+const (
+	NoneErr                    ConnError = "none"
+	ConnectionResetErr         ConnError = "connection reset by peer"
+	IOTimeoutErr               ConnError = "i/o timeout"
+	SelfAttemptErr             ConnError = "dial to self attempted"
+	DialBackoffErr             ConnError = "dial backoff"
+	ConnRefusedErr             ConnError = "connection refused"
+	ContextDeadlineExceededErr ConnError = "context deadline exceeded"
+	NoRouteToHostErr           ConnError = "no route to host"
+	UnReachableNetworkErr      ConnError = "unreachable network"
+	PeerIDMissmatchErr         ConnError = "peer id mismatch"
+	MetadataReqErr             ConnError = "error requesting metadata"
+	NoGoodAddressErr           ConnError = "no good addresses"
+	UncertainErr               ConnError = "uncertain"
+)
+
+// TODO: Refactor for a much beter and cleaner Error handling
+
 // Funtion that formats the error into a Pretty understandable (standard) way.
 // Also important to cohesionate the extra-metrics output csv.
 func FilterError(err string) string {
@@ -49,7 +69,6 @@ func FilterError(err string) string {
 	}
 	// TODO: Further encountered errors:
 	// 		 - stream reset
-	// 		 - no good address
 
 	return errorPretty
 }
