@@ -2,8 +2,10 @@ package apis
 
 import (
 	"context"
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/migalabs/armiarma/pkg/db/postgresql"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -66,60 +68,44 @@ var (
 )
 
 // test the requestCache individually
-func TestIpApiReqCache(t *testing.T) {
-	cacheMax := 5
+func TestApiCall(t *testing.T) {
 
-	// testcase to check the maxsize of the cache
-	// generate a the reqCacher
-	reqCache := newRequestCache(cacheMax)
-	for _, value := range validTestIps {
-		var resp ipResponse
-		resp.ip = value
-		err := reqCache.addRequest(&resp)
-		require.Equal(t, nil, err)
-	}
-	// check the len of the cache
-	l := reqCache.len()
-	require.Equal(t, cacheMax, l)
-
-	// check if the last cacheMax ips are in the cache
-	i := 1
-	for i <= cacheMax {
-		vIp := validTestIps[len(validTestIps)-i]
-		respPoint, ok := reqCache.checkIpInCache(vIp)
-		require.Equal(t, true, ok)
-		require.NotEqual(t, nil, respPoint)
-		i++
+	// request the 50 Public IPs
+	for i := 0; i < 10; i++ {
+		ipInfo, _, err := CallIpApi(validTestIps[i])
+		require.NoError(t, err)
+		require.Equal(t, validTestIps[i], ipInfo.Query)
 	}
 }
 
 // test the requestCache individually
 func TestIpLocator(t *testing.T) {
-	cacheMax := 70
-	// Generate the Routine
-	mainCtx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
-	ipLocator := NewPeerLocalizer(mainCtx, cacheMax)
-	defer ipLocator.Close()
+	loginStr := "postgresql://test:password@localhost:5432/armiarmadb"
+
+	// create db and only initialize the ip table
+	dbCli, err := postgresql.NewDBClient(context.Background(), loginStr, false)
+	require.NoError(t, err)
+	err = dbCli.InitIpTable()
+	require.NoError(t, err)
+
+	ipLocator := NewIpLocator(context.Background(), dbCli)
 
 	ipLocator.Run()
+	defer ipLocator.Close()
 
 	// request the 50 Public IPs
 	for _, value := range validTestIps {
-		_, err := ipLocator.LocateIP(value)
-		require.Equal(t, nil, err)
+		ipLocator.LocateIP(value)
 	}
 
 	// request the 2 Private IPs
 	for _, value := range privTestIps {
-		_, err := ipLocator.LocateIP(value)
-		require.NotEqual(t, TooManyRequestError, err)
+		ipLocator.LocateIP(value)
 	}
 
 	// request the 50 Public IPs again (they should be in Cache)
 	for _, value := range validTestIps {
-		_, err := ipLocator.LocateIP(value)
-		require.Equal(t, nil, err)
+		ipLocator.LocateIP(value)
 	}
 }

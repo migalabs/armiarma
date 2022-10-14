@@ -11,17 +11,19 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/migalabs/armiarma/pkg/db/models"
 	"github.com/migalabs/armiarma/pkg/db/postgresql"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
 
 const (
-	defaultIpTTL        = 30 * 24 * time.Hour // 30 days
-	ipReqBuffSize       = 1024                // number of ip queries that can be buffered in the channel
-	ipApiEndpoint       = "http://ip-api.com/json/?fields=status,continent,continentCode,country,countryCode,region,regionName,city,zip,lat,lon,isp,org,as,asname,mobile,proxy,hosting,query&query={__ip__}"
-	TooManyRequestError = "error HTTP 429"
+	defaultIpTTL  = 30 * 24 * time.Hour // 30 days
+	ipReqBuffSize = 1024                // number of ip queries that can be buffered in the channel
+	ipApiEndpoint = "http://ip-api.com/json/{__ip__}?fields=status,continent,continentCode,country,countryCode,region,regionName,city,zip,lat,lon,isp,org,as,asname,mobile,proxy,hosting,query"
 )
+
+var TooManyRequestError error = fmt.Errorf("error HTTP 429")
 
 // PEER LOCALIZER
 
@@ -57,8 +59,8 @@ func (c *IpLocator) Run() {
 // or if the routine gets canceled
 func (c *IpLocator) locatorRoutine() {
 	log.Info("IP locator routine started")
-	apiCallChan := make(chan string, ipRequestSize) // Give it a size of 20 just in case there are many inbound requests at the same time
 	go func() {
+		var nextDelayRequest time.Duration
 		for {
 			select {
 			// New request to identify an IP
@@ -74,96 +76,67 @@ func (c *IpLocator) locatorRoutine() {
 					continue
 				}
 
-				// old
-				if ok { // the response was alreadi in the cache.
-					log.Debugf("ip %s was in cache", reqIp)
-					response := *cacheResp
-					// TODO: might be interesting to check if the error is due to an invalid IP
-					// 		or if the reported error is due to a connection with the server (too many requests in the last minute)
-					if response.err != nil {
-						log.Warn("readed response from cache includes an error:", response.err.Error())
-					}
-					// put the received response in the channel to reply the external request
-
-					request.respChan <- response
-				} else {
-					// Finally there is space in the channel
-					apiCallChan <- request
-				}
-
-			// the context has been deleted, end go routine
-
-			case <-c.ctx.Done():
-				// close the channels
-				close(c.locationRequest)
-				return
-			}
-		}
-	}()
-	go func() {
-		for {
-			select {
-			// request to Identify IP through api call
-			case request := <-apiCallChan:
-				// control flag to see if we have to wait untill we get the next API call
-				// if nextDelayRequest is 0, we can go for the next one,
-				var nextDelayRequest time.Duration
-				var breakCallLoop bool = false
-				var response ipResponse
-
-				call := atomic.LoadInt32(c.apiCalls)
-				atomic.AddInt32(c.apiCalls, 1)
-
-				response.ip = request.ip
+				// since it didn't exist or did expire, request the ip
 				// new API call needs to be done
-				log.Debugf("call %d-> ip %s not in cache, making API call", call, response.ip)
-				for !breakCallLoop {
-					// if req delay is setted to true, make new request
-					// make the API call, and receive the apiResponse, the nextDelayRequest and the error from the connection
-					response.resp, nextDelayRequest, response.err = c.getLocationFromIp(request.ip)
-					if response.err != nil {
-						if response.err.Error() == TooManyRequestError {
-							// if the error reports that we tried too many calls on the API, sleep given time and try again
-							log.Debug("call", call, "-> error received:", response.err.Error(), "\nwaiting ", nextDelayRequest+(5*time.Second))
-							// set req delay to true, noone can make requests
-							// TODO: Change all the sleeps for
-							/*
-									select {
-									case <- time.After(DURATION):
-									case <- ctx.Done()
-								}
-							*/
-							time.Sleep(nextDelayRequest + (5 * time.Second))
-							continue
-						} else {
-							log.Debug("call", call, "-> diff error received:", response.err.Error())
-							break
-						}
-					} else {
-						log.Debugf("call %d-> api req success", call)
-						// if the error is different from TooManyRequestError break loop and store the request
-						break
-					}
+				log.Debugf(" making API call for %s", reqIp)
 
+			reqLoop:
+				for {
+					atomic.AddInt32(c.apiCalls, 1)
+					respC := c.locateIp(reqIp)
+					select {
+					case apiResp := <-respC:
+						// check if there is an error
+						switch apiResp.Err {
+						case TooManyRequestError:
+							nextDelayRequest = apiResp.DelayTime
+							// if the error reports that we tried too many calls on the API, sleep given time and try again
+							log.Debug("call", reqIp, "-> error received:", err.Error(), "\nwaiting ", nextDelayRequest+(5*time.Second))
+							ticker := time.NewTicker(nextDelayRequest + (5 * time.Second))
+							select {
+							case <-ticker.C:
+								continue
+							case <-c.ctx.Done():
+								log.Info("context closure has been detecting, closing IpApi caller")
+								return
+							}
+						case nil:
+							// if the error is different from TooManyRequestError break loop and store the request
+							log.Debugf("call %s-> api req success", reqIp)
+							// check what to do with the results INSERT / UPDATE
+							if exists && expired {
+								if err := c.dbClient.UpdateIP(apiResp.IpInfo); err != nil {
+									log.Error(err)
+								}
+							} else {
+								if err := c.dbClient.InsertNewIP(apiResp.IpInfo); err != nil {
+									log.Error(err)
+								}
+							}
+							break reqLoop
+
+						default:
+							log.Debug("call", reqIp, "-> diff error received:", err.Error())
+							break reqLoop
+
+						}
+
+					case <-c.ctx.Done():
+						log.Info("context closure has been detecting, closing IpApi caller")
+						return
+					}
 				}
 				// check if there is any waiting time that we have to respect before next connection
 				if nextDelayRequest != time.Duration(0) {
-					log.Debugf("call %d-> number of allowed requests has been exceed, waiting %#v", call, nextDelayRequest+(5*time.Second))
+					log.Debugf("number of allowed requests has been exceed, waiting %#v", nextDelayRequest+(5*time.Second))
 					// set req delay to true, noone can make requests
 					time.Sleep(nextDelayRequest + (5 * time.Second))
 				}
 
-				log.Debugf("call %d-> saving new request and return it")
-				// add the response into the responseCache
-				c.reqCache.addRequest(&response)
-
-				// put the received response in the channel to reply the external request
-				request.respChan <- response
-
 			// the context has been deleted, end go routine
 			case <-c.ctx.Done():
 				// close the channels
-				close(apiCallChan)
+				close(c.locationRequest)
 				return
 			}
 		}
@@ -183,63 +156,37 @@ func (c *IpLocator) Close() {
 
 }
 
-type ipResponse struct {
-	ip   string
-	err  error
-	resp IpInfo
-}
-
-// IP-API message structure
-type IpApiMsg struct {
-	Query         string  `json:"query"`
-	Status        string  `json:"status"`
-	Continent     string  `json:"continent"`
-	ContinentCode string  `json:"continentCode"`
-	Country       string  `json:"country"`
-	CountryCode   string  `json:"countryCode"`
-	Region        string  `json:"region"`
-	RegionName    string  `json:"regionName"`
-	City          string  `json:"city"`
-	Zip           string  `json:"zip"`
-	Lat           float64 `json:"lat"`
-	Lon           float64 `json:"lon"`
-	Isp           string  `json:"isp"`
-	Org           string  `json:"org"`
-	As            string  `json:"as"`
-	AsName        string  `json:"asname"`
-	Mobile        bool    `json:"mobile"`
-	Proxy         bool    `json:"proxy"`
-	Hosting       bool    `json:"hosting"`
-}
-
-type IpInfo struct {
-	IpApiMsg
-	ExpirationTime time.Time
+func (c *IpLocator) locateIp(ip string) chan models.ApiResp {
+	respC := make(chan models.ApiResp)
+	go callIpApi(ip, respC)
+	return respC
 }
 
 // get location country and City from the multiaddress of the peer on the peerstore
-func (c *IpLocator) getLocationFromIp(ip string) (IpInfo, time.Duration, error) {
-	url := strings.Replace(ipApiEndpoint, "{__ip__}", ip, 1)
+func callIpApi(ip string, respC chan models.ApiResp) {
+	var apiResponse models.ApiResp
+	apiResponse.IpInfo, apiResponse.DelayTime, apiResponse.Err = CallIpApi(ip)
+	respC <- apiResponse
+	// defer ^
+}
 
-	var ipInfo IpInfo
-	var delayTime time.Duration
-	var retErr error
+func CallIpApi(ip string) (ipInfo models.IpInfo, delay time.Duration, err error) {
+
+	url := strings.Replace(ipApiEndpoint, "{__ip__}", ip, 1)
 
 	// Make the IP-APi request
 	resp, err := http.Get(url)
-	// increment api calls counter
-	atomic.AddInt32(c.apiCalls, 1)
 	if err != nil {
-		retErr = errors.Wrap(err, "unable to locate IP"+ip)
-		return ipInfo, delayTime, retErr
+		err = errors.Wrap(err, "unable to locate IP"+ip)
+		return
 	}
 	timeLeft, _ := strconv.Atoi(resp.Header["X-Ttl"][0])
 	// check if the error that we are receiving means that we exeeded the request limit
 	if resp.StatusCode == 429 {
 		log.Warnf("limit of requests per minute has been exeeded, wait for next call %s secs", resp.Header["X-Ttl"][0])
-		retErr = errors.New(TooManyRequestError)
-		delayTime = time.Duration(timeLeft) * time.Second
-		return ipInfo, delayTime, retErr
+		err = TooManyRequestError
+		delay = time.Duration(timeLeft) * time.Second
+		return
 	}
 
 	// Check the attempts left that we have to call the api
@@ -248,30 +195,31 @@ func (c *IpLocator) getLocationFromIp(ip string) (IpInfo, time.Duration, error) 
 		// if there are no more attempts left against the api, check how much time do we have to wait
 		// until we can call it again
 		// set the delayTime that we return to the given seconds to wait
-		delayTime = time.Duration(timeLeft) * time.Second
+		delay = time.Duration(timeLeft) * time.Second
 	}
 
 	// check if the response was success or not
 	defer resp.Body.Close()
 	bodyBytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		retErr = errors.Wrap(err, "could not read response body")
-		return ipInfo, delayTime, retErr
+		err = errors.Wrap(err, "could not read response body")
+		return
 	}
 
-	var apiMsg IpApiMsg
+	var apiMsg models.IpApiMsg
 	// Convert response body to struct
 	err = json.Unmarshal(bodyBytes, &apiMsg)
 	if err != nil {
-		retErr = errors.Wrap(err, "could not unmarshall response")
-		return ipInfo, delayTime, retErr
+		err = errors.Wrap(err, "could not unmarshall response")
+		return
 	}
 	// Check if the status of the request has been succesful
 	if apiMsg.Status != "success" {
-		retErr = errors.New(fmt.Sprintf("status from ip different than success, resp header:\n %#v", *resp))
-		return ipInfo, delayTime, retErr
+		err = errors.New(fmt.Sprintf("status from ip different than success, resp header:\n %#v", *resp))
+		return
 	}
+
 	ipInfo.ExpirationTime = time.Now().UTC().Add(defaultIpTTL)
 	ipInfo.IpApiMsg = apiMsg
-	return ipInfo, delayTime, retErr
+	return
 }
