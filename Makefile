@@ -4,9 +4,10 @@ MKDIR_P=mkdir -p
 BIN_PATH=./build
 BIN="./build/armiarma"
 
-.PHONY: check dependencies build install clean
+.PHONY: build install clean
 
-build: 
+build:
+	$(GOCC) get
 	$(GOCC) build -o $(BIN)
 
 
