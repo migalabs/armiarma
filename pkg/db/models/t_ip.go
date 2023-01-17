@@ -4,12 +4,11 @@ import "time"
 
 const (
 	IpInfoTTL = 30 * 24 * time.Hour // 30 days
-
 )
 
 // IP-API message structure
 type IpApiMsg struct {
-	Query         string  `json:"query"`
+	IP            string  `json:"query"`
 	Status        string  `json:"status"`
 	Continent     string  `json:"continent"`
 	ContinentCode string  `json:"continentCode"`
@@ -28,6 +27,11 @@ type IpApiMsg struct {
 	Mobile        bool    `json:"mobile"`
 	Proxy         bool    `json:"proxy"`
 	Hosting       bool    `json:"hosting"`
+}
+
+// IsEmpty returns true if the struct reply that we got from the IP-API is empty
+func (m *IpApiMsg) IsEmpty() bool {
+	return m.Country == "" && m.City == ""
 }
 
 type ApiResp struct {

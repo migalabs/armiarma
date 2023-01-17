@@ -45,7 +45,7 @@ func (c *DBClient) InitIpTable() error {
 }
 
 func (c *DBClient) InsertNewIP(ipInfo models.IpInfo) error {
-	log.Debugf("insert ip %s to ips table", ipInfo.Query)
+	log.Debugf("insert ip %s to ips table", ipInfo.IP)
 
 	_, err := c.psqlPool.Exec(c.ctx, `
 		INSERT INTO ips(
@@ -70,7 +70,7 @@ func (c *DBClient) InsertNewIP(ipInfo models.IpInfo) error {
 			hosting)
 		VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
 	`,
-		ipInfo.Query,
+		ipInfo.IP,
 		ipInfo.ExpirationTime,
 		ipInfo.Continent,
 		ipInfo.ContinentCode,
@@ -91,13 +91,13 @@ func (c *DBClient) InsertNewIP(ipInfo models.IpInfo) error {
 		ipInfo.Hosting,
 	)
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("error inserting ip %s to ips table", ipInfo.Query))
+		return errors.Wrap(err, fmt.Sprintf("error inserting ip %s to ips table", ipInfo.IP))
 	}
 	return nil
 }
 
 func (c *DBClient) UpdateIP(ipInfo models.IpInfo) error {
-	log.Debugf("update ip %s to ips table", ipInfo.Query)
+	log.Debugf("update ip %s to ips table", ipInfo.IP)
 
 	_, err := c.psqlPool.Exec(c.ctx, `
 		UPDATE ips SET
@@ -121,7 +121,7 @@ func (c *DBClient) UpdateIP(ipInfo models.IpInfo) error {
 			hosting = $19
 		WHERE ip=$1;
 	`,
-		ipInfo.Query,
+		ipInfo.IP,
 		ipInfo.ExpirationTime,
 		ipInfo.Continent,
 		ipInfo.ContinentCode,
@@ -176,7 +176,7 @@ func (c *DBClient) ReadIpInfo(ip string) (models.IpInfo, error) {
 		FROM ips
 		WHERE ip=$1
 	`, ip).Scan(
-		&ipInfo.Query,
+		&ipInfo.IP,
 		&ipInfo.ExpirationTime,
 		&ipInfo.Continent,
 		&ipInfo.ContinentCode,

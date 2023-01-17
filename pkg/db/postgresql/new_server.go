@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/migalabs/armiarma/pkg/db/models"
+	"github.com/migalabs/armiarma/pkg/utils"
 	"github.com/sirupsen/logrus"
 
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -22,6 +23,9 @@ type DBClient struct {
 	ctx context.Context
 	m   sync.RWMutex
 
+	// Network that we are Crawling
+	Network utils.P2pNetwork
+
 	// Pgx Postgres variables
 	loginStr string
 	psqlPool *pgxpool.Pool
@@ -31,7 +35,12 @@ type DBClient struct {
 	persistC chan interface{}
 }
 
-func NewDBClient(ctx context.Context, loginStr string, initialized bool) (*DBClient, error) {
+func NewDBClient(
+	ctx context.Context,
+	p2pNetwork utils.P2pNetwork,
+	loginStr string,
+	initialized bool) (*DBClient, error) {
+
 	logEntry := logrus.WithField("module", "db-client")
 	logEntry.WithFields(logrus.Fields{"endpoint": loginStr}).Debug("attempt connection to DB")
 
@@ -58,6 +67,7 @@ func NewDBClient(ctx context.Context, loginStr string, initialized bool) (*DBCli
 	// compose the DBClient
 	dbClient := &DBClient{
 		ctx:      ctx,
+		Network:  p2pNetwork,
 		loginStr: loginStr,
 		psqlPool: pPool,
 		persistC: persistC,

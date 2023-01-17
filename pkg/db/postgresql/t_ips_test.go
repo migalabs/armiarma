@@ -30,13 +30,13 @@ func TestIpTable(t *testing.T) {
 	require.NoError(t, err)
 
 	// Test 6* -> check ip records
-	exists, isExpired, err := dbCli.CheckIpRecords(ipInfo.Query)
+	exists, isExpired, err := dbCli.CheckIpRecords(ipInfo.IP)
 	require.NoError(t, err)
 	require.Equal(t, true, exists)
 	require.Equal(t, false, isExpired)
 
 	// Test 3 -> read ip info
-	readIpInfo, err := dbCli.ReadIpInfo(ipInfo.Query)
+	readIpInfo, err := dbCli.ReadIpInfo(ipInfo.IP)
 	require.NoError(t, err)
 	require.Equal(t, ipInfo.Continent, readIpInfo.Continent)
 	//require.Equal(t, ipInfo.ExpirationTime, readIpInfo.ExpirationTime) // We asume that the extra nanosecods are not necesary
@@ -70,7 +70,7 @@ func TestIpTable(t *testing.T) {
 	require.Equal(t, 1, len(expired))
 
 	// Test 6* -> check ip records
-	exists, isExpired, err = dbCli.CheckIpRecords(readIpInfo.Query)
+	exists, isExpired, err = dbCli.CheckIpRecords(readIpInfo.IP)
 	require.NoError(t, err)
 	require.Equal(t, true, exists)
 	require.Equal(t, true, isExpired)
