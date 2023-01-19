@@ -7,6 +7,8 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/migalabs/armiarma/pkg/db/models"
+	ethrpc "github.com/migalabs/armiarma/pkg/networks/ethereum/rpc"
+
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/sirupsen/logrus"
@@ -85,15 +87,13 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 	go ReqHostInfo(mainCtx, &wg, h, c.IpLocator, conn, &peer, &hinfoErr)
 
 	if c.Network == "eth2" {
-
 		// request BeaconStatus metadata as we connect to a peer
 		wg.Add(1)
-		go ReqBeaconStatus(mainCtx, &wg, h, conn.RemotePeer(), &bStatus, &statusErr)
+		go ethrpc.ReqBeaconStatus(mainCtx, &wg, h, conn.RemotePeer(), &bStatus, &statusErr)
 
 		// request the BeaconMetadata
 		wg.Add(1)
-		go ReqBeaconMetadata(mainCtx, &wg, h, conn.RemotePeer(), &bMetadata, &metadataErr)
-
+		go ethrpc.ReqBeaconMetadata(mainCtx, &wg, h, conn.RemotePeer(), &bMetadata, &metadataErr)
 	}
 
 	wg.Wait()
