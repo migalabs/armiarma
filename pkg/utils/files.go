@@ -25,3 +25,13 @@ func CopyFileToNewPath(oldPath string, newPath string) error {
 	}
 	return nil
 }
+
+func RemoveFolderOrFile(target string) error {
+	// Remove all the directories and files
+	// Using RemoveAll() function
+	err := os.RemoveAll(target)
+	if err != nil {
+		return err
+	}
+	return nil
+}
