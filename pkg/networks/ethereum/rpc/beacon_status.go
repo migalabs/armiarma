@@ -9,8 +9,8 @@ import (
 	"sync"
 
 	com "github.com/migalabs/armiarma/pkg/networks/common"
-	"github.com/migalabs/armiarma/pkg/networks/rpc/methods"
-	"github.com/migalabs/armiarma/pkg/networks/rpc/reqresp"
+	"github.com/migalabs/armiarma/pkg/networks/ethereum/rpc/methods"
+	"github.com/migalabs/armiarma/pkg/networks/ethereum/rpc/reqresp"
 
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"

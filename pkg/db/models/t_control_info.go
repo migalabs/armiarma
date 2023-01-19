@@ -33,7 +33,8 @@ type ControlInfo struct {
 	LeftNetwork bool
 
 	// state of the peer
-	IdentState IdentificationState
+	IdentState           IdentificationState
+	LastConnAttemptError error
 
 	// control timestamps
 	LastActivity    time.Time

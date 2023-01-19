@@ -14,6 +14,7 @@ require (
 	github.com/libp2p/go-libp2p-kbucket v0.4.7
 	github.com/libp2p/go-libp2p-noise v0.3.0
 	github.com/libp2p/go-libp2p-pubsub v0.5.5
+	github.com/libp2p/go-libp2p-swarm v0.9.0
 	github.com/libp2p/go-msgio v0.1.0
 	github.com/libp2p/go-tcp-transport v0.4.0
 	github.com/minio/sha256-simd v1.0.0
@@ -90,7 +91,6 @@ require (
 	github.com/libp2p/go-libp2p-pnet v0.2.0 // indirect
 	github.com/libp2p/go-libp2p-quic-transport v0.15.2 // indirect
 	github.com/libp2p/go-libp2p-record v0.1.3 // indirect
-	github.com/libp2p/go-libp2p-swarm v0.9.0 // indirect
 	github.com/libp2p/go-libp2p-tls v0.3.1 // indirect
 	github.com/libp2p/go-libp2p-transport-upgrader v0.6.0 // indirect
 	github.com/libp2p/go-libp2p-yamux v0.7.0 // indirect

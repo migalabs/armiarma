@@ -1,7 +1,7 @@
 package methods
 
 import (
-	"github.com/migalabs/armiarma/pkg/networks/rpc/reqresp"
+	"github.com/migalabs/armiarma/pkg/networks/ethereum/rpc/reqresp"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 )
 

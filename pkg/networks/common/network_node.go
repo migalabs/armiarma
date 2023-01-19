@@ -17,7 +17,7 @@ type RPCRequest func(
 	host.Host,
 	network.Conn,
 	peer.ID,
-	RPCResults,
+	RPCResult,
 	*error,
 )
 type RPCRequestsName string
