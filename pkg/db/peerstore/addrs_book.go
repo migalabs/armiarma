@@ -11,7 +11,7 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 )
 
-func NewAddInfo(pid peer.ID, addrss []ma.Multiaddr, network utils.P2pNetwork) *PersistablePeer {
+func NewAddInfo(pid peer.ID, addrss []ma.Multiaddr, network utils.NetworkType) *PersistablePeer {
 	persistable := &PersistablePeer{
 		ID:      pid,
 		Addrs:   make([]ma.Multiaddr, 0),
@@ -26,7 +26,7 @@ func NewAddInfo(pid peer.ID, addrss []ma.Multiaddr, network utils.P2pNetwork) *P
 type PersistablePeer struct {
 	ID      peer.ID
 	Addrs   []ma.Multiaddr
-	Network utils.P2pNetwork
+	Network utils.NetworkType
 }
 
 // PersistablePeerJSON is the JSON formateable struct that simplifies the variable types to the basic ones
@@ -82,7 +82,7 @@ func (p *PersistablePeer) UnmarshalJSON(input []byte) error {
 	}
 
 	if jsonStr.Network != "" {
-		network := utils.P2pNetwork(jsonStr.Network)
+		network := utils.NetworkType(jsonStr.Network)
 		p.Network = network
 	}
 	return nil

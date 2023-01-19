@@ -3,7 +3,7 @@ package eth2
 import (
 	"context"
 
-	"github.com/migalabs/armiarma/pkg/onchaindata/eth2/endpoint"
+	"github.com/migalabs/armiarma/pkg/networks/ethereum/endpoint"
 	"github.com/pkg/errors"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 )

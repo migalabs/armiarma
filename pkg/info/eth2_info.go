@@ -28,8 +28,7 @@ import (
 	"github.com/migalabs/armiarma/pkg/utils"
 	"github.com/sirupsen/logrus"
 
-	"github.com/migalabs/armiarma/pkg/onchaindata/eth2"
-	"github.com/migalabs/armiarma/pkg/onchaindata/eth2/endpoint"
+	"github.com/migalabs/armiarma/pkg/networks/ethereum/remoteendpoint"
 )
 
 var (
@@ -152,7 +151,7 @@ func Eth2infoFromConfig(inputConfig config.ConfigData) Eth2InfoData {
 	if !valid {
 		// Check if any Eth2Endpoint was given to get the ForkDigest
 		if i.Eth2endpoint != "" {
-			infuraCli, err := endpoint.NewInfuraClient(i.Eth2endpoint)
+			infuraCli, err := remoteendpoint.NewInfuraClient(i.Eth2endpoint)
 			if err != nil {
 				log.Warnf("unable to genereate the eth2 endpoint from the given one. %s", err.Error())
 				_ = i.SetForkDigest(blockchaintopics.DefaultForkDigest)
@@ -160,7 +159,7 @@ func Eth2infoFromConfig(inputConfig config.ConfigData) Eth2InfoData {
 			} else {
 				ctx, _ := context.WithCancel(context.Background())
 				//defer cancel()
-				forkdigest, err := eth2.GetForkDigetsOfEth2Head(ctx, &infuraCli)
+				forkdigest, err := remoteendpoint.GetForkDigetsOfEth2Head(ctx, &infuraCli)
 				if err != nil {
 					log.Warnf("unable to compute the fork digest from the eth2 endpoint. %s", err.Error())
 					_ = i.SetForkDigest(blockchaintopics.DefaultForkDigest)

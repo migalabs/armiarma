@@ -4,7 +4,7 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/migalabs/armiarma/pkg/rpc/reqresp"
+	"github.com/migalabs/armiarma/pkg/networks/rpc/reqresp"
 	"github.com/protolambda/zrnt/eth2/beacon"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/protolambda/ztyp/codec"

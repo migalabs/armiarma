@@ -24,7 +24,7 @@ type DBClient struct {
 	m   sync.RWMutex
 
 	// Network that we are Crawling
-	Network utils.P2pNetwork
+	Network utils.NetworkType
 
 	// Pgx Postgres variables
 	loginStr string
@@ -37,7 +37,7 @@ type DBClient struct {
 
 func NewDBClient(
 	ctx context.Context,
-	p2pNetwork utils.P2pNetwork,
+	NetworkType utils.NetworkType,
 	loginStr string,
 	initialized bool) (*DBClient, error) {
 
@@ -67,7 +67,7 @@ func NewDBClient(
 	// compose the DBClient
 	dbClient := &DBClient{
 		ctx:      ctx,
-		Network:  p2pNetwork,
+		Network:  NetworkType,
 		loginStr: loginStr,
 		psqlPool: pPool,
 		persistC: persistC,

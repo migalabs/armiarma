@@ -24,13 +24,13 @@ type PeerInfo struct {
 	Latency         time.Duration
 
 	// network
-	network utils.P2pNetwork
+	network utils.NetworkType
 
 	// IP related info
 	IpInfo IpInfo
 
 	// Networking
-	ControlInfo *ControlInfo
+	*ControlInfo
 
 	// DB Info
 	lastExport int64 // Timestamp in seconds of the last exported time (backup for when we are loading the Peer).
@@ -42,7 +42,7 @@ type PeerInfo struct {
 }
 
 // NewPeerInfo returns a new structure of the PeerInfo field for the specific network passed as argk
-func NewPeerInfo(peerID peer.ID, network utils.P2pNetwork) *PeerInfo {
+func NewPeerInfo(peerID peer.ID, network utils.NetworkType) *PeerInfo {
 	return &PeerInfo{
 		network:     network,
 		ID:          peerID,
@@ -70,7 +70,7 @@ func (p PeerInfo) ComposeAddrsInfo() peer.AddrInfo {
 }
 
 // return network of a peer (unable to change it)
-func (p PeerInfo) Network() utils.P2pNetwork {
+func (p PeerInfo) Network() utils.NetworkType {
 	p.RLock()
 	defer p.RUnlock()
 

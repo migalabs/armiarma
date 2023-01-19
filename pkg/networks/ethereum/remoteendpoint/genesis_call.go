@@ -3,7 +3,7 @@ package endpoint
 import (
 	"context"
 
-	"github.com/migalabs/armiarma/pkg/onchaindata/eth2/endpoint/types"
+	"github.com/migalabs/armiarma/pkg/networks/ethereum/remoteendpoint/types"
 	"github.com/pkg/errors"
 )
 

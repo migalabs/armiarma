@@ -35,7 +35,7 @@ func TestPeerInfoInPSQL(t *testing.T) {
 
 func genNewTestPeer(
 	t *testing.T,
-	network utils.P2pNetwork,
+	network utils.NetworkType,
 	peerStr string,
 	ip string,
 	userAgent string,

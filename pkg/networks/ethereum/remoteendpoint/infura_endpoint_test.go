@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/migalabs/armiarma/pkg/onchaindata/eth2/endpoint/types"
+	"github.com/migalabs/armiarma/pkg/networks/ethereum/remoteendpoint/types"
 )
 
 var infuraTestEndpoint = "https://20PdJoS82pnejJJ9joDMnbjsQ32:0c9b868d8621332ea91c7fc24c5fc34f@eth2-beacon-mainnet.infura.io"
