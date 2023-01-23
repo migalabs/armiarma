@@ -2,6 +2,7 @@ package models
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -22,6 +23,8 @@ const (
 
 // HostInfo is the basic struct that contains all the information needed to connect, identify and monitor a Peer
 type HostInfo struct {
+	sync.RWMutex
+
 	// AddrInfo
 	ID     peer.ID
 	IP     string
@@ -37,6 +40,8 @@ type HostInfo struct {
 
 	// Control Info
 	ControlInfo ControlInfo
+
+	Attr map[string]interface{}
 }
 
 // NewHostInfo returns a new structure of the PeerInfo field for the specific network passed as argk
@@ -45,6 +50,7 @@ func NewHostInfo(peerID peer.ID, network utils.NetworkType, opts ...RemoteHostOp
 		ID:      peerID,
 		MAddrs:  make([]ma.Multiaddr, 0),
 		Network: network,
+		Attr:    make(map[string]interface{}),
 	}
 
 	// apply all the Options
@@ -62,6 +68,9 @@ func NewHostInfo(peerID peer.ID, network utils.NetworkType, opts ...RemoteHostOp
 
 func WithIPAndPorts(ip string, tcp, udp int) RemoteHostOptions {
 	return func(h *HostInfo) error {
+		h.Lock()
+		defer h.Unlock()
+
 		h.IP = ip
 		h.UDP = udp
 		h.TCP = tcp
@@ -79,6 +88,9 @@ func WithIPAndPorts(ip string, tcp, udp int) RemoteHostOptions {
 
 func WithMultiaddress(mAddrs []ma.Multiaddr) RemoteHostOptions {
 	return func(h *HostInfo) error {
+		h.Lock()
+		defer h.Unlock()
+
 		for _, a := range mAddrs {
 			h.MAddrs = append(h.MAddrs, a)
 		}
@@ -90,6 +102,9 @@ func WithMultiaddress(mAddrs []ma.Multiaddr) RemoteHostOptions {
 // ComposeAddrsInfo returns the PeerId and Multiaddres in the peer.AddrsInfo format
 // Essential for libp2p.Connect() operation
 func (h HostInfo) ComposeAddrsInfo() peer.AddrInfo {
+	h.RLock()
+	defer h.RUnlock()
+
 	// generate new AddrInfo struct
 	addrInfo := peer.AddrInfo{
 		ID:    h.ID,
@@ -101,7 +116,16 @@ func (h HostInfo) ComposeAddrsInfo() peer.AddrInfo {
 	return addrInfo
 }
 
+func (h *HostInfo) AddAtt(key string, attr interface{}) {
+	h.Lock()
+	defer h.Unlock()
+
+	h.Attr[key] = attr
+}
+
 func (h *HostInfo) IdentifyHost(pInfo *PeerInfo) {
+	h.Lock()
+	defer h.Unlock()
 	h.PeerInfo = *pInfo
 }
 
