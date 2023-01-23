@@ -4,7 +4,7 @@ import (
 	"time"
 )
 
-type ControlInfo struct {
+type OldControlInfo struct {
 	ConnectedDirection    []string  // The directions of each connection event.
 	IsConnected           bool      // If the peer is connected (CheckIfRealConnect).
 	Attempted             bool      // If the peer has been attempted to stablish a connection.
@@ -22,8 +22,8 @@ type ControlInfo struct {
 	MetadataSucceed      bool        // If the peer has been successfully requested its metadata.
 }
 
-func NewControlInfo() *ControlInfo {
-	return &ControlInfo{
+func NewOldControlInfo() *OldControlInfo {
+	return &OldControlInfo{
 		ConnectedDirection:   make([]string, 0),
 		Error:                make([]string, 0),
 		NegativeConnAttempts: make([]time.Time, 0),

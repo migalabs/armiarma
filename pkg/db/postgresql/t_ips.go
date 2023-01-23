@@ -1,7 +1,6 @@
 package postgresql
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/migalabs/armiarma/pkg/db/models"
@@ -44,10 +43,10 @@ func (c *DBClient) InitIpTable() error {
 	return nil
 }
 
-func (c *DBClient) InsertNewIP(ipInfo models.IpInfo) error {
-	log.Debugf("insert ip %s to ips table", ipInfo.IP)
-
-	_, err := c.psqlPool.Exec(c.ctx, `
+// UpsertIP attemtps to insert IP in the DB - or Updates the data info if they where already there
+func (c *DBClient) UpsertIpInfo(ipInfo models.IpInfo) (query string, args []interface{}) {
+	// compose query
+	query = `
 		INSERT INTO ips(
 			ip,
 			expiration_time,
@@ -69,84 +68,52 @@ func (c *DBClient) InsertNewIP(ipInfo models.IpInfo) error {
 			proxy,
 			hosting)
 		VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
-	`,
-		ipInfo.IP,
-		ipInfo.ExpirationTime,
-		ipInfo.Continent,
-		ipInfo.ContinentCode,
-		ipInfo.Country,
-		ipInfo.CountryCode,
-		ipInfo.Region,
-		ipInfo.RegionName,
-		ipInfo.City,
-		ipInfo.Zip,
-		ipInfo.Lat,
-		ipInfo.Lon,
-		ipInfo.Isp,
-		ipInfo.Org,
-		ipInfo.As,
-		ipInfo.AsName,
-		ipInfo.Mobile,
-		ipInfo.Proxy,
-		ipInfo.Hosting,
-	)
-	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("error inserting ip %s to ips table", ipInfo.IP))
-	}
-	return nil
+		ON CONFLICT ON CONSTRAINT ip
+			UPDATE SET
+			expiration_time = excluded.expiration_time
+			continent = excluded.continent
+			continent_code = excluded.continent_code
+			country = excluded.country
+			country_code = excluded.country_code
+			region = excluded.region
+			region_name = excluded.region_name
+			city = excluded.city
+			zip = excluded.zip	
+			lat = excluded.lat
+			lon = excluded.lon
+			isp = excluded.isp
+			org = excluded.org
+			as_raw = excluded.as_raw
+			asname = excluded.asname
+			mobile = excluded.mobile
+			proxy = excluded.proxy
+			hosting = excluded.hosting;
+		`
+
+	args = append(args, ipInfo.IP)
+	args = append(args, ipInfo.ExpirationTime)
+	args = append(args, ipInfo.Continent)
+	args = append(args, ipInfo.ContinentCode)
+	args = append(args, ipInfo.Country)
+	args = append(args, ipInfo.CountryCode)
+	args = append(args, ipInfo.Region)
+	args = append(args, ipInfo.RegionName)
+	args = append(args, ipInfo.City)
+	args = append(args, ipInfo.Zip)
+	args = append(args, ipInfo.Lat)
+	args = append(args, ipInfo.Lon)
+	args = append(args, ipInfo.Isp)
+	args = append(args, ipInfo.Org)
+	args = append(args, ipInfo.As)
+	args = append(args, ipInfo.AsName)
+	args = append(args, ipInfo.Mobile)
+	args = append(args, ipInfo.Proxy)
+	args = append(args, ipInfo.Hosting)
+
+	return query, args
 }
 
-func (c *DBClient) UpdateIP(ipInfo models.IpInfo) error {
-	log.Debugf("update ip %s to ips table", ipInfo.IP)
-
-	_, err := c.psqlPool.Exec(c.ctx, `
-		UPDATE ips SET
-			expiration_time = $2,
-			continent = $3,
-			continent_code = $4,
-			country = $5,
-			country_code = $6,
-			region = $7,
-			region_name = $8,
-			city = $9,
-			zip = $10,
-			lat = $11,
-			lon = $12,
-			isp = $13,
-			org = $14,
-			as_raw = $15,
-			asname = $16,
-			mobile = $17,
-			proxy = $18,
-			hosting = $19
-		WHERE ip=$1;
-	`,
-		ipInfo.IP,
-		ipInfo.ExpirationTime,
-		ipInfo.Continent,
-		ipInfo.ContinentCode,
-		ipInfo.Country,
-		ipInfo.CountryCode,
-		ipInfo.Region,
-		ipInfo.RegionName,
-		ipInfo.City,
-		ipInfo.Zip,
-		ipInfo.Lat,
-		ipInfo.Lon,
-		ipInfo.Isp,
-		ipInfo.Org,
-		ipInfo.As,
-		ipInfo.AsName,
-		ipInfo.Mobile,
-		ipInfo.Proxy,
-		ipInfo.Hosting,
-	)
-	if err != nil {
-		return errors.Wrap(err, "error updating ips table")
-	}
-	return nil
-}
-
+// ReadIpInfo reads all the information available for that specific IP in the DB
 func (c *DBClient) ReadIpInfo(ip string) (models.IpInfo, error) {
 	log.Debugf("reading ip info for ip %s", ip)
 
@@ -204,6 +171,7 @@ func (c *DBClient) ReadIpInfo(ip string) (models.IpInfo, error) {
 
 }
 
+// GetExpiredIpInfo returns all the IP whos' TTL has already expired
 func (c *DBClient) GetExpiredIpInfo() ([]string, error) {
 
 	expIps := make([]string, 0)
@@ -231,6 +199,7 @@ func (c *DBClient) GetExpiredIpInfo() ([]string, error) {
 	return expIps, nil
 }
 
+// CheckIpRecords checks if a given IP is already stored in the DB as whether its TTL has expired
 func (c *DBClient) CheckIpRecords(ip string) (exists bool, expired bool, err error) {
 
 	log.Debugf("checkign if ip %s exists in ips table", ip)

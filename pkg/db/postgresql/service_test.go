@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/migalabs/armiarma/pkg/utils"
 	"github.com/stretchr/testify/require"
 )
 
@@ -14,7 +15,7 @@ const (
 func TestNewService(t *testing.T) {
 
 	// create the DB client
-	dbClient, err := NewDBClient(context.Background(), loginStr, true)
+	dbClient, err := NewDBClient(context.Background(), utils.EthereumNetwork, loginStr, true)
 	require.NoError(t, err)
 
 	dbClient.Close()

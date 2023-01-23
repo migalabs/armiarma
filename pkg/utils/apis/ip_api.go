@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/migalabs/armiarma/pkg/db/models"
-	"github.com/migalabs/armiarma/pkg/db/postgresql"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
@@ -25,21 +24,28 @@ const (
 
 var TooManyRequestError error = fmt.Errorf("error HTTP 429")
 
-// PEER LOCALIZER
+// DB Interface for DBWriter
+type DBWriter interface {
+	PersistToDB(interface{})
+	ReadIpInfo(string) (models.IpInfo, error)
+	CheckIpRecords(string) (bool, bool, error)
+	GetExpiredIpInfo() ([]string, error)
+}
 
+// PEER LOCALIZER
 type IpLocator struct {
 	ctx context.Context
 	// Request channels
 	locationRequest chan string
 	// dbClient
-	dbClient *postgresql.DBClient
+	dbClient DBWriter
 
 	// control variables for IP-API request
 	// Control flags from prometheus
 	apiCalls *int32
 }
 
-func NewIpLocator(ctx context.Context, dbCli *postgresql.DBClient) IpLocator {
+func NewIpLocator(ctx context.Context, dbCli DBWriter) IpLocator {
 	calls := int32(0)
 	return IpLocator{
 		ctx:             ctx,
@@ -103,16 +109,8 @@ func (c *IpLocator) locatorRoutine() {
 						case nil:
 							// if the error is different from TooManyRequestError break loop and store the request
 							log.Debugf("call %s-> api req success", reqIp)
-							// check what to do with the results INSERT / UPDATE
-							if exists && expired {
-								if err := c.dbClient.UpdateIP(apiResp.IpInfo); err != nil {
-									log.Error(err)
-								}
-							} else {
-								if err := c.dbClient.InsertNewIP(apiResp.IpInfo); err != nil {
-									log.Error(err)
-								}
-							}
+							// Upsert the IP into the db
+							c.dbClient.PersistToDB(apiResp.IpInfo)
 							break reqLoop
 
 						default:

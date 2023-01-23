@@ -8,6 +8,8 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/migalabs/armiarma/pkg/db/models"
 	"github.com/pkg/errors"
+
+	log "github.com/sirupsen/logrus"
 )
 
 var (

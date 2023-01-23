@@ -15,7 +15,7 @@ func TestConnEventInPSQL(t *testing.T) {
 
 	loginStr := "postgresql://test:password@localhost:5432/armiarmadb"
 	// generate a new DBclient with the given login string
-	dbCli, err := NewDBClient(context.Background(), loginStr, false)
+	dbCli, err := NewDBClient(context.Background(), utils.EthereumNetwork, loginStr, false)
 	defer func() {
 		dbCli.Close()
 	}()
@@ -27,12 +27,13 @@ func TestConnEventInPSQL(t *testing.T) {
 	// insert a new row for the
 	connEv := genNewTestConnEvent(t, "12D3KooW9pdHR2n4xvYU1RBEgrJMH1kd557QSXYURzEFWeEECjGn")
 
-	err = dbCli.InsertNewConnEvent(connEv)
+	q, args := dbCli.InsertNewConnEvent(connEv)
+	_, err = dbCli.SingleQuery(q, args...)
 	require.NoError(t, err)
 
 	// phase 2 -> (Inserting the same peer should result with an error)
-
-	err = dbCli.InsertNewConnEvent(connEv)
+	q, args = dbCli.InsertNewConnEvent(connEv)
+	_, err = dbCli.SingleQuery(q, args...)
 	require.NotEqual(t, nil, err)
 
 }

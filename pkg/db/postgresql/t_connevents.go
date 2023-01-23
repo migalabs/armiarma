@@ -1,10 +1,9 @@
 package postgresql
 
 import (
-	"fmt"
-
 	"github.com/migalabs/armiarma/pkg/db/models"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 )
 
 func (c *DBClient) InitConnEventTable() error {
@@ -25,7 +24,6 @@ func (c *DBClient) InitConnEventTable() error {
 			UNIQUE(peer_id, conn_time)
 		);
 		`)
-	// FOREIGN KEY(peer_id) REFERENCES peer_info(peer_id)
 
 	if err != nil {
 		return errors.Wrap(err, "initializing conn_events table")
@@ -34,11 +32,9 @@ func (c *DBClient) InitConnEventTable() error {
 	return nil
 }
 
-func (c *DBClient) InsertNewConnEvent(connEv *models.ConnEvent) error {
-	// we might have to check whether there is already a peer_id in the table peer_info
-	fmt.Println("inserting", connEv)
-	// add a simple new row
-	tag, err := c.psqlPool.Exec(c.ctx, `
+func (c *DBClient) InsertNewConnEvent(connEv *models.ConnEvent) (query string, args []interface{}) {
+	// compose query
+	query = `
 		INSERT INTO conn_events (
 			peer_id,
 			direction,
@@ -48,19 +44,15 @@ func (c *DBClient) InsertNewConnEvent(connEv *models.ConnEvent) error {
 			identified,
 			error)
 			VALUES ($1,$2,$3,$4,$5,$6,$7)
-		`,
-		connEv.PeerID.String(),
-		models.DirectionIndexToString(connEv.Direction),
-		connEv.ConnTime.Unix(),
-		connEv.Latency.Milliseconds(),
-		connEv.DiscTime.Unix(),
-		connEv.Identified,
-		connEv.Error,
-	)
-	if err != nil {
-		return errors.Wrap(err, "unable to insert conn event")
-	}
+		`
 
-	fmt.Println(tag)
-	return nil
+	args = append(args, connEv.PeerID.String())
+	args = append(args, models.DirectionIndexToString(connEv.Direction))
+	args = append(args, connEv.ConnTime.Unix())
+	args = append(args, connEv.Latency.Milliseconds())
+	args = append(args, connEv.DiscTime.Unix())
+	args = append(args, connEv.Identified)
+	args = append(args, connEv.Error)
+
+	return query, args
 }

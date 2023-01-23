@@ -36,14 +36,9 @@ func (c *DBClient) InitPeerInfoTable() error {
 }
 
 // InsertNewPeerInfo
-func (c *DBClient) InsertNewPeerInfo(pInfo *models.PeerInfo) error {
-
-	log.Debugf("inserting new peer %s", pInfo.ID.String())
-
-	// filter UserAgent to get client name, version, os, and arch
-	cliName, cliVers, cliOS, cliArch := utils.ParseClientType(c.Network, pInfo.UserAgent)
-	_, err := c.psqlPool.Exec(c.ctx, `
-		INSERT INTO peer_info (
+func (c *DBClient) UpsertPeerInfo(pInfo *models.PeerInfo) (q string, args []interface{}) {
+	// compose the query
+	q = `INSERT INTO peer_info (
 			peer_id,
 			user_agent,
 			client_name,
@@ -54,59 +49,35 @@ func (c *DBClient) InsertNewPeerInfo(pInfo *models.PeerInfo) error {
 			ip,
 			protocol_version,
 			sup_protocols)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-		pInfo.ID.String(),
-		pInfo.UserAgent,
-		cliName,
-		cliVers,
-		cliOS,
-		cliArch,
-		pInfo.MAddrs,
-		pInfo.IpInfo,
-		pInfo.ProtocolVersion,
-		pInfo.Protocols,
-	)
-	if err != nil {
-		return errors.Wrap(err, "unable to create tx to db")
-	}
-
-	return nil
-}
-
-func (c *DBClient) UpdatePeerInfo(pInfo *models.PeerInfo) error {
-	log.Debugf("updating info for peer %s", pInfo.ID.String())
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+		ON CONFLICT ON CONSTRAINT peer_id
+			UPDATE SET
+			user_agent = excluded.user_agent,
+			client_name = excluded.client_name,
+			client_version = excluded.client_version,
+			client_os = excluded.client_os,
+			client_arch = excluded.client_arch,
+			multi_addrs = excluded.multi_addrs,
+			ip = excluded.ip,
+			protocol_version = excluded.protocol_version,
+			sup_protocols = excluded.sup_protocols;
+		`
 
 	// filter UserAgent to get client name, version, os, and arch
 	cliName, cliVers, cliOS, cliArch := utils.ParseClientType(c.Network, pInfo.UserAgent)
-	_, err := c.psqlPool.Exec(c.ctx, `
-		UPDATE peer_info SET	 
-			user_agent = $2,
-			client_name = $3,
-			client_version = $4,
-			client_os = $5,
-			client_arch = $6,
-			multi_addrs = $7,
-			ip = $8,
-			protocol_version = $9,
-			sup_protocols = $10
-		WHERE peer_id = $1;
-		`,
-		pInfo.ID.String(),
-		pInfo.UserAgent,
-		cliName,
-		cliVers,
-		cliOS,
-		cliArch,
-		pInfo.MAddrs,
-		pInfo.IpInfo.IP,
-		pInfo.ProtocolVersion,
-		pInfo.Protocols,
-	)
-	if err != nil {
-		return errors.Wrap(err, "unable to create tx to db")
-	}
 
-	return nil
+	args = append(args, pInfo.ID.String())
+	args = append(args, pInfo.UserAgent)
+	args = append(args, cliName)
+	args = append(args, cliVers)
+	args = append(args, cliOS)
+	args = append(args, cliArch)
+	args = append(args, pInfo.MAddrs)
+	args = append(args, pInfo.IpInfo)
+	args = append(args, pInfo.ProtocolVersion)
+	args = append(args, pInfo.Protocols)
+
+	return q, args
 }
 
 func (c *DBClient) ReadPeerInfo(pID peer.ID) (*models.PeerInfo, error) {

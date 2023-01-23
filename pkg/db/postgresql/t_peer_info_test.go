@@ -29,8 +29,13 @@ func TestPeerInfoInPSQL(t *testing.T) {
 	// insert a new row for the
 	peer1 := genNewTestPeer(t, network, "12D3KooW9pdHR2n4xvYU1RBEgrJMH1kd557QSXYURzEFWeEECjGn", "migalabs-crawler", "9000", "192.168.1.1")
 
-	err = dbCli.InsertNewPeerInfo(peer1)
+	q, args := dbCli.UpsertPeerInfo(peer1)
+	_, err = dbCli.SingleQuery(q, args)
 	require.NoError(t, err)
+
+	// Read peer info
+	ok := dbCli.PeerInfoExists(peer1.ID)
+	require.Equal(t, true, ok)
 }
 
 func genNewTestPeer(
