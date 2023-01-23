@@ -6,6 +6,7 @@ import (
 	"github.com/migalabs/armiarma/pkg/db/models"
 
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 )
 
 func (c *DBClient) InitIpTable() error {

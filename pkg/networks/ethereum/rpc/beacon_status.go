@@ -22,8 +22,8 @@ import (
 func ReqBeaconStatus(ctx context.Context, wg *sync.WaitGroup, h host.Host, peerID peer.ID, result *com.RPCResult, finErr *error) {
 	defer wg.Done()
 
-	// Cast RPCResult into common.Status
-	result = result.(*common.Status)
+	// declare the result obj of the RPC call
+	var status common.Status
 
 	frkDgst := new(common.ForkDigest)
 	b, err := hex.DecodeString("4a26c58b") //TODO: remove hardcodding!!!!
@@ -32,7 +32,7 @@ func ReqBeaconStatus(ctx context.Context, wg *sync.WaitGroup, h host.Host, peerI
 	}
 	frkDgst.UnmarshalText(b)
 
-	status := &common.Status{
+	ourStatus := &common.Status{
 		ForkDigest:     *frkDgst,
 		FinalizedRoot:  common.Root{},
 		FinalizedEpoch: 0,
@@ -41,7 +41,7 @@ func ReqBeaconStatus(ctx context.Context, wg *sync.WaitGroup, h host.Host, peerI
 	}
 	var resCode reqresp.ResponseCode // error by default
 	err = methods.StatusRPCv1.RunRequest(ctx, h.NewStream, peerID, new(reqresp.SnappyCompression),
-		reqresp.RequestSSZInput{Obj: status}, 1,
+		reqresp.RequestSSZInput{Obj: ourStatus}, 1,
 		func() error {
 			return nil
 		},
@@ -51,19 +51,17 @@ func ReqBeaconStatus(ctx context.Context, wg *sync.WaitGroup, h host.Host, peerI
 			case reqresp.ServerErrCode, reqresp.InvalidReqCode:
 				msg, err := chunk.ReadErrMsg()
 				if err != nil {
-					return fmt.Errorf("%s: %w", msg, err)
+					return errors.New(fmt.Sprintf("%s: %s", msg, err))
 				}
 			case reqresp.SuccessCode:
-				var stat common.Status
-				if err := chunk.ReadObj(&stat); err != nil {
+				if err := chunk.ReadObj(&status); err != nil {
 					return err
 				}
-				fmt.Println(stat)
-				*resultStatus = stat
 			default:
 				return errors.New("unexpected result code")
 			}
 			return nil
 		})
 	*finErr = err
+	*result = status
 }

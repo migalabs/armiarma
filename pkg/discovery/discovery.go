@@ -26,6 +26,10 @@ var (
 	)
 )
 
+const (
+	minIterTime = 500 * time.Millisecond
+)
+
 type PeerDiscovery interface {
 	Start()
 	Next() bool
@@ -41,12 +45,12 @@ type Discovery struct {
 	ctx context.Context
 
 	DiscService PeerDiscovery
-	PeerStore   *db.PeerStore
-	IpLocator   *apis.PeerLocalizer
+	PeerStore   *db.DBClient
+	IpLocator   *apis.IpLocator
 }
 
 // NewDiscovery
-func NewDiscovery(ctx context.Context, discServ PeerDiscovery, db *db.PeerStore, ipLoc *apis.PeerLocalizer) *Discovery {
+func NewDiscovery(ctx context.Context, discServ PeerDiscovery, db *db.DBClient, ipLoc *apis.IpLocator) *Discovery {
 	// return the Discovery object
 	return &Discovery{
 		ctx:         ctx,

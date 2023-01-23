@@ -20,8 +20,8 @@ import (
 func ReqBeaconMetadata(ctx context.Context, wg *sync.WaitGroup, h host.Host, peerID peer.ID, result *com.RPCResult, finErr *error) {
 	defer wg.Done()
 
-	// Cast RPCResults to BeaconMetadata
-	result = result(*common.MetaData)
+	// declare the result output of the RPC call
+	var metadata common.MetaData
 
 	// Generate the Server Error Code
 	var resCode reqresp.ResponseCode // error by default
@@ -39,7 +39,7 @@ func ReqBeaconMetadata(ctx context.Context, wg *sync.WaitGroup, h host.Host, pee
 					return errors.Errorf("error reqresping BeaconMetadata RPC: %s", msg)
 				}
 			case reqresp.SuccessCode:
-				if err := chunk.ReadObj(result); err != nil {
+				if err := chunk.ReadObj(&metadata); err != nil {
 					return errors.Wrap(err, "from reqresping BeaconMetadata RPC")
 				}
 			default:
@@ -48,4 +48,5 @@ func ReqBeaconMetadata(ctx context.Context, wg *sync.WaitGroup, h host.Host, pee
 			return nil
 		})
 	*finErr = err
+	*result = metadata
 }

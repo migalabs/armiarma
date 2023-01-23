@@ -12,6 +12,14 @@ import (
 
 type RemoteHostOptions func(*HostInfo) error
 
+const (
+	DeprecableTime = 24 * time.Hour
+	// if in 2 months we didn't connect the peer,
+	// say that it left the network
+	// unless discv5 says the opposite
+	LeftNetworkTime = 24 * time.Hour * 60
+)
+
 // HostInfo is the basic struct that contains all the information needed to connect, identify and monitor a Peer
 type HostInfo struct {
 	// AddrInfo
@@ -22,10 +30,13 @@ type HostInfo struct {
 	MAddrs []ma.Multiaddr
 
 	// network
-	network utils.NetworkType
+	Network utils.NetworkType
 
 	// Indetification
 	PeerInfo PeerInfo
+
+	// Control Info
+	ControlInfo ControlInfo
 }
 
 // NewHostInfo returns a new structure of the PeerInfo field for the specific network passed as argk
@@ -33,7 +44,7 @@ func NewHostInfo(peerID peer.ID, network utils.NetworkType, opts ...RemoteHostOp
 	hInfo := &HostInfo{
 		ID:      peerID,
 		MAddrs:  make([]ma.Multiaddr, 0),
-		network: network,
+		Network: network,
 	}
 
 	// apply all the Options
@@ -66,7 +77,7 @@ func WithIPAndPorts(ip string, tcp, udp int) RemoteHostOptions {
 	}
 }
 
-func WithMultiaddress(mAddrs []ma.Muliaddr) RemoteHostOptions {
+func WithMultiaddress(mAddrs []ma.Multiaddr) RemoteHostOptions {
 	return func(h *HostInfo) error {
 		for _, a := range mAddrs {
 			h.MAddrs = append(h.MAddrs, a)
@@ -108,6 +119,12 @@ type PeerInfo struct {
 	Latency         time.Duration
 }
 
+func NewEmptyPeerInfo() *PeerInfo {
+	return &PeerInfo{
+		Protocols: make([]string, 0),
+	}
+}
+
 // IdentifyHost updates if the fileds are not empty the fields that identify the peer in the network
 func NewPeerInfo(remotePeer peer.ID, userAgent, protocolVersion string, protocols []string, latency time.Duration) *PeerInfo {
 	pInfo := &PeerInfo{
@@ -128,4 +145,24 @@ func NewPeerInfo(remotePeer peer.ID, userAgent, protocolVersion string, protocol
 // IsHostIdentified checks if the Peer was already identified before
 func (p *PeerInfo) IsPeerIdentified() bool {
 	return p.UserAgent != "" || p.ProtocolVersion != "" || len(p.Protocols) > 0
+}
+
+type ControlInfo struct {
+	RemotePeer peer.ID
+
+	// major variables
+	Deprecated  bool
+	LeftNetwork bool
+
+	// control timestamps
+	Attempted       bool
+	LastActivity    time.Time
+	LastConnAttempt time.Time
+	LastError       string
+}
+
+func NewControlInfo() *ControlInfo {
+	return &ControlInfo{
+		LastError: "",
+	}
 }

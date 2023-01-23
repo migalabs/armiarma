@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/migalabs/armiarma/pkg/utils"
 )
 
 type ConnDirection int8
@@ -47,7 +46,7 @@ type ConnInfo struct {
 	Latency    time.Duration
 	Identified bool
 	Att        map[string]interface{}
-	Error      utils.ConnError
+	Error      string
 }
 
 type EndConnInfo struct {

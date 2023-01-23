@@ -9,7 +9,7 @@ import (
 	"github.com/migalabs/armiarma/pkg/utils"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/jackc/pgx/v4"
+	pgx "github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 )
@@ -28,7 +28,7 @@ type DBClient struct {
 	m   sync.RWMutex
 
 	// Network that we are Crawling
-	Network utils.P2pNetwork
+	Network utils.NetworkType
 
 	// Pgx Postgres variables
 	loginStr string
@@ -40,7 +40,7 @@ type DBClient struct {
 
 func NewDBClient(
 	ctx context.Context,
-	p2pNetwork utils.P2pNetwork,
+	p2pNetwork utils.NetworkType,
 	loginStr string,
 	initialized bool) (*DBClient, error) {
 
@@ -133,7 +133,7 @@ func (c *DBClient) launchPersister() {
 			log.Tracef("persisting batch of queries with len(%d)", batch.Len())
 			t := time.Now()
 			// begin pgx.Tx
-			tx, err := c.psqlPool.Begin()
+			tx, err := c.psqlPool.Begin(c.ctx)
 			if err != nil {
 				return errors.Wrap(err, "unable to perist batch")
 			}
@@ -178,7 +178,7 @@ func (c *DBClient) launchPersister() {
 				switch obj.(type) {
 				case (*models.HostInfo):
 					hostInfo := obj.(*models.HostInfo)
-					log.Tracef("persisting peer %s\n", hostInfo.ID.String())
+					log.Tracef("persisting host_info %s\n", hostInfo.ID.String())
 
 					// add raw new HostInfo
 					q, args := c.UpsertHostInfo(hostInfo)
@@ -186,9 +186,22 @@ func (c *DBClient) launchPersister() {
 
 					// check if the peerInfo needs to update anything else
 					if hostInfo.IsHostIdentified() {
-						q, args = c.UpsertPeerInfo()
+						log.Tracef("host_info has peer_info %s\n", hostInfo.PeerInfo.RemotePeer.String())
+						q, args = c.UpdatePeerInfo(&hostInfo.PeerInfo)
 						batchQueryFn(batch, q, args...)
 					}
+
+				case (*models.PeerInfo):
+					peerInfo := obj.(*models.PeerInfo)
+					log.Tracef("persisting new peer_info %s\n", peerInfo.RemotePeer.String())
+					q, args := c.UpdatePeerInfo(peerInfo)
+					batchQueryFn(batch, q, args...)
+
+				case (*models.ConnectionAttempt):
+					connAttempt := obj.(*models.ConnectionAttempt)
+					log.Tracef("persisting conn_attempt")
+					q, args := c.UpdateConnAttempt(connAttempt)
+					batchQueryFn(batch, q, args...)
 
 				case (*models.ConnEvent):
 					connEvent := obj.(*models.ConnEvent)
@@ -196,9 +209,10 @@ func (c *DBClient) launchPersister() {
 					q, args := c.InsertNewConnEvent(connEvent)
 					batchQueryFn(batch, q, args...)
 
-				case (*models.ConnAttempt):
-					connAttempt := obj.(*models.ConnAttempt)
-					log.Tracerf("persisting conn_attempt")
+					// Control Info LastActivity based on last disconnection
+					// get the disconnection time to update the LastActivity timestamp in the peer_info table
+					q, args = c.UpdateLastActivityTimestamp(connEvent.PeerID, connEvent.DiscTime)
+					batchQueryFn(batch, q, args...)
 
 				case (*models.IpInfo):
 					ipInfo := obj.(*models.IpInfo)

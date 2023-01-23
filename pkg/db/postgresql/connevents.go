@@ -3,11 +3,11 @@ package postgresql
 import (
 	"github.com/migalabs/armiarma/pkg/db/models"
 	"github.com/pkg/errors"
-	"github.com/rs/zerolog/log"
+	log "github.com/sirupsen/logrus"
 )
 
 func (c *DBClient) InitConnEventTable() error {
-	log.Debug("initializing conn_events table in db")
+	log.Debugf("initializing conn_events table in db\n")
 
 	_, err := c.psqlPool.Exec(c.ctx, `
 		CREATE TABLE IF NOT EXISTS conn_events(

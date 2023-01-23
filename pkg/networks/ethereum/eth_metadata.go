@@ -18,9 +18,7 @@ type BeaconMetadataStamped struct {
 	Metadata  common.MetaData
 }
 
-// UpdateBeaconMetadata:
-// Update beacon Metadata of the peer.
-// @param bMetadata: the Metadata object used to update the data
+// NewbeaconMetadata generates a timestamped beacon.Metadata structure
 func NewBeaconMetadata(bMetadata common.MetaData) BeaconMetadataStamped {
 	return BeaconMetadataStamped{
 		Timestamp: time.Now(),
@@ -28,23 +26,23 @@ func NewBeaconMetadata(bMetadata common.MetaData) BeaconMetadataStamped {
 	}
 }
 
+// IsEmpty checks whether the Metadata is empty or not
 func (b *BeaconMetadataStamped) IsEmpty() bool {
-	return (b.Timestamp == time.Time{})
+	return b.Timestamp.IsZero()
 }
 
-//  Basic BeaconMetadata struct that includes The timestamp of the received beacon Status
+// Basic BeaconMetadata struct that includes The timestamp of the received beacon Status
 type BeaconStatusStamped struct {
 	Timestamp time.Time
 	Status    common.Status
 }
 
+// IsEmpty checks whether the
 func (b *BeaconStatusStamped) IsEmpty() bool {
-	return (b.Timestamp == time.Time{})
+	return b.Timestamp.IsZero()
 }
 
-// UpdateBeaconStatus:
-// Update beacon Status of the peer.
-// @param bStatus: the Status object used to update the data
+// NewBeaconStatus generates a timestamped OBJ that has all the content of the
 func NewBeaconStatus(bStatus common.Status) BeaconStatusStamped {
 	return BeaconStatusStamped{
 		Timestamp: time.Now(),
@@ -54,10 +52,8 @@ func NewBeaconStatus(bStatus common.Status) BeaconStatusStamped {
 
 // --- Parsers ----
 
-// ParseBeaconStatusFromInterface:
-// Parse the inputMap into the BeaconStatusStamped format
-// @param inputMap: a map of string interface
-// @return a map of string BeaconStatusStamped
+// ParseBeaconStatusFromInterfaced returns the Timestamped beaconStatus structure from a input interface
+// JSON oriented -> Seems to be deprecated
 func ParseBeaconStatusFromInterface(input interface{}) (BeaconStatusStamped, error) {
 	var result BeaconStatusStamped
 	var err error
