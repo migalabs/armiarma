@@ -1,142 +1,131 @@
 package models
 
 import (
-	"sync"
+	"fmt"
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/migalabs/armiarma/pkg/utils"
 	ma "github.com/multiformats/go-multiaddr"
+	log "github.com/sirupsen/logrus"
 )
 
-// PeerInfo is the basic struct that contains all the information needed to connect, identify and monitor a Peer
-type PeerInfo struct {
-	sync.RWMutex
+type RemoteHostOptions func(*HostInfo) error
 
+// HostInfo is the basic struct that contains all the information needed to connect, identify and monitor a Peer
+type HostInfo struct {
 	// AddrInfo
 	ID     peer.ID
+	IP     string
+	UDP    int
+	TCP    int
 	MAddrs []ma.Multiaddr
-
-	// Indetification
-	UserAgent       string
-	ProtocolVersion string
-	Protocols       []string
-	Latency         time.Duration
 
 	// network
 	network utils.NetworkType
 
-	// IP related info
-	IpInfo IpInfo
-
-	// Networking
-	*ControlInfo
-
-	// DB Info
-	lastExport int64 // Timestamp in seconds of the last exported time (backup for when we are loading the Peer).
-
-	// Node NetworkNode // specific data for the peer in each of the networks
-	// Attributes
-	// Application layer / extra attributes
-	Att map[string]interface{}
+	// Indetification
+	PeerInfo PeerInfo
 }
 
-// NewPeerInfo returns a new structure of the PeerInfo field for the specific network passed as argk
-func NewPeerInfo(peerID peer.ID, network utils.NetworkType) *PeerInfo {
-	return &PeerInfo{
-		network:     network,
-		ID:          peerID,
-		MAddrs:      make([]ma.Multiaddr, 0),
-		ControlInfo: NewControlInfo(),
-		Att:         make(map[string]interface{}),
+// NewHostInfo returns a new structure of the PeerInfo field for the specific network passed as argk
+func NewHostInfo(peerID peer.ID, network utils.NetworkType, opts ...RemoteHostOptions) *HostInfo {
+	hInfo := &HostInfo{
+		ID:      peerID,
+		MAddrs:  make([]ma.Multiaddr, 0),
+		network: network,
+	}
+
+	// apply all the Options
+	for _, opt := range opts {
+		err := opt(hInfo)
+		if err != nil {
+			log.Error("unable to init HostInfo with folling Option", opt)
+		}
+	}
+
+	return hInfo
+}
+
+// HostInfo Options
+
+func WithIPAndPorts(ip string, tcp, udp int) RemoteHostOptions {
+	return func(h *HostInfo) error {
+		h.IP = ip
+		h.UDP = udp
+		h.TCP = tcp
+
+		// Compose Muliaddress from data
+		mAddr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%d", ip, tcp))
+		if err != nil {
+			return err
+		}
+		// add single address to the HostInfo
+		h.MAddrs = append(h.MAddrs, mAddr)
+		return nil
+	}
+}
+
+func WithMultiaddress(mAddrs []ma.Muliaddr) RemoteHostOptions {
+	return func(h *HostInfo) error {
+		for _, a := range mAddrs {
+			h.MAddrs = append(h.MAddrs, a)
+		}
+		// TODO: Extract public IP, tcp and udp from ma
+		return nil
 	}
 }
 
 // ComposeAddrsInfo returns the PeerId and Multiaddres in the peer.AddrsInfo format
 // Essential for libp2p.Connect() operation
-func (p PeerInfo) ComposeAddrsInfo() peer.AddrInfo {
-	p.RLock()
-	defer p.RUnlock()
-
+func (h HostInfo) ComposeAddrsInfo() peer.AddrInfo {
 	// generate new AddrInfo struct
 	addrInfo := peer.AddrInfo{
-		ID:    p.ID,
+		ID:    h.ID,
 		Addrs: make([]ma.Multiaddr, 0),
 	}
 	// append the MAddrs
-	addrInfo.Addrs = p.MAddrs
+	addrInfo.Addrs = h.MAddrs
 
 	return addrInfo
 }
 
-// return network of a peer (unable to change it)
-func (p PeerInfo) Network() utils.NetworkType {
-	p.RLock()
-	defer p.RUnlock()
+func (h *HostInfo) IdentifyHost(pInfo *PeerInfo) {
+	h.PeerInfo = *pInfo
+}
 
-	return p.network
+func (h *HostInfo) IsHostIdentified() bool {
+	return h.PeerInfo.IsPeerIdentified()
+}
+
+// PeerInfo contains all the info that can be extracted from the Libp2p.IDService
+type PeerInfo struct {
+	// Indetification
+	RemotePeer      peer.ID
+	UserAgent       string
+	ProtocolVersion string
+	Protocols       []string
+	Latency         time.Duration
 }
 
 // IdentifyHost updates if the fileds are not empty the fields that identify the peer in the network
-func (p *PeerInfo) IndentifyHost(userAgent, protocolVersion string, protocols []string, latency time.Duration) {
-	p.Lock()
-	defer p.Unlock()
-
-	// update the host indentification if the host was already identified
-	// or if the new data is not empty (asuming that we can update the data)
-	if !p.IsHostIdentified() || (userAgent != "" && protocolVersion != "" && len(protocols) > 0) {
-		p.UserAgent = userAgent
-		p.ProtocolVersion = protocolVersion
-		p.Protocols = protocols
-		p.Latency = latency
+func NewPeerInfo(remotePeer peer.ID, userAgent, protocolVersion string, protocols []string, latency time.Duration) *PeerInfo {
+	pInfo := &PeerInfo{
+		RemotePeer:      remotePeer,
+		UserAgent:       userAgent,
+		ProtocolVersion: protocolVersion,
+		Protocols:       make([]string, 0),
+		Latency:         latency,
 	}
+
+	for _, protocol := range protocols {
+		pInfo.Protocols = append(pInfo.Protocols, protocol)
+	}
+
+	return pInfo
 }
 
 // IsHostIdentified checks if the Peer was already identified before
-func (p *PeerInfo) IsHostIdentified() bool {
-	p.RLock()
-	defer p.RUnlock()
-
+func (p *PeerInfo) IsPeerIdentified() bool {
 	return p.UserAgent != "" || p.ProtocolVersion != "" || len(p.Protocols) > 0
 }
-
-// UpdateExportTime updates the time when we updated the time
-func (p *PeerInfo) UpdateExportTime(t time.Time) {
-	p.Lock()
-	defer p.Unlock()
-
-	if t == (time.Time{}) {
-		t = time.Now()
-	}
-	p.lastExport = t.Unix()
-}
-
-// LastExportTime returns the last time we exported the Peer to the DB
-func (p PeerInfo) LastExportTime() int64 {
-	p.RLock()
-	defer p.RUnlock()
-
-	return p.lastExport
-}
-
-// AddAtt adds a new attribute to the peer
-func (p *PeerInfo) AddAttr(key string, value interface{}) {
-	p.Lock()
-	defer p.Unlock()
-
-	p.Att[key] = value
-}
-
-// ReadAtt reads (if it exists) the attribute for the given key
-func (p *PeerInfo) ReadAttr(key string) (interface{}, bool) {
-	p.RLock()
-	defer p.RUnlock()
-
-	value, ok := p.Att[key]
-	return value, ok
-}
-
-// TODO:
-// 		- missing Network related stuff
-// 		- ControlInfo related stuff
-// 		- Attributes

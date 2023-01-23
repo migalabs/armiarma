@@ -11,7 +11,7 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 )
 
-func NewAddInfo(pid peer.ID, addrss []ma.Multiaddr, network utils.NetworkType) *PersistablePeer {
+func NewInfo(pid peer.ID, addrss []ma.Multiaddr, network utils.NetworkType) *PersistablePeer {
 	persistable := &PersistablePeer{
 		ID:      pid,
 		Addrs:   make([]ma.Multiaddr, 0),

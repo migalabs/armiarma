@@ -5,6 +5,7 @@ import (
 	"github.com/migalabs/armiarma/pkg/db/models"
 	"github.com/migalabs/armiarma/pkg/utils"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 )
 
 func (c *DBClient) InitPeerInfoTable() error {
@@ -14,13 +15,16 @@ func (c *DBClient) InitPeerInfoTable() error {
 		CREATE TABLE IF NOT EXISTS peer_info(
 			id SERIAL,
 			peer_id TEXT NOT NULL,
+			network TEXST NOT NULL,
+			multi_addrs TEXT[] NOT NULL,
+			ip TEXT NOT NULL,
+			tcp INT,
+			udp INT,
 			user_agent TEXT,
 			client_name TEXT,
 			client_version TEXT, 
 			client_os TEXT,
 			client_arch TEXT,
-			multi_addrs TEXT[] NOT NULL,
-			ip TEXT NOT NULL,
 			protocol_version TEXT,
 			sup_protocols []TEXT
 
@@ -36,6 +40,35 @@ func (c *DBClient) InitPeerInfoTable() error {
 }
 
 // InsertNewPeerInfo
+func (c *DBClient) UpsertHostInfo(hInfo *models.HostInfo) (q string, args []interface{}) {
+	// compose the query
+	q = `INSERT INTO peer_info (
+			peer_id,
+			network,
+			multi_addrs,
+			ip,
+			tcp,
+			udp)
+		VALUES ($1,$2,$3,$4,$5,$6)
+		ON CONFLICT ON CONSTRAINT peer_id
+			UPDATE SET
+			multi_addrs = excluded.multi_addrs,
+			ip = excluded.ip
+			tcp = excluded.tcp
+			udp = excluded udp;
+		`
+
+	args = append(args, hInfo.ID.String())
+	args = append(args, string(hInfo.Network))
+	args = append(args, hInfo.MAddrs)
+	args = append(args, hInfo.IP)
+	args = append(args, hInfo.TCP)
+	args = append(args, hInfo.UDP)
+
+	return q, args
+}
+
+// InsertNewPeerInfo
 func (c *DBClient) UpsertPeerInfo(pInfo *models.PeerInfo) (q string, args []interface{}) {
 	// compose the query
 	q = `INSERT INTO peer_info (
@@ -45,11 +78,9 @@ func (c *DBClient) UpsertPeerInfo(pInfo *models.PeerInfo) (q string, args []inte
 			client_version,
 			client_os,
 			client_arch,
-			multi_addrs,
-			ip,
 			protocol_version,
 			sup_protocols)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
 		ON CONFLICT ON CONSTRAINT peer_id
 			UPDATE SET
 			user_agent = excluded.user_agent,
@@ -57,8 +88,6 @@ func (c *DBClient) UpsertPeerInfo(pInfo *models.PeerInfo) (q string, args []inte
 			client_version = excluded.client_version,
 			client_os = excluded.client_os,
 			client_arch = excluded.client_arch,
-			multi_addrs = excluded.multi_addrs,
-			ip = excluded.ip,
 			protocol_version = excluded.protocol_version,
 			sup_protocols = excluded.sup_protocols;
 		`
@@ -66,14 +95,12 @@ func (c *DBClient) UpsertPeerInfo(pInfo *models.PeerInfo) (q string, args []inte
 	// filter UserAgent to get client name, version, os, and arch
 	cliName, cliVers, cliOS, cliArch := utils.ParseClientType(c.Network, pInfo.UserAgent)
 
-	args = append(args, pInfo.ID.String())
+	args = append(args, pInfo.RemotePeer.String())
 	args = append(args, pInfo.UserAgent)
 	args = append(args, cliName)
 	args = append(args, cliVers)
 	args = append(args, cliOS)
 	args = append(args, cliArch)
-	args = append(args, pInfo.MAddrs)
-	args = append(args, pInfo.IpInfo)
 	args = append(args, pInfo.ProtocolVersion)
 	args = append(args, pInfo.Protocols)
 

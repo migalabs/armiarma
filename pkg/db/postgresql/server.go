@@ -176,18 +176,29 @@ func (c *DBClient) launchPersister() {
 			case obj := <-c.persistC: // persist any kind of item
 				// Every item/SQL query  has to return (string. []interfaces)
 				switch obj.(type) {
-				case (*models.PeerInfo):
-					// TODO: batch.Queue
-					peerInfo := obj.(*models.PeerInfo)
-					log.Tracef("persisting peer %s\n", peerInfo.ID.String())
-					q, args := c.UpsertPeerInfo(peerInfo)
+				case (*models.HostInfo):
+					hostInfo := obj.(*models.HostInfo)
+					log.Tracef("persisting peer %s\n", hostInfo.ID.String())
+
+					// add raw new HostInfo
+					q, args := c.UpsertHostInfo(hostInfo)
 					batchQueryFn(batch, q, args...)
+
+					// check if the peerInfo needs to update anything else
+					if hostInfo.IsHostIdentified() {
+						q, args = c.UpsertPeerInfo()
+						batchQueryFn(batch, q, args...)
+					}
 
 				case (*models.ConnEvent):
 					connEvent := obj.(*models.ConnEvent)
 					log.Tracef("persisting conn_event for peer %s\n", connEvent.PeerID.String())
 					q, args := c.InsertNewConnEvent(connEvent)
 					batchQueryFn(batch, q, args...)
+
+				case (*models.ConnAttempt):
+					connAttempt := obj.(*models.ConnAttempt)
+					log.Tracerf("persisting conn_attempt")
 
 				case (*models.IpInfo):
 					ipInfo := obj.(*models.IpInfo)

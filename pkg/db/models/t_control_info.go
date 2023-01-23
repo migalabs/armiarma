@@ -1,22 +1,14 @@
 package models
 
 import (
+	"sync"
 	"time"
-
-	"github.com/libp2p/go-libp2p-core/peer"
-)
-
-type AttemptStatus string
-
-const (
-	PossitiveAttempt AttemptStatus = "positive"
-	NegativeAttempt  AttemptStatus = "negative"
 )
 
 type IdentificationState int8
 
 const (
-	NonIdentified IdentificationState = iota
+	NotIdentified IdentificationState = iota
 	AttemptedAndSucceed
 	AttemptedNotSucceed
 )
@@ -30,13 +22,13 @@ const (
 )
 
 type ControlInfo struct {
+	m sync.RWMutex
 	// major variables
 	Deprecated  bool
 	LeftNetwork bool
 
 	// state of the peer
-	IdentState           IdentificationState
-	LastConnAttemptError error
+	IdentState IdentificationState
 
 	// control timestamps
 	LastActivity    time.Time
@@ -46,56 +38,66 @@ type ControlInfo struct {
 }
 
 func NewControlInfo() ControlInfo {
-	return ControlInfo{}
-}
-
-// Deprecate sets the deprecation flag to true while checking if the remote peer looks like it has left the network
-func (c *ControlInfo) Deprecate() {
-	c.Deprecated = true
-	// check if the peer has passed time to be consider as network leaver
-	if c.checkIfLeftNetwork() {
-		c.markAsLeftNetwork()
+	return ControlInfo{
+		IdentState: NotIdentified,
+		LastError:  "",
 	}
 }
 
-// IsDeprecated checks whether the peer has been previoulsy deprecated
-func (c ControlInfo) IsDeprecated() bool {
-	return c.Deprecated
-}
+// THIS MIGHT BE OUTDATED due to the constant info-sharing with the DB
 
-// checkIfLeftNetwork check whether the peer has been unreachable for more thatn LeftNetworkTime
-func (c ControlInfo) checkIfLeftNetwork() bool {
-	return time.Since(c.LastActivity) >= LeftNetworkTime
-}
+// // Deprecate sets the deprecation flag to true while checking if the remote peer looks like it has left the network
+// func (c *ControlInfo) Deprecate() {
+// 	c.m.Lock()
+// 	defer c.m.Unlock()
 
-// markAsLeftNetwork sets the LeftNetwork flag to true
-func (c *ControlInfo) markAsLeftNetwork() {
-	c.LeftNetwork = true
-}
+// 	c.Deprecated = true
+// 	// check if the peer has passed time to be consider as network leaver
+// 	if c.checkIfLeftNetwork() {
+// 		c.markAsLeftNetwork()
+// 	}
+// }
 
-// HasLeftNetwork checks whether the peer has been inactive for more than LeftNetworkTime
-// updates the LeftNetwork flag and returns the
-func (c ControlInfo) HasLeftNetwork() bool {
+// // IsDeprecated checks whether the peer has been previoulsy deprecated
+// func (c ControlInfo) IsDeprecated() bool {
+// 	c.m.RLock()
+// 	defer c.m.RUnlock()
 
-	return c.LeftNetwork
-}
+// 	return c.Deprecated
+// }
 
-// updateStateOfRemotePeer modifies the state of a remote peer depending on their identification state
-func (c *ControlInfo) updateStateOfRemotePeer(newState IdentificationState) {
-	c.IdentState = newState
-}
+// // checkIfLeftNetwork check whether the peer has been unreachable for more thatn LeftNetworkTime
+// func (c ControlInfo) checkIfLeftNetwork() bool {
+// 	c.m.RLock()
+// 	defer c.m.RUnlock()
 
-// ConnectionAttempt is the basic struct that tracks the status of any proactive-attempt to connect any peer in the network
-type ConnectionAttempt struct {
-	RemotePeer peer.ID
-	Timestamp  time.Time
-	Activity   AttemptStatus
-	Error      string
-}
+// 	return time.Since(c.LastActivity) >= LeftNetworkTime
+// }
 
-// AddNewConnAttempt track any new connection attempt to the remote peer
-// TODO: - Check whether this should be better done in the Deprecation part
-// performs the logic to determine whether the peer needs to be deprecated or not
-func (c *ControlInfo) AddNewConnAttemtp(attempt ConnectionAttempt) {
+// // markAsLeftNetwork sets the LeftNetwork flag to true
+// func (c *ControlInfo) markAsLeftNetwork() {
+// 	c.m.Lock()
+// 	defer c.m.Unlock()
 
-}
+// 	c.LeftNetwork = true
+// }
+
+// // HasLeftNetwork checks whether the peer has been inactive for more than LeftNetworkTime
+// // updates the LeftNetwork flag and returns the
+// func (c ControlInfo) HasLeftNetwork() bool {
+// 	c.m.Lock()
+// 	defer c.m.Unlock()
+
+// 	if c.checkIfLeftNetwork() {
+// 		c.markAsLeftNetwork()
+// 	}
+// 	return c.LeftNetwork
+// }
+
+// // updateStateOfRemotePeer modifies the state of a remote peer depending on their identification state
+// func (c *ControlInfo) updateStateOfRemotePeer(newState IdentificationState) {
+// 	c.m.Lock()
+// 	defer c.m.Unlock()
+
+// 	c.IdentState = newState
+// }
