@@ -9,14 +9,11 @@ With this interface, the given host will be able to retreive and connect a set o
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/migalabs/armiarma/pkg/db"
 	"github.com/migalabs/armiarma/pkg/db/models"
+	psql "github.com/migalabs/armiarma/pkg/db/postgresql"
 	"github.com/migalabs/armiarma/pkg/hosts"
-	ma "github.com/multiformats/go-multiaddr"
 	"github.com/sirupsen/logrus"
 )
 
@@ -38,9 +35,9 @@ type PeeringOption func(*PeeringService) error
 type PeeringService struct {
 	ctx context.Context
 
-	host      *hosts.BasicLibp2pHost
-	PeerStore *db.PeerStore
-	strategy  PeeringStrategy
+	host     *hosts.BasicLibp2pHost
+	DBClient *psql.DBClient
+	strategy PeeringStrategy
 	// Control Flags
 	Timeout    time.Duration
 	MaxRetries int
@@ -50,13 +47,13 @@ type PeeringService struct {
 func NewPeeringService(
 	ctx context.Context,
 	h *hosts.BasicLibp2pHost,
-	peerstore *db.PeerStore,
+	dbClient *psql.DBClient,
 	opts ...PeeringOption) (PeeringService, error) {
 
 	pServ := PeeringService{
 		ctx:        ctx,
 		host:       h,
-		PeerStore:  peerstore,
+		DBClient:   dbClient,
 		Timeout:    ConnectionRefuseTimeout,
 		MaxRetries: MaxRetries, // TODO: Hardcoded to 1 retry, future retries are directly dismissed/dropped by dialing peer
 	}
@@ -104,7 +101,7 @@ func (c *PeeringService) Run() {
 // Peering routine that will be launched several times (several workers).
 // @param workerID: id of the worker.
 // @param peerStreamChan: used to receive the next peer.
-func (c *PeeringService) peeringWorker(workerID string, peerStreamChan chan models.Peer) {
+func (c *PeeringService) peeringWorker(workerID string, peerStreamChan chan *models.HostInfo) {
 	log.Infof("launching %s", workerID)
 	peeringCtx := c.ctx
 	h := c.host.Host()
@@ -117,74 +114,64 @@ func (c *PeeringService) peeringWorker(workerID string, peerStreamChan chan mode
 		select {
 		// Next peer arrives
 		case nextPeer := <-peerStreamChan:
-			log.Debugf("%s -> new peer %s to connect", workerID, nextPeer.PeerId)
-			peerID, err := peer.Decode(nextPeer.PeerId)
-			if err != nil {
-				log.Warnf("%s -> coulnd't extract peer.ID from peer %s", workerID, nextPeer.PeerId)
-				// Request the next peer when case is over
-				c.strategy.NextPeer()
-				continue
-			}
+			log.Debugf("%s -> new peer %s to connect", workerID, nextPeer.ID.String())
+
 			// Check if the peer is already connected by the host
 			peerList := h.Network().Peers()
 			connected := false
 			for _, p := range peerList {
-				if p.String() == peerID.String() {
+				if p.String() == nextPeer.ID.String() {
 					connected = true
 					break
 				}
 			}
 			if connected {
-				log.Infof("%s -> Peer %s was already connected", workerID, nextPeer.PeerId)
+				log.Debugf("%s -> Peer %s was already connected", workerID, nextPeer.ID.String())
 				c.strategy.NextPeer()
 				continue
 			}
 
-			// Set the correct address format to connect the peers
-			// libp2p complains if we put multi-addresses that include the peer ID into the Addrs list.
-			addrs := nextPeer.ExtractPublicAddr()
-			transport, _ := peer.SplitAddr(addrs)
-			if transport == nil {
-				// Request the next peer when case is over
-				c.strategy.NextPeer()
-				continue
-			}
-			addrInfo := peer.AddrInfo{
-				ID:    peerID,
-				Addrs: make([]ma.Multiaddr, 0, 1),
-			}
-			addrInfo.Addrs = append(addrInfo.Addrs, transport)
-			nPeer := models.NewPeer(nextPeer.PeerId)
-			connAttStat := ConnectionAttemptStatus{
-				Peer: nPeer,
-			}
+			addrInfo := nextPeer.ComposeAddrsInfo()
+
 			log.Debugf("%s addrs %s attempting connection to peer", workerID, addrInfo.Addrs)
+
+			// control info for the attempt
+			var attStatus models.AttemptStatus = models.NegativeAttempt
+			var attError string = ""
+			var deprecable bool = false
+			var leftNet bool = false
+
 			// try to connect the peer
 			attempts := 0
 			timeoutctx, cancel := context.WithTimeout(peeringCtx, c.Timeout)
 			for attempts < c.MaxRetries {
 				if err := h.Connect(timeoutctx, addrInfo); err != nil {
 					log.WithError(err).Debugf("%s attempts %d failed connection attempt", workerID, attempts+1)
-					// the connetion failed
-					// fill the ConnectionStatus for the given peer connection
-					connAttStat.Timestamp = time.Now()
-					connAttStat.Successful = false
-					connAttStat.RecError = err
+					attError = hosts.ParseConError(err)
 					// increment the attempts
 					attempts++
 					continue
 				} else { // connection successfuly made
-					log.Debugf("%s peer_id %s successful connection made", workerID, peerID.String())
+					log.Debugf("%s peer_id %s successful connection made", workerID, nextPeer.ID.String())
 					// fill the ConnectionStatus for the given peer connection
-					connAttStat.Timestamp = time.Now()
-					connAttStat.Successful = true
-					connAttStat.RecError = nil
+					attStatus = models.PossitiveAttempt
+					attError = hosts.NoConnError
 					break
 				}
 			}
 			cancel()
+
+			// generate the connectionAttempt
+			connAttempt := models.NewConnAttempt(
+				nextPeer.ID,
+				attStatus,
+				attError,
+				deprecable,
+				leftNet,
+			)
+
 			// send it to the strategy
-			c.strategy.NewConnectionAttempt(connAttStat)
+			c.strategy.NewConnectionAttempt(connAttempt)
 			// Request the next peer when case is over
 			c.strategy.NextPeer()
 
@@ -210,22 +197,13 @@ func (c *PeeringService) eventRecorderRoutine() {
 
 		// New connection event
 		case newConn := <-newConnEventChan:
-			switch newConn.ConnType {
-			case int8(1):
-				log.Debugf("new conection from %s", newConn.Peer.PeerId)
-			case int8(2):
-				log.Debugf("new disconnection from %s", newConn.Peer.PeerId)
-			default:
-				log.Debugf("unrecognized event from peer %s", newConn.Peer.PeerId)
-			}
 			c.strategy.NewConnectionEvent(newConn)
 
 		// New identification event has been recorded
 		case newIdent := <-newIdentPeerChan:
-			log.Debugf("new identification %s from peer %s", strconv.FormatBool(newIdent.Peer.IsConnected), newIdent.Peer.PeerId)
 			c.strategy.NewIdentificationEvent(newIdent)
 
-			// Stoping go routine
+		// Stoping go routine
 		case <-c.ctx.Done():
 			log.Debug("closing peering go routine")
 			return

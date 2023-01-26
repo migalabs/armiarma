@@ -19,9 +19,9 @@ var (
 
 	// define the initial delay we apply in each of the types
 	InitialDelayTime = map[string]time.Duration{
-		PositiveDelayType:           128 * time.Minute,
+		PositiveDelayType:           64 * time.Minute,
 		NegativeWithHopeDelayType:   2 * time.Minute,
-		NegativeWithNoHopeDelayType: 256 * time.Minute,
+		NegativeWithNoHopeDelayType: 128 * time.Minute,
 		ZeroDelayType:               0 * time.Hour,
 		Minus1DelayType:             -1000 * time.Hour,
 		TimeoutDelayType:            32 * time.Minute, //experimental
@@ -184,7 +184,7 @@ func (d NegativeDelay) CalculateDelay() time.Duration {
 }
 
 // NegativeWithHopeDelay:
-// In case of "connection reset by peer", "connection refused", "context deadline exceeded", "dial backoff", "metadata error" and default.
+// In case of "connection reset by peer", "connection refused", "context deadline exceeded", "dial backoff"
 // Usually peers that have returned and error but could possibly be identified.
 // baseDelay = 2 minutes.
 type NegativeWithHopeDelay struct {

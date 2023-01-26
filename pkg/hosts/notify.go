@@ -7,7 +7,9 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/migalabs/armiarma/pkg/db/models"
+	eth "github.com/migalabs/armiarma/pkg/networks/ethereum"
 	ethrpc "github.com/migalabs/armiarma/pkg/networks/ethereum/rpc"
+	"github.com/migalabs/armiarma/pkg/utils"
 
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
@@ -18,19 +20,9 @@ import (
 	File that includes the methods to set the custom modification channels for the Libp2p host
 */
 
-// ConnectionEvent
-// It is the struct that compiles the data of a received a connection from the host
-// The struct will be shared between peering and strategy.
-type ConnectionEvent struct {
-	ConnType  int8        // (0)-Empty (1)-Connection (2)-Disconnection
-	Peer      models.Peer // TODO: right now just sending the entire info about the peer, (recheck after Peer struct subdivision)
-	Timestamp time.Time   // Timestamp of when was the attempt done
-	// TODO: More things to add in te future
-}
-
 type IdentificationEvent struct {
-	Peer      models.Peer // TODO: right now just sending the entire info about the peer, (recheck after Peer struct subdivision)
-	Timestamp time.Time   // Timestamp of when was the attempt done
+	HostInfo  *models.HostInfo
+	Timestamp time.Time // Timestamp of when was the attempt done
 }
 
 func (c *BasicLibp2pHost) standardListenF(net network.Network, addr ma.Multiaddr) {
@@ -42,31 +34,31 @@ func (c *BasicLibp2pHost) standardListenCloseF(net network.Network, addr ma.Mult
 }
 
 func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Conn) {
-
-	// Add new connection event
-	// ConnectionEvent and Disconnection
+	// get timestamp fo the event
 	t := time.Now()
-	p := models.NewPeer(conn.RemotePeer().String())
-	// TODO: Add the connection ID to the connection and disconnection events
-	p.ConnectionEvent(conn.Stat().Direction.String(), t)
-	cs := ConnectionEvent{
-		ConnType:  int8(1),
-		Peer:      p,
-		Timestamp: t,
-	}
-
-	c.RecConnEvent(cs)
 
 	log.WithFields(logrus.Fields{
 		"EVENT":     "Connection detected",
 		"DIRECTION": conn.Stat().Direction.String(),
 	}).Debug("Peer: ", conn.RemotePeer().String())
 
-	//  Make synchrony among the different reqresps that we have to do
+	// Only locate new IP if the connection is "Inbound"
+	// if it's outbound - we should already have it in the DB
+	if conn.Stat().Direction.String() == "Inbound" {
+		ip := utils.ExtractIPFromMAddr(conn.RemoteMultiaddr()).String()
+		c.IpLocator.LocateIP(ip)
+	}
 
-	// identify everything that we can about the peer
-	// not adding the connection 2 times
-	peer := models.NewPeer(conn.RemotePeer().String())
+	// since se only have one multiaddress, gen the array
+	mAddrs := make([]ma.Multiaddr, 0)
+	mAddrs = append(mAddrs, conn.RemoteMultiaddr())
+
+	// create new HostInfo
+	hInfo := models.NewHostInfo(
+		conn.RemotePeer(),
+		c.Network,
+		models.WithMultiaddress(mAddrs),
+	)
 
 	// Aggregate timeout context for the different
 	mainCtx, cancel := context.WithTimeout(c.Ctx(), 5*time.Second)
@@ -80,13 +72,14 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 	// for Eth2
 	var bStatus common.Status
 	var bMetadata common.MetaData
+
 	var hinfoErr error
 	var statusErr, metadataErr error
 
 	wg.Add(1)
-	go ReqHostInfo(mainCtx, &wg, h, c.IpLocator, conn, &peer, &hinfoErr)
+	go ReqHostInfo(mainCtx, &wg, h, c.IpLocator, conn, hInfo, &hinfoErr)
 
-	if c.Network == "eth2" {
+	if c.Network == utils.EthereumNetwork {
 		// request BeaconStatus metadata as we connect to a peer
 		wg.Add(1)
 		go ethrpc.ReqBeaconStatus(mainCtx, &wg, h, conn.RemotePeer(), &bStatus, &statusErr)
@@ -112,7 +105,7 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 	}
 
 	// If the network was eth2, wait for the metadata echange to reply
-	if c.Network == "eth2" {
+	if c.Network == utils.EthereumNetwork {
 		// Beacon Status reqresp error check
 		// if there is an error  in the channel, print error
 		if statusErr != nil {
@@ -121,53 +114,69 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 			}).Debug("ReqStatus Peer: ", conn.RemotePeer().String())
 		} else {
 			log.Debug("peer status req, succeed", bStatus)
-			peer.SetAtt("beaconstatus", models.NewBeaconStatus(bStatus))
+			hInfo.AddAtt("beacon-status", eth.NewBeaconStatus(conn.RemotePeer(), bStatus))
 		}
 		// // Beacon Metadata reqresp error check
 		// // if if there is an error  in the channel, print error
 		if metadataErr != nil {
 			log.WithFields(logrus.Fields{
 				"ERROR": metadataErr.Error(),
-			}).Error("ReqMetadata Peer: ", conn.RemotePeer().String())
+			}).Debug("ReqMetadata Peer: ", conn.RemotePeer().String())
 		} else {
-			log.Info("peer metadata req, succeed")
-			peer.SetAtt("beaconmetadata", models.NewBeaconMetadata(bMetadata))
+			log.Debug("peer metadata req, succeed")
+			hInfo.AddAtt("beaconmetadata", eth.NewBeaconMetadata(conn.RemotePeer(), bMetadata))
 		}
-
 	}
 
-	log.Debug("sending identification event of peer", peer.PeerId)
 	identStat := IdentificationEvent{
-		Peer:      peer,
+		HostInfo:  hInfo,
 		Timestamp: t,
 	}
+
+	// Add info about identification into connEvent
+	connEvent := &models.ConnInfo{
+		Direction:  models.ConnDirection(conn.Stat().Direction), // Se share the same int8 structure as network.Direction
+		ConnTime:   t,
+		Latency:    hInfo.PeerInfo.Latency,
+		Identified: hInfo.IsHostIdentified(),
+		Error:      hinfoErr.Error(),
+	}
+
+	// Record the connectino event
+	c.RecConnEvent(&models.EventTrace{
+		PeerID: conn.RemotePeer(),
+		Event:  connEvent,
+	})
 
 	// Send the new connection status
 	c.RecIdentEvent(identStat)
 }
 
 func (c *BasicLibp2pHost) standardDisconnectF(net network.Network, conn network.Conn) {
-	log.Debugf("disconnected from peer %s", conn.RemotePeer().String())
-	// TEMP
-
-	peer := models.NewPeer(conn.RemotePeer().String())
 	t := time.Now()
-	peer.DisconnectionEvent(t)
-	disconnStat := ConnectionEvent{
-		ConnType:  int8(2),
-		Peer:      peer,
-		Timestamp: t,
+
+	log.WithFields(logrus.Fields{
+		"EVENT":     "Disconnection detected",
+		"DIRECTION": conn.Stat().Direction.String(),
+	}).Debug("Peer: ", conn.RemotePeer().String())
+
+	disconEvent := &models.EndConnInfo{
+		DiscTime: t,
 	}
+
 	// Send the new disconnection status
-	c.RecConnEvent(disconnStat)
+	c.RecConnEvent(&models.EventTrace{
+		PeerID: conn.RemotePeer(),
+		Event:  disconEvent,
+	})
 }
 
 func (c *BasicLibp2pHost) standardOpenedStreamF(net network.Network, str network.Stream) {
-	log.Debug("Open Stream")
+	log.Trace("Open Stream")
 }
 
 func (c *BasicLibp2pHost) standardClosedF(net network.Network, str network.Stream) {
-	log.Debug("Close")
+	log.Trace("Close Stream")
 }
 
 // SetCustomNotifications:
