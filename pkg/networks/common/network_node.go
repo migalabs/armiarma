@@ -5,7 +5,6 @@ import (
 	"sync"
 
 	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/migalabs/armiarma/pkg/utils"
 )
@@ -15,11 +14,11 @@ type RPCRequest func(
 	context.Context,
 	*sync.WaitGroup,
 	host.Host,
-	network.Conn,
 	peer.ID,
 	RPCResult,
 	*error,
 )
+
 type RPCRequestsName string
 
 // RPCResults is a simple interface that could be casted

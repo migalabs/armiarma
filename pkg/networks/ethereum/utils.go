@@ -1,14 +1,14 @@
-package eth2
+package ethereum
 
 import (
 	"context"
 
-	"github.com/migalabs/armiarma/pkg/networks/ethereum/endpoint"
+	rendp "github.com/migalabs/armiarma/pkg/networks/ethereum/remoteendpoint"
 	"github.com/pkg/errors"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 )
 
-func GetForkDigetsOfEth2Head(ctx context.Context, infCli *endpoint.InfuraClient) (common.ForkDigest, error) {
+func GetForkDigetsOfEth2Head(ctx context.Context, infCli *rendp.InfuraClient) (common.ForkDigest, error) {
 	if !infCli.IsInitialized() {
 		return common.ForkDigest{}, errors.New("infura client is not initialized")
 	}

@@ -19,7 +19,7 @@ import (
 
 // ReqBeaconStatus opens a new Stream from the given host to send a RPC reqresping the BeaconStatus of the given peer.ID.
 // Returns the BeaconStatus of the given peer if succeed, error if failed.
-func ReqBeaconStatus(ctx context.Context, wg *sync.WaitGroup, h host.Host, peerID peer.ID, result *com.RPCResult, finErr *error) {
+var ReqBeaconStatus com.RPCRequest = func(ctx context.Context, wg *sync.WaitGroup, h host.Host, peerID peer.ID, result com.RPCResult, finErr *error) {
 	defer wg.Done()
 
 	// declare the result obj of the RPC call
@@ -63,5 +63,5 @@ func ReqBeaconStatus(ctx context.Context, wg *sync.WaitGroup, h host.Host, peerI
 			return nil
 		})
 	*finErr = err
-	*result = status
+	result = status
 }

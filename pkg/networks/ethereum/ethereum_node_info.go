@@ -1,4 +1,4 @@
-package models
+package ethereum
 
 import (
 	"encoding/hex"
@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/migalabs/armiarma/pkg/utils"
 	"github.com/pkg/errors"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
@@ -15,13 +16,15 @@ import (
 // Basic BeaconMetadata struct that includes the timestamp of the received beacon metadata
 type BeaconMetadataStamped struct {
 	Timestamp time.Time
+	PeerID    peer.ID
 	Metadata  common.MetaData
 }
 
 // NewbeaconMetadata generates a timestamped beacon.Metadata structure
-func NewBeaconMetadata(bMetadata common.MetaData) BeaconMetadataStamped {
+func NewBeaconMetadata(peerId peer.ID, bMetadata common.MetaData) BeaconMetadataStamped {
 	return BeaconMetadataStamped{
 		Timestamp: time.Now(),
+		PeerID:    peerId,
 		Metadata:  bMetadata,
 	}
 }
@@ -34,6 +37,7 @@ func (b *BeaconMetadataStamped) IsEmpty() bool {
 // Basic BeaconMetadata struct that includes The timestamp of the received beacon Status
 type BeaconStatusStamped struct {
 	Timestamp time.Time
+	PeerID    peer.ID
 	Status    common.Status
 }
 
@@ -43,9 +47,10 @@ func (b *BeaconStatusStamped) IsEmpty() bool {
 }
 
 // NewBeaconStatus generates a timestamped OBJ that has all the content of the
-func NewBeaconStatus(bStatus common.Status) BeaconStatusStamped {
+func NewBeaconStatus(peerId peer.ID, bStatus common.Status) BeaconStatusStamped {
 	return BeaconStatusStamped{
 		Timestamp: time.Now(),
+		PeerID:    peerId,
 		Status:    bStatus,
 	}
 }
@@ -65,6 +70,14 @@ func ParseBeaconStatusFromInterface(input interface{}) (BeaconStatusStamped, err
 	if err != nil {
 		return result, errors.Wrap(err, "unable to compose BeaconStatus.Timestamp from readed interface")
 	}
+
+	// peerID
+	peerId, err := peer.Decode(inputMap["PeerID"].(string))
+	if err != nil {
+		return result, errors.Wrap(err, "unable to decode peerID from readed interface")
+	}
+	result.PeerID = peerId
+
 	// BeaconStatus
 	status := inputMap["Status"].(map[string]interface{})
 	// if the forkdigest field is empty, return empty BeaconStatus
@@ -100,6 +113,7 @@ func ParseBeaconStatusFromInterface(input interface{}) (BeaconStatusStamped, err
 
 func ParseBeaconStatusFromBasicTypes(
 	t time.Time,
+	peerIdStr string,
 	forkdigest string,
 	finaRoot string,
 	finaEpoch int64,
@@ -111,6 +125,13 @@ func ParseBeaconStatusFromBasicTypes(
 
 	// timestamp
 	result.Timestamp = t
+
+	// peerID
+	peerId, err := peer.Decode(peerIdStr)
+	if err != nil {
+		return result, errors.Wrap(err, "unable to decode peerID from readed interface")
+	}
+	result.PeerID = peerId
 
 	err = result.Status.ForkDigest.UnmarshalText(utils.BytesFromString(forkdigest))
 	if err != nil {

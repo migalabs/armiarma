@@ -1,20 +1,32 @@
 package ethereum
 
 import (
-	eth "github.com/ethereum/go-ethereum/p2p/enode"
+	comm "github.com/migalabs/armiarma/pkg/networks/common"
+	"github.com/migalabs/armiarma/pkg/networks/ethereum/rpc"
 )
 
 const (
-	AllRPCRequests []RPCRequestsName = []RPCRequestsName{
-		// TODO: Add all the RPC requests for BeaconStatusRPC and MetadataRPC
-	}
+	BeaconStatusRPC   comm.RPCRequestsName = "beacon-status"
+	BeaconMetadataRPC comm.RPCRequestsName = "beacon-metadata"
 )
 
-type EthereumNode struct {
-	// TODO: add all kind of missing
-	ENR eth.Enode
-
+type ethereumRPCs struct {
 	// List of requestable functions that can be asked when
 	// we stablish a connection to a node
-	RPCRequestables map[RPCRequestsName]RPCRequest
+	RPCRequestables map[comm.RPCRequestsName]comm.RPCRequest
+}
+
+var EthereumRPCs = initEthereumNode()
+
+func initEthereumNode() ethereumRPCs {
+
+	ethNode := ethereumRPCs{
+		RPCRequestables: make(map[comm.RPCRequestsName]comm.RPCRequest),
+	}
+
+	// add the RPCs
+	ethNode.RPCRequestables[BeaconStatusRPC] = rpc.ReqBeaconStatus
+	ethNode.RPCRequestables[BeaconMetadataRPC] = rpc.ReqBeaconMetadata
+
+	return ethNode
 }

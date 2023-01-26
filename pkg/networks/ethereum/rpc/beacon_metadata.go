@@ -17,7 +17,7 @@ import (
 
 // ReqBeaconMetadata opens a new Stream from the given host to send a RPC reqresping the BeaconStatus of the given peer.ID.
 // Returns the BeaconStatus of the given peer if succeed, error if failed.
-func ReqBeaconMetadata(ctx context.Context, wg *sync.WaitGroup, h host.Host, peerID peer.ID, result *com.RPCResult, finErr *error) {
+var ReqBeaconMetadata com.RPCRequest = func(ctx context.Context, wg *sync.WaitGroup, h host.Host, peerID peer.ID, result com.RPCResult, finErr *error) {
 	defer wg.Done()
 
 	// declare the result output of the RPC call
@@ -48,5 +48,5 @@ func ReqBeaconMetadata(ctx context.Context, wg *sync.WaitGroup, h host.Host, pee
 			return nil
 		})
 	*finErr = err
-	*result = metadata
+	result = metadata
 }
