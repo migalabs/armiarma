@@ -9,10 +9,12 @@ import (
 	"github.com/migalabs/armiarma/pkg/db/models"
 	"github.com/migalabs/armiarma/pkg/utils"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
+	ma "github.com/multiformats/go-multiaddr"
 
 	kbucket "github.com/libp2p/go-libp2p-kbucket"
 )
@@ -20,7 +22,7 @@ import (
 // fetchNeighbors sends RPC messages to the given peer and asks for its closest peers to an artificial set
 // of 15 random peer IDs with increasing common prefix lengths (CPL). The returned peers are streamed
 // to the results channel.
-func (disc *IPFSDiscService) fetchNeighbors(ctx context.Context, pi peer.AddrInfo) (*RoutingTable, error) {
+func (disc *KadDHTDiscService) fetchNeighbors(ctx context.Context, pi peer.AddrInfo) (*RoutingTable, error) {
 	rt, err := kbucket.NewRoutingTable(20, kbucket.ConvertPeerID(pi.ID), time.Hour, nil, time.Hour, nil)
 	if err != nil {
 		return nil, err
@@ -93,8 +95,9 @@ type RoutingTable struct {
 }
 
 // extract info from the peer and compose
-func (c *IPFSDiscService) extractHostInfo(p peer.AddrInfo) models.Peer {
-	fpeer := models.NewPeer(p.ID.String())
+func (c *KadDHTDiscService) extractHostInfo(p peer.AddrInfo) *models.HostInfo {
+
+	var mAddrs []ma.Multiaddr
 	// look for the Public single IP
 	for _, addr := range p.Addrs {
 		// extract ip from mAddrs
@@ -102,37 +105,57 @@ func (c *IPFSDiscService) extractHostInfo(p peer.AddrInfo) models.Peer {
 		// check if IP is public
 		if utils.IsIPPublic(tempIP) == true {
 			// the IP is public
-			fpeer.Ip = tempIP.String()
-			fpeer.MAddrs = p.Addrs
+			mAddrs = append(mAddrs, addr)
 		}
 	}
-	err := ReqIpfsHostInfo(c.h, p.ID, &fpeer)
+
+	hInfo := models.NewHostInfo(
+		p.ID,
+		c.network,
+		models.WithMultiaddress(mAddrs),
+	)
+
+	err := ReqIpfsPeerInfo(c.h, p.ID, hInfo)
 	if err != nil {
 		log.Debugf("unable to fetch peer info. %s", err.Error())
 	}
-	return fpeer
+	return hInfo
 }
 
-func ReqIpfsHostInfo(h host.Host, peerID peer.ID, p *models.Peer) error {
+func ReqIpfsPeerInfo(h host.Host, peerID peer.ID, hInfo *models.HostInfo) error {
 	// final error
 	var finErr error
 
+	var userAgent string
 	// Fulfill the hInfo struct
 	ua, err := h.Peerstore().Get(peerID, "AgentVersion")
 	if err == nil {
-		p.UserAgent = ua.(string)
+		userAgent = ua.(string)
 	} else {
 		finErr = errors.Errorf("unable to identify peer. %s", err.Error())
 	}
 
+	var protocolVersion string
 	// Into the new peer to fetch
 	pv, err := h.Peerstore().Get(peerID, "ProtocolVersion")
 	if err == nil {
-		p.ProtocolVersion = pv.(string)
+		protocolVersion = pv.(string)
 	}
+
+	protocols := make([]string, 0)
 	// Extract protocols
-	if protocols, err := h.Peerstore().GetProtocols(peerID); err == nil {
-		p.Protocols = protocols
+	if ps, err := h.Peerstore().GetProtocols(peerID); err == nil {
+		copy(protocols, ps)
 	}
+
+	pInfo := models.NewPeerInfo(
+		peerID,
+		userAgent,
+		protocolVersion,
+		protocols,
+		time.Duration(0),
+	)
+
+	hInfo.IdentifyHost(pInfo)
 	return finErr
 }

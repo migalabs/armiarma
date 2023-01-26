@@ -15,11 +15,10 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/libp2p/go-libp2p-core/network"
+	net "github.com/libp2p/go-libp2p-core/network"
 	"github.com/migalabs/armiarma/pkg/db/models"
 	"github.com/migalabs/armiarma/pkg/discovery"
 	"github.com/migalabs/armiarma/pkg/utils"
-	"github.com/migalabs/armiarma/pkg/utils/apis"
 
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -27,27 +26,23 @@ import (
 	kdht "github.com/libp2p/go-libp2p-kad-dht"
 	pb "github.com/libp2p/go-libp2p-kad-dht/pb"
 
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
 	graceTime = 3 * time.Second
-	timeout   = 10 * time.Second
+	timeout   = 30 * time.Second
 
-	workers    = 25
-	ModuleName = "KDHT-DISC"
-	log        = logrus.WithField(
-		"module", ModuleName,
-	)
+	workers = 25
 )
 
 // IPFS discovery service with Kademlia DHT https://github.com/libp2p/go-libp2p-kad-dht
 // Fulfilling the basic PeerDiscovery interfce for the Armiarma Crawler
-type IPFSDiscService struct {
+type KadDHTDiscService struct {
 	ctx context.Context
 
-	h     host.Host
-	ipLoc *apis.PeerLocalizer
+	h       host.Host
+	network utils.NetworkType
 
 	timeout time.Duration
 	pm      *pb.ProtocolMessenger
@@ -56,9 +51,13 @@ type IPFSDiscService struct {
 	discPeers *discoveredPeers
 
 	bootnodes []peer.AddrInfo
+
+	nodeNotC chan *models.HostInfo
+	wg       sync.WaitGroup
+	doneF    bool
 }
 
-func NewIPFSDiscService(ctx context.Context, h host.Host, protocols []string, bootstrapnodes []peer.AddrInfo, timeout time.Duration) IPFSDiscService {
+func NewKadDHTDiscService(ctx context.Context, h host.Host, network utils.NetworkType, protocols []string, bootstrapnodes []peer.AddrInfo, timeout time.Duration) *KadDHTDiscService {
 
 	ms := &msgSender{
 		h:         h,
@@ -90,19 +89,22 @@ func NewIPFSDiscService(ctx context.Context, h host.Host, protocols []string, bo
 	// get official bootstrap peers reading from the bootstrapnodes file
 	// Alternatively, user 'bootstrapNodes := kdht.GetDefaultBootstrapPeerAddrInfos()' for IPFS ones
 	log.Infof("Bootnodes: %s", bootstrapnodes)
-	ipfsDisc := IPFSDiscService{
+	kadDiscv := &KadDHTDiscService{
 		ctx:       ctx,
 		h:         h,
+		network:   network,
 		timeout:   timeout,
 		pm:        pm,
 		ipfsDHT:   peerkdht,
-		discPeers: &connectablePeers,
+		discPeers: connectablePeers,
 		bootnodes: bootstrapnodes,
+		nodeNotC:  make(chan *models.HostInfo),
+		doneF:     false,
 	}
-	return ipfsDisc
+	return kadDiscv
 }
 
-func (disc *IPFSDiscService) Start() {
+func (disc *KadDHTDiscService) Start() chan *models.HostInfo {
 	// get official bootstrap peers
 	//bootstrapNodes := kdht.GetDefaultBootstrapPeerAddrInfos()
 	// add the bootnodes to the list of known peers
@@ -113,10 +115,10 @@ func (disc *IPFSDiscService) Start() {
 	}
 	log.Infof("Adding %d bootstrap nodes", bnCnt)
 
-	workerTask := func(workerlog logrus.FieldLogger, nextp peer.AddrInfo) {
-		ctx := network.WithDialPeerTimeout(disc.ctx, timeout)
+	workerTask := func(workerlog log.FieldLogger, nextp peer.AddrInfo) {
+		ctx := net.WithDialPeerTimeout(disc.ctx, timeout)
 		// Force direct dials will prevent swarm to run into dial backoff errors. It also prevents proxied connections.
-		ctx = network.WithForceDirectDial(ctx, "prevent backoff")
+		ctx = net.WithForceDirectDial(ctx, "prevent backoff")
 
 		workerlog.Debugf("connecting %s", nextp.ID.String())
 		if err := disc.h.Connect(ctx, nextp); err != nil {
@@ -149,8 +151,10 @@ func (disc *IPFSDiscService) Start() {
 		workerlog := log.WithField(
 			"worker", workerid,
 		)
+		disc.wg.Add(1)
 		go func() {
 			for {
+				defer disc.wg.Done()
 				// get a new random peer to connect and request new peers
 				nextp, ok := disc.discPeers.getBootstrapPeer() //getRandomPeer()
 				if !ok {
@@ -162,7 +166,7 @@ func (disc *IPFSDiscService) Start() {
 				workerTask(workerlog, nextp)
 
 				// check if the context has died to cancel the routine
-				if disc.ctx.Err() != nil {
+				if disc.ctx.Err() != nil || disc.doneF {
 					workerlog.Info("closing discover peer worker")
 					return
 				}
@@ -176,7 +180,9 @@ func (disc *IPFSDiscService) Start() {
 		workerlog := log.WithField(
 			"worker", workerid,
 		)
+		disc.wg.Add(1)
 		go func() {
+			defer disc.wg.Done()
 			for {
 				// get a new random peer to connect and request new peers
 				nextp, ok := disc.discPeers.getRandomPeer()
@@ -189,34 +195,72 @@ func (disc *IPFSDiscService) Start() {
 				workerTask(workerlog, nextp)
 
 				// check if the context has died to cancel the routine
-				if disc.ctx.Err() != nil {
+				if disc.ctx.Err() != nil || disc.doneF {
 					workerlog.Info("closing discover peer worker")
 					return
 				}
 			}
 		}()
 	}
+
+	disc.wg.Add(1)
+	go disc.nodeIterator()
+
+	return disc.nodeNotC
+}
+
+func (d *KadDHTDiscService) nodeIterator() {
+	defer d.wg.Done()
+
+	for {
+		if d.doneF || d.ctx.Err() != nil {
+			log.Info("shutdown detected, closing routine")
+			return
+		}
+
+		if d.Next() {
+			log.Debug("new Kad Peer discovered")
+			// fill the given DiscoveredPeer interface with the next found peer
+			hInfo, ok := d.Peer()
+			if !ok {
+				log.Warn("received peer with invalid maddrs")
+			}
+			log.Debug("notifying of new Kad Peer")
+			d.nodeNotC <- hInfo
+			log.Debug("notification done!")
+		}
+	}
 }
 
 // return the the true if there is any new discovered peer, false if not
-func (disc *IPFSDiscService) Next() bool {
+func (disc *KadDHTDiscService) Next() bool {
 	return disc.discPeers.next()
 }
 
 // fills the given peer struct that satifies the core.Basic standars empty
-func (disc *IPFSDiscService) Peer() (models.Peer, bool) {
+func (disc *KadDHTDiscService) Peer() (*models.HostInfo, bool) {
 	// get the next peer from the discovered peers and filter it
 	addrinfo := disc.discPeers.getNextPeer()
 	if len(addrinfo.Addrs) == 0 {
-		return models.Peer{}, false
+		return &models.HostInfo{}, false
 	}
+
 	// build the DiscoveredPeer from the PeerInfo
-	p := models.NewPeer("")
-	p.PeerId = addrinfo.ID.String()
-	pubAddrs := utils.GetPublicAddrsFromAddrArray(addrinfo.Addrs)
-	p.MAddrs = append(p.MAddrs, pubAddrs)
+	hInfo := models.NewHostInfo(
+		addrinfo.ID,
+		disc.network,
+		models.WithMultiaddress(addrinfo.Addrs),
+	)
+
 	// TODO: Not sure if there is actually an iterest to return IP / UserAgent / Protocols... /
-	return p, true
+	return hInfo, true
+}
+
+func (d *KadDHTDiscService) Stop() {
+	d.doneF = true
+	d.wg.Wait()
+
+	close(d.nodeNotC)
 }
 
 type discoveredPeers struct {
@@ -229,12 +273,12 @@ type discoveredPeers struct {
 	bp     *uint64
 }
 
-func NewDiscoveryPeers(ctx context.Context) discoveredPeers {
+func NewDiscoveryPeers(ctx context.Context) *discoveredPeers {
 	var rp uint64 = 0
 	var wp uint64 = 0
 	var bp uint64 = 0
 	log.Trace("generating new DiscoveryPeers")
-	dp := discoveredPeers{
+	dp := &discoveredPeers{
 		ctx:    ctx,
 		pArray: make([]*peer.AddrInfo, 0),
 		rp:     &rp,

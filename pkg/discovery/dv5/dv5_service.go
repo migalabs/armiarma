@@ -9,53 +9,59 @@ With this implementation, you can create a Discovery5 Service and inititate the 
 import (
 	"context"
 	"crypto/ecdsa"
-	"crypto/x509"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net"
 	"os"
+	"sync"
 
 	"github.com/pkg/errors"
 
-	"github.com/btcsuite/btcd/btcec"
 	"github.com/migalabs/armiarma/pkg/db/models"
 	"github.com/migalabs/armiarma/pkg/discovery"
 	"github.com/migalabs/armiarma/pkg/enode"
-	"github.com/migalabs/armiarma/pkg/gossipsub/blockchaintopics"
+	eth "github.com/migalabs/armiarma/pkg/networks/ethereum"
 	"github.com/migalabs/armiarma/pkg/utils"
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 
 	gethlog "github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	ethenode "github.com/ethereum/go-ethereum/p2p/enode"
 
-	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
-	ma "github.com/multiformats/go-multiaddr"
 )
 
 var (
-	ModuleName = "DV5"
-	log        = logrus.WithField(
-		"module", ModuleName,
-	)
+	ModuleName           = "DV5"
+	NoNewPeerError error = errors.New("no new peer to read")
 )
 
-type Discovery struct {
+type Discovery5 struct {
 	// Service control variables
 	ctx context.Context
 
 	Node        *enode.LocalNode
 	Dv5Listener *discover.UDPv5
 	Iterator    ethenode.Iterator
+
+	// node notifier
+	nodeNotC chan *models.HostInfo
+	wg       sync.WaitGroup
+	doneF    bool
+
 	// Filtering
 	FilterDigest string
 }
 
 // NewDiscovery
-func NewDiscovery(ctx context.Context, node *enode.LocalNode, privkey *ecdsa.PrivateKey, bootnodes []*ethenode.Node, fdigest string, port int) (*Discovery, error) {
+func NewDiscovery5(
+	ctx context.Context,
+	node *enode.LocalNode,
+	privkey *ecdsa.PrivateKey,
+	bootnodes []*ethenode.Node,
+	fdigest string,
+	port int) (*Discovery5, error) {
 
 	if len(bootnodes) == 0 {
 		log.Panic("unable to start dv5 peer discovery, no bootnodes provided")
@@ -96,104 +102,99 @@ func NewDiscovery(ctx context.Context, node *enode.LocalNode, privkey *ecdsa.Pri
 	}
 
 	// return the Discovery object
-	return &Discovery{
+	return &Discovery5{
 		ctx:          ctx,
 		Node:         node,
 		Dv5Listener:  dv5Listener,
 		FilterDigest: fdigest,
+		nodeNotC:     make(chan *models.HostInfo),
+		doneF:        false,
 	}, nil
 }
 
 // Start
-func (d *Discovery) Start() {
+func (d *Discovery5) Start() chan *models.HostInfo {
 	// Generate the iterator over the foud peers
 	d.Iterator = d.Dv5Listener.RandomNodes()
+
+	d.wg.Add(1)
+	go d.nodeIterator()
+
+	return d.nodeNotC
 }
 
-// Next
-func (d *Discovery) Next() bool {
-	return d.Iterator.Next()
+func (d *Discovery5) nodeIterator() {
+	defer d.wg.Done()
+
+	for {
+		if d.doneF || d.ctx.Err() != nil {
+			log.Info("shutdown detected, closing routine")
+			return
+		}
+
+		if d.Iterator.Next() {
+			log.Debug("new ENR discovered")
+			// fill the given DiscoveredPeer interface with the next found peer
+			node := d.Iterator.Node()
+
+			hInfo, err := d.handleENR(node)
+			if err != nil {
+				log.Error(errors.Wrap(err, "error handling new ENR"))
+			}
+			log.Debug("notifying of new ENR")
+			d.nodeNotC <- hInfo
+			log.Debug("notification done!")
+		}
+	}
+
 }
 
-// Peer
-func (d *Discovery) Peer() (models.Peer, bool) {
-	// check if there is a new peer to read
-	if !d.Iterator.Next() {
-		return models.Peer{}, false
-	}
-	// fill the given DiscoveredPeer interface with the next found peer
-	node := d.Iterator.Node()
-	if node == nil {
-		return models.Peer{}, false
-	}
-	bp, err := d.handleENR(node)
+// Stop
+func (d *Discovery5) Stop() {
+	d.doneF = true
+	d.wg.Wait()
+
+	d.Iterator.Close()
+	d.Dv5Listener.Close()
+	close(d.nodeNotC)
+}
+
+// handleENR parses and identifies all the advertised fields of a newly discovered peer
+func (d *Discovery5) handleENR(node *ethenode.Node) (*models.HostInfo, error) {
+
+	// Parse ENR
+	enr, err := eth.ParseEnr(node)
+	// TODO: Add fork digest filter when needed
 	if err != nil {
-		// fo far printing a simple wrap of the function and the received err
-		// with the id of the enode
-		log.Debugf("unable to handle ENR from node %s, error: %s\n", node.ID().String(), err)
-		return models.Peer{}, false
-	}
-
-	return bp, true
-}
-
-// HandleENR
-// Retrieve information from the ENR
-// @param node: represents the enode of the newly discovered peer
-func (d *Discovery) handleENR(node *ethenode.Node) (models.Peer, error) {
-	bp := models.NewPeer("")
-	eth2Dat, ok, err := utils.ParseNodeEth2Data(*node)
-	if err != nil {
-		return models.Peer{}, fmt.Errorf("enr parse error: %v", err)
-	}
-	// check if the peer exists
-	if !ok {
-		return models.Peer{}, fmt.Errorf("peer doesn't exist")
-	}
-
-	// check if the peer matches the given ForkDigest
-	if eth2Dat.ForkDigest.String() != (blockchaintopics.ForkDigestPrefix + d.FilterDigest) {
-		return models.Peer{}, fmt.Errorf("got ENR with other fork digest: %s", eth2Dat.ForkDigest.String())
+		return &models.HostInfo{}, errors.Wrap(err, "unable to parse new discovered ENR")
 	}
 
 	// Get the public key and the peer.ID of the discovered peer
 	pubkey := node.Pubkey()
-	peerid, err := peer.IDFromPublicKey(crypto.PubKey((*crypto.Secp256k1PublicKey)((*btcec.PublicKey)(pubkey))))
+	libp2pKey, err := utils.ConvertECDSAPubkeyToSecp2561k(pubkey)
 	if err != nil {
-		return models.Peer{}, fmt.Errorf("error extracting peer.ID from node %s", node.ID())
+		return &models.HostInfo{}, errors.Wrap(err, "unable to convert Geth pubkey to Libp2p")
 	}
-	// Gerearte the Multiaddres of the New Peer taht will be Updated or Stored
-	ipScheme := "ip4"
-	if len(node.IP()) == net.IPv6len {
-		ipScheme = "ip6"
-	}
-
-	multiAddrStr := fmt.Sprintf("/%s/%s/tcp/%d/p2p/%s", ipScheme, node.IP().String(), node.TCP(), peerid)
-	multiAddr, err := ma.NewMultiaddr(multiAddrStr)
+	peerID, err := peer.IDFromPublicKey(libp2pKey)
 	if err != nil {
-		return models.Peer{}, fmt.Errorf("error composing the maddrs from peer %s", err)
+		return &models.HostInfo{}, errors.Wrap(err, fmt.Sprintf("error extracting peer.ID from node %s", node.ID()))
 	}
 
-	// generate array of MAddr to fit the db.Peer struct
-	mAddrs := make([]ma.Multiaddr, 0)
-	mAddrs = append(mAddrs, multiAddr)
+	hInfo := models.NewHostInfo(
+		peerID,
+		utils.EthereumNetwork,
+		models.WithIPAndPorts(
+			enr.IP.String(),
+			enr.TCP,
+		),
+	)
 
-	// Fill models.Peer with given info
-	pubBytes, _ := x509.MarshalPKIXPublicKey(pubkey) // get the []bytes of the pubkey
-	bp.SetAtt("pubkey", hex.EncodeToString(pubBytes))
-	bp.SetAtt("nodeid", node.ID().String())
-	bp.SetAtt("enr", (*node).String())
-	bp.MAddrs = mAddrs
-	bp.PeerId = peerid.String()
+	hInfo.AddAtt(eth.EnrHostInfoAttribute, enr)
 
-	return bp, nil
+	return hInfo, nil
 }
 
-// ImportBootNodeList
-// This method will read the bootnodes list in string format and create an
-// enode array with the parsed ENRs of the bootnodes.
-// @param import_json_file represents the file where to read the bootnodes from.
-// This file is configured in the config file.
+// ImportBootNodeList reads the Eth2 bootnodes from a given file
 func ReadEth2BootnodeFile(jfile string) ([]*ethenode.Node, error) {
 
 	// where we will store the result

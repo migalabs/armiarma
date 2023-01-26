@@ -3,6 +3,7 @@ package discovery
 import (
 	"context"
 	"net"
+	"sync"
 	"time"
 
 	psql "github.com/migalabs/armiarma/pkg/db/postgresql"
@@ -11,7 +12,7 @@ import (
 	"github.com/migalabs/armiarma/pkg/utils/apis"
 
 	"github.com/migalabs/armiarma/pkg/db/models"
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
 /*
@@ -22,20 +23,15 @@ With this implementation, you can create a Discovery5 Service and inititate the 
 
 var (
 	ModuleName = "DISC"
-	log        = logrus.WithField(
-		"module", ModuleName,
-	)
 )
 
 const (
-	minIterTime = 150 * time.Millisecond
+	minIterTime = 100 * time.Millisecond
 )
 
 type PeerDiscovery interface {
-	Start()
+	Start() chan *models.HostInfo
 	Stop()
-	Next() bool
-	Peer() (*models.HostInfo, bool)
 }
 
 type BootNodeListString struct {
@@ -49,9 +45,12 @@ type Discovery struct {
 	DiscService PeerDiscovery
 	DBClient    *psql.DBClient
 	IpLocator   *apis.IpLocator
+
+	wg    sync.WaitGroup
+	doneC chan struct{}
 }
 
-// NewDiscovery
+// NewDiscovery generates a new module to discover peers in the given network with the given PeerDiscovery submodule
 func NewDiscovery(ctx context.Context, discServ PeerDiscovery, db *psql.DBClient, ipLoc *apis.IpLocator) *Discovery {
 	// return the Discovery object
 	return &Discovery{
@@ -59,51 +58,54 @@ func NewDiscovery(ctx context.Context, discServ PeerDiscovery, db *psql.DBClient
 		DiscService: discServ,
 		DBClient:    db,
 		IpLocator:   ipLoc,
+		doneC:       make(chan struct{}),
 	}
 }
 
-// Start
+// Start spawns the discovery service in a separate go-routine
 func (d *Discovery) Start() {
 	log.Info("starting peer discovery service")
-	d.DiscService.Start()
-	// get next peer from the DiscService
+	nodeNotC := d.DiscService.Start()
+
+	d.wg.Add(1)
 	go func() {
+		defer d.wg.Done()
 		log.Info("launching peer reader")
-		ticker := time.NewTicker(minIterTime)
 		// check if the DiscPeer Obj has a new peer to read
 		for {
-			if d.DiscService.Next() {
-				log.Debugf("next peer avail")
-				// check if the ctx has been closed
-				if d.ctx.Err() != nil {
-					log.Info("closing the peer reader")
-					return
-				}
-				// retrieve the next peer and check if it fine
-				newPeer, ok := d.DiscService.Peer()
-				if !ok {
-					continue
-				}
-				log.Debugf("new peer discovered: %s\n", newPeer.ID.String())
-				d.peerHandler(newPeer)
-			}
+			// check with priority of
 
 			select {
-			case <-ticker.C:
-				// wait untill min time has passed
-				ticker.Reset(minIterTime)
+			case hInfo := <-nodeNotC:
+				log.Debug("next peer avail")
+				d.peerHandler(hInfo)
+
+			case <-d.doneC:
+				log.Info("shutdown detected in discovery service, shutting down")
+				return
+
 			case <-d.ctx.Done():
 				log.Info("shutdown detected in discovery service, shutting down")
-				ticker.Stop()
-				// TODO: add STOP To -> d.DiscService.Stop()
 				return
 			}
 		}
 	}()
 }
 
+func (d *Discovery) Stop() {
+	d.DiscService.Stop()
+	d.doneC <- struct{}{}
+}
+
 // peer handler for the discovered peers
 func (d *Discovery) peerHandler(hInfo *models.HostInfo) {
+	log.WithFields(log.Fields{
+		"peer_id": hInfo.ID.String(),
+		"ip":      hInfo.IP,
+		"attr":    hInfo.Attr,
+	}).Debugf("discovered new peer")
+	// if the peer
+
 	// Persist to DB the hInfo
 	d.DBClient.PersistToDB(hInfo)
 	// if public, req location
@@ -114,8 +116,8 @@ func (d *Discovery) peerHandler(hInfo *models.HostInfo) {
 		log.Debugf("new peer %s had a non-public IP %s", hInfo.ID.String(), hInfo.IP)
 	}
 	// iter through all the attributes of the Node to persit them
-	for key, att := range hInfo.Attr {
-		log.Debugf("found attr %s on peer %s", key, hInfo.ID.String())
+	for _, att := range hInfo.Attr {
 		d.DBClient.PersistToDB(att)
 	}
+	log.Debug("done handling peer")
 }
