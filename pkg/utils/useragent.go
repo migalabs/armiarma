@@ -2,6 +2,8 @@ package utils
 
 import (
 	"strings"
+
+	log "github.com/sirupsen/logrus"
 )
 
 type NetworkType string

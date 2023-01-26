@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net"
+	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -78,6 +79,26 @@ func ExtractIPFromMAddr(maddr ma.Multiaddr) net.IP {
 	ip := spltAddr[2] // the IP is in the third position
 
 	return net.ParseIP(ip)
+}
+
+func GetPortFromMaddrs(maddr ma.Multiaddr) int {
+	// check if MAddrs is empty
+	if maddr == nil {
+		return -1
+	}
+	// remember that the first position is "", as for having an initial /
+	// /ipX/<ip>/<transport_protocol>/<port>/p2p/<peerID>
+	spltAddr := strings.Split(maddr.String(), MADDR_SEPARATOR)
+	if len(spltAddr) < 5 {
+		return -1 // finish returning nil
+	}
+
+	portStr := spltAddr[4] // the IP is in the third position
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		return -1
+	}
+	return port
 }
 
 // checkvalidIP
