@@ -16,7 +16,7 @@ import (
 )
 
 var (
-	Version = "v1.1.0\n"
+	Version = "v2.0.0-beta\n"
 	// logging variables
 	log = logrus.WithField(
 		"module", "ARMIARMA",
@@ -77,5 +77,5 @@ func helpInArgs(args []string) bool {
 }
 
 func PrintVersion() {
-	fmt.Println("Armirma_" + Version)
+	fmt.Println("Armiarma_" + Version)
 }
