@@ -14,16 +14,12 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
 // define constant variables
 var (
 	ModuleName string = "CONFIG"
-	l                 = logrus.New()
-	log               = l.WithField(
-		"module", ModuleName,
-	)
 )
 
 type ConfigData struct {

@@ -194,6 +194,17 @@ func (d *Discovery5) handleENR(node *ethenode.Node) (*models.HostInfo, error) {
 	return hInfo, nil
 }
 
+func ParseBootnodesFromStringSlice(bNodes []string) []*ethenode.Node {
+	// where we will store the result
+	bootNodeList := make([]*ethenode.Node, 0)
+
+	// parse bootnode strings into enodes
+	for _, element := range bNodes {
+		bootNodeList = append(bootNodeList, ethenode.MustParse(element))
+	}
+	return bootNodeList
+}
+
 // ImportBootNodeList reads the Eth2 bootnodes from a given file
 func ReadEth2BootnodeFile(jfile string) ([]*ethenode.Node, error) {
 

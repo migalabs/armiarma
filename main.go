@@ -1,5 +1,5 @@
 /*
-	Copyright © 2021 Miga Labs
+Copyright © 2021 Miga Labs
 */
 package main
 
@@ -44,7 +44,7 @@ func main() {
 		EnableBashCompletion: true,
 		Commands: []*cli.Command{
 			cmd.Eth2CrawlerCommand,
-			cmd.IpfsCrawlerCommand,
+			// cmd.IpfsCrawlerCommand,
 		},
 	}
 

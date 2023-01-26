@@ -19,14 +19,11 @@ import (
 	"github.com/migalabs/armiarma/pkg/exporters"
 	"github.com/migalabs/armiarma/pkg/hosts"
 	"github.com/minio/sha256-simd"
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
 	ModuleName = "GOSSIP-SUB"
-	log        = logrus.WithField(
-		"module", ModuleName,
-	)
 )
 
 // GossipSub

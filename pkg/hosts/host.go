@@ -4,29 +4,28 @@ import (
 	"context"
 	"fmt"
 
-	noise "github.com/libp2p/go-libp2p-noise"
-	tcp_transport "github.com/libp2p/go-tcp-transport"
 	"github.com/migalabs/armiarma/pkg/db/models"
 	psql "github.com/migalabs/armiarma/pkg/db/postgresql"
-	"github.com/migalabs/armiarma/pkg/info"
 	"github.com/migalabs/armiarma/pkg/utils"
 	"github.com/migalabs/armiarma/pkg/utils/apis"
 
 	libp2p "github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
+	noise "github.com/libp2p/go-libp2p-noise"
 	"github.com/libp2p/go-libp2p/p2p/protocol/identify"
+	tcp_transport "github.com/libp2p/go-tcp-transport"
 
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 
 	ma "github.com/multiformats/go-multiaddr"
+
+	"github.com/pkg/errors"
 )
 
 var (
-	ModuleName = "LIBP2P-HOST"
-	log        = logrus.WithField(
-		"module", ModuleName,
-	)
+	ModuleName       = "LIBP2P-HOST"
 	ConnNotChannSize = 200
 )
 
@@ -49,33 +48,29 @@ type BasicLibp2pHost struct {
 	peerID              peer.ID
 }
 
-// NewBasicLibp2pEth2Host:
-// Generate a new Libp2p host from the given context and Options, for Eth2 network (or similar).
-// @param ctx: the parent context
-// @param infoObj: the info object containig our source of information (user parameters).
-// @param ipLocator: object to get ip information.
-// @param ps: peerstore where to store information.
-func NewBasicLibp2pEth2Host(ctx context.Context, infObj info.Eth2InfoData, network utils.NetworkType, ipLocator *apis.IpLocator, ps *psql.DBClient) (*BasicLibp2pHost, error) {
-
-	ip := infObj.IP.String()
-	tcp := fmt.Sprintf("%d", infObj.TcpPort)
-	privkey := infObj.PrivateKey
-	userAgent := infObj.UserAgent
+// NewBasicLibp2pEth2Host generate a new Libp2p host from the given context and Options, for Eth2 network (or similar).
+func NewBasicLibp2pEth2Host(
+	ctx context.Context,
+	ip string,
+	port int,
+	privKey *crypto.Secp256k1PrivateKey,
+	userAgent string,
+	network utils.NetworkType,
+	ipLocator *apis.IpLocator,
+	ps *psql.DBClient) (*BasicLibp2pHost, error) {
 
 	// generate de multiaddress
-	multiaddr := fmt.Sprintf("/ip4/%s/tcp/%s", ip, tcp)
+	multiaddr := fmt.Sprintf("/ip4/%s/tcp/%d", ip, port)
 	muladdr, err := ma.NewMultiaddr(multiaddr)
 	if err != nil {
-		log.Debugf("couldn't generate multiaddress from ip %s and tcp %s", ip, tcp)
-		multiaddr = fmt.Sprintf("/ip4/%s/tcp/%s", DefaultIP, DefaultTCP)
-		muladdr, _ = ma.NewMultiaddr(multiaddr)
+		return nil, errors.Wrap(err, fmt.Sprintf("couldn't generate multiaddress from ip %s and tcp %s", ip, port))
 	}
 	log.Debugf("setting multiaddress to %s", muladdr)
 
 	// Generate the main Libp2p host that will be exposed to the network
 	host, err := libp2p.New(
 		libp2p.ListenAddrs(muladdr),
-		libp2p.Identity(privkey),
+		libp2p.Identity(privKey),
 		libp2p.UserAgent(userAgent),
 		libp2p.Transport(tcp_transport.NewTCPTransport),
 		libp2p.Security(noise.ID, noise.New),
@@ -89,7 +84,11 @@ func NewBasicLibp2pEth2Host(ctx context.Context, infObj info.Eth2InfoData, netwo
 	localMultiaddr, _ := ma.NewMultiaddr(fmaddr)
 	log.Debugf("full multiaddress %s", localMultiaddr)
 	// generate the identify service
-	ids, err := identify.NewIDService(host, identify.UserAgent(userAgent), identify.DisableSignedPeerRecord())
+	ids, err := identify.NewIDService(
+		host,
+		identify.UserAgent(userAgent),
+		identify.DisableSignedPeerRecord(),
+	)
 	if err != nil {
 		return nil, err
 	}

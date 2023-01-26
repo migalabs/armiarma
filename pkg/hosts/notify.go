@@ -13,7 +13,7 @@ import (
 
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
 /*
@@ -37,7 +37,7 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 	// get timestamp fo the event
 	t := time.Now()
 
-	log.WithFields(logrus.Fields{
+	log.WithFields(log.Fields{
 		"EVENT":     "Connection detected",
 		"DIRECTION": conn.Stat().Direction.String(),
 	}).Debug("Peer: ", conn.RemotePeer().String())
@@ -97,7 +97,7 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 	// if if there is an error  in the channel, print error
 	if hinfoErr != nil {
 		// if error, cancel the timeout and stop ReqMetadata and ReqStatus
-		log.WithFields(logrus.Fields{
+		log.WithFields(log.Fields{
 			"ERROR": hinfoErr.Error(),
 		}).Debug("ReqHostInfo Peer: ", conn.RemotePeer().String())
 	} else {
@@ -109,7 +109,7 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 		// Beacon Status reqresp error check
 		// if there is an error  in the channel, print error
 		if statusErr != nil {
-			log.WithFields(logrus.Fields{
+			log.WithFields(log.Fields{
 				"ERROR": statusErr.Error(),
 			}).Debug("ReqStatus Peer: ", conn.RemotePeer().String())
 		} else {
@@ -119,7 +119,7 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 		// // Beacon Metadata reqresp error check
 		// // if if there is an error  in the channel, print error
 		if metadataErr != nil {
-			log.WithFields(logrus.Fields{
+			log.WithFields(log.Fields{
 				"ERROR": metadataErr.Error(),
 			}).Debug("ReqMetadata Peer: ", conn.RemotePeer().String())
 		} else {
@@ -155,7 +155,7 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 func (c *BasicLibp2pHost) standardDisconnectF(net network.Network, conn network.Conn) {
 	t := time.Now()
 
-	log.WithFields(logrus.Fields{
+	log.WithFields(log.Fields{
 		"EVENT":     "Disconnection detected",
 		"DIRECTION": conn.Stat().Direction.String(),
 	}).Debug("Peer: ", conn.RemotePeer().String())

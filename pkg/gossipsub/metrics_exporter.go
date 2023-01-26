@@ -5,9 +5,9 @@ import (
 	"sync/atomic"
 
 	"github.com/migalabs/armiarma/pkg/exporters"
-	"github.com/migalabs/armiarma/pkg/gossipsub/blockchaintopics"
+	eth "github.com/migalabs/armiarma/pkg/networks/ethereum"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
 // MessageMetrics
@@ -135,8 +135,8 @@ func (gs *GossipSub) runGossipPrometheusMetrics() {
 		}
 		msgC := (float64(r) / (exporters.MetricLoopInterval.Seconds())) * 60 // messages per minute
 		totMsg += int64(r)
-		ReceivedMessages.WithLabelValues(blockchaintopics.Eth2TopicPretty(k)).Set(msgC)
-		msgPerMin[blockchaintopics.Eth2TopicPretty(k)] = msgC
+		ReceivedMessages.WithLabelValues(eth.Eth2TopicPretty(k)).Set(msgC)
+		msgPerMin[eth.Eth2TopicPretty(k)] = msgC
 	}
 	// get total of msgs
 	tot := (float64(totMsg) / (exporters.MetricLoopInterval.Seconds())) * 60 // messages per minute
@@ -146,7 +146,7 @@ func (gs *GossipSub) runGossipPrometheusMetrics() {
 	if err != nil {
 		log.Warnf("Unable to reset the gossip topic metrics. ", err.Error())
 	}
-	log.WithFields(logrus.Fields{
+	log.WithFields(log.Fields{
 		"TopicMsg/min": msgPerMin,
 		"TotalMsg/min": tot,
 	}).Info("gossip metrics summary")

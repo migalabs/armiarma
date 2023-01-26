@@ -8,6 +8,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/host"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	psql "github.com/migalabs/armiarma/pkg/db/postgresql"
+	log "github.com/sirupsen/logrus"
 )
 
 // TopicSubscription
