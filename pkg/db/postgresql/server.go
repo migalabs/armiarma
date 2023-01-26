@@ -49,10 +49,6 @@ func NewDBClient(
 	p2pNetwork utils.NetworkType,
 	loginStr string,
 	initialized bool) (*DBClient, error) {
-
-	logEntry := log.WithField("module", "db-client")
-	logEntry.WithFields(log.Fields{"endpoint": loginStr}).Debug("attempt connection to DB")
-
 	// check if the login string has enough len
 	if len(loginStr) == 0 {
 		return nil, errors.New("empty db-endpoint provided")
@@ -63,6 +59,7 @@ func NewDBClient(
 	if err != nil {
 		return nil, err
 	}
+	log.WithFields(log.Fields{"endpoint": loginStr}).Debug("successful connection to DB")
 
 	// check if the connection is successful
 	err = pPool.Ping(ctx)
@@ -114,13 +111,13 @@ func (c *DBClient) initTables() error {
 	// conn_event
 	err = c.InitConnEventTable()
 	if err != nil {
-		return errors.Wrap(err, "initializing peer_info table")
+		return errors.Wrap(err, "initializing conn_events table")
 	}
 
 	// ip table
 	err = c.InitIpTable()
 	if err != nil {
-		return errors.Wrap(err, "initializing peer_info table")
+		return errors.Wrap(err, "initializing ips table")
 	}
 
 	// eth_nodes table
@@ -134,7 +131,9 @@ func (c *DBClient) initTables() error {
 }
 
 func (c *DBClient) launchPersister() {
-	log.Info("inititalizing db persister")
+	logEntry := log.WithFields(log.Fields{
+		"mod": "db-persister",
+	})
 	c.wg.Add(1)
 	go func() {
 		defer c.wg.Done()
@@ -149,12 +148,18 @@ func (c *DBClient) launchPersister() {
 			batch.Queue(query, args...)
 		}
 		persistBatchFn := func(batch *pgx.Batch) error {
-			log.Debugf("persisting batch of queries with len(%d)", batch.Len())
+			logEntry.Debugf("persisting batch of queries with len(%d)", batch.Len())
 			t := time.Now()
+
+			// if batch len == 0, don't even query
+			if batch.Len() == 0 {
+				logEntry.Debug("skipping batch-query, no queries to persist")
+				return nil
+			}
+
 			// begin pgx.Tx
 			tx, err := c.psqlPool.Begin(c.ctx)
 			if err != nil {
-				fmt.Println("unable to begin tx", err.Error())
 				return errors.Wrap(err, "unable to persist batch")
 			}
 			// Add batch to TX
@@ -174,7 +179,7 @@ func (c *DBClient) launchPersister() {
 				return errors.Wrap(err, fmt.Sprintf("unable to persist betch because an error on row %d \n %+v\n", cnt, rows))
 			}
 
-			log.Debugf("batch with %d queries successfully persisted in %s", cnt-1, time.Since(t))
+			logEntry.Debugf("batch with %d queries successfully persisted in %s", cnt-1, time.Since(t))
 			return tx.Commit(c.ctx)
 		}
 
@@ -192,10 +197,10 @@ func (c *DBClient) launchPersister() {
 			// check with higher priority if the main-ctx died
 			select {
 			case <-c.ctx.Done(): // check if the context of the tool died
-				log.Info("context died, clossing persister")
+				logEntry.Info("context died, clossing persister")
 				readyToFinish = true
 			case <-c.doneC:
-				log.Info("closed detected, clossing persister")
+				logEntry.Info("closed detected, clossing persister")
 				readyToFinish = true
 			default:
 			}
@@ -207,7 +212,7 @@ func (c *DBClient) launchPersister() {
 				switch obj.(type) {
 				case (*models.HostInfo):
 					hostInfo := obj.(*models.HostInfo)
-					log.Tracef("persisting host_info %s\n", hostInfo.ID.String())
+					logEntry.Tracef("persisting host_info %s\n", hostInfo.ID.String())
 					// // double-check when are we rewriting hInfo without IP, and port
 					// if hostInfo.IP == "" {
 					// 	log.Error("error trying to add host info without IP and ports", hostInfo)
@@ -218,7 +223,7 @@ func (c *DBClient) launchPersister() {
 
 					// check if the peerInfo needs to update anything else
 					if hostInfo.IsHostIdentified() {
-						log.Tracef("host_info has peer_info %s\n", hostInfo.PeerInfo.RemotePeer.String())
+						logEntry.Tracef("host_info has peer_info %s\n", hostInfo.PeerInfo.RemotePeer.String())
 						q, args = c.UpdatePeerInfo(&hostInfo.PeerInfo)
 						batchQueryFn(batch, q, args...)
 					}
@@ -229,19 +234,19 @@ func (c *DBClient) launchPersister() {
 
 				case (*models.PeerInfo):
 					peerInfo := obj.(*models.PeerInfo)
-					log.Tracef("persisting new peer_info %s\n", peerInfo.RemotePeer.String())
+					logEntry.Tracef("persisting new peer_info %s\n", peerInfo.RemotePeer.String())
 					q, args := c.UpdatePeerInfo(peerInfo)
 					batchQueryFn(batch, q, args...)
 
 				case (*models.ConnectionAttempt):
 					connAttempt := obj.(*models.ConnectionAttempt)
-					log.Tracef("persisting conn_attempt")
+					logEntry.Tracef("persisting conn_attempt")
 					q, args := c.UpdateConnAttempt(connAttempt)
 					batchQueryFn(batch, q, args...)
 
 				case (*models.ConnEvent):
 					connEvent := obj.(*models.ConnEvent)
-					log.Tracef("persisting conn_event for peer %s\n", connEvent.PeerID.String())
+					logEntry.Tracef("persisting conn_event for peer %s\n", connEvent.PeerID.String())
 					q, args := c.InsertNewConnEvent(connEvent)
 					batchQueryFn(batch, q, args...)
 
@@ -252,22 +257,23 @@ func (c *DBClient) launchPersister() {
 
 				case (models.IpInfo):
 					ipInfo := obj.(models.IpInfo)
-					log.Tracef("persisting ip_info %s\n", ipInfo.IP)
+					logEntry.Tracef("persisting ip_info %s\n", ipInfo.IP)
 					q, args := c.UpsertIpInfo(ipInfo)
 					batchQueryFn(batch, q, args...)
 
 				case (*eth.EnrNode):
 					enrNode := obj.(*eth.EnrNode)
-					log.Tracef("persisting eth node_info %s\n", enrNode.ID.String())
+					logEntry.Tracef("persisting eth node_info %s\n", enrNode.ID.String())
 					q, args := c.UpsertEnrInfo(enrNode)
 					batchQueryFn(batch, q, args...)
 
 				default:
-					log.Errorf("unrecognized type of object received to persist into DB %T", obj)
-					log.Error(obj)
+					logEntry.Errorf("unrecognized type of object received to persist into DB %T", obj)
+					logEntry.Error(obj)
 				}
 				// after adding whatever query we got check if we need to persist the batch
 				if isReadyToPersistFn(batch) {
+					logEntry.Debug("batch-query full, ready to persist")
 					err := persistBatchFn(batch)
 					if err != nil {
 						log.Error(err)
@@ -277,7 +283,7 @@ func (c *DBClient) launchPersister() {
 				}
 
 			case <-ticker.C:
-				log.Trace("ticker jumped - flushing content of query-batch")
+				logEntry.Trace("ticker jumped - flushing content of query-batch")
 				// flush the batched queries
 				err := persistBatchFn(batch)
 				if err != nil {
@@ -303,7 +309,6 @@ func (c *DBClient) Close() {
 }
 
 func (c *DBClient) PersistToDB(persItem interface{}) {
-	log.Tracef("persisting item: %T\n", persItem)
 	c.persistC <- persItem
 }
 
