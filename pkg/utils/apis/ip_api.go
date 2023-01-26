@@ -20,7 +20,7 @@ import (
 const (
 	defaultIpTTL   = 30 * 24 * time.Hour // 30 days
 	ipChanBuffSize = 45                  // number of ips that can be buffered unto the channel
-	ipBuffSize     = 25600               // number of ip queries that can be queued in the ipQueue
+	ipBuffSize     = 128                 // number of ip queries that can be queued in the ipQueue
 	ipApiEndpoint  = "http://ip-api.com/json/{__ip__}?fields=status,continent,continentCode,country,countryCode,region,regionName,city,zip,lat,lon,isp,org,as,asname,mobile,proxy,hosting,query"
 	minIterTime    = 100 * time.Millisecond
 )
@@ -147,7 +147,14 @@ func (c *IpLocator) locatorRoutine() {
 				if nextDelayRequest != time.Duration(0) {
 					log.Debug("number of allowed requests has been exceed, waiting ", nextDelayRequest+(2*time.Second))
 					// set req delay to true, noone can make requests
-					time.Sleep(nextDelayRequest + (2 * time.Second))
+					ticker := time.NewTicker(nextDelayRequest + (2 * time.Second))
+					select {
+					case <-ticker.C:
+						continue
+					case <-c.ctx.Done():
+						log.Info("context closure has been detecting, closing IpApi caller")
+						return
+					}
 				}
 
 			// the context has been deleted, end go routine
@@ -185,7 +192,6 @@ func (c *IpLocator) LocateIP(ip string) {
 	ticker.Stop()
 }
 
-//
 func (c *IpLocator) Close() {
 	log.Info("closing IP-API service")
 	// close the context for ending up the routine

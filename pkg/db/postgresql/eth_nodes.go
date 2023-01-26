@@ -8,7 +8,7 @@ import (
 )
 
 func (d *DBClient) dropEthNodesTable() error {
-	log.Debugf("droping eth_nodes table in the db")
+	log.Debugf("droping eth_nodes table in psql-db")
 
 	_, err := d.psqlPool.Exec(d.ctx, `
 		DROP TABLE eth_nodes;
@@ -18,7 +18,7 @@ func (d *DBClient) dropEthNodesTable() error {
 }
 
 func (d *DBClient) InitEthNodesTable() error {
-	log.Debugf("initializing eth_nodes table")
+	log.Debugf("init eth_nodes table in psql-db")
 
 	// try create the table in the DB
 	_, err := d.psqlPool.Exec(
@@ -53,7 +53,7 @@ func (d *DBClient) InitEthNodesTable() error {
 // Insert ENR in the DB
 // insert into the db if new one, update the data if the ENR has a higher Seq number
 func (d *DBClient) UpsertEnrInfo(enr *eth.EnrNode) (query string, args []interface{}) {
-	log.Trace("inserting eth_nodes in the db")
+	log.Trace("upserting new enr to eth_nodes in psql-db")
 
 	query = `
 		INSERT INTO eth_nodes(

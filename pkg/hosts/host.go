@@ -25,8 +25,7 @@ import (
 )
 
 var (
-	ModuleName       = "LIBP2P-HOST"
-	ConnNotChannSize = 200
+	ConnNotChannSize = 256
 )
 
 // Struct that defines the Basic Struct asociated to the Libtp2p host
@@ -40,8 +39,7 @@ type BasicLibp2pHost struct {
 	IpLocator *apis.IpLocator
 
 	// Basic Host Metadata
-	multiAddr     ma.Multiaddr
-	fullMultiAddr ma.Multiaddr
+	multiAddr ma.Multiaddr
 
 	connEventNotChannel chan *models.EventTrace
 	identNotChannel     chan IdentificationEvent
@@ -60,16 +58,14 @@ func NewBasicLibp2pEth2Host(
 	ps *psql.DBClient) (*BasicLibp2pHost, error) {
 
 	// generate de multiaddress
-	multiaddr := fmt.Sprintf("/ip4/%s/tcp/%d", ip, port)
-	muladdr, err := ma.NewMultiaddr(multiaddr)
+	multiaddr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%d", ip, port))
 	if err != nil {
 		return nil, errors.Wrap(err, fmt.Sprintf("couldn't generate multiaddress from ip %s and tcp %s", ip, port))
 	}
-	log.Debugf("setting multiaddress to %s", muladdr)
 
 	// Generate the main Libp2p host that will be exposed to the network
 	host, err := libp2p.New(
-		libp2p.ListenAddrs(muladdr),
+		libp2p.ListenAddrs(multiaddr),
 		libp2p.Identity(privKey),
 		libp2p.UserAgent(userAgent),
 		libp2p.Transport(tcp_transport.NewTCPTransport),
@@ -79,10 +75,11 @@ func NewBasicLibp2pEth2Host(
 	if err != nil {
 		return nil, err
 	}
-	peerId := host.ID().String()
-	fmaddr := host.Addrs()[0].String() + "/p2p/" + host.ID().String()
-	localMultiaddr, _ := ma.NewMultiaddr(fmaddr)
-	log.Debugf("full multiaddress %s", localMultiaddr)
+	log.WithFields(log.Fields{
+		"maddrs": multiaddr.String(),
+		"peerID": host.ID().String(),
+	}).Info("libp2p successfully generated")
+
 	// generate the identify service
 	ids, err := identify.NewIDService(
 		host,
@@ -101,9 +98,8 @@ func NewBasicLibp2pEth2Host(
 		identify:            ids,
 		DBClient:            ps,
 		IpLocator:           ipLocator,
-		multiAddr:           muladdr,
-		fullMultiAddr:       localMultiaddr,
-		peerID:              peer.ID(peerId),
+		multiAddr:           multiaddr,
+		peerID:              host.ID(),
 		connEventNotChannel: make(chan *models.EventTrace, ConnNotChannSize),
 		identNotChannel:     make(chan IdentificationEvent, ConnNotChannSize),
 	}
@@ -177,16 +173,10 @@ func (b *BasicLibp2pHost) Host() host.Host {
 	return b.host
 }
 
-// Start:
-// Start the libp2pHost module (perhaps NOT NECESSARY).
-// So far, start listening on the fullMultiAddrs.
-func (b *BasicLibp2pHost) Start() {
-	err := b.host.Network().Listen()
-	if err != nil {
-		log.Errorf("error starting. %s", err)
-	} else {
-		log.Infof("libp2p host module started")
-	}
+// Start spawns the libp2pHost module
+// So far, start listening on the multiAddrs.
+func (b *BasicLibp2pHost) Start() error {
+	return b.host.Network().Listen()
 }
 
 func (b *BasicLibp2pHost) Ctx() context.Context {

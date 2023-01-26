@@ -16,7 +16,7 @@ import (
 // InitPeerInfoTable compiles all the data needed and extractable from each peer
 // it includes: HostInfo, PeerInfo, and ControlInfo
 func (c *DBClient) InitPeerInfoTable() error {
-	log.Debug("initializing peer_info table in db")
+	log.Debug("initializing peer_info table in psql-db")
 
 	_, err := c.psqlPool.Exec(c.ctx, `
 		CREATE TABLE IF NOT EXISTS peer_info(
@@ -55,6 +55,7 @@ func (c *DBClient) InitPeerInfoTable() error {
 
 // InsertNewPeerInfo
 func (c *DBClient) UpsertHostInfo(hInfo *models.HostInfo) (q string, args []interface{}) {
+	log.Trace("upserting host in peer_info table")
 	// compose the query
 	q = `INSERT INTO peer_info (
 			peer_id,
@@ -84,6 +85,7 @@ func (c *DBClient) UpsertHostInfo(hInfo *models.HostInfo) (q string, args []inte
 
 // InsertNewPeerInfo
 func (c *DBClient) UpdatePeerInfo(pInfo *models.PeerInfo) (q string, args []interface{}) {
+	log.Trace("upserting peer in peer_info table")
 	// compose the query
 	q = `
 		UPDATE peer_info
@@ -116,6 +118,7 @@ func (c *DBClient) UpdatePeerInfo(pInfo *models.PeerInfo) (q string, args []inte
 }
 
 func (c *DBClient) UpdateConnAttempt(connAttempt *models.ConnectionAttempt) (query string, args []interface{}) {
+	log.Tracef("updating peer_info because of new conn attempt %s", connAttempt.RemotePeer.String())
 	// logic to determine how to update the table
 	if connAttempt.Status == models.PossitiveAttempt {
 		// we have the chance to un-deprecate the peer
@@ -156,8 +159,7 @@ func (c *DBClient) UpdateConnAttempt(connAttempt *models.ConnectionAttempt) (que
 }
 
 func (c *DBClient) GetFullHostInfo(pID peer.ID) (*models.HostInfo, error) {
-
-	log.Debugf("reading info for peer %s", pID.String())
+	log.Tracef("reading info for peer %s", pID.String())
 
 	hInfo := models.NewHostInfo(pID, utils.EthereumNetwork)
 	pInfo := models.NewEmptyPeerInfo()
@@ -232,7 +234,7 @@ func (c *DBClient) GetFullHostInfo(pID peer.ID) (*models.HostInfo, error) {
 }
 
 func (c *DBClient) GetPersistable(pID peer.ID) (peerstore.PersistablePeer, error) {
-	log.Debugf("reading persistable info for peer %s", pID.String())
+	log.Tracef("reading persistable info for peer %s", pID.String())
 
 	var maddresses []string
 	var network utils.NetworkType

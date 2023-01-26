@@ -5,7 +5,7 @@ import (
 
 	promth "github.com/migalabs/armiarma/pkg/exporters"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
 // ServeMetrics:
@@ -52,7 +52,7 @@ func (c *PeeringService) ServeMetrics() {
 					return true
 				})
 
-				log.WithFields(logrus.Fields{
+				log.WithFields(log.Fields{
 					"LastIterTime(secs)":          iterTime,
 					"AttemptedPeersSinceLastIter": peersPeriter,
 					//"IterForcingNextConnTime":         peerIterForcingTime,

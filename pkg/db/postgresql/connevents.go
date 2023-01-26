@@ -7,7 +7,7 @@ import (
 )
 
 func (c *DBClient) InitConnEventTable() error {
-	log.Debugf("initializing conn_events table in db\n")
+	log.Debugf("init conn_events table in psql-db\n")
 
 	_, err := c.psqlPool.Exec(c.ctx, `
 		CREATE TABLE IF NOT EXISTS conn_events(
@@ -33,6 +33,7 @@ func (c *DBClient) InitConnEventTable() error {
 }
 
 func (c *DBClient) InsertNewConnEvent(connEv *models.ConnEvent) (query string, args []interface{}) {
+	log.Trace("inserting new connection event to conn_event in psql-db")
 	// compose query
 	query = `
 		INSERT INTO conn_events (

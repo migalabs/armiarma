@@ -12,13 +12,14 @@ import (
 	psql "github.com/migalabs/armiarma/pkg/db/postgresql"
 	"github.com/migalabs/armiarma/pkg/hosts"
 	"github.com/migalabs/armiarma/pkg/utils"
+
 	"github.com/pkg/errors"
 
 	"github.com/libp2p/go-libp2p-core/peer"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
-	PeerStratModuleName = "PRUNING"
 	// Default Delays
 	DeprecationTime       = 1024 * time.Minute // mMinutes after first negative connection that has to pass to deprecate a peer.
 	DefaultNegDelay       = 12 * time.Hour     // Default delay that will be applied for those deprecated peers.
@@ -75,7 +76,7 @@ func NewPruningStrategy(
 	return &PruningStrategy{
 		ctx:            ctx,
 		network:        network,
-		strategyType:   PeerStratModuleName,
+		strategyType:   "pruning",
 		Peerstore:      pstore,
 		DBClient:       dbClient,
 		PeerQueue:      NewPeerQueue(),
@@ -108,7 +109,10 @@ func (c *PruningStrategy) Run() chan *models.HostInfo {
 // receive connections/disconnections, and fetch info comming from the peering service into the db.
 // Main interaction of the Peering Service with the DB.
 func (c *PruningStrategy) peerstoreIteratorRoutine() {
-	log.Debug("starting the peerstore iterator routine")
+	logEntry := log.WithFields(log.Fields{
+		"mod": "prun-strgy-itr",
+	})
+	logEntry.Debug("init")
 	c.PeerQueueIterations = 0
 
 	// get the peer list from the peerstore
@@ -134,7 +138,7 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 		// Receive the notification of sending the next peer
 		case <-c.nextPeerChan:
 			if peerListLen > 0 {
-				log.Debug("prepare next peer for pushing it into peer stream")
+				logEntry.Trace("prepare next peer for pushing it into peer stream")
 				// read info about next peer
 				nextPeer := c.PeerQueue.PeerList[peerCounter]
 
@@ -152,7 +156,7 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 					}
 
 					// Send next peer to the peering service
-					log.Debugf("pushing next peer %s into peer stream", pinfo.ID)
+					logEntry.Tracef("pushing next peer %s into peer stream", pinfo.ID)
 
 					v, _ := c.queueErroDistribution.Load(nextPeer.DelayObj.GetType())
 					val := v.(int)
@@ -169,14 +173,14 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 					peerCounter++
 
 				} else {
-					log.Debug("next peers has to wait to be connected")
+					logEntry.Trace("next peers has to wait to be connected")
 					c.iterForcingNextConnTime = nextPeer.NextConnection()
 
 					c.NextPeer()
 					nextIterFlag = true
 				}
 			} else {
-				log.Warn("empty peerstore")
+				logEntry.Warn("empty peerstore")
 				// Recreate the call of the nextPeer that the iterator just used
 				c.NextPeer()
 
@@ -185,8 +189,8 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 				// time to update the PeerList
 				c.lastIterTime = time.Since(iterStartTime)
 				atomic.StoreInt64(&c.attemptedPeers, int64(peerCounter))
-				log.Debug("peerstore iteration of ", peerCounter, " peers, done in ", c.lastIterTime)
-				log.Debug("missing ", c.PeerQueue.Len()-peerCounter, " peers waiting for next try")
+				logEntry.Debug("peerstore iteration of ", peerCounter, " peers, done in ", c.lastIterTime)
+				logEntry.Debug("missing ", c.PeerQueue.Len()-peerCounter, " peers waiting for next try")
 
 				// check if the minIterTime has been
 				<-validIterTimer.C
@@ -202,7 +206,7 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 				}
 
 				peerListLen = c.PeerQueue.Len()
-				log.Debugf("got new peer list with %d", peerListLen)
+				logEntry.Debugf("got new peer list with %d", peerListLen)
 				validIterTimer = time.NewTimer(MinIterTime)
 				iterStartTime = time.Now()
 				peerCounter = 0
@@ -211,7 +215,7 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 
 		// detect if the context has been shut down to end the go routine
 		case <-c.ctx.Done():
-			log.Debug("closing peerstore iterator")
+			logEntry.Debug("closing")
 			close(c.peerStreamChan)
 			close(c.nextPeerChan)
 			close(c.connEventNot)
@@ -224,7 +228,10 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 // receive connections/disconnections, and fetch info comming from the peering service into the db.
 // Main interaction of the Peering Service with the DB.
 func (c *PruningStrategy) eventRecorderRoutine() {
-	log.Debugf("Running the Event RecorderRoutine")
+	logEntry := log.WithFields(log.Fields{
+		"mod": "prun-evnt-rec",
+	})
+	logEntry.Debugf("init")
 
 	// Buffer of connection Events peer peer (map because of lack of concurrency)
 	connEventBuffer := make(map[peer.ID]*models.ConnEvent, 0)
@@ -233,16 +240,16 @@ func (c *PruningStrategy) eventRecorderRoutine() {
 		select {
 		// Receive the status of the peer that got connected to the crawler
 		case connAttempt := <-c.connAttemptNot:
-			log.Tracef("new connection attempt has been received from peer %s", connAttempt.RemotePeer)
+			logEntry.Tracef("new connection attempt has been received from peer %s", connAttempt.RemotePeer)
 			// update the local info about the peer
 			p, ok := c.PeerQueue.GetPeer(connAttempt.RemotePeer.String())
 			if !ok {
-				log.Warnf("Could not find peer in peerqueue: %s", connAttempt.RemotePeer)
+				logEntry.Warnf("Could not find peer in peerqueue: %s", connAttempt.RemotePeer)
 			}
 			p.ConnEventHandler(connAttempt.Error)
 			// Check if peer needs to be deprecated
 			if p.Deprecable() {
-				log.Warnf("deprecating peer %s", connAttempt.RemotePeer.String())
+				logEntry.Warnf("deprecating peer %s", connAttempt.RemotePeer.String())
 				connAttempt.Deprecable = true
 				// remove p from list of peers to ping (if it appears again in the discovery, it will be updated as undeprecated in the DB)
 				c.PeerQueue.RemovePeer(connAttempt.RemotePeer.String())
@@ -268,12 +275,12 @@ func (c *PruningStrategy) eventRecorderRoutine() {
 				endConnInfo := eventTrace.Event.(*models.EndConnInfo)
 				bEvent.AddDisconn(*endConnInfo)
 			default:
-				log.Warnf("invalid event trace for peer %s - %x\n", eventTrace.PeerID.String(), eventTrace.Event)
+				logEntry.Warnf("invalid event trace for peer %s - %x\n", eventTrace.PeerID.String(), eventTrace.Event)
 			}
 
 			// check if the ConnEvent is ready to be persisted
 			if bEvent.IsReadyToPersist() {
-				log.Debugf("persising full conn event for peer %s", bEvent.PeerID.String())
+				logEntry.Debugf("persising full conn event for peer %s", bEvent.PeerID.String())
 				c.DBClient.PersistToDB(bEvent)
 			}
 
@@ -281,7 +288,7 @@ func (c *PruningStrategy) eventRecorderRoutine() {
 			// We received a new identification attempt
 			// extract whether it was success or a failure
 			// and track it in the PeerQueue and in the peerstore
-			log.Debugf("new identification from peer %s", identEvent.HostInfo.ID.String())
+			logEntry.Debugf("new identification from peer %s", identEvent.HostInfo.ID.String())
 
 			// by default we think the identify was not successful, therefore negativewithhope and error
 			var delayType string = NegativeWithHopeDelayType
@@ -298,13 +305,13 @@ func (c *PruningStrategy) eventRecorderRoutine() {
 			}
 			// double-check when are we rewriting hInfo without IP, and port
 			if identEvent.HostInfo.IP == "" {
-				log.Error("error trying to add host info without IP and ports", identEvent.HostInfo)
+				logEntry.Error("error trying to add host info without IP and ports", identEvent.HostInfo)
 			}
 			c.DBClient.PersistToDB(identEvent.HostInfo)
 
 		// detect if the context has been shut down to end the go routine
 		case <-c.ctx.Done():
-			log.Debug("closing event recorder routine")
+			logEntry.Debug("closing event recorder routine")
 			return
 		}
 	}
@@ -313,14 +320,12 @@ func (c *PruningStrategy) eventRecorderRoutine() {
 // NextPeer notifies the peerstore iterator that a new peer has been requested.
 // After it, the peerstore iterator will put the new peer in the PeerStreamChan.
 func (c *PruningStrategy) NextPeer() {
-	log.Debug("next peer has been requested")
 	c.nextPeerChan <- struct{}{}
 }
 
 // NewConnectionAttempt notifies the peerstore iterator that a new ConnStatus has been received.
 // After it, the peerstore iterator will aggregate the extra info.
 func (c *PruningStrategy) NewConnectionAttempt(connAttStat *models.ConnectionAttempt) {
-	log.Debug("new connection attempt has been received from peer", connAttStat.RemotePeer.String())
 	c.connAttemptNot <- connAttStat
 }
 
@@ -328,13 +333,11 @@ func (c *PruningStrategy) NewConnectionAttempt(connAttStat *models.ConnectionAtt
 // It puts the connection metadata in the connNot channel to let the select
 // loop all the metadata of the received connection.
 func (c *PruningStrategy) NewConnectionEvent(eventTrace *models.EventTrace) {
-	log.Debug("next connection event has been received from peer", eventTrace.PeerID.String())
 	c.connEventNot <- eventTrace
 }
 
 // NewIdentificationEvent will insert a new identification item in the identificationeventnorifier channel.
 func (c *PruningStrategy) NewIdentificationEvent(newIdent hosts.IdentificationEvent) {
-	log.Debugf("new identification has been received from peer %s", newIdent.HostInfo.ID.String())
 	c.identEventNot <- newIdent
 }
 
@@ -456,6 +459,7 @@ func (c *PeerQueue) UpdatePeerListFromRemoteDB(dbClient *psql.DBClient, localPee
 	totcnt := 0
 	new := 0
 
+	// metrics
 	c.queueErroDistribution.Store(PositiveDelayType, 0)
 	c.queueErroDistribution.Store(NegativeWithHopeDelayType, 0)
 	c.queueErroDistribution.Store(NegativeWithNoHopeDelayType, 0)
@@ -483,8 +487,8 @@ func (c *PeerQueue) UpdatePeerListFromRemoteDB(dbClient *psql.DBClient, localPee
 
 			// Whenever we find a new peer that we didn't have locally, add zero delay
 			// even when we read all the peerstore from the DB Endpoint when restarting
-			delayDegree := 0           // default
-			delayType := ZeroDelayType // default
+			delayDegree := 0             // default
+			delayType := Minus1DelayType // default
 
 			newPrunnedPeer := NewPrunedPeer(pInfo.ID.String(), delayType)
 			newPrunnedPeer.DelayObj.SetDegree(delayDegree)
@@ -504,7 +508,7 @@ func (c *PeerQueue) UpdatePeerListFromRemoteDB(dbClient *psql.DBClient, localPee
 	}
 	// Sort the list of peers based on the next connection
 	c.SortPeerList()
-	log.Debugf("len PeerQueue: %d\n", c.Len())
+	log.Debugf("Num of peers in PeerQueue: %d\n", c.Len())
 	return nil
 }
 
@@ -593,7 +597,8 @@ func ErrorToDelayType(errString string) string {
 		hosts.DialErrorConnectionRefused,
 		hosts.DialErrorContextDeadlineExceeded,
 		hosts.DialErrorBackOff,
-		hosts.ErrorRequestingMetadta:
+		hosts.ErrorRequestingMetadta,
+		"unknown":
 		return NegativeWithHopeDelayType
 
 	case hosts.DialErrorNoRouteToHost,
@@ -607,7 +612,7 @@ func ErrorToDelayType(errString string) string {
 		return TimeoutDelayType
 
 	default:
-		log.Warnf("Default Delay applied, error: %s-\n", errString)
+		log.Tracef("Default Delay applied, error: %s\n", errString)
 		return NegativeWithHopeDelayType
 	}
 }

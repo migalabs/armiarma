@@ -11,7 +11,7 @@ import (
 )
 
 func (c *DBClient) InitIpTable() error {
-	log.Debug("init ips table")
+	log.Debug("init ips table in psql-db")
 	_, err := c.psqlPool.Exec(c.ctx, `
 		CREATE TABLE IF NOT EXISTS ips(
 			id SERIAL,
@@ -46,6 +46,7 @@ func (c *DBClient) InitIpTable() error {
 
 // UpsertIP attemtps to insert IP in the DB - or Updates the data info if they where already there
 func (c *DBClient) UpsertIpInfo(ipInfo models.IpInfo) (query string, args []interface{}) {
+	log.Trace("upsert ip_info in psql-db")
 	// compose query
 	query = `
 		INSERT INTO ips(
@@ -116,7 +117,7 @@ func (c *DBClient) UpsertIpInfo(ipInfo models.IpInfo) (query string, args []inte
 
 // ReadIpInfo reads all the information available for that specific IP in the DB
 func (c *DBClient) ReadIpInfo(ip string) (models.IpInfo, error) {
-	log.Tracef("reading ip info for ip %s", ip)
+	log.Tracef("reading ip_info for ip %s from psql-db", ip)
 	var ipInfo models.IpInfo
 	err := c.psqlPool.QueryRow(c.ctx, `
 		SELECT 
@@ -172,6 +173,7 @@ func (c *DBClient) ReadIpInfo(ip string) (models.IpInfo, error) {
 
 // GetExpiredIpInfo returns all the IP whos' TTL has already expired
 func (c *DBClient) GetExpiredIpInfo() ([]string, error) {
+	log.Trace("fetching expired ips from psql-db")
 	expIps := make([]string, 0)
 	ipRows, err := c.psqlPool.Query(c.ctx, `
 		SELECT ip 

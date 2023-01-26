@@ -26,11 +26,11 @@ type IdentificationEvent struct {
 }
 
 func (c *BasicLibp2pHost) standardListenF(net network.Network, addr ma.Multiaddr) {
-	log.Debug("Listen")
+	log.Trace("Listen")
 }
 
 func (c *BasicLibp2pHost) standardListenCloseF(net network.Network, addr ma.Multiaddr) {
-	log.Debug("Close listen")
+	log.Trace("Close listen")
 }
 
 func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Conn) {
@@ -91,10 +91,7 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 
 	wg.Wait()
 	// Parse the errors from the different go routines,
-
-	// check if an error was sent into the channel,
 	// if there wasn't anything in the channel, or if the err is nil fetch peer info
-	// if if there is an error  in the channel, print error
 	if hinfoErr != nil {
 		// if error, cancel the timeout and stop ReqMetadata and ReqStatus
 		log.WithFields(log.Fields{
@@ -154,16 +151,14 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 
 func (c *BasicLibp2pHost) standardDisconnectF(net network.Network, conn network.Conn) {
 	t := time.Now()
-
 	log.WithFields(log.Fields{
 		"EVENT":     "Disconnection detected",
 		"DIRECTION": conn.Stat().Direction.String(),
 	}).Debug("Peer: ", conn.RemotePeer().String())
-
+	// compose the disconnection event
 	disconEvent := &models.EndConnInfo{
 		DiscTime: t,
 	}
-
 	// Send the new disconnection status
 	c.RecConnEvent(&models.EventTrace{
 		PeerID: conn.RemotePeer(),

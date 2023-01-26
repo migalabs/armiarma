@@ -44,6 +44,7 @@ type Discovery5 struct {
 	Node        *enode.LocalNode
 	Dv5Listener *discover.UDPv5
 	Iterator    ethenode.Iterator
+	ForkDigest  string
 
 	// node notifier
 	nodeNotC chan *models.HostInfo
@@ -128,28 +129,29 @@ func (d *Discovery5) nodeIterator() {
 
 	for {
 		if d.doneF || d.ctx.Err() != nil {
-			log.Info("shutdown detected, closing routine")
+			log.Info("shutdown detected, closing discv5 iterator")
 			return
 		}
 
 		if d.Iterator.Next() {
-			log.Debug("new ENR discovered")
 			// fill the given DiscoveredPeer interface with the next found peer
 			node := d.Iterator.Node()
+
+			log.WithFields(log.Fields{
+				"node_id": node.ID().String(),
+				"module":  "Discv5",
+			}).Debug("new ENR discovered")
 
 			hInfo, err := d.handleENR(node)
 			if err != nil {
 				log.Error(errors.Wrap(err, "error handling new ENR"))
 			}
-			log.Debug("notifying of new ENR")
 			d.nodeNotC <- hInfo
-			log.Debug("notification done!")
 		}
 	}
-
 }
 
-// Stop
+// Stop closes the Disv5 node iterator properly :)
 func (d *Discovery5) Stop() {
 	d.doneF = true
 	d.wg.Wait()
@@ -161,12 +163,15 @@ func (d *Discovery5) Stop() {
 
 // handleENR parses and identifies all the advertised fields of a newly discovered peer
 func (d *Discovery5) handleENR(node *ethenode.Node) (*models.HostInfo, error) {
-
 	// Parse ENR
 	enr, err := eth.ParseEnr(node)
-	// TODO: Add fork digest filter when needed
 	if err != nil {
-		return &models.HostInfo{}, errors.Wrap(err, "unable to parse new discovered ENR")
+		return nil, errors.Wrap(err, "unable to parse new discovered ENR")
+	}
+
+	// check if there is any fork digest filter only if the flag All is not set
+	if (enr.Eth2Data.ForkDigest.String() == d.ForkDigest) && (d.FilterDigest != eth.ForkDigests[eth.AllForkDigest]) {
+		return nil, nil
 	}
 
 	// Get the public key and the peer.ID of the discovered peer
@@ -175,11 +180,12 @@ func (d *Discovery5) handleENR(node *ethenode.Node) (*models.HostInfo, error) {
 	if err != nil {
 		return &models.HostInfo{}, errors.Wrap(err, "unable to convert Geth pubkey to Libp2p")
 	}
+	// Generate the peer ID from the pubkey
 	peerID, err := peer.IDFromPublicKey(libp2pKey)
 	if err != nil {
 		return &models.HostInfo{}, errors.Wrap(err, fmt.Sprintf("error extracting peer.ID from node %s", node.ID()))
 	}
-
+	// gen the HostInfo
 	hInfo := models.NewHostInfo(
 		peerID,
 		utils.EthereumNetwork,
@@ -188,9 +194,8 @@ func (d *Discovery5) handleENR(node *ethenode.Node) (*models.HostInfo, error) {
 			enr.TCP,
 		),
 	)
-
+	// add the enr as an attribute
 	hInfo.AddAtt(eth.EnrHostInfoAttribute, enr)
-
 	return hInfo, nil
 }
 

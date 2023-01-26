@@ -28,12 +28,15 @@ var (
 	AltairKey    string = "Altair"
 	BellatrixKey string = "Bellatrix"
 
+	AllForkDigest string = "All"
+
 	// Gnosis
 	GnosisKey          string = "Gnosis"
 	GnosisAltairKey    string = "GnosisAltair"
 	GnosisBellatrixKey string = "Genosisbellatrix"
 
 	ForkDigests = map[string]string{
+		AllForkDigest:      "all",
 		Phase0Key:          "b5303f2a",
 		AltairKey:          "afcaaba0",
 		BellatrixKey:       "4a26c58b",

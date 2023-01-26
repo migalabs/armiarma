@@ -64,20 +64,15 @@ func NewDiscovery(ctx context.Context, discServ PeerDiscovery, db *psql.DBClient
 
 // Start spawns the discovery service in a separate go-routine
 func (d *Discovery) Start() {
-	log.Info("starting peer discovery service")
 	nodeNotC := d.DiscService.Start()
 
 	d.wg.Add(1)
 	go func() {
 		defer d.wg.Done()
-		log.Info("launching peer reader")
 		// check if the DiscPeer Obj has a new peer to read
 		for {
-			// check with priority of
-
 			select {
 			case hInfo := <-nodeNotC:
-				log.Debug("next peer avail")
 				d.peerHandler(hInfo)
 
 			case <-d.doneC:
@@ -102,7 +97,7 @@ func (d *Discovery) peerHandler(hInfo *models.HostInfo) {
 	log.WithFields(log.Fields{
 		"peer_id": hInfo.ID.String(),
 		"ip":      hInfo.IP,
-		"attr":    hInfo.Attr,
+		"attrs":   hInfo.Attr,
 	}).Debugf("discovered new peer")
 	// if the peer
 
@@ -113,11 +108,11 @@ func (d *Discovery) peerHandler(hInfo *models.HostInfo) {
 		// get location from the received peer
 		d.IpLocator.LocateIP(hInfo.IP)
 	} else {
-		log.Debugf("new peer %s had a non-public IP %s", hInfo.ID.String(), hInfo.IP)
+		log.Warnf("new peer %s had a non-public IP %s", hInfo.ID.String(), hInfo.IP)
 	}
 	// iter through all the attributes of the Node to persit them
 	for _, att := range hInfo.Attr {
 		d.DBClient.PersistToDB(att)
 	}
-	log.Debug("done handling peer")
+	log.Trace("done handling peer")
 }
