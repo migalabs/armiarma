@@ -5,8 +5,9 @@ import (
 	"crypto/ecdsa"
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
-	"github.com/migalabs/armiarma/pkg/info"
-	all_utils "github.com/migalabs/armiarma/pkg/utils"
+	"github.com/ethereum/go-ethereum/p2p/enr"
+
+	eth "github.com/migalabs/armiarma/pkg/networks/ethereum"
 	"github.com/sirupsen/logrus"
 )
 
@@ -20,18 +21,12 @@ var (
 type LocalNode struct {
 	ctx       context.Context
 	LocalNode enode.LocalNode
-	info_data *info.Eth2InfoData
 }
 
-// NewLocalNode:
-// This method will create a LocalNode object using the given arguments.
-// @param ctx the context, usually inherited from the base.
-// @param info_obj the InfoData object where to get the configuration data from the user.
-// @param stdOpts the logging options object.
-// @return the LocalNode object.
-func NewLocalNode(ctx context.Context, infObj *info.Eth2InfoData) *LocalNode {
+// NewLocalNode will create a LocalNode object using the given arguments.
+func NewLocalNode(ctx context.Context, privKey *ecdsa.PrivateKey) *LocalNode {
 	// db where to store the ENRs
-	new_db, err := enode.OpenDB("")
+	ethDB, err := enode.OpenDB("")
 	if err != nil {
 		Log.Panicf("Could not create local DB %s", err)
 	}
@@ -39,17 +34,23 @@ func NewLocalNode(ctx context.Context, infObj *info.Eth2InfoData) *LocalNode {
 
 	return &LocalNode{
 		ctx:       ctx,
-		LocalNode: *enode.NewLocalNode(new_db, (*ecdsa.PrivateKey)(infObj.PrivateKey)),
-		info_data: infObj,
+		LocalNode: *enode.NewLocalNode(ethDB, privKey),
 	}
 }
 
-// AddEntries:
-// This method will add specific Eth2 Key Value entries to the created Node.
-// TODO: confirm which data to add and structure appropiately
-func (l *LocalNode) AddEntries() {
-	l.LocalNode.Set(all_utils.NewAttnetsENREntry("ffffffffffffffff"))
-	l.LocalNode.Set(all_utils.NewEth2DataEntry("b5303f2a"))
+// SetForkDigest adds any given ForkDigest into the local node's enr
+func (l *LocalNode) SetForkDigest(forkDigest string) {
+	// TODO: parse to see if it's a valid ForkDigets (len, blabla)
+	l.addEntries(eth.NewEth2DataEntry("b5303f2a"))
 }
 
-// getters and setters
+// SetAttNetworks adds any given set of Attnets into the local node's enr
+func (l *LocalNode) SetAttNetworks(networks string) {
+	// TODO: parse to see if it's a valid ForkDigets (len, blabla)
+	l.addEntries(eth.NewAttnetsENREntry("ffffffffffffffff"))
+}
+
+// AddEntries modifies the local Ethereum Node's ENR adding a new entry to the Key-Value
+func (l *LocalNode) addEntries(entry enr.Entry) {
+	l.LocalNode.Set(entry)
+}

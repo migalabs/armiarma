@@ -9,15 +9,15 @@ import (
 
 	cli "github.com/urfave/cli/v2"
 
-	"github.com/migalabs/armiarma/pkg/db"
-	"github.com/migalabs/armiarma/pkg/db/postgresql"
 	"github.com/migalabs/armiarma/pkg/discovery"
 	"github.com/migalabs/armiarma/pkg/discovery/dv5"
 	"github.com/migalabs/armiarma/pkg/enode"
 	"github.com/migalabs/armiarma/pkg/exporters"
 	"github.com/migalabs/armiarma/pkg/gossipsub"
+	"github.com/migalabs/armiarma/pkg/utils"
 
 	//"github.com/migalabs/armiarma/pkg/gossipsub/blockchaintopics"
+	psql "github.com/migalabs/armiarma/pkg/db/postgresql"
 	"github.com/migalabs/armiarma/pkg/hosts"
 	"github.com/migalabs/armiarma/pkg/info"
 	"github.com/migalabs/armiarma/pkg/peering"
@@ -40,39 +40,54 @@ type Eth2Crawler struct {
 	cancel          context.CancelFunc
 	Host            *hosts.BasicLibp2pHost
 	Node            *enode.LocalNode
-	DB              *db.PeerStore
+	DB              *psql.DBClient
 	Disc            *discovery.Discovery
 	Peering         peering.PeeringService
 	Gs              *gossipsub.GossipSub
 	Info            *info.Eth2InfoData
-	IpLocalizer     apis.PeerLocalizer
+	IpLocator       *apis.IpLocator
 	ExporterService *exporters.ExporterService
 }
 
 func NewEth2Crawler(mainCtx *cli.Context, infObj info.Eth2InfoData) (*Eth2Crawler, error) {
 	ctx, cancel := context.WithCancel(mainCtx.Context)
 
+	network := utils.EthereumNetwork
+
 	// generate the central exporting service
 	exporterService := exporters.NewExporterService(ctx)
 
-	// generate Eth2 network model for the PSQL
-	ethmodel := postgresql.NewEth2Model("eth2")
-
-	// Generate new DB for the peerstore
-	db := db.NewPeerStore(ctx, exporterService, infObj.OutputPath, infObj.DbEndpoint, &ethmodel)
+	// Generate/connect to PSQL Database
+	dbClient, err := psql.NewDBClient(
+		ctx,
+		network,
+		infObj.DbEndpoint,
+		true, // we want the DB intitialized
+	)
+	if err != nil {
+		cancel()
+		return nil, err
+	}
 
 	// IpLocalizer
-	ipLocalizer := apis.NewPeerLocalizer(ctx, IpCacheSize)
+	ipLocator := apis.NewIpLocator(ctx, dbClient)
 
 	// generate libp2pHost
-	host, err := hosts.NewBasicLibp2pEth2Host(ctx, infObj, &ipLocalizer, &db)
+	// TODO: pass only strictly necessary info (IP, PORT, PrivKey)
+	host, err := hosts.NewBasicLibp2pEth2Host(
+		ctx,
+		infObj,
+		network,
+		ipLocator,
+		dbClient,
+	)
 	if err != nil {
 		cancel()
 		return nil, err
 	}
 
 	// generate local Enode and DV5
-	node := enode.NewLocalNode(ctx, &infObj)
+	node := enode.NewLocalNode(ctx, (*ecdsa.PrivateKey)(infObj.PrivateKey))
 
 	// read Eth2 bootnodes
 	dv5bootnodes, err := dv5.ReadEth2BootnodeFile(infObj.BootNodesFile)
@@ -81,7 +96,7 @@ func NewEth2Crawler(mainCtx *cli.Context, infObj info.Eth2InfoData) (*Eth2Crawle
 		return nil, err
 	}
 
-	dv5, err := dv5.NewDiscovery(
+	dv5, err := dv5.NewDiscovery5(
 		ctx,
 		node,
 		(*ecdsa.PrivateKey)(infObj.PrivateKey),
@@ -93,22 +108,34 @@ func NewEth2Crawler(mainCtx *cli.Context, infObj info.Eth2InfoData) (*Eth2Crawle
 		return nil, err
 	}
 
-	disc := discovery.NewDiscovery(ctx, dv5, &db, &ipLocalizer)
+	disc := discovery.NewDiscovery(
+		ctx,
+		dv5,
+		dbClient,
+		ipLocator,
+	)
 
 	// GossipSup
-	gs := gossipsub.NewGossipSub(ctx, exporterService, host, &db)
+	gs := gossipsub.NewGossipSub(ctx, exporterService, host, dbClient)
 	// generate the peering strategy
-	pStrategy, err := peering.NewPruningStrategy(ctx, "eth2", &db)
+	pStrategy, err := peering.NewPruningStrategy(
+		ctx,
+		network,
+		".peerstore", // TODO: remove hardcoded
+		dbClient,
+	)
 	if err != nil {
 		cancel()
 		return nil, err
 	}
 	// Generate the PeeringService
-	peeringServ, err := peering.NewPeeringService(ctx, host, &db,
-		peering.WithPeeringStrategy(&pStrategy),
+	peeringServ, err := peering.NewPeeringService(
+		ctx,
+		host,
+		dbClient,
+		peering.WithPeeringStrategy(pStrategy),
 	)
 	if err != nil {
-
 		cancel()
 		return nil, err
 	}
@@ -119,12 +146,12 @@ func NewEth2Crawler(mainCtx *cli.Context, infObj info.Eth2InfoData) (*Eth2Crawle
 		cancel:          cancel,
 		Host:            host,
 		Info:            &infObj,
-		DB:              &db,
+		DB:              dbClient,
 		Node:            node,
 		Disc:            disc,
 		Peering:         peeringServ,
 		Gs:              gs,
-		IpLocalizer:     ipLocalizer,
+		IpLocator:       ipLocator,
 		ExporterService: exporterService,
 	}
 	return crawler, nil
@@ -134,7 +161,7 @@ func NewEth2Crawler(mainCtx *cli.Context, infObj info.Eth2InfoData) (*Eth2Crawle
 func (c *Eth2Crawler) Run() {
 	// initialization secuence for the crawler
 	c.ExporterService.Run()
-	c.IpLocalizer.Run()
+	c.IpLocator.Run()
 	c.Host.Start()
 	c.Disc.Start()
 	//topics := blockchaintopics.ReturnTopics(c.Info.ForkDigest, c.Info.TopicArray)
@@ -142,12 +169,14 @@ func (c *Eth2Crawler) Run() {
 	//	c.Gs.JoinAndSubscribe(topic)
 	//}
 	c.Peering.Run()
-	c.Gs.ServeMetrics()
-	c.DB.ServeMetrics()
+	// c.Gs.ServeMetrics()
+	//c.DB.ServeMetrics() // TODO: Missing
 }
 
 func (c *Eth2Crawler) Close() {
 	c.Host.Host().Close()
+	c.Disc.Stop()
+	c.DB.Close()
 	c.cancel()
 
 }

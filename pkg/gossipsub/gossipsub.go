@@ -15,7 +15,7 @@ import (
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
-	"github.com/migalabs/armiarma/pkg/db"
+	psql "github.com/migalabs/armiarma/pkg/db/postgresql"
 	"github.com/migalabs/armiarma/pkg/exporters"
 	"github.com/migalabs/armiarma/pkg/hosts"
 	"github.com/minio/sha256-simd"
@@ -36,7 +36,7 @@ type GossipSub struct {
 	ctx context.Context
 
 	BasicHost       *hosts.BasicLibp2pHost
-	PeerStore       *db.PeerStore
+	DBClient        *psql.DBClient
 	PubsubService   *pubsub.PubSub
 	ExporterService *exporters.ExporterService
 	// map where the key are the topic names in string, and the values are the TopicSubscription
@@ -60,7 +60,7 @@ func NewEmptyGossipSub() *GossipSub {
 // @param peerstore: the peerstore where to sotre the data.
 // @param stdOpts: list of options to generate the base of the gossipsub service.
 // @return: pointer to GossipSub struct.
-func NewGossipSub(ctx context.Context, exporter *exporters.ExporterService, h *hosts.BasicLibp2pHost, peerstore *db.PeerStore) *GossipSub {
+func NewGossipSub(ctx context.Context, exporter *exporters.ExporterService, h *hosts.BasicLibp2pHost, dbClient *psql.DBClient) *GossipSub {
 
 	// define gossipsub option
 	// Signature is not used in Eth2, therefore it is needed
@@ -80,7 +80,7 @@ func NewGossipSub(ctx context.Context, exporter *exporters.ExporterService, h *h
 	return &GossipSub{
 		ctx:             ctx,
 		BasicHost:       h,
-		PeerStore:       peerstore,
+		DBClient:        dbClient,
 		PubsubService:   ps,
 		ExporterService: exporter,
 		TopicArray:      make(map[string]*TopicSubscription),
@@ -123,5 +123,5 @@ func (gs *GossipSub) JoinAndSubscribe(topicName string) {
 	// Add the new Topic to the list of supported/subscribed topics in GossipSub
 	gs.TopicArray[topicName] = new_topic_handler
 
-	go gs.TopicArray[topicName].MessageReadingLoop(gs.BasicHost.Host(), gs.PeerStore)
+	go gs.TopicArray[topicName].MessageReadingLoop(gs.BasicHost.Host(), gs.DBClient)
 }

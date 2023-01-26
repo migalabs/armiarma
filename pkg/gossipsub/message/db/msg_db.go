@@ -1,10 +1,8 @@
 package db
 
 import (
-	"github.com/sirupsen/logrus"
-	"database/sql"
 	_ "github.com/lib/pq"
-
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -12,14 +10,13 @@ var (
 	log        = logrus.WithField(
 		"module", ModuleName,
 	)
-	PSQLHost = "localhost"
-	PSQLPort = "5432"
-	PSQLUser = "armiarma" 
+	PSQLHost   = "localhost"
+	PSQLPort   = "5432"
+	PSQLUser   = "armiarma"
 	PSQLPasswd = "localhost"
 	PSQLDbName = "localhost"
 )
 
+// type struct {
 
-type struct {
-	
-}
+// }

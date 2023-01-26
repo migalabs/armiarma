@@ -195,7 +195,17 @@ func Eth2infoFromConfig(inputConfig config.ConfigData) Eth2InfoData {
 	err := i.SetPrivKeyFromString(inputConfig.PrivateKey)
 	if err != nil {
 		log.Warnf("%s. Generating a new one", err.Error())
-		i.SetPrivKeyFromString(utils.GeneratePrivKey())
+		// Gen ECDSA
+		ecdsaKey, err := utils.GenerateECDSAPrivKey()
+		if err != nil {
+			log.Panic("unable to generate new ECDSA private key")
+		}
+		// adapt to Sepc
+		secp256k1Key, err := utils.AdaptSecp256k1FromECDSA(ecdsaKey)
+		if err != nil {
+			log.Panic("unable to get secp256k1 privkey from ECDSA one for Libp2p host")
+		}
+		i.PrivateKey = secp256k1Key
 	}
 	log.Infof("Private Key of the host: %s", i.GetPrivKeyString())
 
@@ -311,16 +321,20 @@ func (i Eth2InfoData) checkValidLogLevel(input_level string) bool {
 }
 
 func (i Eth2InfoData) GetPrivKeyString() string {
-	return utils.PrivKeyToString(i.PrivateKey)
+	return utils.Secp256k1ToString(i.PrivateKey)
 }
 
-func (i *Eth2InfoData) SetPrivKeyFromString(input_key string) error {
-	parsed_key, err := utils.ParsePrivateKey(input_key)
-
+func (i *Eth2InfoData) SetPrivKeyFromString(strKey string) error {
+	ecdsaKey, err := utils.ParseECDSAPrivateKey(strKey)
 	if err != nil {
 		error_string := "Could not parse Private Key"
 		return errors.New(error_string)
 	}
-	i.PrivateKey = parsed_key
+	// ecdsa to secp256k1
+	secp256k1Key, err := utils.AdaptSecp256k1FromECDSA(ecdsaKey)
+	if err != nil {
+		return err
+	}
+	i.PrivateKey = secp256k1Key
 	return nil
 }

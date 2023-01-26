@@ -3,13 +3,11 @@ package gossipsub
 import (
 	"context"
 	"strings"
-	"time"
 
 	"github.com/golang/snappy"
 	"github.com/libp2p/go-libp2p-core/host"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
-	"github.com/migalabs/armiarma/pkg/db"
-	"github.com/migalabs/armiarma/pkg/db/models"
+	psql "github.com/migalabs/armiarma/pkg/db/postgresql"
 )
 
 // TopicSubscription
@@ -51,7 +49,7 @@ func NewTopicSubscription(ctx context.Context, topic *pubsub.Topic, sub pubsub.S
 // and the underlaying msg metrics.
 // @param h: libp2p host.
 // @param peerstore: peerstore of the crawler app.
-func (c *TopicSubscription) MessageReadingLoop(h host.Host, peerstore *db.PeerStore) {
+func (c *TopicSubscription) MessageReadingLoop(h host.Host, dbClient *psql.DBClient) {
 	log.Infof("topic subscription %s reading loop", c.Sub.Topic())
 	subsCtx := c.ctx
 	for {
@@ -74,9 +72,10 @@ func (c *TopicSubscription) MessageReadingLoop(h host.Host, peerstore *db.PeerSt
 			// To avoid getting track of our own messages, check if we are the senders
 			if msg.ReceivedFrom != h.ID() {
 				log.Debugf("new message on %s from %s", c.Sub.Topic(), msg.ReceivedFrom)
-				newPeer := models.NewPeer(msg.ReceivedFrom.String())
-				newPeer.MessageEvent(c.Sub.Topic(), time.Now())
-				peerstore.StoreOrUpdatePeer(newPeer)
+				// HUGE TODO: missing message track for analytics
+				// newPeer := models.NewPeer(msg.ReceivedFrom.String())
+				// newPeer.MessageEvent(c.Sub.Topic(), time.Now())
+				// peerstore.StoreOrUpdatePeer(newPeer)
 				// Add message to msg metrics counter
 				_ = c.MessageMetrics.AddMessgeToTopic(c.Sub.Topic())
 
