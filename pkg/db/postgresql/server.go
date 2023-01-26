@@ -125,6 +125,13 @@ func (c *DBClient) initTables() error {
 	if err != nil {
 		return errors.Wrap(err, "initializing eth_nodes table")
 	}
+
+	// eth_status table
+	err = c.InitEthereumNodeStatus()
+	if err != nil {
+		return errors.Wrap(err, "initializing eth_status table")
+	}
+
 	// INIT all the tables - Separate Networks
 
 	return err
@@ -173,6 +180,9 @@ func (c *DBClient) launchPersister() {
 				rows, qerr = batchResults.Query()
 				rows.Close()
 				cnt++
+				if cnt-1 > batch.Len() {
+					log.Warnf("are we stuck persisting queries? %d iters out of %d queries", cnt, batch.Len())
+				}
 			}
 			// check if there was any error
 			if qerr.Error() != noQueryResult {
@@ -228,9 +238,27 @@ func (c *DBClient) launchPersister() {
 						batchQueryFn(batch, q, args...)
 					}
 					// Read all the Attributes in hInfo
-					// for attName, att := range hostInfo.Attr {
-					// 	// TODO: add tables for BeaconStatus and BeaconMetadata
-					// }
+					for attName, att := range hostInfo.Attr {
+						log.Debugf("detected attribute %s on peer", attName)
+						// TODO: add tables for BeaconStatus and BeaconMetadata
+						switch att.(type) {
+						case eth.BeaconStatusStamped:
+							bstatus := att.(eth.BeaconStatusStamped)
+							q, args = c.UpsertEthereumNodeStatus(bstatus)
+							batchQueryFn(batch, q, args...)
+						case eth.BeaconMetadataStamped:
+							bmetadata := att.(eth.BeaconMetadataStamped)
+							q, args = c.UpsertEthereumNodeMetadata(bmetadata)
+							batchQueryFn(batch, q, args...)
+						case (*eth.EnrNode):
+							enrNode := att.(*eth.EnrNode)
+							logEntry.Tracef("persisting eth node_info %s\n", enrNode.ID.String())
+							q, args := c.UpsertEnrInfo(enrNode)
+							batchQueryFn(batch, q, args...)
+						default:
+							log.Warnf("not yet recognized type for attr %s - %T - %+v", attName, att, att)
+						}
+					}
 
 				case (*models.PeerInfo):
 					peerInfo := obj.(*models.PeerInfo)
@@ -242,8 +270,8 @@ func (c *DBClient) launchPersister() {
 					connAttempt := obj.(*models.ConnectionAttempt)
 					logEntry.Tracef("persisting conn_attempt")
 					q, args := c.UpdateConnAttempt(connAttempt)
-					batchQueryFn(batch, q, args...)
 
+					batchQueryFn(batch, q, args...)
 				case (*models.ConnEvent):
 					connEvent := obj.(*models.ConnEvent)
 					logEntry.Tracef("persisting conn_event for peer %s\n", connEvent.PeerID.String())
@@ -261,16 +289,11 @@ func (c *DBClient) launchPersister() {
 					q, args := c.UpsertIpInfo(ipInfo)
 					batchQueryFn(batch, q, args...)
 
-				case (*eth.EnrNode):
-					enrNode := obj.(*eth.EnrNode)
-					logEntry.Tracef("persisting eth node_info %s\n", enrNode.ID.String())
-					q, args := c.UpsertEnrInfo(enrNode)
-					batchQueryFn(batch, q, args...)
-
 				default:
 					logEntry.Errorf("unrecognized type of object received to persist into DB %T", obj)
 					logEntry.Error(obj)
 				}
+
 				// after adding whatever query we got check if we need to persist the batch
 				if isReadyToPersistFn(batch) {
 					logEntry.Debug("batch-query full, ready to persist")

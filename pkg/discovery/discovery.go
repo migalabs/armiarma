@@ -110,9 +110,5 @@ func (d *Discovery) peerHandler(hInfo *models.HostInfo) {
 	} else {
 		log.Warnf("new peer %s had a non-public IP %s", hInfo.ID.String(), hInfo.IP)
 	}
-	// iter through all the attributes of the Node to persit them
-	for _, att := range hInfo.Attr {
-		d.DBClient.PersistToDB(att)
-	}
 	log.Trace("done handling peer")
 }

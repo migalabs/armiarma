@@ -2,7 +2,6 @@ package ethereum
 
 import (
 	comm "github.com/migalabs/armiarma/pkg/networks/common"
-	"github.com/migalabs/armiarma/pkg/networks/ethereum/rpc"
 )
 
 const (
@@ -24,9 +23,10 @@ func initEthereumNode() ethereumRPCs {
 		RPCRequestables: make(map[comm.RPCRequestsName]comm.RPCRequest),
 	}
 
+	// TODO: Still need to address this -
 	// add the RPCs
-	ethNode.RPCRequestables[BeaconStatusRPC] = rpc.ReqBeaconStatus
-	ethNode.RPCRequestables[BeaconMetadataRPC] = rpc.ReqBeaconMetadata
+	// ethNode.RPCRequestables[BeaconStatusRPC] = rpc.ReqBeaconStatus
+	// ethNode.RPCRequestables[BeaconMetadataRPC] = rpc.ReqBeaconMetadata
 
 	return ethNode
 }

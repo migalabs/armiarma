@@ -6,7 +6,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	com "github.com/migalabs/armiarma/pkg/networks/common"
 	"github.com/migalabs/armiarma/pkg/networks/ethereum/rpc/methods"
 	"github.com/migalabs/armiarma/pkg/networks/ethereum/rpc/reqresp"
 
@@ -17,7 +16,7 @@ import (
 
 // ReqBeaconMetadata opens a new Stream from the given host to send a RPC reqresping the BeaconStatus of the given peer.ID.
 // Returns the BeaconStatus of the given peer if succeed, error if failed.
-var ReqBeaconMetadata com.RPCRequest = func(ctx context.Context, wg *sync.WaitGroup, h host.Host, peerID peer.ID, result com.RPCResult, finErr *error) {
+var ReqBeaconMetadata = func(ctx context.Context, wg *sync.WaitGroup, h host.Host, peerID peer.ID, result *common.MetaData, finErr *error) {
 	defer wg.Done()
 
 	// declare the result output of the RPC call
@@ -48,5 +47,5 @@ var ReqBeaconMetadata com.RPCRequest = func(ctx context.Context, wg *sync.WaitGr
 			return nil
 		})
 	*finErr = err
-	result = metadata
+	*result = metadata
 }
