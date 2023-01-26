@@ -16,7 +16,8 @@ import (
 )
 
 var (
-	PeerstoreType = "BoltDB"
+	PeerstoreType      = "BoltDB"
+	PeerNotInAddrsBook = errors.New("peer not in addr book")
 )
 
 const (
@@ -24,13 +25,13 @@ const (
 )
 
 // New BoltPeerDB creates an new local Peertore ready to accept new peers.
-func NewPeerstore(folderpath string) Peerstore {
+func NewPeerstore(folderpath string) *Peerstore {
 	// Generate a new one
 	db, err := openBoltDB(folderpath+"/"+peerstoreFile, "address_book", 0600, nil)
 	if err != nil {
 		log.Panicf(err.Error())
 	}
-	dbObj := Peerstore{
+	dbObj := &Peerstore{
 		db:        db,
 		startTime: time.Now(),
 	}
@@ -54,7 +55,7 @@ type Peerstore struct {
 }
 
 // Stores a Peer with the given key.
-func (b Peerstore) StorePeer(value PersistablePeer) error {
+func (b *Peerstore) StorePeer(value PersistablePeer) error {
 	value_marshalled, err := json.Marshal(value)
 	if err != nil {
 		return err
@@ -64,7 +65,7 @@ func (b Peerstore) StorePeer(value PersistablePeer) error {
 }
 
 // Retrieves an object from the db using a key.
-func (b Peerstore) LoadPeer(key string) (PersistablePeer, bool) {
+func (b *Peerstore) LoadPeer(key string) (PersistablePeer, bool) {
 	value_marshalled, ok := b.db.load([]byte(key))
 	if !ok {
 		return PersistablePeer{}, false
@@ -80,13 +81,13 @@ func (b Peerstore) LoadPeer(key string) (PersistablePeer, bool) {
 }
 
 // Deletes the object for the given key in the db.
-func (b Peerstore) DeletePeer(key string) {
+func (b *Peerstore) DeletePeer(key string) {
 	b.db.delete([]byte(key))
 }
 
 // range itereates through all the records found in the Peerstore, applying
 // the given function as argument
-func (b Peerstore) Range(f func(value PersistablePeer) bool) {
+func (b *Peerstore) Range(f func(value PersistablePeer) bool) {
 	b.db.Range(func(key, value []byte) bool {
 		var obj PersistablePeer
 		err := json.Unmarshal(value, &obj)
@@ -100,13 +101,11 @@ func (b Peerstore) Range(f func(value PersistablePeer) bool) {
 }
 
 // GetAllPeers returns the entire list of PersistablePeers found in the Peerstore
-func (b Peerstore) GetAllPeers() []PersistablePeer {
+func (b *Peerstore) GetAllPeers() []PersistablePeer {
 	persistables := make([]PersistablePeer, 0)
 
 	copyFunc := func(value PersistablePeer) bool {
-		var newP PersistablePeer
-		newP = value
-		persistables = append(persistables, newP)
+		persistables = append(persistables, value)
 		return true
 	}
 
@@ -115,20 +114,18 @@ func (b Peerstore) GetAllPeers() []PersistablePeer {
 }
 
 // GetPeersIDs resturns a list of peerIDs existing in the db
-func (b Peerstore) GetPeerIDs() []peer.ID {
+func (b *Peerstore) GetPeerIDs() []peer.ID {
 	peers := make([]peer.ID, 0)
 
 	copyID := func(value PersistablePeer) bool {
-		var newP PersistablePeer
-		newP = value
-		peers = append(peers, newP.ID)
+		peers = append(peers, value.ID)
 		return true
 	}
 	b.Range(copyID)
 	return peers
 }
 
-func (b Peerstore) Close() {
+func (b *Peerstore) Close() {
 	b.db.close()
 }
 

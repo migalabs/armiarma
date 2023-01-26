@@ -35,9 +35,10 @@ func (m *IpApiMsg) IsEmpty() bool {
 }
 
 type ApiResp struct {
-	IpInfo    IpInfo
-	DelayTime time.Duration
-	Err       error
+	IpInfo       IpInfo
+	DelayTime    time.Duration
+	AttemptsLeft int
+	Err          error
 }
 
 type IpInfo struct {

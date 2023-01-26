@@ -2,10 +2,12 @@ package postgresql
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
 	"github.com/migalabs/armiarma/pkg/db/models"
+	eth "github.com/migalabs/armiarma/pkg/networks/ethereum"
 	"github.com/migalabs/armiarma/pkg/utils"
 	log "github.com/sirupsen/logrus"
 
@@ -16,16 +18,18 @@ import (
 
 const (
 	batchFlushingTimeout = 1 * time.Second
-	batchSize            = 128
+	batchSize            = 256
 	maxPersisters        = 1
+)
 
-	noQueryError = "no error"
+var (
+	noQueryError  string = "no error"
+	noQueryResult string = "no result"
 )
 
 type DBClient struct {
 	// Control Variables
 	ctx context.Context
-	m   sync.RWMutex
 
 	// Network that we are Crawling
 	Network utils.NetworkType
@@ -36,6 +40,8 @@ type DBClient struct {
 
 	// Request channels
 	persistC chan interface{}
+	doneC    chan struct{}
+	wg       *sync.WaitGroup
 }
 
 func NewDBClient(
@@ -67,6 +73,8 @@ func NewDBClient(
 	// generate all the necessary/control channels
 	persistC := make(chan interface{}, batchSize)
 
+	var wg sync.WaitGroup
+
 	// compose the DBClient
 	dbClient := &DBClient{
 		ctx:      ctx,
@@ -74,6 +82,8 @@ func NewDBClient(
 		loginStr: loginStr,
 		psqlPool: pPool,
 		persistC: persistC,
+		doneC:    make(chan struct{}),
+		wg:       &wg,
 	}
 
 	// initialize all the tables
@@ -113,6 +123,11 @@ func (c *DBClient) initTables() error {
 		return errors.Wrap(err, "initializing peer_info table")
 	}
 
+	// eth_nodes table
+	err = c.InitEthNodesTable()
+	if err != nil {
+		return errors.Wrap(err, "initializing eth_nodes table")
+	}
 	// INIT all the tables - Separate Networks
 
 	return err
@@ -120,22 +135,27 @@ func (c *DBClient) initTables() error {
 
 func (c *DBClient) launchPersister() {
 	log.Info("inititalizing db persister")
+	c.wg.Add(1)
 	go func() {
+		defer c.wg.Done()
+
 		// batch to aggregate all the queries
 		batch := &pgx.Batch{}
 		isReadyToPersistFn := func(batch *pgx.Batch) bool {
 			return batch.Len() >= batchSize
 		}
 		batchQueryFn := func(batch *pgx.Batch, query string, args ...interface{}) {
-			batch.Queue(query, args)
+			// fmt.Printf("adding query %s\n with args (%d) %+v\n", query, len(args), args)
+			batch.Queue(query, args...)
 		}
 		persistBatchFn := func(batch *pgx.Batch) error {
-			log.Tracef("persisting batch of queries with len(%d)", batch.Len())
+			log.Debugf("persisting batch of queries with len(%d)", batch.Len())
 			t := time.Now()
 			// begin pgx.Tx
 			tx, err := c.psqlPool.Begin(c.ctx)
 			if err != nil {
-				return errors.Wrap(err, "unable to perist batch")
+				fmt.Println("unable to begin tx", err.Error())
+				return errors.Wrap(err, "unable to persist batch")
 			}
 			// Add batch to TX
 			batchResults := tx.SendBatch(c.ctx, batch)
@@ -143,31 +163,40 @@ func (c *DBClient) launchPersister() {
 			// Exec the queries
 			var qerr error
 			var rows pgx.Rows
+			var cnt int
 			for qerr == nil {
 				rows, qerr = batchResults.Query()
 				rows.Close()
+				cnt++
 			}
 			// check if there was any error
-			if qerr.Error() != noQueryError {
-				return errors.Wrap(err, "unable to persist batch")
+			if qerr.Error() != noQueryResult {
+				return errors.Wrap(err, fmt.Sprintf("unable to persist betch because an error on row %d \n %+v\n", cnt, rows))
 			}
 
-			// after peristing the batch, we can already flush all the
-			batch = &pgx.Batch{}
-
-			log.Tracef("batch persisted in %s", time.Since(t))
-			return nil
+			log.Debugf("batch with %d queries successfully persisted in %s", cnt-1, time.Since(t))
+			return tx.Commit(c.ctx)
 		}
 
 		// batch flushing ticker
 		ticker := time.NewTicker(batchFlushingTimeout)
 
+		var readyToFinish bool
+
+	persistingLoop:
 		for {
+			if readyToFinish && len(c.persistC) == 0 {
+				break persistingLoop
+			}
+
 			// check with higher priority if the main-ctx died
 			select {
 			case <-c.ctx.Done(): // check if the context of the tool died
 				log.Info("context died, clossing persister")
-				return
+				readyToFinish = true
+			case <-c.doneC:
+				log.Info("closed detected, clossing persister")
+				readyToFinish = true
 			default:
 			}
 
@@ -179,7 +208,10 @@ func (c *DBClient) launchPersister() {
 				case (*models.HostInfo):
 					hostInfo := obj.(*models.HostInfo)
 					log.Tracef("persisting host_info %s\n", hostInfo.ID.String())
-
+					// // double-check when are we rewriting hInfo without IP, and port
+					// if hostInfo.IP == "" {
+					// 	log.Error("error trying to add host info without IP and ports", hostInfo)
+					// }
 					// add raw new HostInfo
 					q, args := c.UpsertHostInfo(hostInfo)
 					batchQueryFn(batch, q, args...)
@@ -190,6 +222,10 @@ func (c *DBClient) launchPersister() {
 						q, args = c.UpdatePeerInfo(&hostInfo.PeerInfo)
 						batchQueryFn(batch, q, args...)
 					}
+					// Read all the Attributes in hInfo
+					// for attName, att := range hostInfo.Attr {
+					// 	// TODO: add tables for BeaconStatus and BeaconMetadata
+					// }
 
 				case (*models.PeerInfo):
 					peerInfo := obj.(*models.PeerInfo)
@@ -214,14 +250,21 @@ func (c *DBClient) launchPersister() {
 					q, args = c.UpdateLastActivityTimestamp(connEvent.PeerID, connEvent.DiscTime)
 					batchQueryFn(batch, q, args...)
 
-				case (*models.IpInfo):
-					ipInfo := obj.(*models.IpInfo)
+				case (models.IpInfo):
+					ipInfo := obj.(models.IpInfo)
 					log.Tracef("persisting ip_info %s\n", ipInfo.IP)
-					q, args := c.UpsertIpInfo(*ipInfo)
+					q, args := c.UpsertIpInfo(ipInfo)
+					batchQueryFn(batch, q, args...)
+
+				case (*eth.EnrNode):
+					enrNode := obj.(*eth.EnrNode)
+					log.Tracef("persisting eth node_info %s\n", enrNode.ID.String())
+					q, args := c.UpsertEnrInfo(enrNode)
 					batchQueryFn(batch, q, args...)
 
 				default:
-					log.Error("unrecognized type of object received to persist into DB", obj)
+					log.Errorf("unrecognized type of object received to persist into DB %T", obj)
+					log.Error(obj)
 				}
 				// after adding whatever query we got check if we need to persist the batch
 				if isReadyToPersistFn(batch) {
@@ -229,6 +272,8 @@ func (c *DBClient) launchPersister() {
 					if err != nil {
 						log.Error(err)
 					}
+					// after peristing the batch, we can already flush all the
+					batch = &pgx.Batch{}
 				}
 
 			case <-ticker.C:
@@ -238,14 +283,20 @@ func (c *DBClient) launchPersister() {
 				if err != nil {
 					log.Error(err)
 				}
+				// after peristing the batch, we can already flush all the
+				batch = &pgx.Batch{}
 			}
 		}
 	}()
 }
 
 func (c *DBClient) Close() {
+	// Let the persister finish cleaning the batch
+	c.doneC <- struct{}{}
+	c.wg.Wait()
+
 	// close safelly the connection with PSQL
-	c.psqlPool.Close()
+	c.psqlPool.Close() // TODO: fix hanging call
 
 	// close all the exisiting channels
 	close(c.persistC)

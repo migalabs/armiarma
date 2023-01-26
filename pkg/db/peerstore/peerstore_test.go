@@ -37,7 +37,7 @@ func composeTestPeers(t *testing.T) []PersistablePeer {
 		maddresses := make([]ma.Multiaddr, 0)
 		maddresses = append(maddresses, maddrs)
 		// Compose the AddrInfo
-		persis := NewAddInfo(peerID, maddresses, utils.EthereumNetwork)
+		persis := NewPersistable(peerID, maddresses, utils.EthereumNetwork)
 		persistables = append(persistables, *persis)
 	}
 	// check that the actual len if 3

@@ -32,6 +32,12 @@ func DirectionIndexToString(connDir ConnDirection) string {
 // 2. while we identify the peer or the metadata, the disconnection might come
 // 3. persist the Metadata or the disconn to the prev added
 
+//
+type EventTrace struct {
+	PeerID peer.ID
+	Event  interface{}
+}
+
 // the struct of a connection and its info to a given peer
 type ConnEvent struct {
 	PeerID peer.ID

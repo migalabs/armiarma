@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/migalabs/armiarma/pkg/db/peerstore"
 	"github.com/migalabs/armiarma/pkg/utils"
 	ma "github.com/multiformats/go-multiaddr"
 	log "github.com/sirupsen/logrus"
@@ -28,8 +29,7 @@ type HostInfo struct {
 	// AddrInfo
 	ID     peer.ID
 	IP     string
-	UDP    int
-	TCP    int
+	Port   int
 	MAddrs []ma.Multiaddr
 
 	// network
@@ -66,17 +66,16 @@ func NewHostInfo(peerID peer.ID, network utils.NetworkType, opts ...RemoteHostOp
 
 // HostInfo Options
 
-func WithIPAndPorts(ip string, tcp, udp int) RemoteHostOptions {
+func WithIPAndPorts(ip string, port int) RemoteHostOptions {
 	return func(h *HostInfo) error {
 		h.Lock()
 		defer h.Unlock()
 
 		h.IP = ip
-		h.UDP = udp
-		h.TCP = tcp
+		h.Port = port
 
 		// Compose Muliaddress from data
-		mAddr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%d", ip, tcp))
+		mAddr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%d", ip, port))
 		if err != nil {
 			return err
 		}
@@ -91,17 +90,30 @@ func WithMultiaddress(mAddrs []ma.Multiaddr) RemoteHostOptions {
 		h.Lock()
 		defer h.Unlock()
 
-		for _, a := range mAddrs {
-			h.MAddrs = append(h.MAddrs, a)
+		h.MAddrs = append(h.MAddrs, mAddrs...)
+
+		var pubIp string
+		var port int
+
+		for _, addr := range mAddrs {
+			ip := utils.ExtractIPFromMAddr(addr)
+			if utils.IsIPPublic(ip) {
+				pubIp = ip.String()
+				port = utils.GetPortFromMaddrs(addr)
+				break
+			}
 		}
-		// TODO: Extract public IP, tcp and udp from ma
+
+		h.IP = pubIp
+		h.Port = port
+
 		return nil
 	}
 }
 
 // ComposeAddrsInfo returns the PeerId and Multiaddres in the peer.AddrsInfo format
 // Essential for libp2p.Connect() operation
-func (h HostInfo) ComposeAddrsInfo() peer.AddrInfo {
+func (h *HostInfo) ComposeAddrsInfo() peer.AddrInfo {
 	h.RLock()
 	defer h.RUnlock()
 
@@ -114,6 +126,14 @@ func (h HostInfo) ComposeAddrsInfo() peer.AddrInfo {
 	addrInfo.Addrs = h.MAddrs
 
 	return addrInfo
+}
+
+func (h *HostInfo) ComposePersistable() peerstore.PersistablePeer {
+	return *peerstore.NewPersistable(
+		h.ID,
+		h.MAddrs,
+		h.Network,
+	)
 }
 
 func (h *HostInfo) AddAtt(key string, attr interface{}) {
@@ -159,9 +179,7 @@ func NewPeerInfo(remotePeer peer.ID, userAgent, protocolVersion string, protocol
 		Latency:         latency,
 	}
 
-	for _, protocol := range protocols {
-		pInfo.Protocols = append(pInfo.Protocols, protocol)
-	}
+	pInfo.Protocols = append(pInfo.Protocols, protocols...)
 
 	return pInfo
 }

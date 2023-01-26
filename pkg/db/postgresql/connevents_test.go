@@ -50,7 +50,7 @@ func genNewTestConnEvent(t *testing.T, peerStr string) *models.ConnEvent {
 		Latency:    lat,
 		Identified: true,
 		Att:        make(map[string]interface{}),
-		Error:      utils.NoneErr,
+		Error:      "None",
 	}
 	connEv.AddConnInfo(cInfo)
 

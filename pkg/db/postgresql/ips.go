@@ -3,6 +3,7 @@ package postgresql
 import (
 	"time"
 
+	"github.com/jackc/pgx/v4"
 	"github.com/migalabs/armiarma/pkg/db/models"
 
 	"github.com/pkg/errors"
@@ -11,7 +12,6 @@ import (
 
 func (c *DBClient) InitIpTable() error {
 	log.Debug("init ips table")
-
 	_, err := c.psqlPool.Exec(c.ctx, `
 		CREATE TABLE IF NOT EXISTS ips(
 			id SERIAL,
@@ -69,25 +69,25 @@ func (c *DBClient) UpsertIpInfo(ipInfo models.IpInfo) (query string, args []inte
 			proxy,
 			hosting)
 		VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
-		ON CONFLICT ON CONSTRAINT ip
-			UPDATE SET
-			expiration_time = excluded.expiration_time
-			continent = excluded.continent
-			continent_code = excluded.continent_code
-			country = excluded.country
-			country_code = excluded.country_code
-			region = excluded.region
-			region_name = excluded.region_name
-			city = excluded.city
-			zip = excluded.zip	
-			lat = excluded.lat
-			lon = excluded.lon
-			isp = excluded.isp
-			org = excluded.org
-			as_raw = excluded.as_raw
-			asname = excluded.asname
-			mobile = excluded.mobile
-			proxy = excluded.proxy
+		ON CONFLICT (ip)
+		DO UPDATE SET
+			expiration_time = excluded.expiration_time,
+			continent = excluded.continent,
+			continent_code = excluded.continent_code,
+			country = excluded.country,
+			country_code = excluded.country_code,
+			region = excluded.region,
+			region_name = excluded.region_name,
+			city = excluded.city,
+			zip = excluded.zip,
+			lat = excluded.lat,
+			lon = excluded.lon,
+			isp = excluded.isp,
+			org = excluded.org,
+			as_raw = excluded.as_raw,
+			asname = excluded.asname,
+			mobile = excluded.mobile,
+			proxy = excluded.proxy,
 			hosting = excluded.hosting;
 		`
 
@@ -116,10 +116,8 @@ func (c *DBClient) UpsertIpInfo(ipInfo models.IpInfo) (query string, args []inte
 
 // ReadIpInfo reads all the information available for that specific IP in the DB
 func (c *DBClient) ReadIpInfo(ip string) (models.IpInfo, error) {
-	log.Debugf("reading ip info for ip %s", ip)
-
+	log.Tracef("reading ip info for ip %s", ip)
 	var ipInfo models.IpInfo
-
 	err := c.psqlPool.QueryRow(c.ctx, `
 		SELECT 
 			ip,
@@ -174,9 +172,7 @@ func (c *DBClient) ReadIpInfo(ip string) (models.IpInfo, error) {
 
 // GetExpiredIpInfo returns all the IP whos' TTL has already expired
 func (c *DBClient) GetExpiredIpInfo() ([]string, error) {
-
 	expIps := make([]string, 0)
-
 	ipRows, err := c.psqlPool.Query(c.ctx, `
 		SELECT ip 
 		FROM ips
@@ -202,19 +198,22 @@ func (c *DBClient) GetExpiredIpInfo() ([]string, error) {
 
 // CheckIpRecords checks if a given IP is already stored in the DB as whether its TTL has expired
 func (c *DBClient) CheckIpRecords(ip string) (exists bool, expired bool, err error) {
-
-	log.Debugf("checkign if ip %s exists in ips table", ip)
-
-	var expTime time.Time
+	log.Tracef("checking if ip %s exists in ips table", ip)
 	var readIp string
+	var expTime time.Time
 
-	err = c.psqlPool.QueryRow(c.ctx, `
-		SELECT ip, expiration_time
+	row := c.psqlPool.QueryRow(c.ctx, `
+		SELECT 
+			ip,
+			expiration_time
 		FROM ips
 		WHERE ip=$1;
-	`, ip).Scan(&readIp, &expTime)
+	`, ip)
 
-	if err != nil {
+	err = row.Scan(&readIp, &expTime)
+	if err == pgx.ErrNoRows {
+		return false, false, nil
+	} else if err != nil {
 		return
 	}
 
