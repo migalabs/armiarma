@@ -63,7 +63,7 @@ func (d *DBClient) UpsertEthereumNodeStatus(bstatus eth.BeaconStatusStamped) (qu
 	`
 
 	args = append(args, bstatus.PeerID.String())
-	args = append(args, bstatus.Timestamp)
+	args = append(args, bstatus.Timestamp.Unix())
 	args = append(args, bstatus.Status.ForkDigest.String())
 	args = append(args, bstatus.Status.FinalizedRoot.String())
 	args = append(args, bstatus.Status.FinalizedEpoch)
@@ -93,7 +93,7 @@ func (d *DBClient) UpsertEthereumNodeMetadata(bmetadata eth.BeaconMetadataStampe
 		`
 
 	args = append(args, bmetadata.PeerID.String())
-	args = append(args, bmetadata.Timestamp)
+	args = append(args, bmetadata.Timestamp.Unix())
 	args = append(args, bmetadata.Metadata.SeqNumber)
 	args = append(args, bmetadata.Metadata.Attnets.String())
 	args = append(args, bmetadata.Metadata.Syncnets.String())

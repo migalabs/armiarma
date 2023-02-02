@@ -3,6 +3,7 @@ package postgresql
 import (
 	"time"
 
+	"github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v4"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/migalabs/armiarma/pkg/db/models"
@@ -118,7 +119,7 @@ func (c *DBClient) UpdatePeerInfo(pInfo *models.PeerInfo) (q string, args []inte
 }
 
 func (c *DBClient) UpdateConnAttempt(connAttempt *models.ConnectionAttempt) (query string, args []interface{}) {
-	log.Tracef("updating peer_info because of new conn attempt %s", connAttempt.RemotePeer.String())
+	log.Tracef("updating peer_info because of new conn attempt %+v", connAttempt)
 	// logic to determine how to update the table
 	if connAttempt.Status == models.PossitiveAttempt {
 		// we have the chance to un-deprecate the peer
@@ -293,7 +294,6 @@ func (c *DBClient) PeerInfoExists(pID peer.ID) bool {
 }
 
 func (c *DBClient) UpdateLastActivityTimestamp(peerID peer.ID, t time.Time) (query string, args []interface{}) {
-
 	query = `
 		UPDATE peer_info
 		SET
@@ -307,35 +307,72 @@ func (c *DBClient) UpdateLastActivityTimestamp(peerID peer.ID, t time.Time) (que
 	return query, args
 }
 
-func (c *DBClient) GetNonDeprecatedPeers() ([]peer.ID, error) {
+func (c *DBClient) GetNonDeprecatedPeers() ([]*peerstore.PersistablePeer, error) {
 	log.Tracef("retrieving the list of peer_ids from the DB that are not deprecated\n")
-	var peerIDs []peer.ID
+	var persisPeers []*peerstore.PersistablePeer
 
 	rows, err := c.psqlPool.Query(c.ctx, `
 		SELECT
-			peer_id
+			peer_id,
+			network,
+			multi_addrs
 		FROM peer_info
 		WHERE deprecated='false';`)
 
 	// If there are no rows, don't panic
 	if err != nil && err != pgx.ErrNoRows {
-		return peerIDs, errors.Wrap(err, "unable to retrieve peers in the network")
+		return persisPeers, errors.Wrap(err, "unable to retrieve peers in the network")
 	}
+	defer rows.Close()
 
 	for rows.Next() {
-		pIDs, err := rows.Values()
+		attr_row, err := rows.Values()
 		if err != nil {
-			return peerIDs, err
+			return persisPeers, err
 		}
-		for _, pIDStr := range pIDs {
-			// decode peerID to have proper OBJ
-			peerID, err := peer.Decode(pIDStr.(string))
-			if err != nil {
-				log.Errorf("unable to get peerID from DB %s\n", pIDStr)
-				continue // if error, go for the next one
+		// general info for peers
+		var peerID peer.ID
+		var mAddrs []ma.Multiaddr
+		var network utils.NetworkType
+		// TODO: we are basing the login on the possition of the items
+		for idx, attr := range attr_row {
+			switch idx {
+			case 0:
+				peerID, err = peer.Decode(attr.(string))
+				if err != nil {
+					log.Errorf("unable to get peerID from DB %s \n", attr)
+					continue // if error, go for the next one
+				}
+			case 1:
+				netw := attr.(string)
+				network = utils.NetworkType(netw)
+			case 2:
+				maddrPg := attr.(pgtype.TextArray)
+				// var maddrStr []string
+				// err = maddrPg.Scan(&maddrStr)
+				// if err != nil {
+				// 	log.Error(errors.Wrap(err, "unable to retreive maddrs"))
+				// }
+				for _, element := range maddrPg.Elements {
+					mAddr, err := ma.NewMultiaddr(element.String)
+					if err != nil {
+						log.Error(errors.Wrap(err, "unable to parse mAddrs reading full peer_info"))
+						continue
+					}
+					mAddrs = append(mAddrs, mAddr)
+				}
+			default:
+				log.Error("extra info received getting the non-deprecated peers", attr)
+				continue
 			}
-			peerIDs = append(peerIDs, peerID)
 		}
+		persistable := peerstore.NewPersistable(
+			peerID,
+			mAddrs,
+			network,
+		)
+		// decode peerID to have proper OBJ
+		persisPeers = append(persisPeers, persistable)
 	}
-	return peerIDs, nil
+	return persisPeers, nil
 }

@@ -54,17 +54,32 @@ func NewDBClient(
 		return nil, errors.New("empty db-endpoint provided")
 	}
 
+	// setup the configuration for the pgx.Pool
+	pgxConf, err := pgxpool.ParseConfig(loginStr)
+	if err != nil {
+		return nil, err
+	}
+	// update the number of concurrent connections
+	pgxConf.MinConns = 1
+	pgxConf.MaxConns = 16
+
 	// try connecting to the DB from the given logingStr
-	pPool, err := pgxpool.Connect(ctx, loginStr)
+	psqlPool, err := pgxpool.ConnectConfig(ctx, pgxConf)
 	if err != nil {
 		return nil, err
 	}
 	log.WithFields(log.Fields{"endpoint": loginStr}).Debug("successful connection to DB")
 
 	// check if the connection is successful
-	err = pPool.Ping(ctx)
+	err = psqlPool.Ping(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to ping db")
+		return nil, errors.Wrap(err, "unable to ping db through dbWriter")
+	}
+
+	// check if the connection is successful
+	err = psqlPool.Ping(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to ping db through dbReader")
 	}
 
 	// generate all the necessary/control channels
@@ -77,7 +92,7 @@ func NewDBClient(
 		ctx:      ctx,
 		Network:  p2pNetwork,
 		loginStr: loginStr,
-		psqlPool: pPool,
+		psqlPool: psqlPool,
 		persistC: persistC,
 		doneC:    make(chan struct{}),
 		wg:       &wg,
@@ -325,7 +340,7 @@ func (c *DBClient) Close() {
 	c.wg.Wait()
 
 	// close safelly the connection with PSQL
-	c.psqlPool.Close() // TODO: fix hanging call
+	c.psqlPool.Close()
 
 	// close all the exisiting channels
 	close(c.persistC)

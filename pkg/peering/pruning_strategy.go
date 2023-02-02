@@ -147,6 +147,7 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 				if nextPeer.IsReadyForConnection() || c.PeerQueueIterations == 0 {
 					pinfo, ok := c.Peerstore.LoadPeer(nextPeer.PeerID)
 					if !ok {
+						log.Debug("peer not in the local peerstore, fetching it from PSQL")
 						// Really unlikely to happen but try to retrieve the peer info from the DB
 						pinfo, err = c.DBClient.GetPersistable(peer.ID(nextPeer.PeerID))
 						if err != nil {
@@ -154,7 +155,6 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 							continue
 						}
 					}
-
 					// Send next peer to the peering service
 					logEntry.Tracef("pushing next peer %s into peer stream", pinfo.ID)
 
@@ -468,20 +468,14 @@ func (c *PeerQueue) UpdatePeerListFromRemoteDB(dbClient *psql.DBClient, localPee
 	c.queueErroDistribution.Store(TimeoutDelayType, 0)
 
 	// Fill the PeerQueue.PeerList with the missing peers from the
-	for _, peerID := range peerList {
+	for _, persisPeer := range peerList {
 		totcnt++
-		if !c.IsPeerAlready(peerID.String()) {
+		if !c.IsPeerAlready(persisPeer.ID.String()) {
 			// Peer was not in the list of peers
-			pInfo, ok := localPeerstore.LoadPeer(peerID.String())
+			pInfo, ok := localPeerstore.LoadPeer(persisPeer.ID.String())
 			if !ok {
-				// if peer not found locally, fetch data
-				pInfo, err = dbClient.GetPersistable(peerID)
-				if err != nil {
-					log.Errorf("unable import peer to PeerQueue. %s\n", err.Error())
-					continue
-				}
 				// add it locally
-				localPeerstore.StorePeer(pInfo)
+				localPeerstore.StorePeer(*persisPeer)
 			}
 			new++
 
@@ -500,7 +494,7 @@ func (c *PeerQueue) UpdatePeerListFromRemoteDB(dbClient *psql.DBClient, localPee
 			c.queueErroDistribution.Store(delayType, val+1)
 
 		} else {
-			prunnedPeer, _ := c.GetPeer(peerID.String())
+			prunnedPeer, _ := c.GetPeer(persisPeer.ID.String())
 			v, _ := c.queueErroDistribution.Load(prunnedPeer.DelayObj.GetType())
 			val := v.(int)
 			c.queueErroDistribution.Store(prunnedPeer.DelayObj.GetType(), val+1)
@@ -509,6 +503,7 @@ func (c *PeerQueue) UpdatePeerListFromRemoteDB(dbClient *psql.DBClient, localPee
 	// Sort the list of peers based on the next connection
 	c.SortPeerList()
 	log.Debugf("Num of peers in PeerQueue: %d\n", c.Len())
+	log.Debugf("Num of peers in LocalPeerstore: %d\n", localPeerstore.Stats())
 	return nil
 }
 

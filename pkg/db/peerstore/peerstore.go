@@ -100,6 +100,16 @@ func (b *Peerstore) Range(f func(value PersistablePeer) bool) {
 	})
 }
 
+// return the total length of the local Peerstore
+func (b *Peerstore) Stats() int {
+	len := 0
+	b.db.Range(func(key, value []byte) bool {
+		len++
+		return true
+	})
+	return len
+}
+
 // GetAllPeers returns the entire list of PersistablePeers found in the Peerstore
 func (b *Peerstore) GetAllPeers() []PersistablePeer {
 	persistables := make([]PersistablePeer, 0)

@@ -18,9 +18,9 @@ import (
 )
 
 var (
-	ConnectionRefuseTimeout = 10 * time.Second
+	ConnectionRefuseTimeout = 20 * time.Second
 	MaxRetries              = 1
-	DefaultWorkers          = 20
+	DefaultWorkers          = 25
 )
 
 type PeeringOption func(*PeeringService) error
@@ -112,7 +112,7 @@ func (c *PeeringService) peeringWorker(workerID string, peerStreamChan chan *mod
 		select {
 		// Next peer arrives
 		case nextPeer := <-peerStreamChan:
-			logEntry.Tracef("%s -> new peer %s to connect", workerID, nextPeer.ID.String())
+			logEntry.Tracef("%s -> new peer %+v to connect", workerID, nextPeer)
 
 			// Check if the peer is already connected by the host
 			peerList := h.Network().Peers()
@@ -143,7 +143,8 @@ func (c *PeeringService) peeringWorker(workerID string, peerStreamChan chan *mod
 			timeoutctx, cancel := context.WithTimeout(c.ctx, c.Timeout)
 			for attempts < c.MaxRetries {
 				if err := h.Connect(timeoutctx, addrInfo); err != nil { // there was an error
-					logEntry.WithError(err).Debugf("%s attempts %d failed connection attempt", workerID, attempts+1)
+					logEntry.WithError(err).Debugf("%s attempts %d failed connection attempt to %+v",
+						workerID, attempts+1, addrInfo)
 					attError = hosts.ParseConError(err)
 					attempts++
 					continue
