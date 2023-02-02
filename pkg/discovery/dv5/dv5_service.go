@@ -145,6 +145,7 @@ func (d *Discovery5) nodeIterator() {
 			hInfo, err := d.handleENR(node)
 			if err != nil {
 				log.Error(errors.Wrap(err, "error handling new ENR"))
+				continue
 			}
 			d.nodeNotC <- hInfo
 		}
