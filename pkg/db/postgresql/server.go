@@ -2,7 +2,6 @@ package postgresql
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
@@ -11,7 +10,6 @@ import (
 	"github.com/migalabs/armiarma/pkg/utils"
 	log "github.com/sirupsen/logrus"
 
-	pgx "github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 )
@@ -60,8 +58,8 @@ func NewDBClient(
 		return nil, err
 	}
 	// update the number of concurrent connections
-	pgxConf.MinConns = 1
-	pgxConf.MaxConns = 16
+	pgxConf.MinConns = 0
+	pgxConf.MaxConns = 1
 
 	// try connecting to the DB from the given logingStr
 	psqlPool, err := pgxpool.ConnectConfig(ctx, pgxConf)
@@ -161,52 +159,7 @@ func (c *DBClient) launchPersister() {
 		defer c.wg.Done()
 
 		// batch to aggregate all the queries
-		batch := &pgx.Batch{}
-		isReadyToPersistFn := func(batch *pgx.Batch) bool {
-			return batch.Len() >= batchSize
-		}
-		batchQueryFn := func(batch *pgx.Batch, query string, args ...interface{}) {
-			// fmt.Printf("adding query %s\n with args (%d) %+v\n", query, len(args), args)
-			batch.Queue(query, args...)
-		}
-		persistBatchFn := func(batch *pgx.Batch) error {
-			logEntry.Debugf("persisting batch of queries with len(%d)", batch.Len())
-			t := time.Now()
-
-			// if batch len == 0, don't even query
-			if batch.Len() == 0 {
-				logEntry.Debug("skipping batch-query, no queries to persist")
-				return nil
-			}
-
-			// begin pgx.Tx
-			tx, err := c.psqlPool.Begin(c.ctx)
-			if err != nil {
-				return errors.Wrap(err, "unable to persist batch")
-			}
-			// Add batch to TX
-			batchResults := tx.SendBatch(c.ctx, batch)
-
-			// Exec the queries
-			var qerr error
-			var rows pgx.Rows
-			var cnt int
-			for qerr == nil {
-				rows, qerr = batchResults.Query()
-				rows.Close()
-				cnt++
-				if cnt-1 > batch.Len() {
-					log.Warnf("are we stuck persisting queries? %d iters out of %d queries", cnt, batch.Len())
-				}
-			}
-			// check if there was any error
-			if qerr.Error() != noQueryResult {
-				return errors.Wrap(err, fmt.Sprintf("unable to persist betch because an error on row %d \n %+v\n", cnt, rows))
-			}
-
-			logEntry.Debugf("batch with %d queries successfully persisted in %s", cnt-1, time.Since(t))
-			return tx.Commit(c.ctx)
-		}
+		batch := NewQueryBatch(c.ctx, c.psqlPool, batchSize)
 
 		// batch flushing ticker
 		ticker := time.NewTicker(batchFlushingTimeout)
@@ -244,13 +197,13 @@ func (c *DBClient) launchPersister() {
 					// }
 					// add raw new HostInfo
 					q, args := c.UpsertHostInfo(hostInfo)
-					batchQueryFn(batch, q, args...)
+					batch.AddQuery(q, args...)
 
 					// check if the peerInfo needs to update anything else
 					if hostInfo.IsHostIdentified() {
 						logEntry.Tracef("host_info has peer_info %s\n", hostInfo.PeerInfo.RemotePeer.String())
 						q, args = c.UpdatePeerInfo(&hostInfo.PeerInfo)
-						batchQueryFn(batch, q, args...)
+						batch.AddQuery(q, args...)
 					}
 					// Read all the Attributes in hInfo
 					for attName, att := range hostInfo.Attr {
@@ -260,16 +213,16 @@ func (c *DBClient) launchPersister() {
 						case eth.BeaconStatusStamped:
 							bstatus := att.(eth.BeaconStatusStamped)
 							q, args = c.UpsertEthereumNodeStatus(bstatus)
-							batchQueryFn(batch, q, args...)
+							batch.AddQuery(q, args...)
 						case eth.BeaconMetadataStamped:
 							bmetadata := att.(eth.BeaconMetadataStamped)
 							q, args = c.UpsertEthereumNodeMetadata(bmetadata)
-							batchQueryFn(batch, q, args...)
+							batch.AddQuery(q, args...)
 						case (*eth.EnrNode):
 							enrNode := att.(*eth.EnrNode)
 							logEntry.Tracef("persisting eth node_info %s\n", enrNode.ID.String())
 							q, args := c.UpsertEnrInfo(enrNode)
-							batchQueryFn(batch, q, args...)
+							batch.AddQuery(q, args...)
 						default:
 							log.Warnf("not yet recognized type for attr %s - %T - %+v", attName, att, att)
 						}
@@ -279,30 +232,30 @@ func (c *DBClient) launchPersister() {
 					peerInfo := obj.(*models.PeerInfo)
 					logEntry.Tracef("persisting new peer_info %s\n", peerInfo.RemotePeer.String())
 					q, args := c.UpdatePeerInfo(peerInfo)
-					batchQueryFn(batch, q, args...)
+					batch.AddQuery(q, args...)
 
 				case (*models.ConnectionAttempt):
 					connAttempt := obj.(*models.ConnectionAttempt)
 					logEntry.Tracef("persisting conn_attempt")
 					q, args := c.UpdateConnAttempt(connAttempt)
+					batch.AddQuery(q, args...)
 
-					batchQueryFn(batch, q, args...)
 				case (*models.ConnEvent):
 					connEvent := obj.(*models.ConnEvent)
 					logEntry.Tracef("persisting conn_event for peer %s\n", connEvent.PeerID.String())
 					q, args := c.InsertNewConnEvent(connEvent)
-					batchQueryFn(batch, q, args...)
+					batch.AddQuery(q, args...)
 
 					// Control Info LastActivity based on last disconnection
 					// get the disconnection time to update the LastActivity timestamp in the peer_info table
 					q, args = c.UpdateLastActivityTimestamp(connEvent.PeerID, connEvent.DiscTime)
-					batchQueryFn(batch, q, args...)
+					batch.AddQuery(q, args...)
 
 				case (models.IpInfo):
 					ipInfo := obj.(models.IpInfo)
 					logEntry.Tracef("persisting ip_info %s\n", ipInfo.IP)
 					q, args := c.UpsertIpInfo(ipInfo)
-					batchQueryFn(batch, q, args...)
+					batch.AddQuery(q, args...)
 
 				default:
 					logEntry.Errorf("unrecognized type of object received to persist into DB %T", obj)
@@ -310,25 +263,21 @@ func (c *DBClient) launchPersister() {
 				}
 
 				// after adding whatever query we got check if we need to persist the batch
-				if isReadyToPersistFn(batch) {
+				if batch.IsReadyToPersist() {
 					logEntry.Debug("batch-query full, ready to persist")
-					err := persistBatchFn(batch)
+					err := batch.PersistBatch()
 					if err != nil {
 						log.Error(err)
 					}
-					// after peristing the batch, we can already flush all the
-					batch = &pgx.Batch{}
 				}
 
 			case <-ticker.C:
 				logEntry.Trace("ticker jumped - flushing content of query-batch")
 				// flush the batched queries
-				err := persistBatchFn(batch)
+				err := batch.PersistBatch()
 				if err != nil {
 					log.Error(err)
 				}
-				// after peristing the batch, we can already flush all the
-				batch = &pgx.Batch{}
 			}
 		}
 	}()
