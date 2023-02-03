@@ -72,7 +72,7 @@ func (d *Discovery) nodesPerForkMetrics() *metrics.IndvMetrics {
 
 func (c *Discovery) AttnetsDistMetrics() *metrics.IndvMetrics {
 	initFn := func() error {
-		prometheus.MustRegister(NodesPerForkDistribution)
+		prometheus.MustRegister(AttnetsDistribution)
 		return nil
 	}
 
@@ -82,7 +82,7 @@ func (c *Discovery) AttnetsDistMetrics() *metrics.IndvMetrics {
 			return nil, err
 		}
 		for attnets, cnt := range summary {
-			NodesPerForkDistribution.WithLabelValues(attnets).Set(float64(cnt.(int)))
+			AttnetsDistribution.WithLabelValues(attnets).Set(float64(cnt.(int)))
 		}
 		return summary, nil
 	}
