@@ -4,10 +4,8 @@ import (
 	"fmt"
 	"sync/atomic"
 
-	"github.com/migalabs/armiarma/pkg/exporters"
-	eth "github.com/migalabs/armiarma/pkg/networks/ethereum"
+	"github.com/migalabs/armiarma/pkg/metrics"
 	"github.com/prometheus/client_golang/prometheus"
-	log "github.com/sirupsen/logrus"
 )
 
 // MessageMetrics
@@ -104,17 +102,14 @@ func (c *MessageMetrics) GetTotalMessages() int64 {
 // ServePrometheusMetrics:
 // This method will generate the metrics from GossipSub msg Metrics
 // and serve the values to the local prometheus instance.
-func (gs *GossipSub) ServeMetrics() {
-	exptr, _ := exporters.NewMetricsExporter(
-		gs.ctx,
-		"Gossip-Metrics-Prometheus",
-		"Expose in Prometheus the gossip metrics of the tools DB",
-		gs.initGossipPrometheusMetrics,
-		gs.runGossipPrometheusMetrics,
-		func() {},
-		exporters.MetricLoopInterval,
+func (gs *GossipSub) GetMetrics() *metrics.MetricsModule {
+	_ = metrics.NewMetricsModule(
+		"gossip",
+		"exposes metrics from gossipsub",
 	)
-	gs.ExporterService.AddNewExporter(exptr)
+	// add all the related metrics
+	// metricsMod.AddIndvMetric()
+	return nil
 }
 
 func (gs *GossipSub) initGossipPrometheusMetrics() {
@@ -123,31 +118,31 @@ func (gs *GossipSub) initGossipPrometheusMetrics() {
 	prometheus.MustRegister(ReceivedMessages)
 }
 
-func (gs *GossipSub) runGossipPrometheusMetrics() {
-	var totMsg int64
-	msgPerMin := make(map[string]float64, 0)
-	// get the total of the messages
-	for k, _ := range gs.MessageMetrics.topicList {
-		r := gs.MessageMetrics.GetTopicMsgs(k)
-		if r < int32(0) {
-			log.Warnf("Unable to get message count for topic %s", k)
-			continue
-		}
-		msgC := (float64(r) / (exporters.MetricLoopInterval.Seconds())) * 60 // messages per minute
-		totMsg += int64(r)
-		ReceivedMessages.WithLabelValues(eth.Eth2TopicPretty(k)).Set(msgC)
-		msgPerMin[eth.Eth2TopicPretty(k)] = msgC
-	}
-	// get total of msgs
-	tot := (float64(totMsg) / (exporters.MetricLoopInterval.Seconds())) * 60 // messages per minute
-	ReceivedTotalMessages.Set(tot)
-	// reset the values
-	err := gs.MessageMetrics.ResetAllTopics()
-	if err != nil {
-		log.Warnf("Unable to reset the gossip topic metrics. ", err.Error())
-	}
-	log.WithFields(log.Fields{
-		"TopicMsg/min": msgPerMin,
-		"TotalMsg/min": tot,
-	}).Info("gossip metrics summary")
-}
+// func (gs *GossipSub) runGossipPrometheusMetrics() {
+// 	var totMsg int64
+// 	msgPerMin := make(map[string]float64, 0)
+// 	// get the total of the messages
+// 	for k, _ := range gs.MessageMetrics.topicList {
+// 		r := gs.MessageMetrics.GetTopicMsgs(k)
+// 		if r < int32(0) {
+// 			log.Warnf("Unable to get message count for topic %s", k)
+// 			continue
+// 		}
+// 		msgC := (float64(r) / (exporters.MetricLoopInterval.Seconds())) * 60 // messages per minute
+// 		totMsg += int64(r)
+// 		ReceivedMessages.WithLabelValues(eth.Eth2TopicPretty(k)).Set(msgC)
+// 		msgPerMin[eth.Eth2TopicPretty(k)] = msgC
+// 	}
+// 	// get total of msgs
+// 	tot := (float64(totMsg) / (exporters.MetricLoopInterval.Seconds())) * 60 // messages per minute
+// 	ReceivedTotalMessages.Set(tot)
+// 	// reset the values
+// 	err := gs.MessageMetrics.ResetAllTopics()
+// 	if err != nil {
+// 		log.Warnf("Unable to reset the gossip topic metrics. ", err.Error())
+// 	}
+// 	log.WithFields(log.Fields{
+// 		"TopicMsg/min": msgPerMin,
+// 		"TotalMsg/min": tot,
+// 	}).Info("gossip metrics summary")
+// }

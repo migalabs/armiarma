@@ -16,8 +16,8 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	psql "github.com/migalabs/armiarma/pkg/db/postgresql"
-	"github.com/migalabs/armiarma/pkg/exporters"
 	"github.com/migalabs/armiarma/pkg/hosts"
+	"github.com/migalabs/armiarma/pkg/metrics"
 	"github.com/minio/sha256-simd"
 	log "github.com/sirupsen/logrus"
 )
@@ -32,10 +32,10 @@ var (
 type GossipSub struct {
 	ctx context.Context
 
-	BasicHost       *hosts.BasicLibp2pHost
-	DBClient        *psql.DBClient
-	PubsubService   *pubsub.PubSub
-	ExporterService *exporters.ExporterService
+	BasicHost     *hosts.BasicLibp2pHost
+	DBClient      *psql.DBClient
+	PubsubService *pubsub.PubSub
+	Metrics       *metrics.MetricsModule
 	// map where the key are the topic names in string, and the values are the TopicSubscription
 	TopicArray     map[string]*TopicSubscription
 	MessageMetrics *MessageMetrics
@@ -57,7 +57,7 @@ func NewEmptyGossipSub() *GossipSub {
 // @param peerstore: the peerstore where to sotre the data.
 // @param stdOpts: list of options to generate the base of the gossipsub service.
 // @return: pointer to GossipSub struct.
-func NewGossipSub(ctx context.Context, exporter *exporters.ExporterService, h *hosts.BasicLibp2pHost, dbClient *psql.DBClient) *GossipSub {
+func NewGossipSub(ctx context.Context, h *hosts.BasicLibp2pHost, dbClient *psql.DBClient) *GossipSub {
 
 	// define gossipsub option
 	// Signature is not used in Eth2, therefore it is needed
@@ -75,13 +75,13 @@ func NewGossipSub(ctx context.Context, exporter *exporters.ExporterService, h *h
 	msgMetrics := NewMessageMetrics()
 	// return the GossipSub object
 	return &GossipSub{
-		ctx:             ctx,
-		BasicHost:       h,
-		DBClient:        dbClient,
-		PubsubService:   ps,
-		ExporterService: exporter,
-		TopicArray:      make(map[string]*TopicSubscription),
-		MessageMetrics:  &msgMetrics,
+		ctx:           ctx,
+		BasicHost:     h,
+		DBClient:      dbClient,
+		PubsubService: ps,
+		// Metrics:        metrMod, // TODO: finish this
+		TopicArray:     make(map[string]*TopicSubscription),
+		MessageMetrics: &msgMetrics,
 	}
 }
 

@@ -89,7 +89,6 @@ func (c *PeeringService) Run() {
 		go c.peeringWorker(workerName, peerStreamChan)
 	}
 	go c.eventRecorderRoutine()
-	go c.ServeMetrics()
 }
 
 // peeringWorker

@@ -15,9 +15,9 @@ import (
 	"github.com/migalabs/armiarma/pkg/discovery"
 	"github.com/migalabs/armiarma/pkg/discovery/dv5"
 	"github.com/migalabs/armiarma/pkg/enode"
-	"github.com/migalabs/armiarma/pkg/exporters"
 	"github.com/migalabs/armiarma/pkg/gossipsub"
 	"github.com/migalabs/armiarma/pkg/hosts"
+	"github.com/migalabs/armiarma/pkg/metrics"
 	"github.com/migalabs/armiarma/pkg/peering"
 	"github.com/migalabs/armiarma/pkg/utils"
 	"github.com/migalabs/armiarma/pkg/utils/apis"
@@ -26,16 +26,16 @@ import (
 
 // crawler status containing the main basemodule and info that the app will ConnectedF
 type EthereumCrawler struct {
-	ctx             context.Context
-	cancel          context.CancelFunc
-	Host            *hosts.BasicLibp2pHost
-	Node            *enode.LocalNode
-	DB              *psql.DBClient
-	Disc            *discovery.Discovery
-	Peering         peering.PeeringService
-	Gs              *gossipsub.GossipSub
-	IpLocator       *apis.IpLocator
-	ExporterService *exporters.ExporterService
+	ctx       context.Context
+	cancel    context.CancelFunc
+	Host      *hosts.BasicLibp2pHost
+	Node      *enode.LocalNode
+	DB        *psql.DBClient
+	Disc      *discovery.Discovery
+	Peering   peering.PeeringService
+	Gs        *gossipsub.GossipSub
+	IpLocator *apis.IpLocator
+	Metrics   *metrics.PrometheusMetrics
 }
 
 func NewEthereumCrawler(mainCtx *cli.Context, conf config.EthereumCrawlerConfig) (*EthereumCrawler, error) {
@@ -70,7 +70,7 @@ func NewEthereumCrawler(mainCtx *cli.Context, conf config.EthereumCrawlerConfig)
 	ctx, cancel := context.WithCancel(mainCtx.Context)
 
 	// generate the central exporting service
-	exporterService := exporters.NewExporterService(ctx)
+	promethMetrics := metrics.NewPrometheusMetrics(ctx)
 
 	// Generate/connect to PSQL Database
 	dbClient, err := psql.NewDBClient(ctx, network, conf.PsqlEndpoint, true)
@@ -120,7 +120,7 @@ func NewEthereumCrawler(mainCtx *cli.Context, conf config.EthereumCrawlerConfig)
 	)
 
 	// GossipSup
-	gs := gossipsub.NewGossipSub(ctx, exporterService, host, dbClient)
+	//gs := gossipsub.NewGossipSub(ctx, host, dbClient)
 
 	// generate the peering strategy
 	pStrategy, err := peering.NewPruningStrategy(
@@ -145,26 +145,38 @@ func NewEthereumCrawler(mainCtx *cli.Context, conf config.EthereumCrawlerConfig)
 		return nil, err
 	}
 
+	// init the metrics for all the modules
+
 	// generate the CrawlerBase
 	crawler := &EthereumCrawler{
-		ctx:             ctx,
-		cancel:          cancel,
-		Host:            host,
-		DB:              dbClient,
-		Node:            node,
-		Disc:            disc,
-		Peering:         peeringServ,
-		Gs:              gs,
-		IpLocator:       ipLocator,
-		ExporterService: exporterService,
+		ctx:     ctx,
+		cancel:  cancel,
+		Host:    host,
+		DB:      dbClient,
+		Node:    node,
+		Disc:    disc,
+		Peering: peeringServ,
+		//Gs:        gs,
+		IpLocator: ipLocator,
+		Metrics:   promethMetrics,
 	}
+
+	// Register the metrics for the crawler and submodules
+	crawlMetricsMod := crawler.GetMetrics()
+	promethMetrics.AddMeticsModule(crawlMetricsMod)
+
+	pruneMetricsMod := peeringServ.GetMetrics()
+	promethMetrics.AddMeticsModule(pruneMetricsMod)
+
+	// hostMetricsMod := host.GetMetrics()
+	// promethMetrics.AddMeticsModule(hostMetricsMod)
+
 	return crawler, nil
 }
 
 // generate new CrawlerBase
 func (c *EthereumCrawler) Run() {
 	// initialization secuence for the crawler
-	c.ExporterService.Run()
 	c.IpLocator.Run()
 	c.Host.Start()
 	c.Disc.Start()
@@ -173,14 +185,14 @@ func (c *EthereumCrawler) Run() {
 	//	c.Gs.JoinAndSubscribe(topic)
 	//}
 	c.Peering.Run()
-	// c.Gs.ServeMetrics()
-	//c.DB.ServeMetrics() // TODO: Missing
+	c.Metrics.Start()
 }
 
 func (c *EthereumCrawler) Close() {
 	c.Host.Host().Close()
 	c.Disc.Stop()
 	c.DB.Close()
+	c.Metrics.Close()
 	c.cancel()
 
 }
