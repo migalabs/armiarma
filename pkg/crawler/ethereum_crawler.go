@@ -168,6 +168,9 @@ func NewEthereumCrawler(mainCtx *cli.Context, conf config.EthereumCrawlerConfig)
 	pruneMetricsMod := peeringServ.GetMetrics()
 	promethMetrics.AddMeticsModule(pruneMetricsMod)
 
+	discoveryMetricsMod := disc.GetEthereumMetrics()
+	promethMetrics.AddMeticsModule(discoveryMetricsMod)
+
 	// hostMetricsMod := host.GetMetrics()
 	// promethMetrics.AddMeticsModule(hostMetricsMod)
 

@@ -20,7 +20,7 @@ import (
 const (
 	defaultIpTTL   = 30 * 24 * time.Hour // 30 days
 	ipChanBuffSize = 45                  // number of ips that can be buffered unto the channel
-	ipBuffSize     = 128                 // number of ip queries that can be queued in the ipQueue
+	ipBuffSize     = 1280                // number of ip queries that can be queued in the ipQueue
 	ipApiEndpoint  = "http://ip-api.com/json/{__ip__}?fields=status,continent,continentCode,country,countryCode,region,regionName,city,zip,lat,lon,isp,org,as,asname,mobile,proxy,hosting,query"
 	minIterTime    = 100 * time.Millisecond
 )
