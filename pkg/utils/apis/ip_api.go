@@ -20,7 +20,7 @@ import (
 const (
 	defaultIpTTL   = 30 * 24 * time.Hour // 30 days
 	ipChanBuffSize = 45                  // number of ips that can be buffered unto the channel
-	ipBuffSize     = 1280                // number of ip queries that can be queued in the ipQueue
+	ipBuffSize     = 8192                // number of ip queries that can be queued in the ipQueue
 	ipApiEndpoint  = "http://ip-api.com/json/{__ip__}?fields=status,continent,continentCode,country,countryCode,region,regionName,city,zip,lat,lon,isp,org,as,asname,mobile,proxy,hosting,query"
 	minIterTime    = 100 * time.Millisecond
 )
@@ -169,6 +169,11 @@ func (c *IpLocator) locatorRoutine() {
 
 // LocateIP is an externa request that any module could do to identify an IP
 func (c *IpLocator) LocateIP(ip string) {
+	// check first if IP is already in queue (to queue same ip)
+	if c.ipQueue.ipExists(ip) {
+		return
+	}
+
 	// Check if the IP is already in the cache
 	exists, expired, err := c.dbClient.CheckIpRecords(ip)
 	if err != nil {
@@ -181,6 +186,7 @@ func (c *IpLocator) LocateIP(ip string) {
 
 	// since it didn't exist or it is expired, locate it again
 	ticker := time.NewTicker(1 * time.Second)
+	// wait 1 sec because is the normal time to wait untill we can start querying again
 	for {
 		err := c.ipQueue.addItem(ip)
 		if err == nil {
@@ -188,6 +194,7 @@ func (c *IpLocator) LocateIP(ip string) {
 		}
 		<-ticker.C
 		ticker.Reset(1 * time.Second)
+		log.Debug("waiting to alocate a new IP request")
 	}
 	ticker.Stop()
 }
@@ -319,6 +326,15 @@ func (q *ipQueue) readItem() (string, error) {
 	q.ipList = append(q.ipList[:0], q.ipList[0+1:]...)
 
 	return item, nil
+}
+
+func (q *ipQueue) ipExists(target string) bool {
+	for _, ip := range q.ipList {
+		if ip == target {
+			return true
+		}
+	}
+	return false
 }
 
 func (q *ipQueue) len() int {

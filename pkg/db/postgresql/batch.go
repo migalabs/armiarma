@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	QueryTimeout = 1 * time.Minute
+	QueryTimeout = 5 * time.Minute
 	MaxRetries   = 2
 
 	ErrorNoConnFree = "no connection adquirable"
@@ -104,7 +104,9 @@ func (q *QueryBatch) persistBatch() error {
 	logEntry.Trace("readed all the result of the queries inside the batch")
 	// check if there was any error
 	if qerr.Error() != noQueryResult {
-		log.Errorf("unable to persist betch because an error on row %d \n %+v\n", cnt, rows)
+		log.Errorf("unable to persist betch because an error on row %d \n %+v \n %+v", cnt, rows, err)
+		errRollback := tx.Commit(q.ctx)
+		log.Errorf("rolled back with err %+v", errRollback)
 		return err
 	}
 	return tx.Commit(q.ctx)

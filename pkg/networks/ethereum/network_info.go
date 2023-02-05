@@ -21,7 +21,7 @@ var (
 	// new
 	ForkDigestPrefix string = "0x"
 	ForkDigestSize   int    = 8 // without the ForkDigestPrefix
-	BlockchainName   string = "eth2"
+	BlockchainName   string = "eth-cl"
 
 	// mainnet
 	Phase0Key    string = "Mainnet"
@@ -37,11 +37,11 @@ var (
 
 	ForkDigests = map[string]string{
 		AllForkDigest:      "all",
-		Phase0Key:          "b5303f2a",
-		AltairKey:          "afcaaba0",
-		BellatrixKey:       "4a26c58b",
-		GnosisKey:          "f925ddc5",
-		GnosisAltairKey:    "56fdb5e0",
+		Phase0Key:          "0xb5303f2a",
+		AltairKey:          "0xafcaaba0",
+		BellatrixKey:       "0x4a26c58b",
+		GnosisKey:          "0xf925ddc5",
+		GnosisAltairKey:    "0x56fdb5e0",
 		GnosisBellatrixKey: "",
 	}
 
@@ -122,14 +122,13 @@ func CheckValidForkDigest(input_string string) (string, bool) {
 		if strings.ToLower(forkDigestKey) == input_string {
 			return ForkDigests[strings.ToLower(forkDigestKey)], true
 		} else {
-			newForkDigest := strings.TrimPrefix(input_string, "0x")
-			forkDigestBytes, err := hex.DecodeString(newForkDigest)
+			forkDigestBytes, err := hex.DecodeString(forkDigestKey)
 			if err != nil {
 				return "", false
 			} else if len(forkDigestBytes) != 4 {
 				return "", false
 			} else {
-				return newForkDigest, true
+				return forkDigestKey, true
 			}
 		}
 	}

@@ -20,8 +20,7 @@ func (c *DBClient) InitConnEventTable() error {
 			identified BOOL,
 			error TEXT NOT NULL,
 
-			PRIMARY KEY (id),
-			UNIQUE(peer_id, conn_time)
+			PRIMARY KEY (id)
 		);
 		`)
 

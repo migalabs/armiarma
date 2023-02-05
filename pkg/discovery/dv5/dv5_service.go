@@ -33,8 +33,9 @@ import (
 )
 
 var (
-	ModuleName           = "DV5"
-	NoNewPeerError error = errors.New("no new peer to read")
+	ModuleName              = "DV5"
+	NoNewPeerError    error = errors.New("no new peer to read")
+	ErrorNotValidNode error = errors.New("not valid node - different fork")
 )
 
 type Discovery5 struct {
@@ -44,7 +45,6 @@ type Discovery5 struct {
 	Node        *enode.LocalNode
 	Dv5Listener *discover.UDPv5
 	Iterator    ethenode.Iterator
-	ForkDigest  string
 
 	// node notifier
 	nodeNotC chan *models.HostInfo
@@ -63,6 +63,8 @@ func NewDiscovery5(
 	bootnodes []*ethenode.Node,
 	fdigest string,
 	port int) (*Discovery5, error) {
+
+	log.Infof("launching discovery5 at fork %s", fdigest)
 
 	if len(bootnodes) == 0 {
 		log.Panic("unable to start dv5 peer discovery, no bootnodes provided")
@@ -144,7 +146,9 @@ func (d *Discovery5) nodeIterator() {
 
 			hInfo, err := d.handleENR(node)
 			if err != nil {
-				log.Error(errors.Wrap(err, "error handling new ENR"))
+				if err != ErrorNotValidNode { // don't show anything if the error is related to the fork digest
+					log.Error(errors.Wrap(err, "error handling new ENR"))
+				}
 				continue
 			}
 			d.nodeNotC <- hInfo
@@ -171,8 +175,9 @@ func (d *Discovery5) handleENR(node *ethenode.Node) (*models.HostInfo, error) {
 	}
 
 	// check if there is any fork digest filter only if the flag All is not set
-	if (enr.Eth2Data.ForkDigest.String() == d.ForkDigest) && (d.FilterDigest != eth.ForkDigests[eth.AllForkDigest]) {
-		return nil, nil
+	if enr.Eth2Data.ForkDigest.String() != d.FilterDigest && d.FilterDigest != eth.ForkDigests[eth.AllForkDigest] {
+		log.Tracef("new node discovered - wrong fork %s - looking for %s", enr.Eth2Data.ForkDigest.String(), d.FilterDigest)
+		return nil, ErrorNotValidNode
 	}
 
 	// Get the public key and the peer.ID of the discovered peer
