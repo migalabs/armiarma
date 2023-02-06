@@ -358,7 +358,7 @@ func (c *PruningStrategy) AttemptedPeersSinceLastIter() int64 {
 	return atomic.LoadInt64(&c.attemptedPeers)
 }
 
-func (c *PruningStrategy) ControlDistribution() sync.Map {
+func (c *PruningStrategy) ControlDistribution() map[string]int {
 	return c.PeerQueue.DelayDistribution()
 }
 
@@ -369,41 +369,54 @@ func (c *PruningStrategy) GetErrorAttemptDistribution() sync.Map {
 // PeerQueue is an auxiliar peer array and map list to keep the list of peers sorted
 // by connection time, and still able to modify in a short time the values of each peer.
 type PeerQueue struct {
+	sync.RWMutex
+
 	PeerList []*PrunedPeer
-	PeerMap  sync.Map
+	PeerMap  map[string]*PrunedPeer
 	// Metrics
-	queueErroDistribution sync.Map
+	queueErroDistribution map[string]int
 }
 
 // DelayDistribution returns the distribution of the delays in a map.
-func (c *PeerQueue) DelayDistribution() sync.Map {
+func (c *PeerQueue) DelayDistribution() map[string]int {
+	c.RLock()
+	defer c.RUnlock()
 	return c.queueErroDistribution
 }
 
 // NewPeerQueue is the constructor of a NewPeerQueue
 func NewPeerQueue() PeerQueue {
-	pq := PeerQueue{
-		PeerList: make([]*PrunedPeer, 0),
+	return PeerQueue{
+		PeerList:              make([]*PrunedPeer, 0),
+		PeerMap:               make(map[string]*PrunedPeer),
+		queueErroDistribution: make(map[string]int),
 	}
-	return pq
 }
 
 // IsPeerAlready checks whether a peer is already in the Queue.
 func (c *PeerQueue) IsPeerAlready(peerID string) bool {
-	_, ok := c.PeerMap.Load(peerID)
+	c.RLock()
+	defer c.RUnlock()
+	_, ok := c.PeerMap[peerID]
 	return ok
 }
 
 // AddPeer Adds a peer to the peerqueue.
 func (c *PeerQueue) AddPeer(pPeer *PrunedPeer) {
+	c.Lock()
+	defer c.Unlock()
+
 	// append new item at the beginning of the array
 	c.PeerList = append([]*PrunedPeer{pPeer}, c.PeerList...)
-	c.PeerMap.Store(pPeer.PeerID, pPeer)
+	c.PeerMap[pPeer.PeerID] = pPeer
 }
 
 // RemovePeer()
 func (c *PeerQueue) RemovePeer(pPeer string) {
-	c.PeerMap.Delete(pPeer)
+	c.Lock()
+	defer c.Unlock()
+
+	delete(c.PeerMap, pPeer)
 	var idx int = -1
 	for index, pInfo := range c.PeerList {
 		if pInfo.PeerID == pPeer {
@@ -418,11 +431,29 @@ func (c *PeerQueue) RemovePeer(pPeer string) {
 
 // GetPeer retrieves the info of the peer requested from args.
 func (c *PeerQueue) GetPeer(peerID string) (*PrunedPeer, bool) {
-	p, ok := c.PeerMap.Load(peerID)
+	c.Lock()
+	defer c.Unlock()
+
+	p, ok := c.PeerMap[peerID]
 	if !ok {
 		return &PrunedPeer{}, ok
 	}
-	return p.(*PrunedPeer), ok
+	return p, ok
+}
+
+func (c *PeerQueue) GetErrorMetrics(key string) (int, bool) {
+	c.RLock()
+	defer c.RUnlock()
+
+	val, ok := c.queueErroDistribution[key]
+	return val, ok
+}
+
+func (c *PeerQueue) SetUpdateErrorMetrics(key string, val int) {
+	c.Lock()
+	defer c.Unlock()
+
+	c.queueErroDistribution[key] = val
 }
 
 // SortPeerList sorts the PeerQueue array leaving at the beginning the peers
@@ -439,12 +470,12 @@ func (c *PeerQueue) Swap(i, j int) {
 }
 
 // Less is part of sort.Interface. We use c.PeerList.NextConnection as the value to sort by.
-func (c PeerQueue) Less(i, j int) bool {
+func (c *PeerQueue) Less(i, j int) bool {
 	return c.PeerList[i].NextConnection().Before(c.PeerList[j].NextConnection())
 }
 
 // Len is part of sort.Interface. We use the peer list to get the length of the array.
-func (c PeerQueue) Len() int {
+func (c *PeerQueue) Len() int {
 	return len(c.PeerList)
 }
 
@@ -460,12 +491,12 @@ func (c *PeerQueue) UpdatePeerListFromRemoteDB(dbClient *psql.DBClient, localPee
 	new := 0
 
 	// metrics
-	c.queueErroDistribution.Store(PositiveDelayType, 0)
-	c.queueErroDistribution.Store(NegativeWithHopeDelayType, 0)
-	c.queueErroDistribution.Store(NegativeWithNoHopeDelayType, 0)
-	c.queueErroDistribution.Store(Minus1DelayType, 0)
-	c.queueErroDistribution.Store(ZeroDelayType, 0)
-	c.queueErroDistribution.Store(TimeoutDelayType, 0)
+	c.SetUpdateErrorMetrics(PositiveDelayType, 0)
+	c.SetUpdateErrorMetrics(NegativeWithHopeDelayType, 0)
+	c.SetUpdateErrorMetrics(NegativeWithNoHopeDelayType, 0)
+	c.SetUpdateErrorMetrics(Minus1DelayType, 0)
+	c.SetUpdateErrorMetrics(ZeroDelayType, 0)
+	c.SetUpdateErrorMetrics(TimeoutDelayType, 0)
 
 	// Fill the PeerQueue.PeerList with the missing peers from the
 	for _, persisPeer := range peerList {
@@ -489,15 +520,13 @@ func (c *PeerQueue) UpdatePeerListFromRemoteDB(dbClient *psql.DBClient, localPee
 
 			// add the new item to the list
 			c.AddPeer(newPrunnedPeer)
-			v, _ := c.queueErroDistribution.Load(delayType)
-			val := v.(int)
-			c.queueErroDistribution.Store(delayType, val+1)
+			val, _ := c.GetErrorMetrics(delayType)
+			c.SetUpdateErrorMetrics(delayType, val+1)
 
 		} else {
 			prunnedPeer, _ := c.GetPeer(persisPeer.ID.String())
-			v, _ := c.queueErroDistribution.Load(prunnedPeer.DelayObj.GetType())
-			val := v.(int)
-			c.queueErroDistribution.Store(prunnedPeer.DelayObj.GetType(), val+1)
+			val, _ := c.GetErrorMetrics(prunnedPeer.DelayObj.GetType())
+			c.SetUpdateErrorMetrics(prunnedPeer.DelayObj.GetType(), val+1)
 		}
 	}
 	// Sort the list of peers based on the next connection

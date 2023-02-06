@@ -63,11 +63,10 @@ func (p *PeeringService) getPrunedErrorDistribtuion() *metrics.IndvMetrics {
 	updateFn := func() (interface{}, error) {
 		summary := make(map[string]interface{}, 0)
 		controlDist := p.strategy.ControlDistribution()
-		controlDist.Range(func(key, value interface{}) bool {
-			summary[key.(string)] = value
-			PrunedErrorDistribution.WithLabelValues(key.(string)).Set(float64(value.(int)))
-			return true
-		})
+		for key, val := range controlDist {
+			PrunedErrorDistribution.WithLabelValues(key).Set(float64(val))
+			summary[key] = val
+		}
 		return summary, nil
 	}
 

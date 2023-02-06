@@ -22,6 +22,6 @@ type PeeringStrategy interface {
 	LastIterTime() float64
 	IterForcingNextConnTime() string
 	AttemptedPeersSinceLastIter() int64
-	ControlDistribution() sync.Map
+	ControlDistribution() map[string]int
 	GetErrorAttemptDistribution() sync.Map
 }
