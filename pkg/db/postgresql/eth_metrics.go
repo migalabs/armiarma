@@ -19,11 +19,11 @@ func (db *DBClient) GetNodePerForkDistribution() (map[string]interface{}, error)
 			count(aux.fork_digest) as cnt
 		FROM (
 			SELECT 
-				to_timestamp(timestamp) as t,
+				CURRENT_TIMESTAMP as c_t,
+				to_timestamp(timestamp) as t_s,
 				fork_digest
 			FROM eth_nodes
 			WHERE fork_digest IS NOT NULL and to_timestamp(timestamp) > CURRENT_TIMESTAMP - INTERVAL '1 DAY'
-			GROUP BY t, fork_digest
 		) as aux
 		GROUP BY fork_digest
 		ORDER BY cnt DESC;
@@ -60,6 +60,7 @@ func (db *DBClient) GetAttnetsDistribution() (map[string]interface{}, error) {
 			count(aux.attnets_number) as cnt
 		FROM (
 		SELECT 
+				CURRENT_TIMESTAMP as c_t,
 				to_timestamp(timestamp) as t,
 				fork_digest,
 				attnets_number
