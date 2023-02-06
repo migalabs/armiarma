@@ -55,7 +55,6 @@ type PruningStrategy struct {
 	lastIterTime             time.Duration
 	iterForcingNextConnTime  time.Time
 	attemptedPeers           int64
-	queueErroDistribution    sync.Map
 	PeerQueueIterations      int
 	ErrorAttemptDistribution sync.Map
 }
@@ -121,12 +120,12 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 		log.Error(err)
 	}
 
-	c.queueErroDistribution.Store(PositiveDelayType, 0)
-	c.queueErroDistribution.Store(NegativeWithHopeDelayType, 0)
-	c.queueErroDistribution.Store(NegativeWithNoHopeDelayType, 0)
-	c.queueErroDistribution.Store(Minus1DelayType, 0)
-	c.queueErroDistribution.Store(ZeroDelayType, 0)
-	c.queueErroDistribution.Store(TimeoutDelayType, 0)
+	c.ErrorAttemptDistribution.Store(PositiveDelayType, 0)
+	c.ErrorAttemptDistribution.Store(NegativeWithHopeDelayType, 0)
+	c.ErrorAttemptDistribution.Store(NegativeWithNoHopeDelayType, 0)
+	c.ErrorAttemptDistribution.Store(Minus1DelayType, 0)
+	c.ErrorAttemptDistribution.Store(ZeroDelayType, 0)
+	c.ErrorAttemptDistribution.Store(TimeoutDelayType, 0)
 
 	peerCounter := 0
 	peerListLen := c.PeerQueue.Len()
@@ -158,9 +157,9 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 					// Send next peer to the peering service
 					logEntry.Tracef("pushing next peer %s into peer stream", pinfo.ID)
 
-					v, _ := c.queueErroDistribution.Load(nextPeer.DelayObj.GetType())
+					v, _ := c.ErrorAttemptDistribution.Load(nextPeer.DelayObj.GetType())
 					val := v.(int)
-					c.queueErroDistribution.Store(nextPeer.DelayObj.GetType(), val+1)
+					c.ErrorAttemptDistribution.Store(nextPeer.DelayObj.GetType(), val+1)
 					// we need to send the hInfo of the peer - compose it from the persistable peer
 					hInfo := models.NewHostInfo(
 						pinfo.ID,
@@ -196,7 +195,7 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 				<-validIterTimer.C
 
 				// reset values
-				c.queueErroDistribution = ResetMapValues(c.queueErroDistribution)
+				c.ErrorAttemptDistribution = ResetMapValues(c.ErrorAttemptDistribution)
 
 				// get the peer list from the peerstore
 				err := c.PeerQueue.UpdatePeerListFromRemoteDB(c.DBClient, c.Peerstore)
