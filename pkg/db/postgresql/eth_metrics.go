@@ -14,18 +14,16 @@ func (db *DBClient) GetNodePerForkDistribution() (map[string]interface{}, error)
 	rows, err := db.psqlPool.Query(
 		db.ctx,
 		`
-		SELECT aux.fork_digest,
+		SELECT 
+			aux.fork_digest,
 			count(aux.fork_digest) as cnt
 		FROM (
-			SELECT pi.peer_id,
-				pi.ip,
-				pi.port,
-				pi.deprecated,
-				pi.attempted,
-				eth.fork_digest
-			FROM peer_info as pi
-			LEFT JOIN eth_nodes as eth ON pi.ip=eth.ip and pi.port=eth.tcp
-			WHERE pi.deprecated='false' and pi.attempted='true' and eth.fork_digest IS NOT NULL
+			SELECT 
+				to_timestamp(timestamp) as t,
+				fork_digest
+			FROM eth_nodes
+			WHERE fork_digest IS NOT NULL and to_timestamp(timestamp) > CURRENT_TIMESTAMP - INTERVAL '1 DAY'
+			GROUP BY t, fork_digest
 		) as aux
 		GROUP BY fork_digest
 		ORDER BY cnt DESC;
@@ -54,24 +52,22 @@ func (db *DBClient) GetAttnetsDistribution() (map[string]interface{}, error) {
 	log.Debug("fetching attnets distribution")
 	nodeDist := make(map[string]interface{})
 
+	// TODO: add here a check of the timestamp )()
 	rows, err := db.psqlPool.Query(
 		db.ctx,
 		`
 		SELECT aux.attnets_number as attnets,
 			count(aux.attnets_number) as cnt
 		FROM (
-			SELECT pi.peer_id,
-				pi.ip,
-				pi.port,
-				pi.deprecated,
-				pi.attempted,
-				eth.attnets_number
-			FROM peer_info as pi
-			LEFT JOIN eth_nodes as eth ON pi.ip=eth.ip and pi.port=eth.tcp
-			WHERE pi.deprecated='false' and pi.attempted='true' and eth.attnets_number >= 0
+		SELECT 
+				to_timestamp(timestamp) as t,
+				fork_digest,
+				attnets_number
+			FROM eth_nodes
+			WHERE fork_digest IS NOT NULL and to_timestamp(timestamp) > CURRENT_TIMESTAMP - INTERVAL '1 DAY'
 		) as aux
 		GROUP BY attnets
-		ORDER BY attnets ASC;
+		ORDER BY cnt DESC;	
 		`,
 	)
 	// make sure we close the rows and we free the connection/session
