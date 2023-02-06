@@ -1,8 +1,12 @@
 package crawler
 
 import (
+	"fmt"
+
 	"github.com/migalabs/armiarma/pkg/metrics"
 	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/pkg/errors"
 )
 
 var (
@@ -37,6 +41,12 @@ var (
 		Help:      "Number of peers from each of the crawled countries",
 	},
 	)
+	DeprecatedCount = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: modName,
+		Name:      "deprecated_nodes",
+		Help:      "Total number of deprecated peers",
+	},
+	)
 )
 
 func (c *EthereumCrawler) GetMetrics() *metrics.MetricsModule {
@@ -49,6 +59,9 @@ func (c *EthereumCrawler) GetMetrics() *metrics.MetricsModule {
 	// compose all the metrics
 	metricsMod.AddIndvMetric(c.clientDistributionMetrics())
 	metricsMod.AddIndvMetric(c.versionDistributionMetrics())
+	metricsMod.AddIndvMetric(c.geoDistributionMetrics())
+	metricsMod.AddIndvMetric(c.nodeDistributionMetrics())
+	metricsMod.AddIndvMetric(c.deprecatedNodeMetrics())
 
 	return metricsMod
 }
@@ -120,6 +133,7 @@ func (c *EthereumCrawler) geoDistributionMetrics() *metrics.IndvMetrics {
 	updateFn := func() (interface{}, error) {
 		summary, err := c.DB.GetGeoDistribution()
 		if err != nil {
+			fmt.Println(errors.Wrap(err, "unable to get GeoDist"))
 			return nil, err
 		}
 		for country, cnt := range summary {
@@ -157,7 +171,7 @@ func (c *EthereumCrawler) nodeDistributionMetrics() *metrics.IndvMetrics {
 		return len(peerLs), nil
 	}
 
-	versDist, err := metrics.NewIndvMetrics(
+	nodeDist, err := metrics.NewIndvMetrics(
 		"geographical_distribution",
 		"Number of peers from each of the crawled countries",
 		initFn,
@@ -166,5 +180,32 @@ func (c *EthereumCrawler) nodeDistributionMetrics() *metrics.IndvMetrics {
 	if err != nil {
 		return nil
 	}
-	return versDist
+	return nodeDist
+}
+
+func (c *EthereumCrawler) deprecatedNodeMetrics() *metrics.IndvMetrics {
+	initFn := func() error {
+		prometheus.MustRegister(DeprecatedCount)
+		return nil
+	}
+
+	updateFn := func() (interface{}, error) {
+		nodeCnt, err := c.DB.GetDeprecatedNodes()
+		if err != nil {
+			return nil, err
+		}
+		DeprecatedCount.Set(float64(nodeCnt))
+		return nodeCnt, nil
+	}
+
+	depNodes, err := metrics.NewIndvMetrics(
+		"deprecated_nodes",
+		"Total number of deprecated peers",
+		initFn,
+		updateFn,
+	)
+	if err != nil {
+		return nil
+	}
+	return depNodes
 }

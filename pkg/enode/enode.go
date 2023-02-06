@@ -41,13 +41,13 @@ func NewLocalNode(ctx context.Context, privKey *ecdsa.PrivateKey) *LocalNode {
 // SetForkDigest adds any given ForkDigest into the local node's enr
 func (l *LocalNode) SetForkDigest(forkDigest string) {
 	// TODO: parse to see if it's a valid ForkDigets (len, blabla)
-	l.addEntries(eth.NewEth2DataEntry("b5303f2a"))
+	l.addEntries(eth.NewEth2DataEntry(forkDigest))
 }
 
 // SetAttNetworks adds any given set of Attnets into the local node's enr
 func (l *LocalNode) SetAttNetworks(networks string) {
 	// TODO: parse to see if it's a valid ForkDigets (len, blabla)
-	l.addEntries(eth.NewAttnetsENREntry("ffffffffffffffff"))
+	l.addEntries(eth.NewAttnetsENREntry(networks))
 }
 
 // AddEntries modifies the local Ethereum Node's ENR adding a new entry to the Key-Value

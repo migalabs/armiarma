@@ -6,6 +6,7 @@ package crawler
 import (
 	"context"
 	"crypto/ecdsa"
+	"strings"
 
 	"github.com/libp2p/go-libp2p-core/crypto"
 	cli "github.com/urfave/cli/v2"
@@ -101,6 +102,10 @@ func NewEthereumCrawler(mainCtx *cli.Context, conf config.EthereumCrawlerConfig)
 
 	// generate local Enode and DV5 service
 	node := enode.NewLocalNode(ctx, gethPrivKey)
+	// subscribre to all attestnets and set forkdigest
+	node.SetAttNetworks("ffffffffffffffff")
+	node.SetForkDigest(strings.Trim(conf.ForkDigest, "0x"))
+
 	dv5, err := dv5.NewDiscovery5(
 		ctx,
 		node,

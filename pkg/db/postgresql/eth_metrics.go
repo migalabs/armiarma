@@ -92,3 +92,24 @@ func (db *DBClient) GetAttnetsDistribution() (map[string]interface{}, error) {
 
 	return nodeDist, nil
 }
+
+func (db *DBClient) GetDeprecatedNodes() (int, error) {
+	log.Debug("fetching deprecated node count")
+
+	var deprecatedCount int
+	err := db.psqlPool.QueryRow(
+		db.ctx,
+		`
+		select
+			count(deprecated)
+		from peer_info
+		where deprecated='true';
+		`).Scan(
+		&deprecatedCount,
+	)
+	if err != nil {
+		return deprecatedCount, errors.Wrap(err, "unable to fetch deprecated node count")
+	}
+
+	return deprecatedCount, nil
+}
