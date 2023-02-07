@@ -19,6 +19,7 @@ import (
 	"github.com/migalabs/armiarma/pkg/gossipsub"
 	"github.com/migalabs/armiarma/pkg/hosts"
 	"github.com/migalabs/armiarma/pkg/metrics"
+	eth "github.com/migalabs/armiarma/pkg/networks/ethereum"
 	"github.com/migalabs/armiarma/pkg/peering"
 	"github.com/migalabs/armiarma/pkg/utils"
 	"github.com/migalabs/armiarma/pkg/utils/apis"
@@ -34,7 +35,7 @@ type EthereumCrawler struct {
 	DB        *psql.DBClient
 	Disc      *discovery.Discovery
 	Peering   peering.PeeringService
-	Gs        *gossipsub.GossipSub
+	Gossipsub *gossipsub.GossipSub
 	IpLocator *apis.IpLocator
 	Metrics   *metrics.PrometheusMetrics
 }
@@ -125,7 +126,19 @@ func NewEthereumCrawler(mainCtx *cli.Context, conf config.EthereumCrawlerConfig)
 	)
 
 	// GossipSup
-	//gs := gossipsub.NewGossipSub(ctx, host, dbClient)
+	gs := gossipsub.NewGossipSub(ctx, host, dbClient)
+
+	// ---- Subcribe to Subnets ----
+	// generate a new subnets-handler
+	subnetHandler, err := gossipsub.NewSubnetsHandler(conf.ValPubkeys)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, subnet := range conf.Subnets {
+		subTopics := eth.ComposeAttnetsTopic(conf.ForkDigest, subnet)
+		gs.JoinAndSubscribe(subTopics, subnetHandler.SubnetMessageHandler)
+	}
 
 	// generate the peering strategy
 	pStrategy, err := peering.NewPruningStrategy(
@@ -154,14 +167,14 @@ func NewEthereumCrawler(mainCtx *cli.Context, conf config.EthereumCrawlerConfig)
 
 	// generate the CrawlerBase
 	crawler := &EthereumCrawler{
-		ctx:     ctx,
-		cancel:  cancel,
-		Host:    host,
-		DB:      dbClient,
-		Node:    node,
-		Disc:    disc,
-		Peering: peeringServ,
-		//Gs:        gs,
+		ctx:       ctx,
+		cancel:    cancel,
+		Host:      host,
+		DB:        dbClient,
+		Node:      node,
+		Disc:      disc,
+		Peering:   peeringServ,
+		Gossipsub: gs,
 		IpLocator: ipLocator,
 		Metrics:   promethMetrics,
 	}
@@ -188,10 +201,11 @@ func (c *EthereumCrawler) Run() {
 	c.IpLocator.Run()
 	c.Host.Start()
 	c.Disc.Start()
-	//topics := eth.ReturnTopics(c.Info.ForkDigest, c.Info.TopicArray)
-	//for _, topic := range topics {
-	//	c.Gs.JoinAndSubscribe(topic)
-	//}
+	// topics := eth.ReturnTopics(c.Info.ForkDigest, c.Info.TopicArray)
+	// for _, topic := range topics {
+	// 	c.Gs.JoinAndSubscribe(topic)
+	// }
+
 	c.Peering.Run()
 	c.Metrics.Start()
 }

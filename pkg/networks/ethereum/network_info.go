@@ -2,6 +2,7 @@ package ethereum
 
 import (
 	"encoding/hex"
+	"fmt"
 	"strings"
 
 	"github.com/migalabs/armiarma/pkg/utils"
@@ -21,7 +22,7 @@ var (
 	// new
 	ForkDigestPrefix string = "0x"
 	ForkDigestSize   int    = 8 // without the ForkDigestPrefix
-	BlockchainName   string = "eth-cl"
+	BlockchainName   string = "eth2"
 
 	// mainnet
 	Phase0Key    string = "Mainnet"
@@ -53,14 +54,14 @@ var (
 		"attester_slashing",
 	}
 
+	AttestationTopicBase = "beacon_attestation_{__subnet_id__}"
+	SubnetLimit          = 64
+
 	Encoding string = "ssz_snappy"
 )
 
-// GenerateEth2Topics:
-// This method returns the built topic out of the given arguments.
-// You may check the commented examples above.
-// @param forkDigest: the forDigest key in the map. You may use the Key constants.
-// @param topic: the message type we want to use in the topic. You may use the Key constants.
+// GenerateEth2Topics returns the built topic out of the given arguments.
+// You may check the commented examples above.nstants.
 func GenerateEth2Topics(forkDigest string, messageTypeName string) string {
 	// check valid messagetype
 	if !utils.ExistsInArray(MessageTypes, messageTypeName) {
@@ -74,6 +75,22 @@ func GenerateEth2Topics(forkDigest string, messageTypeName string) string {
 	return "/" + BlockchainName +
 		"/" + forkDigest +
 		"/" + messageTypeName +
+		"/" + Encoding
+}
+
+// ComposeAttnetsTopic generates the GossipSub topic for the given ForkDigest and subnet
+func ComposeAttnetsTopic(forkDigest string, subnet int) string {
+	if subnet > SubnetLimit || subnet <= 0 {
+		return ""
+	}
+
+	// trim "0x" if exists
+	forkDigest = strings.Trim(forkDigest, "0x")
+
+	name := strings.Replace(AttestationTopicBase, "{__subnet_id__}", fmt.Sprintf("%d", subnet), -1)
+	return "/" + BlockchainName +
+		"/" + forkDigest +
+		"/" + name +
 		"/" + Encoding
 }
 
