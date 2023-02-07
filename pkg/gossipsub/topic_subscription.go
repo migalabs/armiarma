@@ -2,14 +2,19 @@ package gossipsub
 
 import (
 	"context"
-	"strings"
 
-	"github.com/golang/snappy"
 	"github.com/libp2p/go-libp2p-core/host"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	psql "github.com/migalabs/armiarma/pkg/db/postgresql"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
+
+type MessageHandler func(*pubsub.Message) (PersistableMsg, error)
+
+type PersistableMsg interface {
+	IsZero() bool
+}
 
 // TopicSubscription
 // Sumarizes the control fields necesary to manage and
@@ -20,10 +25,10 @@ type TopicSubscription struct {
 	ctx context.Context
 
 	// Messages is a channel of messages received from other peers in the chat room
-	Messages       chan []byte
-	Topic          *pubsub.Topic
-	Sub            *pubsub.Subscription
-	MessageMetrics *MessageMetrics
+	messages  chan []byte
+	topic     *pubsub.Topic
+	sub       *pubsub.Subscription
+	handlerFn MessageHandler
 }
 
 // NewTopicSubscription:
@@ -35,13 +40,17 @@ type TopicSubscription struct {
 // @param msgMetrics: underlaying message metrics regarding each of the joined topics.
 // @param stdOpts: list of options to generate the base of the topic subscription service.
 // @return: pointer to TopicSubscription.
-func NewTopicSubscription(ctx context.Context, topic *pubsub.Topic, sub pubsub.Subscription, msgMetrics *MessageMetrics) *TopicSubscription {
+func NewTopicSubscription(
+	ctx context.Context,
+	topic *pubsub.Topic,
+	sub pubsub.Subscription,
+	msgHandlerFn MessageHandler) *TopicSubscription {
 	return &TopicSubscription{
-		ctx:            ctx,
-		Topic:          topic,
-		Sub:            &sub,
-		MessageMetrics: msgMetrics,
-		Messages:       make(chan []byte),
+		ctx:       ctx,
+		topic:     topic,
+		sub:       &sub,
+		messages:  make(chan []byte),
+		handlerFn: msgHandlerFn,
 	}
 }
 
@@ -51,41 +60,33 @@ func NewTopicSubscription(ctx context.Context, topic *pubsub.Topic, sub pubsub.S
 // @param h: libp2p host.
 // @param peerstore: peerstore of the crawler app.
 func (c *TopicSubscription) MessageReadingLoop(h host.Host, dbClient *psql.DBClient) {
-	log.Infof("topic subscription %s reading loop", c.Sub.Topic())
+	log.Infof("topic subscription %s reading loop", c.sub.Topic())
 	subsCtx := c.ctx
 	for {
-		msg, err := c.Sub.Next(subsCtx)
+		msg, err := c.sub.Next(subsCtx)
 		if err != nil {
 			if err == subsCtx.Err() {
-				log.Errorf("context of the subsciption %s has been canceled", c.Sub.Topic())
+				log.Errorf("context of the subsciption %s has been canceled", c.sub.Topic())
 				break
 			}
-			log.Errorf("error reading next message in topic %s. %slol", c.Sub.Topic(), err.Error())
+			log.Errorf("error reading next message in topic %s. %slol", c.sub.Topic(), err.Error())
 		} else {
-			var msgData []byte
-			if strings.HasSuffix(c.Sub.Topic(), "_snappy") {
-				msgData, err = snappy.Decode(nil, msg.Data)
-				if err != nil {
-					log.WithError(err).WithField("topic", c.Sub.Topic()).Error("Cannot decompress snappy message")
-					continue
-				}
-			}
 			// To avoid getting track of our own messages, check if we are the senders
 			if msg.ReceivedFrom != h.ID() {
-				log.Debugf("new message on %s from %s", c.Sub.Topic(), msg.ReceivedFrom)
-				// HUGE TODO: missing message track for analytics
-				// newPeer := models.NewPeer(msg.ReceivedFrom.String())
-				// newPeer.MessageEvent(c.Sub.Topic(), time.Now())
-				// peerstore.StoreOrUpdatePeer(newPeer)
-				// Add message to msg metrics counter
-				_ = c.MessageMetrics.AddMessgeToTopic(c.Sub.Topic())
-
-				log.Debugf("msg content %s", msgData)
+				log.Infof("new message on %s from %s", c.sub.Topic(), msg.ReceivedFrom)
+				// use the msg handler for that specific topic that we have
+				content, err := c.handlerFn(msg)
+				if err != nil {
+					log.Error(errors.Wrap(err, "unable to unwrap message"))
+				}
+				if !content.IsZero() {
+					log.Infof("successfully tracked message: %+v", content)
+				}
 			} else {
-				log.Debugf("message sent by ourselfs received on %s", c.Sub.Topic())
+				log.Debugf("message sent by ourselfs received on %s", c.sub.Topic())
 			}
 		}
 	}
 	<-subsCtx.Done()
-	log.Debugf("ending %s reading loop", c.Sub.Topic())
+	log.Debugf("ending %s reading loop", c.sub.Topic())
 }

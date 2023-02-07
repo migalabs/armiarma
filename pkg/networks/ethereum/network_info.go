@@ -36,6 +36,8 @@ var (
 	GnosisAltairKey    string = "GnosisAltair"
 	GnosisBellatrixKey string = "Genosisbellatrix"
 
+	PraterPhase0 string = "PraterPhase0"
+
 	ForkDigests = map[string]string{
 		AllForkDigest:      "all",
 		Phase0Key:          "0xb5303f2a",
@@ -44,6 +46,7 @@ var (
 		GnosisKey:          "0xf925ddc5",
 		GnosisAltairKey:    "0x56fdb5e0",
 		GnosisBellatrixKey: "",
+		PraterPhase0:       "0x79df0428",
 	}
 
 	MessageTypes = []string{
@@ -86,7 +89,6 @@ func ComposeAttnetsTopic(forkDigest string, subnet int) string {
 
 	// trim "0x" if exists
 	forkDigest = strings.Trim(forkDigest, "0x")
-
 	name := strings.Replace(AttestationTopicBase, "{__subnet_id__}", fmt.Sprintf("%d", subnet), -1)
 	return "/" + BlockchainName +
 		"/" + forkDigest +
@@ -134,20 +136,21 @@ func ReturnTopics(forkDigest string, messageTypeName []string) []string {
 // This method will check if Fork Digest exists in the corresponding map (ForkDigests).
 // @return the fork digest of the given network.
 // @return a boolean (true for valid, false for not valid).
-func CheckValidForkDigest(input_string string) (string, bool) {
-	for forkDigestKey, _ := range ForkDigests {
-		if strings.ToLower(forkDigestKey) == input_string {
+func CheckValidForkDigest(inStr string) (string, bool) {
+	for forkDigestKey, forkDigest := range ForkDigests {
+		if strings.ToLower(forkDigestKey) == inStr {
 			return ForkDigests[strings.ToLower(forkDigestKey)], true
-		} else {
-			forkDigestBytes, err := hex.DecodeString(forkDigestKey)
-			if err != nil {
-				return "", false
-			} else if len(forkDigestBytes) != 4 {
-				return "", false
-			} else {
-				return forkDigestKey, true
-			}
+		}
+		if forkDigest == inStr {
+			return forkDigest, true
 		}
 	}
-	return "", false
+	forkDigestBytes, err := hex.DecodeString(inStr)
+	if err != nil {
+		return "", false
+	}
+	if len(forkDigestBytes) != 4 {
+		return "", false
+	}
+	return inStr, true
 }

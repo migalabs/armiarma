@@ -22,6 +22,7 @@ require (
 	github.com/multiformats/go-multiaddr v0.4.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.11.0
+	github.com/protolambda/bls12-381-util v0.0.0-20210720105258-a772f2aac13e
 	github.com/protolambda/zrnt v0.28.0
 	github.com/protolambda/ztyp v0.2.2
 	github.com/rs/zerolog v1.15.0
@@ -136,7 +137,6 @@ require (
 	github.com/prometheus/client_model v0.2.0 // indirect
 	github.com/prometheus/common v0.30.0 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
-	github.com/protolambda/bls12-381-util v0.0.0-20210720105258-a772f2aac13e // indirect
 	github.com/russross/blackfriday/v2 v2.0.1 // indirect
 	github.com/shurcooL/sanitized_anchor_name v1.0.0 // indirect
 	github.com/spacemonkeygo/spacelog v0.0.0-20180420211403-2296661a0572 // indirect
@@ -160,3 +160,5 @@ require (
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace github.com/libp2p/go-libp2p-pubsub v0.5.5 => ./go-libp2p-pubsub
