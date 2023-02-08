@@ -6,7 +6,7 @@ import (
 )
 
 var MetaDataRPCv1 = reqresp.RPCMethod{
-	Protocol:                  "/eth2/beacon_chain/req/metadata/2/ssz",
+	Protocol:                  "/eth2/beacon_chain/req/metadata/2/ssz_snappy",
 	RequestCodec:              (*reqresp.SSZCodec)(nil), // no reqresp data, just empty bytes.
 	ResponseChunkCodec:        reqresp.NewSSZCodec(func() reqresp.SerDes { return new(beacon.MetaData) }, beacon.MetadataByteLen, beacon.MetadataByteLen),
 	DefaultResponseChunkCount: 1,
