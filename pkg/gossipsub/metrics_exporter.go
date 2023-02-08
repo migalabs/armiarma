@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"sync/atomic"
 
-	"github.com/migalabs/armiarma/pkg/metrics"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -97,19 +96,6 @@ func (c *MessageMetrics) GetTotalMessages() int64 {
 		total += int64(r)
 	}
 	return total
-}
-
-// ServePrometheusMetrics:
-// This method will generate the metrics from GossipSub msg Metrics
-// and serve the values to the local prometheus instance.
-func (gs *GossipSub) GetMetrics() *metrics.MetricsModule {
-	_ = metrics.NewMetricsModule(
-		"gossip",
-		"exposes metrics from gossipsub",
-	)
-	// add all the related metrics
-	// metricsMod.AddIndvMetric()
-	return nil
 }
 
 func (gs *GossipSub) initGossipPrometheusMetrics() {

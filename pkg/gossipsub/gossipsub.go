@@ -13,14 +13,23 @@ import (
 	"context"
 	"encoding/base64"
 
+	"github.com/libp2p/go-libp2p-core/host"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
-	psql "github.com/migalabs/armiarma/pkg/db/postgresql"
-	"github.com/migalabs/armiarma/pkg/hosts"
 	"github.com/migalabs/armiarma/pkg/metrics"
 	"github.com/minio/sha256-simd"
 	log "github.com/sirupsen/logrus"
 )
+
+type database interface {
+	PersistToDB(interface{})
+}
+
+type MessageHandler func(*pubsub.Message) (PersistableMsg, error)
+
+type PersistableMsg interface {
+	IsZero() bool
+}
 
 // GossipSub
 // sumarizes the control fields necesary to manage and
@@ -28,8 +37,8 @@ import (
 type GossipSub struct {
 	ctx context.Context
 
-	BasicHost     *hosts.BasicLibp2pHost
-	DBClient      *psql.DBClient
+	host          host.Host
+	DBClient      database
 	PubsubService *pubsub.PubSub
 	Metrics       *metrics.MetricsModule
 	// map where the key are the topic names in string, and the values are the TopicSubscription
@@ -41,25 +50,30 @@ func NewEmptyGossipSub() *GossipSub {
 }
 
 // NewGossipSub sumarizes the control fields necesary to manage and govern over a joined and subscribed topic.
-func NewGossipSub(ctx context.Context, h *hosts.BasicLibp2pHost, dbClient *psql.DBClient) *GossipSub {
+func NewGossipSub(ctx context.Context, h host.Host, dbClient database) *GossipSub {
+
+	// Setup the params
+	gossipParams := pubsub.DefaultGossipSubParams()
 
 	// define gossipsub option
-	// Signature is not used in Eth2, therefore it is needed
+	// Signature is not used in Eth2, therefore it is not needed
 	// to specify this options to false
 	// Otherwise, messages are discarded
 	psOptions := []pubsub.Option{
 		pubsub.WithMessageSigning(false),
 		pubsub.WithStrictSignatureVerification(false),
 		pubsub.WithMessageIdFn(MsgIDFunction),
+		pubsub.WithGossipSubParams(gossipParams),
 	}
-	ps, err := pubsub.NewGossipSub(ctx, h.Host(), psOptions...)
+	ps, err := pubsub.NewGossipSub(ctx, h, psOptions...)
 	if err != nil {
 		log.Panic(err)
 	}
+
 	// return the GossipSub object
 	return &GossipSub{
 		ctx:           ctx,
-		BasicHost:     h,
+		host:          h,
 		DBClient:      dbClient,
 		PubsubService: ps,
 		// Metrics:        metrMod, // TODO: finish this
@@ -92,9 +106,9 @@ func (gs *GossipSub) JoinAndSubscribe(topicName string, handlerFn MessageHandler
 		log.Errorf(err.Error())
 	}
 
-	new_topic_handler := NewTopicSubscription(gs.ctx, topic, *sub, handlerFn)
+	log.Debugf("subscribed to %s", topicName)
+	topicSub := NewTopicSubscription(gs.ctx, topic, *sub, handlerFn)
 	// Add the new Topic to the list of supported/subscribed topics in GossipSub
-	gs.TopicArray[topicName] = new_topic_handler
-
-	go gs.TopicArray[topicName].MessageReadingLoop(gs.BasicHost.Host(), gs.DBClient)
+	gs.TopicArray[topicName] = topicSub
+	go gs.TopicArray[topicName].MessageReadingLoop(gs.host.ID(), gs.DBClient)
 }
