@@ -75,7 +75,7 @@ func (r *BlocksByRangeReqV1) String() string {
 
 func BlocksByRangeRPCv1(spec *common.Spec, opcBlock beacon.OpaqueBlock) *reqresp.RPCMethod {
 	return &reqresp.RPCMethod{
-		Protocol:                  "/eth2/beacon_chain/req/beacon_blocks_by_range/1/ssz",
+		Protocol:                  "/eth2/beacon_chain/req/beacon_blocks_by_range/1/ssz_snappy",
 		RequestCodec:              reqresp.NewSSZCodec(func() reqresp.SerDes { return new(BlocksByRangeReqV1) }, blocksByRangeReqByteLen, blocksByRangeReqByteLen),
 		ResponseChunkCodec:        reqresp.NewSSZCodec(func() reqresp.SerDes { return spec.Wrap(opcBlock) }, 0, opcBlock.ByteLength(spec)),
 		DefaultResponseChunkCount: 20,

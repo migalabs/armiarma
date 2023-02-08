@@ -10,8 +10,7 @@ func (d *DBClient) DropEthereumNodeStatus() error {
 	log.Debug("dropping eth_status table from psql-db")
 	_, err := d.psqlPool.Exec(
 		d.ctx, `
-			DROP TABEL eth_status;
-		);
+			DROP TABLE eth_status;
 	`)
 	return err
 }

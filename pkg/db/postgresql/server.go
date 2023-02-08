@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/migalabs/armiarma/pkg/db/models"
+	"github.com/migalabs/armiarma/pkg/gossipsub"
 	eth "github.com/migalabs/armiarma/pkg/networks/ethereum"
 	"github.com/migalabs/armiarma/pkg/utils"
 	log "github.com/sirupsen/logrus"
@@ -16,8 +17,8 @@ import (
 
 const (
 	batchFlushingTimeout = 1 * time.Second
-	batchSize            = 256
-	maxPersisters        = 1
+	batchSize            = 512
+	maxPersisters        = 2
 )
 
 var (
@@ -105,8 +106,9 @@ func NewDBClient(
 	}
 
 	// run the db persisters
-	go dbClient.launchPersister()
-
+	for i := 0; i < maxPersisters; i++ {
+		go dbClient.launchPersister()
+	}
 	return dbClient, nil
 }
 
@@ -133,19 +135,37 @@ func (c *DBClient) initTables() error {
 		return errors.Wrap(err, "initializing ips table")
 	}
 
-	// eth_nodes table
-	err = c.InitEthNodesTable()
-	if err != nil {
-		return errors.Wrap(err, "initializing eth_nodes table")
-	}
+	switch c.Network {
+	// ETHEREUM
+	case utils.EthereumNetwork:
+		// eth_nodes table
+		err = c.InitEthNodesTable()
+		if err != nil {
+			return errors.Wrap(err, "initializing eth_nodes table")
+		}
 
-	// eth_status table
-	err = c.InitEthereumNodeStatus()
-	if err != nil {
-		return errors.Wrap(err, "initializing eth_status table")
-	}
+		// eth_status table
+		err = c.InitEthereumNodeStatus()
+		if err != nil {
+			return errors.Wrap(err, "initializing eth_status table")
+		}
 
-	// INIT all the tables - Separate Networks
+		// gossipsub messages
+		// eth_attestation
+		err = c.initEthereumAttestationsTable()
+		if err != nil {
+			return errors.Wrap(err, "initializing eth_attestations table")
+		}
+		// eth blocks
+		err = c.initEthereumBeaconBlocksTable()
+		if err != nil {
+			return errors.Wrap(err, "initializing eth_blocks table")
+		}
+	//IPFS
+	// FILECOIN
+	default:
+
+	}
 
 	return err
 }
@@ -257,6 +277,22 @@ func (c *DBClient) launchPersister() {
 					q, args := c.UpsertIpInfo(ipInfo)
 					batch.AddQuery(q, args...)
 
+				// GossipSub Messages
+				case (gossipsub.PersistableMsg):
+					prsMsg := obj.(gossipsub.PersistableMsg)
+					// select the type of message inside the list of messages
+					switch prsMsg.(type) {
+					case (*eth.TrackedAttestation):
+						attMsg := prsMsg.(*eth.TrackedAttestation)
+						log.Tracef("persisting eth_attestation %s", attMsg.MsgID)
+						q, args := c.InsertNewEthereumAttestation(attMsg)
+						batch.AddQuery(q, args...)
+					case (*eth.TrackedBeaconBlock):
+						bblockMsg := prsMsg.(*eth.TrackedBeaconBlock)
+						log.Tracef("persisting eth_block %s", bblockMsg.MsgID)
+						q, args := c.InsertNewEthereumBeaconBlock(bblockMsg)
+						batch.AddQuery(q, args...)
+					}
 				default:
 					logEntry.Errorf("unrecognized type of object received to persist into DB %T", obj)
 					logEntry.Error(obj)

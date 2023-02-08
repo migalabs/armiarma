@@ -87,6 +87,18 @@ var Eth2CrawlerCommand = &cli.Command{
 			EnvVars:     []string{"ARMIARMA_LOCAL_PEERSTORE"},
 			DefaultText: config.DefaultLocalPeerstorePath,
 		},
+		&cli.StringSliceFlag{
+			Name:        "subnet",
+			Usage:       "List of subnets (gossipsub topics) that we want to subscribe the crawler to",
+			EnvVars:     []string{"ARMIARMA_SUBNETS"},
+			DefaultText: "One --subnet <subnet_id> per subnet",
+		},
+		&cli.StringFlag{
+			Name:        "val-pubkeys",
+			Usage:       "Path of the file that has the pubkeys of those validators that we want to track",
+			EnvVars:     []string{"ARMIARMA_VAL_PUBKEYS"},
+			DefaultText: "./validator_pubkeys.txt",
+		},
 	},
 }
 

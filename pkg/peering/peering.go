@@ -99,7 +99,7 @@ func (c *PeeringService) peeringWorker(workerID string, peerStreamChan chan *mod
 	logEntry := log.WithFields(log.Fields{
 		"peering-worker": workerID,
 	})
-	logEntry.Info("launching worker")
+	logEntry.Debug("launching worker")
 
 	h := c.host.Host()
 

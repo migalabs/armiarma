@@ -22,8 +22,8 @@ import (
 var (
 	// Default Delays
 	DeprecationTime       = 512 * time.Minute // mMinutes after first negative connection that has to pass to deprecate a peer.
-	DefaultNegDelay       = 64 * time.Minute  // Default delay that will be applied for those deprecated peers.
-	DefaultPossitiveDelay = 32 * time.Minute  // Default delay after each positive severe negative attempts.
+	DefaultNegDelay       = 16 * time.Minute  // Default delay that will be applied for those deprecated peers.
+	DefaultPossitiveDelay = 4 * time.Minute   // Default delay after each positive severe negative attempts.
 	StartExpD             = 2 * time.Minute   // Starting delay that will serve for the Exponential Delay.
 	// Control variables
 	MinIterTime = 5 * time.Second // Minimum time that has to pass before iterating again.
@@ -380,7 +380,12 @@ type PeerQueue struct {
 func (c *PeerQueue) DelayDistribution() map[string]int {
 	c.RLock()
 	defer c.RUnlock()
-	return c.queueErroDistribution
+	// make copy of the actual dist
+	dist := make(map[string]int, len(c.queueErroDistribution))
+	for key, val := range c.queueErroDistribution {
+		dist[key] = val
+	}
+	return dist
 }
 
 // NewPeerQueue is the constructor of a NewPeerQueue

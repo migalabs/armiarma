@@ -2,26 +2,16 @@ package ethereum
 
 import (
 	"encoding/hex"
+	"fmt"
 	"strings"
-
-	"github.com/migalabs/armiarma/pkg/utils"
+	"time"
 )
 
 var (
-	// Eth2 Mainnet topics
-	/* Deprecated for dynamic Eth2 topic construction see bellow
-	MainnetForkDigest string = "b5303f2a"
-	BeaconBlock          string = "/eth2/b5303f2a/beacon_block/ssz_snappy"
-	BeaconAggregateProof string = "/eth2/b5303f2a/beacon_aggregate_and_proof/ssz_snappy"
-	VoluntaryExit        string = "/eth2/b5303f2a/voluntary_exit/ssz_snappy"
-	ProposerSlashing     string = "/eth2/b5303f2a/proposer_slashing/ssz_snappy"
-	AttesterSlashing     string = "/eth2/b5303f2a/attester_slashing/ssz_snappy"
-	*/
-
 	// new
 	ForkDigestPrefix string = "0x"
 	ForkDigestSize   int    = 8 // without the ForkDigestPrefix
-	BlockchainName   string = "eth-cl"
+	BlockchainName   string = "eth2"
 
 	// mainnet
 	Phase0Key    string = "Mainnet"
@@ -35,6 +25,9 @@ var (
 	GnosisAltairKey    string = "GnosisAltair"
 	GnosisBellatrixKey string = "Genosisbellatrix"
 
+	PraterPhase0Key    string = "PraterPhase0"
+	PraterBellatrixKey string = "PraterBellatrix"
+
 	ForkDigests = map[string]string{
 		AllForkDigest:      "all",
 		Phase0Key:          "0xb5303f2a",
@@ -43,37 +36,58 @@ var (
 		GnosisKey:          "0xf925ddc5",
 		GnosisAltairKey:    "0x56fdb5e0",
 		GnosisBellatrixKey: "",
+		PraterPhase0Key:    "0x79df0428",
+		PraterBellatrixKey: "0xc2ce3aa8",
 	}
 
 	MessageTypes = []string{
-		"beacon_block",
-		"beacon_aggregate_and_proof",
-		"voluntary_exit",
-		"proposer_slashing",
-		"attester_slashing",
+		BeaconBlockTopicBase,
+		BeaconAggregateAndProofTopicBase,
+		VoluntaryExitTopicBase,
+		ProposerSlashingTopicBase,
+		AttesterSlashingTopicBase,
 	}
+
+	BeaconBlockTopicBase             string = "beacon_block"
+	BeaconAggregateAndProofTopicBase string = "beacon_aggregate_and_proof"
+	VoluntaryExitTopicBase           string = "voluntary_exit"
+	ProposerSlashingTopicBase        string = "proposer_slashing"
+	AttesterSlashingTopicBase        string = "attester_slashing"
+	AttestationTopicBase             string = "beacon_attestation_{__subnet_id__}"
+	SubnetLimit                             = 64
 
 	Encoding string = "ssz_snappy"
 )
 
-// GenerateEth2Topics:
-// This method returns the built topic out of the given arguments.
-// You may check the commented examples above.
-// @param forkDigest: the forDigest key in the map. You may use the Key constants.
-// @param topic: the message type we want to use in the topic. You may use the Key constants.
-func GenerateEth2Topics(forkDigest string, messageTypeName string) string {
-	// check valid messagetype
-	if !utils.ExistsInArray(MessageTypes, messageTypeName) {
-		return ""
-	}
-	// check valid fork digest
-	if !utils.ExistsInMapValue(ForkDigests, forkDigest) {
-		return ""
-	}
+var (
+	MainnetGenesis time.Time     = time.Unix(1606824023, 0)
+	GoerliGenesis  time.Time     = time.Unix(1616508000, 0)
+	SecondsPerSlot time.Duration = 12 * time.Second
+)
+
+// GenerateEth2Topic returns the built topic out of the given arguments.
+// You may check the commented examples above.nstants.
+func ComposeTopic(forkDigest string, messageTypeName string) string {
+	forkDigest = strings.Trim(forkDigest, ForkDigestPrefix)
 	// if we reach here, inputs were okay
 	return "/" + BlockchainName +
 		"/" + forkDigest +
 		"/" + messageTypeName +
+		"/" + Encoding
+}
+
+// ComposeAttnetsTopic generates the GossipSub topic for the given ForkDigest and subnet
+func ComposeAttnetsTopic(forkDigest string, subnet int) string {
+	if subnet > SubnetLimit || subnet <= 0 {
+		return ""
+	}
+
+	// trim "0x" if exists
+	forkDigest = strings.Trim(forkDigest, "0x")
+	name := strings.Replace(AttestationTopicBase, "{__subnet_id__}", fmt.Sprintf("%d", subnet), -1)
+	return "/" + BlockchainName +
+		"/" + forkDigest +
+		"/" + name +
 		"/" + Encoding
 }
 
@@ -94,7 +108,7 @@ func Eth2TopicPretty(eth2topic string) string {
 func ReturnAllTopics(inputForkDigest string) []string {
 	result_array := make([]string, 0)
 	for _, messageValue := range MessageTypes {
-		result_array = append(result_array, GenerateEth2Topics(inputForkDigest, messageValue))
+		result_array = append(result_array, ComposeTopic(inputForkDigest, messageValue))
 	}
 	return result_array
 }
@@ -104,11 +118,11 @@ func ReturnAllTopics(inputForkDigest string) []string {
 // @param forkDigest: the forkDigest to use in the topic.
 // @param messageTypeName: the type of topic.
 // @return the list of generated topics with the given parameters (several messageTypes).
-func ReturnTopics(forkDigest string, messageTypeName []string) []string {
+func ComposeTopics(forkDigest string, messageTypeName []string) []string {
 	result_array := make([]string, 0)
 
 	for _, messageTypeTmp := range messageTypeName {
-		result_array = append(result_array, GenerateEth2Topics(forkDigest, messageTypeTmp))
+		result_array = append(result_array, ComposeTopic(forkDigest, messageTypeTmp))
 	}
 	return result_array
 }
@@ -117,20 +131,21 @@ func ReturnTopics(forkDigest string, messageTypeName []string) []string {
 // This method will check if Fork Digest exists in the corresponding map (ForkDigests).
 // @return the fork digest of the given network.
 // @return a boolean (true for valid, false for not valid).
-func CheckValidForkDigest(input_string string) (string, bool) {
-	for forkDigestKey, _ := range ForkDigests {
-		if strings.ToLower(forkDigestKey) == input_string {
+func CheckValidForkDigest(inStr string) (string, bool) {
+	for forkDigestKey, forkDigest := range ForkDigests {
+		if strings.ToLower(forkDigestKey) == inStr {
 			return ForkDigests[strings.ToLower(forkDigestKey)], true
-		} else {
-			forkDigestBytes, err := hex.DecodeString(forkDigestKey)
-			if err != nil {
-				return "", false
-			} else if len(forkDigestBytes) != 4 {
-				return "", false
-			} else {
-				return forkDigestKey, true
-			}
+		}
+		if forkDigest == inStr {
+			return forkDigest, true
 		}
 	}
-	return "", false
+	forkDigestBytes, err := hex.DecodeString(inStr)
+	if err != nil {
+		return "", false
+	}
+	if len(forkDigestBytes) != 4 {
+		return "", false
+	}
+	return inStr, true
 }
