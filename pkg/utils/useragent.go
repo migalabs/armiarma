@@ -26,6 +26,7 @@ const (
 	Grandine   ClientName = "grandine"
 	Cortex     ClientName = "cortze"
 	Trinity    ClientName = "trinity"
+	Erigon     ClientName = "erigon"
 
 	// IPFS Client
 	Kubo         ClientName = "kubo"
@@ -63,6 +64,7 @@ var EthCLClients map[ClientName][]string = map[ClientName][]string{
 	Grandine:   {"grandine", "rust-libp2p"},
 	Cortex:     {"cortex"},
 	Trinity:    {"trinity"},
+	Erigon:     {"erigon", "erigon/lightclient"},
 }
 
 // IPFS Clients

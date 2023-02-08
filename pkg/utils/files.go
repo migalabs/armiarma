@@ -45,6 +45,8 @@ func ReadFilePerRows(filePath string, delimiter string) ([]string, error) {
 	if err != nil {
 		return rows, err
 	}
+	defer f.Close()
+
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		line := scanner.Text()

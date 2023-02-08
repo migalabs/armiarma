@@ -31,6 +31,7 @@ type EthereumCrawler struct {
 	ctx       context.Context
 	cancel    context.CancelFunc
 	Host      *hosts.BasicLibp2pHost
+	EthNet    *eth.EthereumNetwork
 	Node      *enode.LocalNode
 	DB        *psql.DBClient
 	Disc      *discovery.Discovery
@@ -42,12 +43,19 @@ type EthereumCrawler struct {
 
 func NewEthereumCrawler(mainCtx *cli.Context, conf config.EthereumCrawlerConfig) (*EthereumCrawler, error) {
 	// Setup the configuration
-	network := utils.EthereumNetwork
-
 	log.SetLevel(utils.ParseLogLevel(conf.LogLevel))
 
-	// error
+	// --- build up all the necesary modules ---
+	ctx, cancel := context.WithCancel(mainCtx.Context)
 	var err error
+
+	// generate confg for EthNetwork // TODO: should be moved to enode
+	ethNet := eth.NewEthereumNetwork(
+		ctx,
+		eth.ComposeQuickBeaconStatus(conf.ForkDigest),
+		eth.ComposeQuickBeaconMetaData(),
+	)
+	// serve
 
 	// Private Key
 	var gethPrivKey *ecdsa.PrivateKey
@@ -68,14 +76,11 @@ func NewEthereumCrawler(mainCtx *cli.Context, conf config.EthereumCrawlerConfig)
 		return nil, err
 	}
 
-	// --- build up all the necesary modules ---
-	ctx, cancel := context.WithCancel(mainCtx.Context)
-
 	// generate the central exporting service
 	promethMetrics := metrics.NewPrometheusMetrics(ctx)
 
 	// Generate/connect to PSQL Database
-	dbClient, err := psql.NewDBClient(ctx, network, conf.PsqlEndpoint, true)
+	dbClient, err := psql.NewDBClient(ctx, ethNet.NetworkType(), conf.PsqlEndpoint, true)
 	if err != nil {
 		cancel()
 		return nil, err
@@ -92,9 +97,8 @@ func NewEthereumCrawler(mainCtx *cli.Context, conf config.EthereumCrawlerConfig)
 		conf.Port,
 		libp2pPrivKey,
 		conf.UserAgent,
-		network,
+		ethNet,
 		ipLocator,
-		dbClient,
 	)
 	if err != nil {
 		cancel()
@@ -126,24 +130,37 @@ func NewEthereumCrawler(mainCtx *cli.Context, conf config.EthereumCrawlerConfig)
 	)
 
 	// GossipSup
-	gs := gossipsub.NewGossipSub(ctx, host, dbClient)
+	gs := gossipsub.NewGossipSub(ctx, host.Host(), dbClient)
 
-	// ---- Subcribe to Subnets ----
 	// generate a new subnets-handler
-	subnetHandler, err := gossipsub.NewSubnetsHandler(conf.ValPubkeys)
+	ethMsgHandler, err := eth.NewEthMessageHandler(eth.GoerliGenesis, conf.ValPubkeys)
 	if err != nil {
+		cancel()
 		return nil, err
 	}
-
+	// subscribe the topics
+	for _, top := range conf.GossipTopics {
+		var msgHandler gossipsub.MessageHandler
+		switch top {
+		case eth.BeaconBlockTopicBase:
+			msgHandler = ethMsgHandler.BeaconBlockMessageHandler
+		default:
+			log.Error("untraceable gossipsub topic", top)
+			continue
+		}
+		topic := eth.ComposeTopic(conf.ForkDigest, top)
+		gs.JoinAndSubscribe(topic, msgHandler)
+	}
+	// ---- Subcribe to Subnets ----
 	for _, subnet := range conf.Subnets {
 		subTopics := eth.ComposeAttnetsTopic(conf.ForkDigest, subnet)
-		gs.JoinAndSubscribe(subTopics, subnetHandler.SubnetMessageHandler)
+		gs.JoinAndSubscribe(subTopics, ethMsgHandler.SubnetMessageHandler)
 	}
 
 	// generate the peering strategy
 	pStrategy, err := peering.NewPruningStrategy(
 		ctx,
-		network,
+		ethNet.NetworkType(),
 		conf.LocalPeerstorePath,
 		dbClient,
 	)
@@ -176,6 +193,7 @@ func NewEthereumCrawler(mainCtx *cli.Context, conf config.EthereumCrawlerConfig)
 		Peering:   peeringServ,
 		Gossipsub: gs,
 		IpLocator: ipLocator,
+		EthNet:    ethNet,
 		Metrics:   promethMetrics,
 	}
 
@@ -189,23 +207,26 @@ func NewEthereumCrawler(mainCtx *cli.Context, conf config.EthereumCrawlerConfig)
 	discoveryMetricsMod := disc.GetEthereumMetrics()
 	promethMetrics.AddMeticsModule(discoveryMetricsMod)
 
-	// hostMetricsMod := host.GetMetrics()
-	// promethMetrics.AddMeticsModule(hostMetricsMod)
+	hostMetricsMod := host.GetMetrics()
+	promethMetrics.AddMeticsModule(hostMetricsMod)
+
+	gossipMetricsMod := gs.GetMetrics()
+	promethMetrics.AddMeticsModule(gossipMetricsMod)
 
 	return crawler, nil
 }
 
 // generate new CrawlerBase
 func (c *EthereumCrawler) Run() {
+	// init all the eth_protocols
+	c.EthNet.ServeBeaconPing(c.Host.Host())
+	c.EthNet.ServeBeaconStatus(c.Host.Host())
+	c.EthNet.ServeBeaconMetadata(c.Host.Host())
+
 	// initialization secuence for the crawler
 	c.IpLocator.Run()
 	c.Host.Start()
 	c.Disc.Start()
-	// topics := eth.ReturnTopics(c.Info.ForkDigest, c.Info.TopicArray)
-	// for _, topic := range topics {
-	// 	c.Gs.JoinAndSubscribe(topic)
-	// }
-
 	c.Peering.Run()
 	c.Metrics.Start()
 }
