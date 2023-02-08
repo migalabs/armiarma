@@ -13,7 +13,7 @@ build:
 
 dependecies:
 	$(GIT_SUBM) update --init
-	cd go-libp2p-pubsub && git checkout origin/armiarma
+	cd go-libp2p-pubsub && git checkout origin/armiarma && git pull origin armiarma
 
 install:
 	$(GOCC) install
