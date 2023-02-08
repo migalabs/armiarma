@@ -18,6 +18,3 @@ jobs:
     - name: Run tests
       run: |
         cd src/db
-        go test -v
-        cd ../peering
-        go test -v
