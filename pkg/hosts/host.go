@@ -3,13 +3,14 @@ package hosts
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/migalabs/armiarma/pkg/db/models"
-	psql "github.com/migalabs/armiarma/pkg/db/postgresql"
 	"github.com/migalabs/armiarma/pkg/utils"
 	"github.com/migalabs/armiarma/pkg/utils/apis"
 
 	libp2p "github.com/libp2p/go-libp2p"
+	conmgr "github.com/libp2p/go-libp2p-connmgr"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -28,14 +29,17 @@ var (
 	ConnNotChannSize = 256
 )
 
+type P2pNetwork interface {
+	NetworkType() utils.NetworkType
+}
+
 // Struct that defines the Basic Struct asociated to the Libtp2p host
 type BasicLibp2pHost struct {
 	ctx     context.Context
-	Network utils.NetworkType
+	Network P2pNetwork
 	// Basic sevices related with the libp2p host
 	host      host.Host
 	identify  identify.IDService
-	DBClient  *psql.DBClient
 	IpLocator *apis.IpLocator
 
 	// Basic Host Metadata
@@ -53,15 +57,20 @@ func NewBasicLibp2pEth2Host(
 	port int,
 	privKey *crypto.Secp256k1PrivateKey,
 	userAgent string,
-	network utils.NetworkType,
-	ipLocator *apis.IpLocator,
-	ps *psql.DBClient) (*BasicLibp2pHost, error) {
+	network P2pNetwork,
+	ipLocator *apis.IpLocator) (*BasicLibp2pHost, error) {
 
 	// generate de multiaddress
 	multiaddr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%d", ip, port))
 	if err != nil {
 		return nil, errors.Wrap(err, fmt.Sprintf("couldn't generate multiaddress from ip %s and tcp %s", ip, port))
 	}
+
+	// connection manager
+	low := 5000
+	hi := 7000
+	graceTime := 30 * time.Minute
+	conMngr := conmgr.NewConnManager(low, hi, graceTime)
 
 	// Generate the main Libp2p host that will be exposed to the network
 	host, err := libp2p.New(
@@ -71,6 +80,7 @@ func NewBasicLibp2pEth2Host(
 		libp2p.Transport(tcp_transport.NewTCPTransport),
 		libp2p.Security(noise.ID, noise.New),
 		libp2p.NATPortMap(),
+		libp2p.ConnectionManager(conMngr),
 	)
 	if err != nil {
 		return nil, err
@@ -96,7 +106,6 @@ func NewBasicLibp2pEth2Host(
 		Network:             network,
 		host:                host,
 		identify:            ids,
-		DBClient:            ps,
 		IpLocator:           ipLocator,
 		multiAddr:           multiaddr,
 		peerID:              host.ID(),

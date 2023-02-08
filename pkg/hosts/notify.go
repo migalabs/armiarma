@@ -8,7 +8,6 @@ import (
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/migalabs/armiarma/pkg/db/models"
 	eth "github.com/migalabs/armiarma/pkg/networks/ethereum"
-	ethrpc "github.com/migalabs/armiarma/pkg/networks/ethereum/rpc"
 	"github.com/migalabs/armiarma/pkg/utils"
 
 	ma "github.com/multiformats/go-multiaddr"
@@ -56,7 +55,7 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 	// create new HostInfo
 	hInfo := models.NewHostInfo(
 		conn.RemotePeer(),
-		c.Network,
+		c.Network.NetworkType(),
 		models.WithMultiaddress(mAddrs),
 	)
 
@@ -79,14 +78,16 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 	wg.Add(1)
 	go ReqHostInfo(mainCtx, &wg, h, c.IpLocator, conn, hInfo, &hinfoErr)
 
-	if c.Network == utils.EthereumNetwork {
+	switch c.Network.(type) {
+	case (*eth.EthereumNetwork):
+		ethNet := c.Network.(*eth.EthereumNetwork)
 		// request BeaconStatus metadata as we connect to a peer
 		wg.Add(1)
-		go ethrpc.ReqBeaconStatus(mainCtx, &wg, h, conn.RemotePeer(), &bStatus, &statusErr)
-
+		go ethNet.ReqBeaconStatus(mainCtx, &wg, h, conn.RemotePeer(), &bStatus, &statusErr)
 		// request the BeaconMetadata
 		wg.Add(1)
-		go ethrpc.ReqBeaconMetadata(mainCtx, &wg, h, conn.RemotePeer(), &bMetadata, &metadataErr)
+		go ethNet.ReqBeaconMetadata(mainCtx, &wg, h, conn.RemotePeer(), &bMetadata, &metadataErr)
+	default:
 	}
 
 	wg.Wait()
@@ -102,7 +103,8 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 	}
 
 	// If the network was eth2, wait for the metadata echange to reply
-	if c.Network == utils.EthereumNetwork {
+	switch c.Network.(type) {
+	case (*eth.EthereumNetwork):
 		// Beacon Status reqresp error check
 		// if there is an error  in the channel, print error
 		if statusErr != nil {
@@ -123,6 +125,7 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 			log.Debug("peer metadata req, succeed")
 			hInfo.AddAtt("beaconmetadata", eth.NewBeaconMetadata(conn.RemotePeer(), bMetadata))
 		}
+	default:
 	}
 
 	identStat := IdentificationEvent{
