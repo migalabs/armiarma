@@ -144,7 +144,7 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 				if nextPeer.PeerID == lastAttemptedPeer.PeerID {
 					peerCounter++
 					c.NextPeer()
-					continue
+					goto pointerCheck
 				}
 
 				// check if the node is ready for connection
@@ -159,7 +159,7 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 							log.Warn(err)
 							peerCounter++
 							c.NextPeer()
-							continue
+							goto pointerCheck
 						}
 					}
 					// Send next peer to the peering service
@@ -195,6 +195,7 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 				c.NextPeer()
 
 			}
+		pointerCheck:
 			if nextIterFlag || peerCounter >= peerListLen {
 				// time to update the PeerList
 				c.lastIterTime = time.Since(iterStartTime)
