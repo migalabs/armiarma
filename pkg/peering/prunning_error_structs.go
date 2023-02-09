@@ -21,10 +21,10 @@ var (
 	InitialDelayTime = map[string]time.Duration{
 		PositiveDelayType:           4 * time.Minute,
 		NegativeWithHopeDelayType:   2 * time.Minute,
-		NegativeWithNoHopeDelayType: 64 * time.Minute,
-		ZeroDelayType:               0 * time.Hour,
+		NegativeWithNoHopeDelayType: 120 * time.Minute,
+		ZeroDelayType:               0 * time.Minute,
 		Minus1DelayType:             -1000 * time.Hour,
-		TimeoutDelayType:            48 * time.Minute, //experimental
+		TimeoutDelayType:            60 * time.Minute, //experimental
 	}
 )
 

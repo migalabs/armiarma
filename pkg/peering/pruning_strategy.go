@@ -21,10 +21,8 @@ import (
 
 var (
 	// Default Delays
-	DeprecationTime       = 512 * time.Minute // mMinutes after first negative connection that has to pass to deprecate a peer.
-	DefaultNegDelay       = 16 * time.Minute  // Default delay that will be applied for those deprecated peers.
-	DefaultPossitiveDelay = 4 * time.Minute   // Default delay after each positive severe negative attempts.
-	StartExpD             = 2 * time.Minute   // Starting delay that will serve for the Exponential Delay.
+	DeprecationTime = 4 * time.Hour   // mMinutes after first negative connection that has to pass to deprecate a peer.
+	StartExpD       = 2 * time.Minute // Starting delay that will serve for the Exponential Delay.
 	// Control variables
 	MinIterTime = 5 * time.Second // Minimum time that has to pass before iterating again.
 
@@ -132,6 +130,7 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 	validIterTimer := time.NewTimer(MinIterTime)
 	iterStartTime := time.Now()
 	nextIterFlag := false
+	lastAttemptedPeer := PrunedPeer{}
 	for {
 		select {
 		// Receive the notification of sending the next peer
@@ -140,6 +139,13 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 				logEntry.Trace("prepare next peer for pushing it into peer stream")
 				// read info about next peer
 				nextPeer := c.PeerQueue.PeerList[peerCounter]
+
+				// check if the next peer is the extact same one as the previous one
+				if nextPeer.PeerID == lastAttemptedPeer.PeerID {
+					peerCounter++
+					c.NextPeer()
+					continue
+				}
 
 				// check if the node is ready for connection
 				// or we are in the first iteration, then we always try all of them
@@ -151,6 +157,8 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 						pinfo, err = c.DBClient.GetPersistable(peer.ID(nextPeer.PeerID))
 						if err != nil {
 							log.Warn(err)
+							peerCounter++
+							c.NextPeer()
 							continue
 						}
 					}
@@ -166,10 +174,13 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 						pinfo.Network,
 						models.WithMultiaddress(pinfo.Addrs),
 					)
-					c.peerStreamChan <- hInfo
-
 					// increment peerCounter to see if we finished iterating the peerstore
 					peerCounter++
+
+					// update the last attempted peer
+					lastAttemptedPeer = *nextPeer
+
+					c.peerStreamChan <- hInfo
 
 				} else {
 					logEntry.Trace("next peers has to wait to be connected")
@@ -243,7 +254,15 @@ func (c *PruningStrategy) eventRecorderRoutine() {
 			// update the local info about the peer
 			p, ok := c.PeerQueue.GetPeer(connAttempt.RemotePeer.String())
 			if !ok {
-				logEntry.Warnf("Could not find peer in peerqueue: %s", connAttempt.RemotePeer)
+				logEntry.Warnf("Could not find peer in peerqueue: %s - probably deprecated", connAttempt.RemotePeer)
+				// check if the connectionwas successful or not
+				if connAttempt.Status == models.NegativeAttempt {
+					log.Warn("we received a negative attempt of connection to %s - that was probably deprecated")
+					continue
+				} else {
+					// create a new instance of a Pruned peer
+					p = NewPrunedPeer(connAttempt.RemotePeer.String(), PositiveDelayType)
+				}
 			}
 			p.ConnEventHandler(connAttempt.Error)
 			// Check if peer needs to be deprecated
@@ -252,6 +271,7 @@ func (c *PruningStrategy) eventRecorderRoutine() {
 				connAttempt.Deprecable = true
 				// remove p from list of peers to ping (if it appears again in the discovery, it will be updated as undeprecated in the DB)
 				c.PeerQueue.RemovePeer(connAttempt.RemotePeer.String())
+				c.Peerstore.DeletePeer(connAttempt.RemotePeer.String())
 			}
 
 			c.DBClient.PersistToDB(connAttempt)
@@ -430,6 +450,8 @@ func (c *PeerQueue) RemovePeer(pPeer string) {
 	}
 	if idx > -1 {
 		c.PeerList = append(c.PeerList[:idx], c.PeerList[idx+1:]...)
+	} else {
+		log.Debugf("unable to find peer %s inside queued peers", pPeer)
 	}
 }
 
@@ -463,6 +485,8 @@ func (c *PeerQueue) SetUpdateErrorMetrics(key string, val int) {
 // SortPeerList sorts the PeerQueue array leaving at the beginning the peers
 // with the shorter next peer connection.
 func (c *PeerQueue) SortPeerList() {
+	c.Lock()
+	defer c.Unlock()
 	sort.Sort(c)
 }
 
