@@ -1,4 +1,4 @@
-GOCC=go1.17.7
+GOCC=go
 MKDIR_P=mkdir -p
 GIT_SUBM=git submodule
 

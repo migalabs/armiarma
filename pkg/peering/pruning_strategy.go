@@ -126,7 +126,6 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 	c.ErrorAttemptDistribution.Store(TimeoutDelayType, 0)
 
 	peerCounter := 0
-	peerListLen := c.PeerQueue.Len()
 	validIterTimer := time.NewTimer(MinIterTime)
 	iterStartTime := time.Now()
 	nextIterFlag := false
@@ -135,7 +134,7 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 		select {
 		// Receive the notification of sending the next peer
 		case <-c.nextPeerChan:
-			if peerListLen > 0 {
+			if c.PeerQueue.Len() > 0 && peerCounter < c.PeerQueue.Len() {
 				logEntry.Trace("prepare next peer for pushing it into peer stream")
 				// read info about next peer
 				nextPeer := c.PeerQueue.PeerList[peerCounter]
@@ -190,13 +189,13 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 					nextIterFlag = true
 				}
 			} else {
-				logEntry.Warn("empty peerstore")
+				logEntry.Warn("empty peerstore or pointer exceeded")
 				// Recreate the call of the nextPeer that the iterator just used
 				c.NextPeer()
 
 			}
 		pointerCheck:
-			if nextIterFlag || peerCounter >= peerListLen {
+			if nextIterFlag || peerCounter >= c.PeerQueue.Len() {
 				// time to update the PeerList
 				c.lastIterTime = time.Since(iterStartTime)
 				atomic.StoreInt64(&c.attemptedPeers, int64(peerCounter))
@@ -216,8 +215,7 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 					log.Error(err)
 				}
 
-				peerListLen = c.PeerQueue.Len()
-				logEntry.Debugf("got new peer list with %d", peerListLen)
+				logEntry.Debugf("got new peer list with %d", c.PeerQueue.Len())
 				validIterTimer = time.NewTimer(MinIterTime)
 				iterStartTime = time.Now()
 				peerCounter = 0
