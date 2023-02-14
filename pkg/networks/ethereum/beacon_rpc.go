@@ -11,7 +11,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func (en *EthereumNetwork) ServeBeaconPing(h host.Host) {
+func (en *LocalEthereumNode) ServeBeaconPing(h host.Host) {
 	go func() {
 		sCtxFn := func() context.Context {
 			reqCtx, _ := context.WithTimeout(en.ctx, RPCTimeout)
@@ -42,7 +42,7 @@ func (en *EthereumNetwork) ServeBeaconPing(h host.Host) {
 	}()
 }
 
-func (en *EthereumNetwork) ServeBeaconGoodbye(h host.Host) {
+func (en *LocalEthereumNode) ServeBeaconGoodbye(h host.Host) {
 	go func() {
 		sCtxFn := func() context.Context {
 			reqCtx, _ := context.WithTimeout(en.ctx, RPCTimeout)

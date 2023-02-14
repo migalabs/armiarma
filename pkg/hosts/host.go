@@ -30,17 +30,18 @@ var (
 )
 
 type P2pNetwork interface {
-	NetworkType() utils.NetworkType
+	Network() utils.NetworkType
 }
 
 // Struct that defines the Basic Struct asociated to the Libtp2p host
 type BasicLibp2pHost struct {
-	ctx     context.Context
-	Network P2pNetwork
+	ctx context.Context
+
 	// Basic sevices related with the libp2p host
-	host      host.Host
-	identify  identify.IDService
-	IpLocator *apis.IpLocator
+	host        host.Host
+	identify    identify.IDService
+	IpLocator   *apis.IpLocator
+	NetworkNode P2pNetwork
 
 	// Basic Host Metadata
 	multiAddr ma.Multiaddr
@@ -57,7 +58,7 @@ func NewBasicLibp2pEth2Host(
 	port int,
 	privKey *crypto.Secp256k1PrivateKey,
 	userAgent string,
-	network P2pNetwork,
+	netNode P2pNetwork,
 	ipLocator *apis.IpLocator) (*BasicLibp2pHost, error) {
 
 	// generate de multiaddress
@@ -103,7 +104,7 @@ func NewBasicLibp2pEth2Host(
 	// Gererate the struct that contains all the configuration and structs surrounding the Libp2p Host
 	basicHost := &BasicLibp2pHost{
 		ctx:                 ctx,
-		Network:             network,
+		NetworkNode:         netNode,
 		host:                host,
 		identify:            ids,
 		IpLocator:           ipLocator,

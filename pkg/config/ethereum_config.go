@@ -46,7 +46,6 @@ type EthereumCrawlerConfig struct {
 }
 
 // TODO: read from config-file
-
 func NewEthereumCrawlerConfig() *EthereumCrawlerConfig {
 	// Return Default values for the ethereum configuration
 	return &EthereumCrawlerConfig{

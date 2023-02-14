@@ -19,7 +19,7 @@ import (
 
 // ReqBeaconMetadata opens a new Stream from the given host to send a RPC reqresping the BeaconStatus of the given peer.ID.
 // Returns the BeaconStatus of the given peer if succeed, error if failed.
-func (en *EthereumNetwork) ReqBeaconMetadata(
+func (en *LocalEthereumNode) ReqBeaconMetadata(
 	ctx context.Context,
 	wg *sync.WaitGroup,
 	h host.Host,
@@ -73,7 +73,7 @@ func (en *EthereumNetwork) ReqBeaconMetadata(
 	*result = metadata
 }
 
-func (en *EthereumNetwork) ServeBeaconMetadata(h host.Host) {
+func (en *LocalEthereumNode) ServeBeaconMetadata(h host.Host) {
 
 	go func() {
 		sCtxFn := func() context.Context {

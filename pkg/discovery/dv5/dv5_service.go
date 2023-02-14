@@ -20,7 +20,6 @@ import (
 
 	"github.com/migalabs/armiarma/pkg/db/models"
 	"github.com/migalabs/armiarma/pkg/discovery"
-	"github.com/migalabs/armiarma/pkg/enode"
 	eth "github.com/migalabs/armiarma/pkg/networks/ethereum"
 	"github.com/migalabs/armiarma/pkg/utils"
 	log "github.com/sirupsen/logrus"
@@ -42,7 +41,7 @@ type Discovery5 struct {
 	// Service control variables
 	ctx context.Context
 
-	Node        *enode.LocalNode
+	Node        *eth.LocalEthereumNode
 	Dv5Listener *discover.UDPv5
 	Iterator    ethenode.Iterator
 
@@ -58,7 +57,7 @@ type Discovery5 struct {
 // NewDiscovery
 func NewDiscovery5(
 	ctx context.Context,
-	node *enode.LocalNode,
+	node *eth.LocalEthereumNode,
 	privkey *ecdsa.PrivateKey,
 	bootnodes []*ethenode.Node,
 	fdigest string,
@@ -99,7 +98,7 @@ func NewDiscovery5(
 	}
 
 	// start the discovery5 service and listen using the given connection
-	dv5Listener, err := discover.ListenV5(conn, &node.LocalNode, cfg)
+	dv5Listener, err := discover.ListenV5(conn, node.EthNode(), cfg)
 	if err != nil {
 		log.Panic(err.Error())
 	}

@@ -15,7 +15,6 @@ import (
 	psql "github.com/migalabs/armiarma/pkg/db/postgresql"
 	"github.com/migalabs/armiarma/pkg/discovery"
 	"github.com/migalabs/armiarma/pkg/discovery/dv5"
-	"github.com/migalabs/armiarma/pkg/enode"
 	"github.com/migalabs/armiarma/pkg/gossipsub"
 	"github.com/migalabs/armiarma/pkg/hosts"
 	"github.com/migalabs/armiarma/pkg/metrics"
@@ -31,8 +30,7 @@ type EthereumCrawler struct {
 	ctx       context.Context
 	cancel    context.CancelFunc
 	Host      *hosts.BasicLibp2pHost
-	EthNet    *eth.EthereumNetwork
-	Node      *enode.LocalNode
+	EthNode   *eth.LocalEthereumNode
 	DB        *psql.DBClient
 	Disc      *discovery.Discovery
 	Peering   peering.PeeringService
@@ -45,59 +43,63 @@ func NewEthereumCrawler(mainCtx *cli.Context, conf config.EthereumCrawlerConfig)
 	// Setup the configuration
 	log.SetLevel(utils.ParseLogLevel(conf.LogLevel))
 
-	// --- build up all the necesary modules ---
 	ctx, cancel := context.WithCancel(mainCtx.Context)
 	var err error
 
-	// generate confg for EthNetwork // TODO: should be moved to enode
-	ethNet := eth.NewEthereumNetwork(
-		ctx,
-		eth.ComposeQuickBeaconStatus(conf.ForkDigest),
-		eth.ComposeQuickBeaconMetaData(),
-	)
-	// serve
-
-	// Private Key
+	// parse or create a private key for the host
 	var gethPrivKey *ecdsa.PrivateKey
 	var libp2pPrivKey *crypto.Secp256k1PrivateKey
 	if conf.PrivateKey == "" {
 		gethPrivKey, err = utils.GenerateECDSAPrivKey()
 		if err != nil {
+			cancel()
 			return nil, err
 		}
 	} else {
 		gethPrivKey, err = utils.ParseECDSAPrivateKey(conf.PrivateKey)
 		if err != nil {
+			cancel()
 			return nil, err
 		}
 	}
 	libp2pPrivKey, err = utils.AdaptSecp256k1FromECDSA(gethPrivKey)
 	if err != nil {
+		cancel()
 		return nil, err
 	}
+
+	// generate local node for the ethereum network
+	ethNode := eth.NewLocalEthereumNode(
+		ctx,
+		gethPrivKey,
+		eth.ComposeQuickBeaconStatus(conf.ForkDigest),
+		eth.ComposeQuickBeaconMetaData(),
+	)
+	// subscribre to all attestnets and set forkdigest
+	ethNode.SetAttNetworks("ffffffffffffffff")
+	ethNode.SetForkDigest(strings.Trim(conf.ForkDigest, "0x"))
 
 	// generate the central exporting service
 	promethMetrics := metrics.NewPrometheusMetrics(ctx)
 
-	// Generate/connect to PSQL Database
-	dbClient, err := psql.NewDBClient(ctx, ethNet.NetworkType(), conf.PsqlEndpoint, true)
+	// generate/connect to PSQL Database
+	dbClient, err := psql.NewDBClient(ctx, ethNode.Network(), conf.PsqlEndpoint, true)
 	if err != nil {
 		cancel()
 		return nil, err
 	}
 
-	// IpLocalizer
+	// create an ip-locator instance
 	ipLocator := apis.NewIpLocator(ctx, dbClient)
 
-	// generate libp2pHost
-	// TODO: pass only strictly necessary info (IP, PORT, PrivKey)
+	// generate libp2pHostd
 	host, err := hosts.NewBasicLibp2pEth2Host(
 		ctx,
 		conf.IP,
 		conf.Port,
 		libp2pPrivKey,
 		conf.UserAgent,
-		ethNet,
+		ethNode, // ethereum local node
 		ipLocator,
 	)
 	if err != nil {
@@ -105,15 +107,10 @@ func NewEthereumCrawler(mainCtx *cli.Context, conf config.EthereumCrawlerConfig)
 		return nil, err
 	}
 
-	// generate local Enode and DV5 service
-	node := enode.NewLocalNode(ctx, gethPrivKey)
-	// subscribre to all attestnets and set forkdigest
-	node.SetAttNetworks("ffffffffffffffff")
-	node.SetForkDigest(strings.Trim(conf.ForkDigest, "0x"))
-
+	// create a new discovery5 service to discover peers in the Ethereum network
 	dv5, err := dv5.NewDiscovery5(
 		ctx,
-		node,
+		ethNode,
 		gethPrivKey,
 		dv5.ParseBootnodesFromStringSlice(conf.Bootnodes),
 		conf.ForkDigest,
@@ -129,7 +126,7 @@ func NewEthereumCrawler(mainCtx *cli.Context, conf config.EthereumCrawlerConfig)
 		ipLocator,
 	)
 
-	// GossipSup
+	// create a gossipsub routing
 	gs := gossipsub.NewGossipSub(ctx, host.Host(), dbClient)
 
 	// generate a new subnets-handler
@@ -151,7 +148,7 @@ func NewEthereumCrawler(mainCtx *cli.Context, conf config.EthereumCrawlerConfig)
 		topic := eth.ComposeTopic(conf.ForkDigest, top)
 		gs.JoinAndSubscribe(topic, msgHandler)
 	}
-	// ---- Subcribe to Subnets ----
+	// subcribe to attestation subnets
 	for _, subnet := range conf.Subnets {
 		subTopics := eth.ComposeAttnetsTopic(conf.ForkDigest, subnet)
 		gs.JoinAndSubscribe(subTopics, ethMsgHandler.SubnetMessageHandler)
@@ -160,7 +157,7 @@ func NewEthereumCrawler(mainCtx *cli.Context, conf config.EthereumCrawlerConfig)
 	// generate the peering strategy
 	pStrategy, err := peering.NewPruningStrategy(
 		ctx,
-		ethNet.NetworkType(),
+		ethNode.Network(),
 		conf.LocalPeerstorePath,
 		dbClient,
 	)
@@ -180,20 +177,17 @@ func NewEthereumCrawler(mainCtx *cli.Context, conf config.EthereumCrawlerConfig)
 		return nil, err
 	}
 
-	// init the metrics for all the modules
-
 	// generate the CrawlerBase
 	crawler := &EthereumCrawler{
 		ctx:       ctx,
 		cancel:    cancel,
 		Host:      host,
 		DB:        dbClient,
-		Node:      node,
+		EthNode:   ethNode,
 		Disc:      disc,
 		Peering:   peeringServ,
 		Gossipsub: gs,
 		IpLocator: ipLocator,
-		EthNet:    ethNet,
 		Metrics:   promethMetrics,
 	}
 
@@ -219,9 +213,9 @@ func NewEthereumCrawler(mainCtx *cli.Context, conf config.EthereumCrawlerConfig)
 // generate new CrawlerBase
 func (c *EthereumCrawler) Run() {
 	// init all the eth_protocols
-	c.EthNet.ServeBeaconPing(c.Host.Host())
-	c.EthNet.ServeBeaconStatus(c.Host.Host())
-	c.EthNet.ServeBeaconMetadata(c.Host.Host())
+	c.EthNode.ServeBeaconPing(c.Host.Host())
+	c.EthNode.ServeBeaconStatus(c.Host.Host())
+	c.EthNode.ServeBeaconMetadata(c.Host.Host())
 
 	// initialization secuence for the crawler
 	c.IpLocator.Run()

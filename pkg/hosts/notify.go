@@ -55,7 +55,7 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 	// create new HostInfo
 	hInfo := models.NewHostInfo(
 		conn.RemotePeer(),
-		c.Network.NetworkType(),
+		c.NetworkNode.Network(),
 		models.WithMultiaddress(mAddrs),
 	)
 
@@ -78,9 +78,9 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 	wg.Add(1)
 	go ReqHostInfo(mainCtx, &wg, h, c.IpLocator, conn, hInfo, &hinfoErr)
 
-	switch c.Network.(type) {
-	case (*eth.EthereumNetwork):
-		ethNet := c.Network.(*eth.EthereumNetwork)
+	switch c.NetworkNode.(type) {
+	case (*eth.LocalEthereumNode):
+		ethNet := c.NetworkNode.(*eth.LocalEthereumNode)
 		// request BeaconStatus metadata as we connect to a peer
 		wg.Add(1)
 		go ethNet.ReqBeaconStatus(mainCtx, &wg, h, conn.RemotePeer(), &bStatus, &statusErr)
@@ -103,8 +103,8 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 	}
 
 	// If the network was eth2, wait for the metadata echange to reply
-	switch c.Network.(type) {
-	case (*eth.EthereumNetwork):
+	switch c.NetworkNode.(type) {
+	case (*eth.LocalEthereumNode):
 		// Beacon Status reqresp error check
 		// if there is an error  in the channel, print error
 		if statusErr != nil {
