@@ -52,7 +52,6 @@ func (db *DBClient) GetAttnetsDistribution() (map[string]interface{}, error) {
 	log.Debug("fetching attnets distribution")
 	nodeDist := make(map[string]interface{})
 
-	// TODO: add here a check of the timestamp )()
 	rows, err := db.psqlPool.Query(
 		db.ctx,
 		`

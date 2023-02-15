@@ -86,8 +86,6 @@ func TestPeerInfoInPSQL(t *testing.T) {
 	require.Equal(t, connAttemtp1.Timestamp.Unix(), rHostInfo.ControlInfo.LastConnAttempt.Unix())
 	require.Equal(t, connAttemtp1.Error, rHostInfo.ControlInfo.LastError)
 
-	// TODO: extend this tests to include edgy cases with Connections and Disconnections
-	// TODO: extend this test to include deprecated and left network SQL queries
 }
 
 func genNewTestHostInfo(

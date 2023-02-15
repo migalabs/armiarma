@@ -3,7 +3,6 @@ package postgresql
 import (
 	"time"
 
-	"github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v4"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/migalabs/armiarma/pkg/db/models"
@@ -326,51 +325,43 @@ func (c *DBClient) GetNonDeprecatedPeers() ([]*peerstore.PersistablePeer, error)
 	defer rows.Close()
 
 	for rows.Next() {
-		attr_row, err := rows.Values()
+		var peerIDStr string
+		var mAddrsStr []string
+		var networkStr string
+
+		err := rows.Scan(&peerIDStr, &mAddrsStr, &networkStr)
 		if err != nil {
 			return persisPeers, err
 		}
-		// general info for peers
-		var peerID peer.ID
-		var mAddrs []ma.Multiaddr
-		var network utils.NetworkType
-		// TODO: we are basing the login on the possition of the items
-		for idx, attr := range attr_row {
-			switch idx {
-			case 0:
-				peerID, err = peer.Decode(attr.(string))
-				if err != nil {
-					log.Errorf("unable to get peerID from DB %s \n", attr)
-					continue // if error, go for the next one
-				}
-			case 1:
-				netw := attr.(string)
-				network = utils.NetworkType(netw)
-			case 2:
-				maddrPg := attr.(pgtype.TextArray)
-				// var maddrStr []string
-				// err = maddrPg.Scan(&maddrStr)
-				// if err != nil {
-				// 	log.Error(errors.Wrap(err, "unable to retreive maddrs"))
-				// }
-				for _, element := range maddrPg.Elements {
-					mAddr, err := ma.NewMultiaddr(element.String)
-					if err != nil {
-						log.Error(errors.Wrap(err, "unable to parse mAddrs reading full peer_info"))
-						continue
-					}
-					mAddrs = append(mAddrs, mAddr)
-				}
-			default:
-				log.Error("extra info received getting the non-deprecated peers", attr)
+
+		// persist peerID
+		peerID, err := peer.Decode(peerIDStr)
+		if err != nil {
+			log.Errorf("unable to get peerID from DB %s \n", peerIDStr)
+			continue // if error, go for the next one
+		}
+
+		// parse the network type
+		network := utils.NetworkType(networkStr)
+
+		// parse the multiaddress
+		maddrs := make([]ma.Multiaddr, len(mAddrsStr))
+		for _, element := range mAddrsStr {
+			mAddr, err := ma.NewMultiaddr(element)
+			if err != nil {
+				log.Error(errors.Wrap(err, "unable to parse mAddrs reading full peer_info"))
 				continue
 			}
+			maddrs = append(maddrs, mAddr)
 		}
+
+		// create the persistable instance
 		persistable := peerstore.NewPersistable(
 			peerID,
-			mAddrs,
+			maddrs,
 			network,
 		)
+
 		// decode peerID to have proper OBJ
 		persisPeers = append(persisPeers, persistable)
 	}

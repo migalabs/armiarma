@@ -228,7 +228,6 @@ func (c *DBClient) launchPersister() {
 					// Read all the Attributes in hInfo
 					for attName, att := range hostInfo.Attr {
 						log.Debugf("detected attribute %s on peer", attName)
-						// TODO: add tables for BeaconStatus and BeaconMetadata
 						switch att.(type) {
 						case eth.BeaconStatusStamped:
 							bstatus := att.(eth.BeaconStatusStamped)
