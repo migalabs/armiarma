@@ -102,7 +102,6 @@ var Eth2TestClients []clientInfoTest = []clientInfoTest{
 	},
 }
 
-// TODO: Fill it with the
 var IPFSTestClients []string = []string{
 	"go-ipfs/0.8.0/48f94e2",
 	"hydra-booster/0.7.4",

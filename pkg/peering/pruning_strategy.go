@@ -66,10 +66,8 @@ func NewPruningStrategy(
 	dbClient *psql.DBClient) (*PruningStrategy, error) {
 
 	// generate a local peerstore for addrBook
-	// TODO: move this to the crawler? -> makes more logic to me here
 	pstore := peerstore.NewPeerstore(localPeerstorePath)
 
-	// TODO: consider making the ConnStatus channel larger
 	return &PruningStrategy{
 		ctx:            ctx,
 		network:        network,
@@ -563,7 +561,6 @@ func (c *PeerQueue) UpdatePeerListFromRemoteDB(dbClient *psql.DBClient, localPee
 	return nil
 }
 
-// TODO: think about including a sync.RWMutex in case we upgrade to workers
 type PrunedPeer struct {
 	PeerID                   string
 	DelayObj                 DelayObject // define the delay to connect based on error

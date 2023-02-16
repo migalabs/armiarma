@@ -13,7 +13,6 @@ import (
 const ATTNETS_KEY = "attnets"
 const ETH2_ENR_KEY = "eth2"
 
-// TODO: Comment
 // Attended networks are the networks the node will be participating in
 type AttnetsENREntry []byte
 

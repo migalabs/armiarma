@@ -50,7 +50,7 @@ func NewPeeringService(
 		host:       h,
 		DBClient:   dbClient,
 		Timeout:    ConnectionRefuseTimeout,
-		MaxRetries: MaxRetries, // TODO: Hardcoded to 1 retry, future retries are directly dismissed/dropped by dialing peer
+		MaxRetries: MaxRetries,
 	}
 	// iterate through the Options given as args
 	for _, opt := range opts {

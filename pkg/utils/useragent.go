@@ -107,7 +107,6 @@ var ValidArchs map[ClientArch][]string = map[ClientArch][]string{
 // storm: storm
 // lotus: lotus-1.13.0+mainnet+git.7a55e8e8
 
-// TODO: Add network to the
 func ParseClientType(network NetworkType, userAgent string) (cliName string, cliVersion string, cliOs string, cliArch string) {
 
 	// split the UserAgent into chunks divided by '/'
@@ -160,7 +159,7 @@ func ParseClientType(network NetworkType, userAgent string) (cliName string, cli
 		// stract the version from the user
 		var version string
 		switch client {
-		case GoIpfs, Kubo, Ioi, Storm, HydraBooster:
+		case Lotus:
 			version = cleanVersion(cleanVersionLotus(splUserAgent[0]))
 		default:
 			log.Errorf("unable to determine client name for UserAgent %s", userAgent)
@@ -171,7 +170,7 @@ func ParseClientType(network NetworkType, userAgent string) (cliName string, cli
 		cliVersion = version
 
 	default:
-		log.Error("unable to retrieve the ")
+		log.Error("unable to retrieve the user_agent from network", network)
 	}
 
 	os := ClientOSParser(ValidOs, userAgent)
