@@ -92,7 +92,7 @@ func MsgIDFunction(pmsg *pubsub_pb.Message) string {
 }
 
 // JoinAndSubscribe this method allows the GossipSub service to join and subscribe to a topic.
-func (gs *GossipSub) JoinAndSubscribe(topicName string, handlerFn MessageHandler) {
+func (gs *GossipSub) JoinAndSubscribe(topicName string, handlerFn MessageHandler, persistMsgs bool) {
 	// Join topic
 	topic, err := gs.PubsubService.Join(topicName)
 	if err != nil {
@@ -107,7 +107,7 @@ func (gs *GossipSub) JoinAndSubscribe(topicName string, handlerFn MessageHandler
 	}
 
 	log.Debugf("subscribed to %s", topicName)
-	topicSub := NewTopicSubscription(gs.ctx, topic, *sub, handlerFn)
+	topicSub := NewTopicSubscription(gs.ctx, topic, *sub, handlerFn, persistMsgs)
 	// Add the new Topic to the list of supported/subscribed topics in GossipSub
 	gs.TopicArray[topicName] = topicSub
 	go gs.TopicArray[topicName].MessageReadingLoop(gs.host.ID(), gs.DBClient)

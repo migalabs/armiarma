@@ -35,14 +35,15 @@ type EthereumCrawlerConfig struct {
 	IP                        string   `json:"ip"`
 	Port                      int      `json:"port"`
 	UserAgent                 string   `json:"user-agent"`
-	GossipTopics              []string `json:"gossip-topics"`
 	EthCLRemoteEndpoint       string   `json:"remote-cl-endpoint"`
 	PsqlEndpoint              string   `json:"psql-endpoint"`
 	ActivePeersBackupInterval string   `json:ActivePeersBackupInterval`
 	ForkDigest                string   `json:"fork-digest"`
 	Bootnodes                 []string `json:"bootnodes"`
 	LocalPeerstorePath        string   `json:"local-peerstore-path"`
+	GossipTopics              []string `json:"gossip-topics"`
 	Subnets                   []int    `json:"subnets"`
+	PersistMsgs               bool     `json:"persist-msgs"`
 	ValPubkeys                []string `json:"val-pubkeys"`
 }
 
@@ -55,7 +56,6 @@ func NewEthereumCrawlerConfig() *EthereumCrawlerConfig {
 		IP:                        DefaultIP,
 		Port:                      DefaultPort,
 		UserAgent:                 DefaultUserAgent,
-		GossipTopics:              DefaultEthereumGossipTopics,
 		EthCLRemoteEndpoint:       DefaultCLRemoteEndpoint,
 		PsqlEndpoint:              DefaultPSQLEndpoint,
 		ActivePeersBackupInterval: DefaultActivePeersBackupInterval,
@@ -63,6 +63,8 @@ func NewEthereumCrawlerConfig() *EthereumCrawlerConfig {
 		Bootnodes:                 DefaultEthereumBootnodes,
 		LocalPeerstorePath:        DefaultLocalPeerstorePath,
 		Subnets:                   DefaultSubnets,
+		GossipTopics:              DefaultEthereumGossipTopics,
+		PersistMsgs:               false,
 		ValPubkeys:                DefaultValPubkeys,
 	}
 }
@@ -91,10 +93,6 @@ func (c *EthereumCrawlerConfig) Apply(ctx *cli.Context) {
 	// user agent
 	if ctx.IsSet("user-agent") {
 		c.UserAgent = ctx.String("user-agent")
-	}
-	// gossip topics
-	if ctx.IsSet("gossip-topic") {
-		c.GossipTopics = ctx.StringSlice("gossip-topic")
 	}
 
 	// fork digest
@@ -143,6 +141,11 @@ func (c *EthereumCrawlerConfig) Apply(ctx *cli.Context) {
 		log.Panic("unable to create folder for local-peerstore" + err.Error())
 	}
 
+	// gossip topics
+	if ctx.IsSet("gossip-topic") {
+		c.GossipTopics = ctx.StringSlice("gossip-topic")
+	}
+
 	// Subnets
 	if ctx.IsSet("subnet") {
 		subnets := ctx.StringSlice("subnet")
@@ -166,6 +169,11 @@ func (c *EthereumCrawlerConfig) Apply(ctx *cli.Context) {
 		}
 	}
 
+	// check if we want to track the Msgs in the SQL database
+	if ctx.IsSet("persist-msgs") {
+		c.PersistMsgs = ctx.Bool("persist-msgs")
+	}
+
 	// read validator-pubkeys .csv file if it exists
 	if ctx.IsSet("val-pubkeys") {
 		filePath := ctx.String("val-pubkeys")
@@ -185,11 +193,12 @@ func (c *EthereumCrawlerConfig) Apply(ctx *cli.Context) {
 		"psql":            c.PsqlEndpoint,
 		"backup-interval": c.ActivePeersBackupInterval,
 		"fork-digest":     c.ForkDigest,
-		"gossip-topics":   c.GossipTopics,
 		"cl-endpoint":     c.EthCLRemoteEndpoint,
 		"bootnodes":       c.Bootnodes,
 		"peerstore":       c.LocalPeerstorePath,
+		"gossip-topics":   c.GossipTopics,
 		"subnets":         c.Subnets,
+		"persist-msgs":    c.PersistMsgs,
 		"val-pubkeys":     len(c.ValPubkeys),
 	}).Info("config for the Ethereum crawler")
 }

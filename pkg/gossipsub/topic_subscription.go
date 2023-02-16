@@ -18,11 +18,12 @@ type TopicSubscription struct {
 	ctx context.Context
 
 	// Messages is a channel of messages received from other peers in the chat room
-	psub      *pubsub.PubSub
-	messages  chan []byte
-	topic     *pubsub.Topic
-	sub       *pubsub.Subscription
-	handlerFn MessageHandler
+	psub        *pubsub.PubSub
+	messages    chan []byte
+	topic       *pubsub.Topic
+	sub         *pubsub.Subscription
+	handlerFn   MessageHandler
+	persistMsgs bool
 }
 
 // NewTopicSubscription sumarizes the control fields necesary to manage and
@@ -31,13 +32,15 @@ func NewTopicSubscription(
 	ctx context.Context,
 	topic *pubsub.Topic,
 	sub pubsub.Subscription,
-	msgHandlerFn MessageHandler) *TopicSubscription {
+	msgHandlerFn MessageHandler,
+	persistMsgs bool) *TopicSubscription {
 	return &TopicSubscription{
-		ctx:       ctx,
-		topic:     topic,
-		sub:       &sub,
-		messages:  make(chan []byte),
-		handlerFn: msgHandlerFn,
+		ctx:         ctx,
+		topic:       topic,
+		sub:         &sub,
+		messages:    make(chan []byte),
+		handlerFn:   msgHandlerFn,
+		persistMsgs: persistMsgs,
 	}
 }
 
@@ -64,7 +67,7 @@ func (c *TopicSubscription) MessageReadingLoop(selfId peer.ID, dbClient database
 					log.Error(errors.Wrap(err, "unable to unwrap message"))
 					continue
 				}
-				if !content.IsZero() {
+				if !content.IsZero() && c.persistMsgs {
 					log.Debugf("msg on %s content: %+v", c.sub.Topic(), content)
 					dbClient.PersistToDB(content)
 				}

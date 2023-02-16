@@ -33,9 +33,7 @@ func EthMessageBaseHandler(topic string, msg *pubsub.Message) ([]byte, error) {
 
 type EthMessageHandler struct {
 	genesisTime time.Time
-
-	pubkeys []*common.BLSPubkey // pubkeys of those validators we want to track
-
+	pubkeys     []*common.BLSPubkey // pubkeys of those validators we want to track
 }
 
 func NewEthMessageHandler(genesis time.Time, pubkeysStr []string) (*EthMessageHandler, error) {

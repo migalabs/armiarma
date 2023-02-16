@@ -63,12 +63,6 @@ var Eth2CrawlerCommand = &cli.Command{
 			EnvVars:     []string{"ARMIARMA_BACKUP_INTERVAL"},
 			DefaultText: config.DefaultActivePeersBackupInterval,
 		},
-		&cli.StringSliceFlag{
-			Name:        "gossip-topic",
-			Usage:       "List of gossipsub topics that the crawler will subscribe to",
-			EnvVars:     []string{"ARMIARMA_GOSSIP_TOPICS"},
-			DefaultText: "One --gossip-topic <topic> per topic",
-		},
 		&cli.StringFlag{
 			Name:        "remote-cl-endpoint",
 			Usage:       "Remote Ethereum Consensus Layer Client to request metadata (experimental)",
@@ -93,9 +87,20 @@ var Eth2CrawlerCommand = &cli.Command{
 			DefaultText: config.DefaultLocalPeerstorePath,
 		},
 		&cli.StringSliceFlag{
+			Name:        "gossip-topic",
+			Usage:       "List of gossipsub topics that the crawler will subscribe to",
+			EnvVars:     []string{"ARMIARMA_GOSSIP_TOPICS"},
+			DefaultText: "One --gossip-topic <topic> per topic",
+		},
+		&cli.StringSliceFlag{
 			Name:    "subnet",
 			Usage:   "List of subnets (gossipsub topics) that we want to subscribe the crawler to (One --subnet <subnet_id> per subnet)",
 			EnvVars: []string{"ARMIARMA_SUBNETS"},
+		},
+		&cli.BoolFlag{
+			Name:    "persist-msgs",
+			Usage:   "Decide whether we want to track the msgs-metadata into the DB",
+			EnvVars: []string{"ARMIARMA_PERSIST_MSGS"},
 		},
 		&cli.StringFlag{
 			Name:    "val-pubkeys",

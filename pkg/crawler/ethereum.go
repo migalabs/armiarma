@@ -75,6 +75,7 @@ func NewEthereumCrawler(mainCtx *cli.Context, conf config.EthereumCrawlerConfig)
 		gethPrivKey,
 		eth.ComposeQuickBeaconStatus(conf.ForkDigest),
 		eth.ComposeQuickBeaconMetaData(),
+		conf.ForkDigest,
 	)
 	// subscribre to all attestnets and set forkdigest
 	ethNode.SetAttNetworks("ffffffffffffffff")
@@ -136,7 +137,7 @@ func NewEthereumCrawler(mainCtx *cli.Context, conf config.EthereumCrawlerConfig)
 	gs := gossipsub.NewGossipSub(ctx, host.Host(), dbClient)
 
 	// generate a new subnets-handler
-	ethMsgHandler, err := eth.NewEthMessageHandler(eth.GoerliGenesis, conf.ValPubkeys)
+	ethMsgHandler, err := eth.NewEthMessageHandler(ethNode.GetNetworkGenesis(), conf.ValPubkeys)
 	if err != nil {
 		cancel()
 		return nil, err
@@ -152,12 +153,12 @@ func NewEthereumCrawler(mainCtx *cli.Context, conf config.EthereumCrawlerConfig)
 			continue
 		}
 		topic := eth.ComposeTopic(conf.ForkDigest, top)
-		gs.JoinAndSubscribe(topic, msgHandler)
+		gs.JoinAndSubscribe(topic, msgHandler, conf.PersistMsgs)
 	}
 	// subcribe to attestation subnets
 	for _, subnet := range conf.Subnets {
 		subTopics := eth.ComposeAttnetsTopic(conf.ForkDigest, subnet)
-		gs.JoinAndSubscribe(subTopics, ethMsgHandler.SubnetMessageHandler)
+		gs.JoinAndSubscribe(subTopics, ethMsgHandler.SubnetMessageHandler, conf.PersistMsgs)
 	}
 
 	// generate the peering strategy

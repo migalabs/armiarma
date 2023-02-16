@@ -26,6 +26,8 @@ type LocalEthereumNode struct {
 	// node's metadata in the network
 	LocalStatus   common.Status
 	LocalMetadata common.MetaData
+	// Network Details
+	networkGenesis time.Time
 }
 
 // NewLocalNode will create a LocalNode object using the given arguments.
@@ -33,7 +35,8 @@ func NewLocalEthereumNode(
 	ctx context.Context,
 	privKey *ecdsa.PrivateKey,
 	status common.Status,
-	matadata common.MetaData) *LocalEthereumNode {
+	matadata common.MetaData,
+	forkDigest string) *LocalEthereumNode {
 
 	// db where to store the ENRs
 	ethDB, err := enode.OpenDB("")
@@ -42,10 +45,29 @@ func NewLocalEthereumNode(
 	}
 	log.Infof("Creating Local Node")
 
-	return &LocalEthereumNode{
-		ctx:     ctx,
-		ethNode: enode.NewLocalNode(ethDB, privKey),
+	// select network based on the network that we are participating in
+	var genesis time.Time
+	switch forkDigest {
+	case ForkDigests[Phase0Key], ForkDigests[AltairKey], ForkDigests[BellatrixKey]:
+		// Mainnet
+		genesis = MainnetGenesis
+	case ForkDigests[PraterPhase0Key], ForkDigests[PraterBellatrixKey]:
+		// Prater
+		genesis = GoerliGenesis
+	default:
+		// Mainnet
+		genesis = MainnetGenesis
 	}
+
+	return &LocalEthereumNode{
+		ctx:            ctx,
+		ethNode:        enode.NewLocalNode(ethDB, privKey),
+		networkGenesis: genesis,
+	}
+}
+
+func (en *LocalEthereumNode) GetNetworkGenesis() time.Time {
+	return en.networkGenesis
 }
 
 func (en *LocalEthereumNode) UpdateStatus(newStatus common.Status) {
