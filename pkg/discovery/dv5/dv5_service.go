@@ -10,7 +10,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net"
 	"os"
@@ -27,8 +26,6 @@ import (
 	gethlog "github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	ethenode "github.com/ethereum/go-ethereum/p2p/enode"
-
-	"github.com/libp2p/go-libp2p-core/peer"
 )
 
 var (
@@ -179,16 +176,10 @@ func (d *Discovery5) handleENR(node *ethenode.Node) (*models.HostInfo, error) {
 		return nil, ErrorNotValidNode
 	}
 
-	// Get the public key and the peer.ID of the discovered peer
-	pubkey := node.Pubkey()
-	libp2pKey, err := utils.ConvertECDSAPubkeyToSecp2561k(pubkey)
+	// Generate the peer ID from the pubkey
+	peerID, err := enr.GetPeerID()
 	if err != nil {
 		return &models.HostInfo{}, errors.Wrap(err, "unable to convert Geth pubkey to Libp2p")
-	}
-	// Generate the peer ID from the pubkey
-	peerID, err := peer.IDFromPublicKey(libp2pKey)
-	if err != nil {
-		return &models.HostInfo{}, errors.Wrap(err, fmt.Sprintf("error extracting peer.ID from node %s", node.ID()))
 	}
 	// gen the HostInfo
 	hInfo := models.NewHostInfo(

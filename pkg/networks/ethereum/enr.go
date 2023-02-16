@@ -87,7 +87,10 @@ func ParseEnr(node *enode.Node) (*EnrNode, error) {
 
 func (enr *EnrNode) GetPeerID() (peer.ID, error) {
 	// Get the public key and the peer.ID of the discovered peer
-	pubkey, _ := utils.ConvertECDSAPubkeyToSecp2561k(enr.Pubkey)
+	pubkey, err := utils.ConvertECDSAPubkeyToSecp2561k(enr.Pubkey)
+	if err != nil {
+		return *new(peer.ID), errors.Errorf("error converting geth pubkey to libp2p pubkey")
+	}
 
 	peerId, err := peer.IDFromPublicKey(pubkey)
 	if err != nil {

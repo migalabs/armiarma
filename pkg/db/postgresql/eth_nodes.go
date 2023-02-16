@@ -83,7 +83,7 @@ func (d *DBClient) UpsertEnrInfo(enr *eth.EnrNode) (query string, args []interfa
 			attnets_number = excluded.attnets_number;
 		`
 
-	// if peer_id goes empty, not my foult here we should have checked it before
+	// if peer_id goes empty, not my fault here we should have checked it before
 	var peerIDStr string
 	peerId, err := enr.GetPeerID()
 	if err == nil {
@@ -91,8 +91,8 @@ func (d *DBClient) UpsertEnrInfo(enr *eth.EnrNode) (query string, args []interfa
 	}
 
 	args = append(args, enr.Timestamp.Unix())
-	args = append(args, enr.ID.String())
 	args = append(args, peerIDStr)
+	args = append(args, enr.ID.String())
 	args = append(args, enr.Seq)
 	args = append(args, enr.IP)
 	args = append(args, enr.TCP)
