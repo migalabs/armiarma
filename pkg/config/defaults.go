@@ -11,12 +11,14 @@ import (
 
 var (
 	// Crawler
-	DefaultLogLevel     string = "info"
-	DefaultPrivKey      string = ""
-	DefaultIP           string = "0.0.0.0"
-	DefaultPort         int    = 9020
-	DefaultUserAgent    string = "Armiarma Crawler"
-	DefaultPSQLEndpoint string = "postgres://user:password@ip:port/database"
+	DefaultLogLevel                  string = "info"
+	DefaultPrivKey                   string = ""
+	DefaultIP                        string = "0.0.0.0"
+	DefaultPort                      int    = 9020
+	DefaultUserAgent                 string = "Armiarma Crawler"
+	DefaultPSQLEndpoint              string = "postgres://user:password@ip:port/database"
+	DefaultActivePeersBackupInterval string = "12h"
+
 	// Metrics
 	DefaultLocalPeerstorePath string = "./.peerstore"
 

@@ -19,7 +19,7 @@ import (
 // CrawlCommand contains the crawl sub-command configuration.
 var Eth2CrawlerCommand = &cli.Command{
 	Name:   "eth2",
-	Usage:  "crawl the eth2 network with the given configuration in the conf-file",
+	Usage:  "crawl the given Ethereum CL network (selected by fork_digest)",
 	Action: LaunchEth2Crawler,
 	Flags: []cli.Flag{
 		&cli.StringFlag{
@@ -57,6 +57,12 @@ var Eth2CrawlerCommand = &cli.Command{
 			EnvVars:     []string{"ARMIARMA_PSQL"},
 			DefaultText: config.DefaultPSQLEndpoint,
 		},
+		&cli.StringFlag{
+			Name:        "peers-backup",
+			Usage:       "Time interval that will be use to backup the peer_ids into a single table - allowing to recontruct the network in past-crawled times",
+			EnvVars:     []string{"ARMIARMA_BACKUP_INTERVAL"},
+			DefaultText: config.DefaultActivePeersBackupInterval,
+		},
 		&cli.StringSliceFlag{
 			Name:        "gossip-topic",
 			Usage:       "List of gossipsub topics that the crawler will subscribe to",
@@ -76,10 +82,9 @@ var Eth2CrawlerCommand = &cli.Command{
 			DefaultText: config.DefaultMainnetForkDigest,
 		},
 		&cli.StringSliceFlag{
-			Name:        "bootnode",
-			Usage:       "List of boondes that the crawler will use to discover more peers in the network",
-			EnvVars:     []string{"ARMIARMA_BOOTNODES"},
-			DefaultText: "One --bootnode <bootnode> per bootnode",
+			Name:    "bootnode",
+			Usage:   "List of boondes that the crawler will use to discover more peers in the network (One --bootnode <bootnode> per bootnode)",
+			EnvVars: []string{"ARMIARMA_BOOTNODES"},
 		},
 		&cli.StringFlag{
 			Name:        "local-peerstore",
@@ -88,16 +93,14 @@ var Eth2CrawlerCommand = &cli.Command{
 			DefaultText: config.DefaultLocalPeerstorePath,
 		},
 		&cli.StringSliceFlag{
-			Name:        "subnet",
-			Usage:       "List of subnets (gossipsub topics) that we want to subscribe the crawler to",
-			EnvVars:     []string{"ARMIARMA_SUBNETS"},
-			DefaultText: "One --subnet <subnet_id> per subnet",
+			Name:    "subnet",
+			Usage:   "List of subnets (gossipsub topics) that we want to subscribe the crawler to (One --subnet <subnet_id> per subnet)",
+			EnvVars: []string{"ARMIARMA_SUBNETS"},
 		},
 		&cli.StringFlag{
-			Name:        "val-pubkeys",
-			Usage:       "Path of the file that has the pubkeys of those validators that we want to track",
-			EnvVars:     []string{"ARMIARMA_VAL_PUBKEYS"},
-			DefaultText: "./validator_pubkeys.txt",
+			Name:    "val-pubkeys",
+			Usage:   "Path of the file that has the pubkeys of those validators that we want to track (experimental)",
+			EnvVars: []string{"ARMIARMA_VAL_PUBKEYS"},
 		},
 	},
 }

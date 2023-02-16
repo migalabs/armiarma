@@ -100,6 +100,20 @@ var Eth2TestClients []clientInfoTest = []clientInfoTest{
 		clientOS:      "unknown",
 		clientArch:    "unknown",
 	},
+	{
+		userAgent:     "erigon/lightclient",
+		clientname:    "erigon",
+		clientVersion: "unknown",
+		clientOS:      "unknown",
+		clientArch:    "unknown",
+	},
+	{
+		userAgent:     "erigon",
+		clientname:    "erigon",
+		clientVersion: "unknown",
+		clientOS:      "unknown",
+		clientArch:    "unknown",
+	},
 }
 
 var IPFSTestClients []string = []string{

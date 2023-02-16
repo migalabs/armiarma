@@ -25,43 +25,45 @@ var (
 	DefaultSubnets              []int    = []int{}
 	DefaultValPubkeys           []string = []string{}
 
-	// remote Infura endpoint
+	// remote RemoteEth client's endpoint
 	DefaultCLRemoteEndpoint = ""
 )
 
 type EthereumCrawlerConfig struct {
-	LogLevel            string   `json:"log-level"`
-	PrivateKey          string   `json:"priv-key"`
-	IP                  string   `json:"ip"`
-	Port                int      `json:"port"`
-	UserAgent           string   `json:"user-agent"`
-	GossipTopics        []string `json:"gossip-topics"`
-	EthCLRemoteEndpoint string   `json:"remote-cl-endpoint"`
-	PsqlEndpoint        string   `json:"psql-endpoint"`
-	ForkDigest          string   `json:"fork-digest"`
-	Bootnodes           []string `json:"bootnodes"`
-	LocalPeerstorePath  string   `json:"local-peerstore-path"`
-	Subnets             []int    `json:"subnets"`
-	ValPubkeys          []string `json:"val-pubkeys"`
+	LogLevel                  string   `json:"log-level"`
+	PrivateKey                string   `json:"priv-key"`
+	IP                        string   `json:"ip"`
+	Port                      int      `json:"port"`
+	UserAgent                 string   `json:"user-agent"`
+	GossipTopics              []string `json:"gossip-topics"`
+	EthCLRemoteEndpoint       string   `json:"remote-cl-endpoint"`
+	PsqlEndpoint              string   `json:"psql-endpoint"`
+	ActivePeersBackupInterval string   `json:ActivePeersBackupInterval`
+	ForkDigest                string   `json:"fork-digest"`
+	Bootnodes                 []string `json:"bootnodes"`
+	LocalPeerstorePath        string   `json:"local-peerstore-path"`
+	Subnets                   []int    `json:"subnets"`
+	ValPubkeys                []string `json:"val-pubkeys"`
 }
 
 // TODO: read from config-file
 func NewEthereumCrawlerConfig() *EthereumCrawlerConfig {
 	// Return Default values for the ethereum configuration
 	return &EthereumCrawlerConfig{
-		LogLevel:            DefaultLogLevel,
-		PrivateKey:          DefaultPrivKey,
-		IP:                  DefaultIP,
-		Port:                DefaultPort,
-		UserAgent:           DefaultUserAgent,
-		GossipTopics:        DefaultEthereumGossipTopics,
-		EthCLRemoteEndpoint: DefaultCLRemoteEndpoint,
-		PsqlEndpoint:        DefaultPSQLEndpoint,
-		ForkDigest:          DefaultMainnetForkDigest,
-		Bootnodes:           DefaultEthereumBootnodes,
-		LocalPeerstorePath:  DefaultLocalPeerstorePath,
-		Subnets:             DefaultSubnets,
-		ValPubkeys:          DefaultValPubkeys,
+		LogLevel:                  DefaultLogLevel,
+		PrivateKey:                DefaultPrivKey,
+		IP:                        DefaultIP,
+		Port:                      DefaultPort,
+		UserAgent:                 DefaultUserAgent,
+		GossipTopics:              DefaultEthereumGossipTopics,
+		EthCLRemoteEndpoint:       DefaultCLRemoteEndpoint,
+		PsqlEndpoint:              DefaultPSQLEndpoint,
+		ActivePeersBackupInterval: DefaultActivePeersBackupInterval,
+		ForkDigest:                DefaultMainnetForkDigest,
+		Bootnodes:                 DefaultEthereumBootnodes,
+		LocalPeerstorePath:        DefaultLocalPeerstorePath,
+		Subnets:                   DefaultSubnets,
+		ValPubkeys:                DefaultValPubkeys,
 	}
 }
 
@@ -123,6 +125,11 @@ func (c *EthereumCrawlerConfig) Apply(ctx *cli.Context) {
 		c.PsqlEndpoint = ctx.String("psql-endpoint")
 	}
 
+	// active peers' backup interval
+	if ctx.IsSet("peers-backup") {
+		c.ActivePeersBackupInterval = ctx.String("peers-backup")
+	}
+
 	// bootnodes
 	if ctx.IsSet("bootnode") {
 		c.Bootnodes = ctx.StringSlice("bootnode")
@@ -170,18 +177,19 @@ func (c *EthereumCrawlerConfig) Apply(ctx *cli.Context) {
 	}
 
 	log.WithFields(log.Fields{
-		"log-level":     c.LogLevel,
-		"priv-key":      c.PrivateKey,
-		"ip":            c.IP,
-		"port":          c.Port,
-		"user-agent":    c.UserAgent,
-		"psql":          c.PsqlEndpoint,
-		"fork-digest":   c.ForkDigest,
-		"gossip-topics": c.GossipTopics,
-		"cl-endpoint":   c.EthCLRemoteEndpoint,
-		"bootnodes":     c.Bootnodes,
-		"peerstore":     c.LocalPeerstorePath,
-		"subnets":       c.Subnets,
-		"val-pubkeys":   len(c.ValPubkeys),
+		"log-level":       c.LogLevel,
+		"priv-key":        c.PrivateKey,
+		"ip":              c.IP,
+		"port":            c.Port,
+		"user-agent":      c.UserAgent,
+		"psql":            c.PsqlEndpoint,
+		"backup-interval": c.ActivePeersBackupInterval,
+		"fork-digest":     c.ForkDigest,
+		"gossip-topics":   c.GossipTopics,
+		"cl-endpoint":     c.EthCLRemoteEndpoint,
+		"bootnodes":       c.Bootnodes,
+		"peerstore":       c.LocalPeerstorePath,
+		"subnets":         c.Subnets,
+		"val-pubkeys":     len(c.ValPubkeys),
 	}).Info("config for the Ethereum crawler")
 }

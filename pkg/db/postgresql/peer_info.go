@@ -329,7 +329,7 @@ func (c *DBClient) GetNonDeprecatedPeers() ([]*peerstore.PersistablePeer, error)
 		var mAddrsStr []string
 		var networkStr string
 
-		err := rows.Scan(&peerIDStr, &mAddrsStr, &networkStr)
+		err := rows.Scan(&peerIDStr, &networkStr, &mAddrsStr)
 		if err != nil {
 			return persisPeers, err
 		}
@@ -345,7 +345,7 @@ func (c *DBClient) GetNonDeprecatedPeers() ([]*peerstore.PersistablePeer, error)
 		network := utils.NetworkType(networkStr)
 
 		// parse the multiaddress
-		maddrs := make([]ma.Multiaddr, len(mAddrsStr))
+		maddrs := make([]ma.Multiaddr, 0, len(mAddrsStr))
 		for _, element := range mAddrsStr {
 			mAddr, err := ma.NewMultiaddr(element)
 			if err != nil {
@@ -354,7 +354,6 @@ func (c *DBClient) GetNonDeprecatedPeers() ([]*peerstore.PersistablePeer, error)
 			}
 			maddrs = append(maddrs, mAddr)
 		}
-
 		// create the persistable instance
 		persistable := peerstore.NewPersistable(
 			peerID,

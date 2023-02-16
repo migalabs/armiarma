@@ -33,7 +33,7 @@ func main() {
 
 	app := &cli.App{
 		Name:      "armiarma",
-		Usage:     "Distributed libp2p crawler that monitors, measures, and exposes information about libp2p p2p networks.",
+		Usage:     "Distributed libp2p crawler that monitors, measures, and exposes the gathered information about libp2p network's overlays.",
 		UsageText: "armiarma [commands] [arguments...]",
 		Authors: []*cli.Author{
 			{

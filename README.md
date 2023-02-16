@@ -16,10 +16,10 @@ The project offers a network crawler able to monitor the Eth2 p2p network.
 To use the tool, the following requirements need to be installed in the machine:
 - git
 - gcc - C compiler
-- [go](https://go.dev/doc/install) on its 1.17 version or above. Go needs to be executable from the terminal. Lower versions will report a dependency import error for the package `io/fs`.
+- [go](https://go.dev/doc/install) on its 1.17 version (upper versions might fail to compile, we are working on it). Go needs to be executable from the terminal. Lower versions will report a dependency import error for the package `io/fs`.
 - PostgreSQL DB 
-- Docker version 20.10.17 (tested and working)
-- Docker-Compose 1.29.2 (tested and working)
+- Docker version
+- Docker-Compose 
 
 
 Alternatively, the tool can also be executed from:
@@ -39,10 +39,11 @@ To run the tool from the source code, follow these steps:
 git clone https://github.com/migalabs/armiarma.git && cd armiarma
 
 # Compile the tool generating the armiarma binary
-go build -o armiarma
+make dependencies
+make build
 
 # Ready to call the tool
-./armiarma [options] [FLAGS]
+./build/armiarma [options] [FLAGS]
 
 ```
 
@@ -51,17 +52,11 @@ At the moment, the tool only offers a single command for the crawler. Check the 
 ```
 
 EXECUTION:
-    ./armiarma [OPTIONS] [FLAGS]
+    ./build/armiarma [OPTIONS] [FLAGS]
 
 OPTIONS:
-    eth2   to launch the crawler on the given eth2 network (mainnet, subnets, gnosis, ... all by setting the eth2 parameters in the <eth2-config-file>)     
-	
-    ipfs   to launch the crawler on any ipfs-based network (ipfs, filecoin, ... all by setting the eth2 prameters in the <ipfs-config-file>)
-
-FLAGS
-    --config-file   Load the configuration from the file into the executable.
-                    Find a config.json example in ./config-files/eth2-config.json or ./config-files/ipfs-config.json
-
+    eth2     crawl the given Ethereum CL network (selected by fork_digest)
+    help, h  Shows a list of commands or help for one command
 ```
 ## Docker installation
 We also provide a Dockerfile and Docker-Compose file that can be used to run the crawler without having to compile it manually. The docker-compose file spaws the following docker images:
@@ -94,7 +89,7 @@ docker-compose up
 
 ```
 Docker-compose will generate the Docker images for you and will run the crawler and its requirements in your machine. 
-Please note that, by running the tool through the `docker-compose up` command, the default config-file will serve as reference `config-files/eth2-config.json` for the tools' configuration.
+Please note that, by running the tool through the `docker-compose up` command.
 
 Remember that all these default configurations could be modified from the `docker-compose.yaml` file. 
 
@@ -103,50 +98,39 @@ NOTE: you might need to run `docker-compose up` with `sudo` privileges if the Li
 ### Supported networks
 Currently supported protocols:
 ```
-Ethereum 2      Different networks or forks can be crawled by defining the 'ForkDigest' in the 'config.json' file  
-Gnosis          Gnosis fork from the Eth2 Network. Add '56fdb5e0' Gnosis ForkDigest in 'config.file' to discover and crawl the network.
-
-IPFS		The crawler can directly join and discover the IPFS network, as any other Kademlia-DHT based network  
-Filecoin	
+Ethereum CL      Different networks or forks can be crawled by defining the 'ForkDigest' in the --fork-digest flag  
 ```
 
 ### Custom configuration of the tool
-The crawler, by default, reads the configuration file located in `config-files/config.json`. The file contains several fields that can be customized anytime before the launch of the crawler. The fields correspond to the following features:
+The crawler has several fields that can be customized anytime before the launch of the crawler. The fields correspond to the following flags:
 
-Eth2-based networks
 ```
-IP:             IP that wants to be assigned to the crawler (default = "0.0.0.0") 
-TcpPort:        Port that will be used to establish TCP connections (default = 9020)
-UdpPort:        Port that will be used to establish UDP connections (default = 9020)
-TopicArray:     List of GossipSub topics that the tool will be subscribed to. Leave empty [] to get default ones (Eth2 topics)
-Network:        Name of the Eth2 Network that the crawler will join (default = "mainnet")
-DBEndpoint:     Psql endpoint with the credentials and DB name information. (Example: 'postgresql://user:password@localhost:5432/dbname')
-Eth2Endpoint:   Endpoint to an Eth2 beacon node such as Infura. Used to dynamically calculate the fork-digest of the Eth2 mainnet (default = "" since default fork-digest = Eth2 Altair)
-ForkDigest:     4 byte hexadecimal code of the Network's ForkDigest (default = "afcaaba0")
-UserAgent:      Name that will identify the crawler in the joined network (default = "bsc-crawler")
-LogLevel:       Level of logs that will be printed in the terminal ("trace", "debug", "info", "warn", "error") (default = "info")
-PrivateKey:     hexadecimal encoded libp2p privkey that will be used to create a peerID for the crawler in the network (will generate a new one by default, can be copy-pasted from the printed one in the terminal)
-BootNodesFile:  List of boot-nodes that will be used for the peer discovery service (recommended = "./src/discovery/official-eth2-bootnodes.json")
-```
+USAGE:
+   ./build/armiarma eth2 [options...]
 
-IPFS-based networks
-```
-IP:             IP that wants to be assigned to the crawler (default = "0.0.0.0") 
-TcpPort:        Port that will be used to establish TCP connections (default = 9020)
-UdpPort:        Port that will be used to establish UDP connections (default = 9020)
-TopicArray:     List of GossipSub topics that the tool will be subscribed to. Leave empty [] to get default ones (Eth2 topics)
-Network:        Name of the Eth2 Network that the crawler will join (default = "mainnet")
-DBEndpoint:     Psql endpoint with the credentials and DB name information. (Example: 'postgresql://user:password@localhost:5432/dbname')
-UserAgent:      Name that will identify the crawler in the joined network (default = "bsc-crawler")
-LogLevel:       Level of logs that will be printed in the terminal ("trace", "debug", "info", "warn", "error") (default = "info")
-PrivateKey:     hexadecimal encoded libp2p privkey that will be used to create a peerID for the crawler in the network (will generate a new one by default, can be copy-pasted from the printed one in the terminal)
-BootNodesFile:  List of boot-nodes that will be used for the peer discovery service (recommended = "./src/discovery/official-eth2-bootnodes.json")
+OPTIONS:
+   --log-level value           Verbosity level for the Crawler's logs (default: info) [$ARMIARMA_LOG_LEVEL]
+   --priv-key value            String representation of the PrivateKey to be used by the crawler [$ARMIARMA_PRIV_KEY]
+   --ip value                  IP in the machine that we want to asign to the crawler (default: 0.0.0.0) [$ARMIARMA_IP]
+   --port value                TCP and UDP port that the crawler with advertise to establish connections (default: 9020) [$ARMIARMA_PORT]
+   --user-agent value          Agent name that will identify the crawler in the network (default: Armiarma Crawler) [$ARMIARMA_USER_AGENT]
+   --psql-endpoint value       PSQL enpoint where the crwaler will submit the all the gathered info (default: postgres://user:password@ip:port/database) [$ARMIARMA_PSQL]
+   --peers-backup value        Time interval that will be use to backup the peer_ids into a single table - allowing to recontruct the network in past-crawled times (default: 12h) [$ARMIARMA_BACKUP_INTERVAL]
+   --gossip-topic value        List of gossipsub topics that the crawler will subscribe to [$ARMIARMA_GOSSIP_TOPICS]
+   --remote-cl-endpoint value  Remote Ethereum Consensus Layer Client to request metadata (experimental) [$ARMIARMA_REMOTE_CL_ENDPOINT]
+   --fork-digest value         Fork Digest of the Ethereum Consensus Layer network that we want to crawl (default: 0x4a26c58b) [$ARMIARMA_FORK_DIGEST]
+   --bootnode value            List of boondes that the crawler will use to discover more peers in the network (One --bootnode <bootnode> per bootnode) [$ARMIARMA_BOOTNODES]
+   --local-peerstore value     Path to the local folder that the crawler will use to register the Addrs-Book of discovered peers (default: ./.peerstore) [$ARMIARMA_LOCAL_PEERSTORE]
+   --subnet value              List of subnets (gossipsub topics) that we want to subscribe the crawler to (One --subnet <subnet_id> per subnet) [$ARMIARMA_SUBNETS]
+   --val-pubkeys value         Path of the file that has the pubkeys of those validators that we want to track (experimental) [$ARMIARMA_VAL_PUBKEYS]
+   --help, -h                  show help (default: false)
+
 ```
 
 ## Data visualization
 The combination of Prometheus and Grafana is the one that we have chosen to display the network data. In the repository, both configuration files are provided. In addition, the crawler, by default, exports all the metrics to Prometheus in port 9080. 
 
-The results of our analysis are also openly available on our website [migalabs.es](https://migalabs.es/crawler/dashboard).
+The results of our analysis are also openly available on our website [migalabs.es](https://migalabs.es/beaconnodes).
 
 ## Contact
 To get in contact with us, feel free to reach us through our [email](migalabs@protonmail.com), and don't forget to follow our latest news on [Twitter](https://twitter.com/miga_labs). 
@@ -154,6 +138,8 @@ To get in contact with us, feel free to reach us through our [email](migalabs@pr
 ## Notes
 Please, note that the tool is currently in a developing stage. Any bugs report and/or suggestions are very welcome.
 
+## Maintainer
+@cortze
 
 ## License
 MIT, see [LICENSE](https://github.com/Cortze/armiarma/blob/master/LICENSE) file.

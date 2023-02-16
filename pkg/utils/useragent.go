@@ -121,10 +121,9 @@ func ParseClientType(network NetworkType, userAgent string) (cliName string, cli
 		// stract the version from the user
 		var version string
 		switch client {
-		case Prysm, Lighthouse, Lodestar, Grandine, Nimbus, Cortex, Trinity:
+		case Prysm, Lighthouse, Lodestar, Grandine, Nimbus, Cortex, Trinity, Erigon:
 			version = cleanVersion(getVersionIfAny(splUserAgent, 1))
 		case Teku:
-			// teku
 			version = cleanVersion(getVersionIfAny(splUserAgent, 2))
 
 		default:

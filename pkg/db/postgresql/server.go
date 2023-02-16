@@ -28,7 +28,8 @@ var (
 
 type DBClient struct {
 	// Control Variables
-	ctx context.Context
+	ctx                 context.Context
+	dailyBackupInterval time.Duration
 
 	// Network that we are Crawling
 	Network utils.NetworkType
@@ -47,6 +48,7 @@ func NewDBClient(
 	ctx context.Context,
 	p2pNetwork utils.NetworkType,
 	loginStr string,
+	dailyBackupInt time.Duration,
 	initialized bool) (*DBClient, error) {
 	// check if the login string has enough len
 	if len(loginStr) == 0 {
@@ -88,13 +90,14 @@ func NewDBClient(
 
 	// compose the DBClient
 	dbClient := &DBClient{
-		ctx:      ctx,
-		Network:  p2pNetwork,
-		loginStr: loginStr,
-		psqlPool: psqlPool,
-		persistC: persistC,
-		doneC:    make(chan struct{}),
-		wg:       &wg,
+		ctx:                 ctx,
+		dailyBackupInterval: dailyBackupInt,
+		Network:             p2pNetwork,
+		loginStr:            loginStr,
+		psqlPool:            psqlPool,
+		persistC:            persistC,
+		doneC:               make(chan struct{}),
+		wg:                  &wg,
 	}
 
 	// initialize all the tables
@@ -133,6 +136,12 @@ func (c *DBClient) initTables() error {
 	err = c.InitIpTable()
 	if err != nil {
 		return errors.Wrap(err, "initializing ips table")
+	}
+
+	// active peers' backup
+	err = c.InitActivePeersTable()
+	if err != nil {
+		return errors.Wrap(err, "initializing active_peers backup")
 	}
 
 	switch c.Network {
@@ -316,6 +325,25 @@ func (c *DBClient) launchPersister() {
 			}
 		}
 	}()
+
+	// launch the daily backup heartbeat
+	go c.dailyBackupheartbeat()
+}
+
+func (c *DBClient) dailyBackupheartbeat() {
+	ticker := time.NewTicker(c.dailyBackupInterval)
+	for {
+		select {
+		case <-ticker.C:
+			err := c.activePeersBackup()
+			if err != nil {
+				log.Error(err)
+			}
+		case <-c.ctx.Done():
+			return
+		}
+	}
+
 }
 
 func (c *DBClient) Close() {
@@ -323,6 +351,10 @@ func (c *DBClient) Close() {
 	c.doneC <- struct{}{}
 	c.wg.Wait()
 
+	err := c.activePeersBackup()
+	if err != nil {
+		log.Error(err)
+	}
 	// close safelly the connection with PSQL
 	c.psqlPool.Close()
 
