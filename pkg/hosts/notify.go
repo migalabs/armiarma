@@ -122,7 +122,7 @@ func (c *BasicLibp2pHost) standardConnectF(net network.Network, conn network.Con
 				"ERROR": metadataErr.Error(),
 			}).Debug("ReqMetadata Peer: ", conn.RemotePeer().String())
 		} else {
-			log.Debug("peer metadata req, succeed")
+			log.Debug("peer metadata req, succeed", bMetadata)
 			hInfo.AddAtt("beaconmetadata", eth.NewBeaconMetadata(conn.RemotePeer(), bMetadata))
 		}
 	default:

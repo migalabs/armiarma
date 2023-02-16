@@ -39,16 +39,11 @@ func (en *LocalEthereumNode) ReqBeaconMetadata(
 	}
 	attnets.UnmarshalText(bytes)
 
-	ourMetadata := &common.MetaData{
-		SeqNumber: common.SeqNr(1),
-		Attnets:   *attnets,
-	}
-
 	// Generate the Server Error Code
 	var resCode reqresp.ResponseCode // error by default
 	// record the error into the error channel
 	err = methods.MetaDataRPCv1.RunRequest(ctx, h.NewStream, peerID, new(reqresp.SnappyCompression),
-		reqresp.RequestSSZInput{Obj: ourMetadata}, 1,
+		reqresp.RequestSSZInput{Obj: nil}, 1,
 		func() error {
 			return nil
 		},
@@ -91,8 +86,6 @@ func (en *LocalEthereumNode) ServeBeaconMetadata(h host.Host) {
 				if err := handler.WriteResponseChunk(reqresp.SuccessCode, &en.LocalMetadata); err != nil {
 					log.Tracef("failed to respond to metadata request: %v", err)
 				} else {
-					// update if possible out status
-					//en.UpdateStatus(reqStatus)
 					log.Tracef("handled metadata request")
 				}
 			}

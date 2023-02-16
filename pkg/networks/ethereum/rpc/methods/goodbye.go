@@ -6,7 +6,7 @@ import (
 )
 
 var GoodbyeRPCv1 = reqresp.RPCMethod{
-	Protocol:                  "/eth2/beacon_chain/req/goodbye/1/ssz_snappy",
+	Protocol:                  "/eth2/beacon_chain/req/goodbye/1/ssz",
 	RequestCodec:              reqresp.NewSSZCodec(func() reqresp.SerDes { return new(common.Goodbye) }, 8, 8),
 	ResponseChunkCodec:        reqresp.NewSSZCodec(func() reqresp.SerDes { return new(common.Goodbye) }, 8, 8),
 	DefaultResponseChunkCount: 0,
