@@ -47,7 +47,7 @@ type PruningStrategy struct {
 	identEventNot  chan hosts.IdentificationEvent
 
 	// List of peers sorted by the amount of time thatwe have to wait
-	PeerQueue PeerQueue
+	PeerQueue *PeerQueue
 
 	// Prometheus Control Variables
 	lastIterTime             time.Duration
@@ -80,7 +80,6 @@ func NewPruningStrategy(
 		connAttemptNot: make(chan *models.ConnectionAttempt),
 		connEventNot:   make(chan *models.EventTrace),
 		identEventNot:  make(chan hosts.IdentificationEvent),
-		// Metrics Variables
 	}, nil
 }
 
@@ -108,7 +107,6 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 		"mod": "prun-strgy-itr",
 	})
 	logEntry.Debug("init")
-	c.PeerQueueIterations = 0
 
 	// get the peer list from the peerstore
 	err := c.PeerQueue.UpdatePeerListFromRemoteDB(c.DBClient, c.Peerstore)
@@ -145,13 +143,12 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 				}
 
 				// check if the node is ready for connection
-				// or we are in the first iteration, then we always try all of them
-				if nextPeer.IsReadyForConnection() || c.PeerQueueIterations == 0 {
+				if nextPeer.IsReadyForConnection() {
 					pinfo, ok := c.Peerstore.LoadPeer(nextPeer.PeerID)
 					if !ok {
-						log.Debug("peer not in the local peerstore, fetching it from PSQL")
+						log.Warn("peer not in the local peerstore, fetching it from PSQL")
 						// Really unlikely to happen but try to retrieve the peer info from the DB
-						pinfo, err = c.DBClient.GetPersistable(peer.ID(nextPeer.PeerID))
+						pinfo, err = c.DBClient.GetPersistable(nextPeer.PeerID)
 						if err != nil {
 							log.Warn(err)
 							peerCounter++
@@ -162,9 +159,6 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 					// Send next peer to the peering service
 					logEntry.Tracef("pushing next peer %s into peer stream", pinfo.ID)
 
-					v, _ := c.ErrorAttemptDistribution.Load(nextPeer.DelayObj.GetType())
-					val := v.(int)
-					c.ErrorAttemptDistribution.Store(nextPeer.DelayObj.GetType(), val+1)
 					// we need to send the hInfo of the peer - compose it from the persistable peer
 					hInfo := models.NewHostInfo(
 						pinfo.ID,
@@ -208,12 +202,12 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 
 				// get the peer list from the peerstore
 				err := c.PeerQueue.UpdatePeerListFromRemoteDB(c.DBClient, c.Peerstore)
-				c.PeerQueueIterations++ // another iteration
 				if err != nil {
 					log.Error(err)
 				}
 
 				logEntry.Debugf("got new peer list with %d", c.PeerQueue.Len())
+				c.PeerQueueIterations++ // another iteration
 				validIterTimer = time.NewTimer(MinIterTime)
 				iterStartTime = time.Now()
 				peerCounter = 0
@@ -247,14 +241,14 @@ func (c *PruningStrategy) eventRecorderRoutine() {
 		select {
 		// Receive the status of the peer that got connected to the crawler
 		case connAttempt := <-c.connAttemptNot:
-			logEntry.Tracef("new connection attempt has been received from peer %s", connAttempt.RemotePeer)
+			logEntry.Tracef("new connection attempt has been received from peer %s", connAttempt.RemotePeer.String())
 			// update the local info about the peer
 			p, ok := c.PeerQueue.GetPeer(connAttempt.RemotePeer.String())
 			if !ok {
-				logEntry.Warnf("Could not find peer in peerqueue: %s - probably deprecated", connAttempt.RemotePeer)
+				logEntry.Debugf("Could not find peer in peerqueue: %s - probably deprecated", connAttempt.RemotePeer).String()
 				// check if the connectionwas successful or not
 				if connAttempt.Status == models.NegativeAttempt {
-					log.Warn("we received a negative attempt of connection to %s - that was probably deprecated")
+					log.Debugf("we received a negative attempt of connection to %s - that was probably deprecated", connAttempt.RemotePeer.String())
 					continue
 				} else {
 					// create a new instance of a Pruned peer
@@ -406,8 +400,8 @@ func (c *PeerQueue) DelayDistribution() map[string]int {
 }
 
 // NewPeerQueue is the constructor of a NewPeerQueue
-func NewPeerQueue() PeerQueue {
-	return PeerQueue{
+func NewPeerQueue() *PeerQueue {
+	return &PeerQueue{
 		PeerList:              make([]*PrunedPeer, 0),
 		PeerMap:               make(map[string]*PrunedPeer),
 		queueErroDistribution: make(map[string]int),
@@ -527,10 +521,12 @@ func (c *PeerQueue) UpdatePeerListFromRemoteDB(dbClient *psql.DBClient, localPee
 	for _, persisPeer := range peerList {
 		totcnt++
 		if !c.IsPeerAlready(persisPeer.ID.String()) {
+			log.Tracef("peer %s not locally", persisPeer.ID.String())
 			// Peer was not in the list of peers
 			pInfo, ok := localPeerstore.LoadPeer(persisPeer.ID.String())
 			if !ok {
-				// add it locally
+				// add it local
+				log.Tracef("peer %s not in peerstore neither, storing it", persisPeer.ID.String())
 				localPeerstore.StorePeer(*persisPeer)
 			}
 			new++
