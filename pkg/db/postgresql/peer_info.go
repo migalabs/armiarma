@@ -233,8 +233,8 @@ func (c *DBClient) GetFullHostInfo(pID peer.ID) (*models.HostInfo, error) {
 	return hInfo, nil
 }
 
-func (c *DBClient) GetPersistable(pID peer.ID) (peerstore.PersistablePeer, error) {
-	log.Tracef("reading persistable info for peer %s", pID.String())
+func (c *DBClient) GetPersistable(pID string) (peerstore.PersistablePeer, error) {
+	log.Tracef("reading persistable info for peer %s", pID)
 
 	var maddresses []string
 	var network utils.NetworkType
@@ -246,7 +246,7 @@ func (c *DBClient) GetPersistable(pID peer.ID) (peerstore.PersistablePeer, error
 			multi_addrs
 		FROM peer_info
 		WHERE peer_id=$1;
-	`, pID.String()).Scan(
+	`, pID).Scan(
 		&network,
 		&maddresses,
 	)
@@ -266,8 +266,13 @@ func (c *DBClient) GetPersistable(pID peer.ID) (peerstore.PersistablePeer, error
 		mAddrs = append(mAddrs, mAddr)
 	}
 
+	peerID, err := peer.Decode(pID)
+	if err != nil {
+		return peerstore.PersistablePeer{}, err
+	}
+
 	persistable := peerstore.NewPersistable(
-		pID,
+		peerID,
 		mAddrs,
 		network,
 	)

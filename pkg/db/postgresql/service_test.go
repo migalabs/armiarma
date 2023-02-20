@@ -46,7 +46,7 @@ func TestNewService(t *testing.T) {
 	// Wait at least 3 secs to persist
 	time.Sleep(5 * time.Second)
 
-	persistable, err := dbClient.GetPersistable(hInfo.ID)
+	persistable, err := dbClient.GetPersistable(hInfo.ID.String())
 	require.NoError(t, err)
 	require.Equal(t, persistable.ID, hInfo.ID)
 	require.Equal(t, persistable.Network, hInfo.Network)

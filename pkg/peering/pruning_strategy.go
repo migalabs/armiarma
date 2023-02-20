@@ -245,7 +245,7 @@ func (c *PruningStrategy) eventRecorderRoutine() {
 			// update the local info about the peer
 			p, ok := c.PeerQueue.GetPeer(connAttempt.RemotePeer.String())
 			if !ok {
-				logEntry.Debugf("Could not find peer in peerqueue: %s - probably deprecated", connAttempt.RemotePeer).String()
+				logEntry.Debugf("Could not find peer in peerqueue: %s - probably deprecated", connAttempt.RemotePeer.String())
 				// check if the connectionwas successful or not
 				if connAttempt.Status == models.NegativeAttempt {
 					log.Debugf("we received a negative attempt of connection to %s - that was probably deprecated", connAttempt.RemotePeer.String())
