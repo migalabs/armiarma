@@ -24,14 +24,12 @@ func NewMetricsModule(
 	return module
 }
 
-//
 func (m *MetricsModule) AddIndvMetric(indvMetric *IndvMetrics) error {
 	m.IndvMetrics = append(m.IndvMetrics, indvMetric)
 	return nil
 }
 
 func (m *MetricsModule) Init() error {
-	log.Debug("ini")
 	for _, metric := range m.IndvMetrics {
 		err := metric.Init()
 		if err != nil {

@@ -80,12 +80,6 @@ var Eth2CrawlerCommand = &cli.Command{
 			Usage:   "List of boondes that the crawler will use to discover more peers in the network (One --bootnode <bootnode> per bootnode)",
 			EnvVars: []string{"ARMIARMA_BOOTNODES"},
 		},
-		&cli.StringFlag{
-			Name:        "local-peerstore",
-			Usage:       "Path to the local folder that the crawler will use to register the Addrs-Book of discovered peers",
-			EnvVars:     []string{"ARMIARMA_LOCAL_PEERSTORE"},
-			DefaultText: config.DefaultLocalPeerstorePath,
-		},
 		&cli.StringSliceFlag{
 			Name:        "gossip-topic",
 			Usage:       "List of gossipsub topics that the crawler will subscribe to",

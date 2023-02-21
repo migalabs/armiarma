@@ -19,9 +19,6 @@ var (
 	DefaultPSQLEndpoint              string = "postgres://user:password@ip:port/database"
 	DefaultActivePeersBackupInterval string = "12h"
 
-	// Metrics
-	DefaultLocalPeerstorePath string = "./.peerstore"
-
 	// ETH2
 	DefaultEth2Network string = "mainnet"
 

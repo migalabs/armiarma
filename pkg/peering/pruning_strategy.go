@@ -4,11 +4,9 @@ import (
 	"context"
 	"sort"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/migalabs/armiarma/pkg/db/models"
-	"github.com/migalabs/armiarma/pkg/db/peerstore"
 	psql "github.com/migalabs/armiarma/pkg/db/postgresql"
 	"github.com/migalabs/armiarma/pkg/hosts"
 	"github.com/migalabs/armiarma/pkg/utils"
@@ -16,6 +14,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/libp2p/go-libp2p-core/peer"
+	ma "github.com/multiformats/go-multiaddr"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -25,7 +24,8 @@ var (
 	StartExpD       = 2 * time.Minute // Starting delay that will serve for the Exponential Delay.
 	// Control variables
 	MinIterTime = 5 * time.Second // Minimum time that has to pass before iterating again.
-
+	//
+	PruneStrategy = "pruning"
 )
 
 // Pruning Strategy is a Peering Strategy that applies penalties to peers that haven't shown activity when attempting to connect them.
@@ -33,10 +33,8 @@ var (
 type PruningStrategy struct {
 	ctx context.Context
 
-	network      utils.NetworkType
-	strategyType string
-	Peerstore    *peerstore.Peerstore
-	DBClient     *psql.DBClient
+	network  utils.NetworkType
+	DBClient *psql.DBClient
 
 	// Peer Stream and Return ConnectionStatus channels (communication between modules)
 	// both empty by default (need for initialization)
@@ -50,11 +48,9 @@ type PruningStrategy struct {
 	PeerQueue *PeerQueue
 
 	// Prometheus Control Variables
-	lastIterTime             time.Duration
-	iterForcingNextConnTime  time.Time
-	attemptedPeers           int64
-	PeerQueueIterations      int
-	ErrorAttemptDistribution sync.Map
+	m              sync.RWMutex
+	lastIterTime   time.Duration
+	attemptedPeers map[Delay]int64
 }
 
 // NewPruningStrategy is a constructor that will offer a models.Peer stream for the
@@ -62,30 +58,25 @@ type PruningStrategy struct {
 func NewPruningStrategy(
 	ctx context.Context,
 	network utils.NetworkType,
-	localPeerstorePath string,
 	dbClient *psql.DBClient) (*PruningStrategy, error) {
-
-	// generate a local peerstore for addrBook
-	pstore := peerstore.NewPeerstore(localPeerstorePath)
 
 	return &PruningStrategy{
 		ctx:            ctx,
 		network:        network,
-		strategyType:   "pruning",
-		Peerstore:      pstore,
 		DBClient:       dbClient,
-		PeerQueue:      NewPeerQueue(),
+		PeerQueue:      NewPeerQueue(dbClient),
 		peerStreamChan: make(chan *models.HostInfo, DefaultWorkers),
 		nextPeerChan:   make(chan struct{}, DefaultWorkers),
 		connAttemptNot: make(chan *models.ConnectionAttempt),
 		connEventNot:   make(chan *models.EventTrace),
 		identEventNot:  make(chan hosts.IdentificationEvent),
+		attemptedPeers: make(map[Delay]int64, 0),
 	}, nil
 }
 
 // Type returns the strategy type that has been set.
 func (c PruningStrategy) Type() string {
-	return c.strategyType
+	return PruneStrategy
 }
 
 // Run initializes the models.Peer stream on the returning models.Peer chan
@@ -99,6 +90,20 @@ func (c *PruningStrategy) Run() chan *models.HostInfo {
 	return c.peerStreamChan
 }
 
+// ResetMapValues iterates over a string int map and resets all values to 0.
+func (c *PruningStrategy) composeDelayDistFromAttemptedPeers(prunedPeers map[peer.ID]*PrunedPeer) {
+	c.m.Lock()
+	defer c.m.Unlock()
+
+	for _, pPeer := range prunedPeers {
+		_, ok := c.attemptedPeers[pPeer.delayObj.dtype]
+		if !ok {
+			c.attemptedPeers[pPeer.delayObj.dtype] = int64(0)
+		}
+		c.attemptedPeers[pPeer.delayObj.dtype]++
+	}
+}
+
 // peerstoreIterator private function that is in charge of iterating through the peerstore,
 // receive connections/disconnections, and fetch info comming from the peering service into the db.
 // Main interaction of the Peering Service with the DB.
@@ -109,109 +114,91 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 	logEntry.Debug("init")
 
 	// get the peer list from the peerstore
-	err := c.PeerQueue.UpdatePeerListFromRemoteDB(c.DBClient, c.Peerstore)
+	err := c.PeerQueue.UpdatePeerListFromRemoteDB()
 	if err != nil {
 		log.Error(err)
 	}
 
-	c.ErrorAttemptDistribution.Store(PositiveDelayType, 0)
-	c.ErrorAttemptDistribution.Store(NegativeWithHopeDelayType, 0)
-	c.ErrorAttemptDistribution.Store(NegativeWithNoHopeDelayType, 0)
-	c.ErrorAttemptDistribution.Store(Minus1DelayType, 0)
-	c.ErrorAttemptDistribution.Store(ZeroDelayType, 0)
-	c.ErrorAttemptDistribution.Store(TimeoutDelayType, 0)
-
-	peerCounter := 0
 	validIterTimer := time.NewTimer(MinIterTime)
 	iterStartTime := time.Now()
-	nextIterFlag := false
-	lastAttemptedPeer := PrunedPeer{}
+	callForPeer := false
+	attemptedPeers := make(map[peer.ID]*PrunedPeer)
+
 	for {
 		select {
 		// Receive the notification of sending the next peer
 		case <-c.nextPeerChan:
-			if c.PeerQueue.Len() > 0 && peerCounter < c.PeerQueue.Len() {
+			// check is the PeerQueue is not empty and if the next peer is valid
+			if !c.PeerQueue.IsEmpty() && c.PeerQueue.ValidNextPeer() {
 				logEntry.Trace("prepare next peer for pushing it into peer stream")
 				// read info about next peer
-				nextPeer := c.PeerQueue.PeerList[peerCounter]
+				nextPeer := c.PeerQueue.GetNextPeer()
 
-				// check if the next peer is the extact same one as the previous one
-				if nextPeer.PeerID == lastAttemptedPeer.PeerID {
-					peerCounter++
-					c.NextPeer()
+				// double check that we didn't attempt the peer in the same iteration
+				_, ok := attemptedPeers[nextPeer.iD]
+				if ok {
+					log.Warnf("we already attempted to connect peer %s in the same iteration", nextPeer.iD.String())
+					callForPeer = true
 					goto pointerCheck
 				}
 
-				// check if the node is ready for connection
-				if nextPeer.IsReadyForConnection() {
-					pinfo, ok := c.Peerstore.LoadPeer(nextPeer.PeerID)
-					if !ok {
-						log.Warn("peer not in the local peerstore, fetching it from PSQL")
-						// Really unlikely to happen but try to retrieve the peer info from the DB
-						pinfo, err = c.DBClient.GetPersistable(nextPeer.PeerID)
-						if err != nil {
-							log.Warn(err)
-							peerCounter++
-							c.NextPeer()
-							goto pointerCheck
-						}
-					}
-					// Send next peer to the peering service
-					logEntry.Tracef("pushing next peer %s into peer stream", pinfo.ID)
+				// add peer to the list of peers attempted in the last iter
+				attemptedPeers[nextPeer.iD] = nextPeer
 
-					// we need to send the hInfo of the peer - compose it from the persistable peer
-					hInfo := models.NewHostInfo(
-						pinfo.ID,
-						pinfo.Network,
-						models.WithMultiaddress(pinfo.Addrs),
-					)
-					// increment peerCounter to see if we finished iterating the peerstore
-					peerCounter++
+				// we need to send the hInfo of the peer - compose it from the persistable peer
+				hInfo := models.NewHostInfo(
+					nextPeer.iD,
+					nextPeer.network,
+					models.WithMultiaddress(nextPeer.addr),
+				)
 
-					// update the last attempted peer
-					lastAttemptedPeer = *nextPeer
+				// Send next peer to the peering service
+				logEntry.Tracef("pushing next peer %s into peer stream", nextPeer.iD.String())
+				c.peerStreamChan <- hInfo
 
-					c.peerStreamChan <- hInfo
-
-				} else {
-					logEntry.Trace("next peers has to wait to be connected")
-					c.iterForcingNextConnTime = nextPeer.NextConnection()
-
-					c.NextPeer()
-					nextIterFlag = true
-				}
 			} else {
-				logEntry.Warn("empty peerstore or pointer exceeded")
-				// Recreate the call of the nextPeer that the iterator just used
-				c.NextPeer()
+				// check the cause of the failure:
+				if c.PeerQueue.IsEmpty() {
+					logEntry.Warn("forcing peerstore update because it's empty - len=", c.PeerQueue.Len())
 
-			}
-		pointerCheck:
-			if nextIterFlag || peerCounter >= c.PeerQueue.Len() {
+				}
+				// check the cause of the failure:
+				if c.PeerQueue.ValidNextPeer() {
+					logEntry.Warn("forcing peerstore update because next peer is not ready to be connected")
+				}
 				// time to update the PeerList
 				c.lastIterTime = time.Since(iterStartTime)
-				atomic.StoreInt64(&c.attemptedPeers, int64(peerCounter))
-				logEntry.Debug("peerstore iteration of ", peerCounter, " peers, done in ", c.lastIterTime)
-				logEntry.Debug("missing ", c.PeerQueue.Len()-peerCounter, " peers waiting for next try")
+				logEntry.Debug("peerstore iteration of ", len(c.attemptedPeers), " peers, done in ", c.lastIterTime)
 
 				// check if the minIterTime has been
 				<-validIterTimer.C
 
-				// reset values
-				c.ErrorAttemptDistribution = ResetMapValues(c.ErrorAttemptDistribution)
+				// save attempted peers' values and reset the map
+				c.composeDelayDistFromAttemptedPeers(attemptedPeers)
+				attemptedPeers = make(map[peer.ID]*PrunedPeer)
+
+				// reset the pointer
+				c.PeerQueue.ResetPeerPointer()
 
 				// get the peer list from the peerstore
-				err := c.PeerQueue.UpdatePeerListFromRemoteDB(c.DBClient, c.Peerstore)
+				err := c.PeerQueue.UpdatePeerListFromRemoteDB()
 				if err != nil {
 					log.Error(err)
 				}
 
 				logEntry.Debugf("got new peer list with %d", c.PeerQueue.Len())
-				c.PeerQueueIterations++ // another iteration
 				validIterTimer = time.NewTimer(MinIterTime)
 				iterStartTime = time.Now()
-				peerCounter = 0
-				nextIterFlag = false
+
+				// Recreate the call of the nextPeer that the iterator just used
+				callForPeer = true
+			}
+
+		pointerCheck:
+			// check if we need to call for a new Peer
+			if callForPeer {
+				c.NextPeer()
+				callForPeer = false
 			}
 
 		// detect if the context has been shut down to end the go routine
@@ -243,29 +230,25 @@ func (c *PruningStrategy) eventRecorderRoutine() {
 		case connAttempt := <-c.connAttemptNot:
 			logEntry.Tracef("new connection attempt has been received from peer %s", connAttempt.RemotePeer.String())
 			// update the local info about the peer
-			p, ok := c.PeerQueue.GetPeer(connAttempt.RemotePeer.String())
+			p, ok := c.PeerQueue.GetPeer(connAttempt.RemotePeer)
 			if !ok {
-				logEntry.Debugf("Could not find peer in peerqueue: %s - probably deprecated", connAttempt.RemotePeer.String())
 				// check if the connectionwas successful or not
 				if connAttempt.Status == models.NegativeAttempt {
 					log.Debugf("we received a negative attempt of connection to %s - that was probably deprecated", connAttempt.RemotePeer.String())
-					continue
 				} else {
-					// create a new instance of a Pruned peer
-					p = NewPrunedPeer(connAttempt.RemotePeer.String(), PositiveDelayType)
+					log.Debugf("we received a possitive attempt of connection to %s - but was probably deprecated", connAttempt.RemotePeer.String())
+				}
+			} else {
+				p.ConnEventHandler(connAttempt.Error)
+				// Check if peer needs to be deprecated
+				if p.Deprecable() {
+					logEntry.Warnf("deprecating peer %s", connAttempt.RemotePeer.String())
+					connAttempt.Deprecable = true
+					// remove p from list of peers to ping (if it appears again in the discovery, it will be updated as undeprecated in the DB)
+					c.PeerQueue.RemovePeer(connAttempt.RemotePeer)
+					c.DBClient.PersistToDB(connAttempt)
 				}
 			}
-			p.ConnEventHandler(connAttempt.Error)
-			// Check if peer needs to be deprecated
-			if p.Deprecable() {
-				logEntry.Warnf("deprecating peer %s", connAttempt.RemotePeer.String())
-				connAttempt.Deprecable = true
-				// remove p from list of peers to ping (if it appears again in the discovery, it will be updated as undeprecated in the DB)
-				c.PeerQueue.RemovePeer(connAttempt.RemotePeer.String())
-				c.Peerstore.DeletePeer(connAttempt.RemotePeer.String())
-			}
-
-			c.DBClient.PersistToDB(connAttempt)
 
 		// Receive a notification of a connection event
 		case eventTrace := <-c.connEventNot:
@@ -295,28 +278,7 @@ func (c *PruningStrategy) eventRecorderRoutine() {
 			}
 
 		case identEvent := <-c.identEventNot:
-			// We received a new identification attempt
-			// extract whether it was success or a failure
-			// and track it in the PeerQueue and in the peerstore
 			logEntry.Debugf("new identification from peer %s", identEvent.HostInfo.ID.String())
-
-			// by default we think the identify was not successful, therefore negativewithhope and error
-			var delayType string = NegativeWithHopeDelayType
-
-			if identEvent.HostInfo.IsHostIdentified() {
-				delayType = PositiveDelayType
-			}
-
-			var p *PrunedPeer
-			p, ok := c.PeerQueue.GetPeer(identEvent.HostInfo.ID.String())
-			if !ok {
-				p = NewPrunedPeer(identEvent.HostInfo.ID.String(), delayType)
-				c.PeerQueue.AddPeer(p)
-			}
-			// double-check when are we rewriting hInfo without IP, and port
-			if identEvent.HostInfo.IP == "" {
-				logEntry.Error("error trying to add host info without IP and ports", identEvent.HostInfo)
-			}
 			c.DBClient.PersistToDB(identEvent.HostInfo)
 
 		// detect if the context has been shut down to end the go routine
@@ -357,23 +319,33 @@ func (c *PruningStrategy) NewIdentificationEvent(newIdent hosts.IdentificationEv
 
 // LastIterTime returns the lastiteration time of the peerqueue
 func (c *PruningStrategy) LastIterTime() float64 {
+	c.m.RLock()
+	defer c.m.RUnlock()
 	return float64(c.lastIterTime.Microseconds()) / 1000000
 }
 
-func (c *PruningStrategy) IterForcingNextConnTime() string {
-	return c.iterForcingNextConnTime.String()
-}
-
 func (c *PruningStrategy) AttemptedPeersSinceLastIter() int64 {
-	return atomic.LoadInt64(&c.attemptedPeers)
+	c.m.RLock()
+	defer c.m.RUnlock()
+	attempted := int64(0)
+	for _, v := range c.attemptedPeers {
+		attempted += v
+	}
+	return attempted
 }
 
-func (c *PruningStrategy) ControlDistribution() map[string]int {
+func (c *PruningStrategy) ControlDistribution() map[string]int64 {
 	return c.PeerQueue.DelayDistribution()
 }
 
-func (c *PruningStrategy) GetErrorAttemptDistribution() sync.Map {
-	return c.ErrorAttemptDistribution
+func (c *PruningStrategy) GetErrorAttemptDistribution() map[string]int64 {
+	c.m.RLock()
+	defer c.m.RUnlock()
+	attemptDist := make(map[string]int64)
+	for k, v := range c.attemptedPeers {
+		attemptDist[string(k)] = v
+	}
+	return attemptDist
 }
 
 // PeerQueue is an auxiliar peer array and map list to keep the list of peers sorted
@@ -381,38 +353,75 @@ func (c *PruningStrategy) GetErrorAttemptDistribution() sync.Map {
 type PeerQueue struct {
 	sync.RWMutex
 
-	PeerList []*PrunedPeer
-	PeerMap  map[string]*PrunedPeer
-	// Metrics
-	queueErroDistribution map[string]int
-}
+	// DBs
+	dbClient *psql.DBClient
 
-// DelayDistribution returns the distribution of the delays in a map.
-func (c *PeerQueue) DelayDistribution() map[string]int {
-	c.RLock()
-	defer c.RUnlock()
-	// make copy of the actual dist
-	dist := make(map[string]int, len(c.queueErroDistribution))
-	for key, val := range c.queueErroDistribution {
-		dist[key] = val
-	}
-	return dist
+	// control variables
+	peerPtr  int
+	peerList []*PrunedPeer
+	peerMap  map[peer.ID]*PrunedPeer
 }
 
 // NewPeerQueue is the constructor of a NewPeerQueue
-func NewPeerQueue() *PeerQueue {
+func NewPeerQueue(dbClient *psql.DBClient) *PeerQueue {
 	return &PeerQueue{
-		PeerList:              make([]*PrunedPeer, 0),
-		PeerMap:               make(map[string]*PrunedPeer),
-		queueErroDistribution: make(map[string]int),
+		dbClient: dbClient,
+		peerPtr:  0,
+		peerList: make([]*PrunedPeer, 0),
+		peerMap:  make(map[peer.ID]*PrunedPeer),
 	}
 }
 
-// IsPeerAlready checks whether a peer is already in the Queue.
-func (c *PeerQueue) IsPeerAlready(peerID string) bool {
+func (c *PeerQueue) IsEmpty() bool {
 	c.RLock()
 	defer c.RUnlock()
-	_, ok := c.PeerMap[peerID]
+	return len(c.peerList) == 0
+}
+
+func (c *PeerQueue) ValidNextPeer() bool {
+	c.RLock()
+	defer c.RUnlock()
+
+	// if the pointer is in a correct range and the next peer is ready for connection
+	if c.peerPtr >= c.Len() {
+		return false
+	} else {
+		if !c.peerList[c.peerPtr].IsReadyForConnection() {
+			return false
+		}
+	}
+	return true
+}
+
+func (c *PeerQueue) GetNextPeer() *PrunedPeer {
+	c.Lock()
+	defer c.Unlock()
+
+	nextPeer := c.peerList[c.peerPtr]
+	c.peerPtr++
+	// check if the pointer went beyond the limits
+	// if c.peerPtr >= c.Len() {
+	// 	// reset counter
+	// 	c.peerPtr = 0
+	// 	err := c.UpdatePeerListFromRemoteDB()
+	// 	if err != nil {
+	// 		log.Error(errors.Wrap(err, "exceeded number of peers in list"))
+	// 	}
+	// }
+	return nextPeer
+}
+
+func (c *PeerQueue) ResetPeerPointer() {
+	c.Lock()
+	defer c.Unlock()
+	c.peerPtr = 0
+}
+
+// IsPeerAlready checks whether a peer is already in the Queue.
+func (c *PeerQueue) IsPeerAlready(id peer.ID) bool {
+	c.RLock()
+	defer c.RUnlock()
+	_, ok := c.peerMap[id]
 	return ok
 }
 
@@ -422,55 +431,71 @@ func (c *PeerQueue) AddPeer(pPeer *PrunedPeer) {
 	defer c.Unlock()
 
 	// append new item at the beginning of the array
-	c.PeerList = append([]*PrunedPeer{pPeer}, c.PeerList...)
-	c.PeerMap[pPeer.PeerID] = pPeer
+	c.peerList = append([]*PrunedPeer{pPeer}, c.peerList...)
+	c.peerMap[pPeer.iD] = pPeer
 }
 
 // RemovePeer()
-func (c *PeerQueue) RemovePeer(pPeer string) {
+func (c *PeerQueue) RemovePeer(id peer.ID) {
 	c.Lock()
 	defer c.Unlock()
 
-	delete(c.PeerMap, pPeer)
+	// check if we have the peer in our local peerqueue
+	_, ok := c.peerMap[id]
+	if !ok {
+		log.Debugf("peer %s not in local peerstore", id.String())
+		return
+	}
+
+	// proceed to delete the peer from our queue
+	log.Debugf("total len of queue %d - removing peer %s", c.Len(), id.String())
+
+	delete(c.peerMap, id)
+
 	var idx int = -1
-	for index, pInfo := range c.PeerList {
-		if pInfo.PeerID == pPeer {
+	for index, pInfo := range c.peerList {
+		if pInfo.iD == id {
 			idx = index
 			break
 		}
 	}
+
 	if idx > -1 {
-		c.PeerList = append(c.PeerList[:idx], c.PeerList[idx+1:]...)
+		c.peerList = append(c.peerList[:idx], c.peerList[idx+1:]...)
 	} else {
-		log.Debugf("unable to find peer %s inside queued peers", pPeer)
+		log.Debugf("unable to find peer %s inside queued peers", id.String())
+		return
 	}
+
+	log.Debugf("total len of queue %d post removing peer", c.Len())
 }
 
 // GetPeer retrieves the info of the peer requested from args.
-func (c *PeerQueue) GetPeer(peerID string) (*PrunedPeer, bool) {
+func (c *PeerQueue) GetPeer(id peer.ID) (*PrunedPeer, bool) {
 	c.Lock()
 	defer c.Unlock()
 
-	p, ok := c.PeerMap[peerID]
+	p, ok := c.peerMap[id]
 	if !ok {
 		return &PrunedPeer{}, ok
 	}
 	return p, ok
 }
 
-func (c *PeerQueue) GetErrorMetrics(key string) (int, bool) {
+// DelayDistribution returns the distribution of the delays in a map.
+func (c *PeerQueue) DelayDistribution() map[string]int64 {
 	c.RLock()
 	defer c.RUnlock()
-
-	val, ok := c.queueErroDistribution[key]
-	return val, ok
-}
-
-func (c *PeerQueue) SetUpdateErrorMetrics(key string, val int) {
-	c.Lock()
-	defer c.Unlock()
-
-	c.queueErroDistribution[key] = val
+	// iter through the peers in the queue map getting the distribution
+	distribution := make(map[string]int64)
+	for _, val := range c.peerMap {
+		_, ok := distribution[string(val.delayObj.dtype)]
+		if !ok {
+			distribution[string(val.delayObj.dtype)] = int64(0)
+		}
+		distribution[string(val.delayObj.dtype)]++
+	}
+	return distribution
 }
 
 // SortPeerList sorts the PeerQueue array leaving at the beginning the peers
@@ -485,92 +510,68 @@ func (c *PeerQueue) SortPeerList() {
 
 // Swap is part of sort.Interface.
 func (c *PeerQueue) Swap(i, j int) {
-	c.PeerList[i], c.PeerList[j] = c.PeerList[j], c.PeerList[i]
+	c.peerList[i], c.peerList[j] = c.peerList[j], c.peerList[i]
 }
 
 // Less is part of sort.Interface. We use c.PeerList.NextConnection as the value to sort by.
 func (c *PeerQueue) Less(i, j int) bool {
-	return c.PeerList[i].NextConnection().Before(c.PeerList[j].NextConnection())
+	return c.peerList[i].NextConnection().Before(c.peerList[j].NextConnection())
 }
 
 // Len is part of sort.Interface. We use the peer list to get the length of the array.
 func (c *PeerQueue) Len() int {
-	return len(c.PeerList)
+	return len(c.peerList)
 }
 
 // UpdatePeerListFromPeerStore will refresh the peerqueue with the peerstore.
 // Basically we add those peers that did not exist before in the peerqueue.
-func (c *PeerQueue) UpdatePeerListFromRemoteDB(dbClient *psql.DBClient, localPeerstore *peerstore.Peerstore) error {
+func (c *PeerQueue) UpdatePeerListFromRemoteDB() error {
 	// Get the list of peers from the peerstore
-	peerList, err := dbClient.GetNonDeprecatedPeers()
+	peerList, err := c.dbClient.GetNonDeprecatedPeers()
 	if err != nil {
 		return errors.Wrap(err, "fail to update pruning peer queue from DBClient")
 	}
+	// metrics
 	totcnt := 0
 	new := 0
 
-	// metrics
-	c.SetUpdateErrorMetrics(PositiveDelayType, 0)
-	c.SetUpdateErrorMetrics(NegativeWithHopeDelayType, 0)
-	c.SetUpdateErrorMetrics(NegativeWithNoHopeDelayType, 0)
-	c.SetUpdateErrorMetrics(Minus1DelayType, 0)
-	c.SetUpdateErrorMetrics(ZeroDelayType, 0)
-	c.SetUpdateErrorMetrics(TimeoutDelayType, 0)
-
 	// Fill the PeerQueue.PeerList with the missing peers from the
-	for _, persisPeer := range peerList {
+	for _, connectablePeer := range peerList {
 		totcnt++
-		if !c.IsPeerAlready(persisPeer.ID.String()) {
-			log.Tracef("peer %s not locally", persisPeer.ID.String())
-			// Peer was not in the list of peers
-			pInfo, ok := localPeerstore.LoadPeer(persisPeer.ID.String())
-			if !ok {
-				// add it local
-				log.Tracef("peer %s not in peerstore neither, storing it", persisPeer.ID.String())
-				localPeerstore.StorePeer(*persisPeer)
-			}
+		if !c.IsPeerAlready(connectablePeer.ID) {
 			new++
-
+			log.Tracef("peer %s not locally, storing it", connectablePeer.ID.String())
 			// Whenever we find a new peer that we didn't have locally, add zero delay
 			// even when we read all the peerstore from the DB Endpoint when restarting
-			delayDegree := 0             // default
-			delayType := Minus1DelayType // default
-
-			newPrunnedPeer := NewPrunedPeer(pInfo.ID.String(), delayType)
-			newPrunnedPeer.DelayObj.SetDegree(delayDegree)
-
+			newPrunnedPeer := NewPrunedPeer(connectablePeer.ID, connectablePeer.Addrs, connectablePeer.Network, Minus1Delay)
 			// add the new item to the list
 			c.AddPeer(newPrunnedPeer)
-			val, _ := c.GetErrorMetrics(delayType)
-			c.SetUpdateErrorMetrics(delayType, val+1)
-
-		} else {
-			prunnedPeer, _ := c.GetPeer(persisPeer.ID.String())
-			val, _ := c.GetErrorMetrics(prunnedPeer.DelayObj.GetType())
-			c.SetUpdateErrorMetrics(prunnedPeer.DelayObj.GetType(), val+1)
 		}
 	}
 	// Sort the list of peers based on the next connection
 	c.SortPeerList()
 	log.Debugf("Num of peers in PeerQueue: %d\n", c.Len())
-	log.Debugf("Num of peers in LocalPeerstore: %d\n", localPeerstore.Stats())
 	return nil
 }
 
 type PrunedPeer struct {
-	PeerID                   string
-	DelayObj                 DelayObject // define the delay to connect based on error
-	BaseConnectionTimestamp  time.Time   // define the first event. To calculate the next connection we sum this with delay.
-	BaseDeprecationTimestamp time.Time   // this + DeprecationTime defines when we are ready to deprecate
+	iD                       peer.ID
+	addr                     []ma.Multiaddr
+	network                  utils.NetworkType
+	delayObj                 DelayObject // define the delay to connect based on error
+	baseConnectionTimestamp  time.Time   // define the first event. To calculate the next connection we sum this with delay.
+	baseDeprecationTimestamp time.Time   // this + DeprecationTime defines when we are ready to deprecate
 }
 
-func NewPrunedPeer(peerID string, inputType string) *PrunedPeer {
+func NewPrunedPeer(id peer.ID, maddrs []ma.Multiaddr, network utils.NetworkType, delay Delay) *PrunedPeer {
 	t := time.Now()
 	pp := PrunedPeer{
-		PeerID:                   peerID,
-		DelayObj:                 ReturnAccordingDelayObject(inputType),
-		BaseConnectionTimestamp:  t,
-		BaseDeprecationTimestamp: t, // by default we set it now, so if no positive connection it will be deprecated in 24 hours since creation of this prunned peer
+		iD:                       id,
+		addr:                     maddrs,
+		network:                  network,
+		delayObj:                 NewDelayObject(delay),
+		baseConnectionTimestamp:  t,
+		baseDeprecationTimestamp: t, // by default we set it now, so if no positive connection it will be deprecated in 24 hours since creation of this prunned peer
 	}
 
 	return &pp
@@ -586,22 +587,22 @@ func (c *PrunedPeer) IsReadyForConnection() bool {
 // NextConnection returns the time where the pPeer needs to be connected (based on previous connAttempts)
 func (c *PrunedPeer) NextConnection() time.Time {
 
-	if c.DelayObj.GetType() == Minus1DelayType { // in case of Minus1, this is new peer and we want it to connect as soon as possible
+	if c.delayObj.dtype == Minus1Delay { // in case of Minus1, this is new peer and we want it to connect as soon as possible
 		return time.Time{}
 	}
 
-	if c.DelayObj.CalculateDelay() > MaxDelayTime {
-		return c.BaseConnectionTimestamp.Add(MaxDelayTime)
+	if c.delayObj.CalculateDelay() > MaxDelayTime {
+		return c.baseConnectionTimestamp.Add(MaxDelayTime)
 	}
 
 	// nextConnection should be from first event + the applied delay
-	return c.BaseConnectionTimestamp.Add(c.DelayObj.CalculateDelay())
+	return c.baseConnectionTimestamp.Add(c.delayObj.CalculateDelay())
 }
 
 // Deprecable evaluates if the peer is in time to be deprecated.
 func (c *PrunedPeer) Deprecable() bool {
 	// if the difference between now and the BaseDeprecationTimestampo is more than the DeprecationTime, true
-	if time.Now().Sub(c.BaseDeprecationTimestamp) >= DeprecationTime {
+	if time.Now().Sub(c.baseDeprecationTimestamp) >= DeprecationTime {
 		return true
 	}
 
@@ -614,59 +615,19 @@ func (c *PrunedPeer) ConnEventHandler(recErr string) {
 }
 
 // NewEvent will reevaluate the delay in case of a new Positive or NegativeDelay happens
-func (c *PrunedPeer) UpdateDelay(newDelayType string) {
+func (c *PrunedPeer) UpdateDelay(newDelayType Delay) {
 	// if the delaytype is different, always refresh the object
-	c.BaseConnectionTimestamp = time.Now()
+	c.baseConnectionTimestamp = time.Now()
 
-	if c.DelayObj.GetType() != newDelayType {
-		c.DelayObj = ReturnAccordingDelayObject(newDelayType)
+	if c.delayObj.dtype != newDelayType {
+		c.delayObj = NewDelayObject(newDelayType)
 	}
 
 	// if there is a positive delay (success identify), then we update the deprecation time
 	// therefore, we start counting from now to deprecate
-	if c.DelayObj.GetType() == PositiveDelayType {
-		c.BaseDeprecationTimestamp = time.Now()
+	if c.delayObj.dtype == PositiveDelay {
+		c.baseDeprecationTimestamp = time.Now()
 	}
 
-	c.DelayObj.AddDegree()
-}
-
-// ErrorToDelayType transforms an error into a DelayType.
-func ErrorToDelayType(errString string) string {
-	switch errString {
-	case hosts.NoConnError:
-		return PositiveDelayType
-
-	case hosts.DialErrorConnectionResetByPeer,
-		hosts.DialErrorConnectionRefused,
-		hosts.DialErrorContextDeadlineExceeded,
-		hosts.DialErrorBackOff,
-		hosts.ErrorRequestingMetadta,
-		"unknown":
-		return NegativeWithHopeDelayType
-
-	case hosts.DialErrorNoRouteToHost,
-		hosts.DialErrorNetworkUnreachable,
-		hosts.DialErrorPeerIDMismatch,
-		hosts.DialErrorSelfAttempt,
-		hosts.DialErrorNoGoodAddresses:
-		return NegativeWithNoHopeDelayType
-
-	case hosts.DialErrorIoTimeout:
-		return TimeoutDelayType
-
-	default:
-		log.Tracef("Default Delay applied, error: %s\n", errString)
-		return NegativeWithHopeDelayType
-	}
-}
-
-// ResetMapValues iterates over a string int map and resets all values to 0.
-func ResetMapValues(inputMap sync.Map) sync.Map {
-	var outMap sync.Map
-	inputMap.Range(func(key, value interface{}) bool {
-		outMap.Store(key, 0)
-		return true
-	})
-	return outMap
+	c.delayObj.IncreaseDegree()
 }

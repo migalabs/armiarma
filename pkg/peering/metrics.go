@@ -93,11 +93,10 @@ func (p *PeeringService) getErrorAttemptDistribtuion() *metrics.IndvMetrics {
 	updateFn := func() (interface{}, error) {
 		summary := make(map[string]interface{})
 		errorAttemptDist := p.strategy.GetErrorAttemptDistribution()
-		errorAttemptDist.Range(func(key, value interface{}) bool {
-			summary[key.(string)] = value
-			ErrorAttemptDistribution.WithLabelValues(key.(string)).Set(float64(value.(int)))
-			return true
-		})
+		for key, val := range errorAttemptDist {
+			summary[key] = val
+			ErrorAttemptDistribution.WithLabelValues(key).Set(float64(val))
+		}
 		return summary, nil
 	}
 

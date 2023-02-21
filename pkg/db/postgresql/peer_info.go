@@ -6,7 +6,6 @@ import (
 	"github.com/jackc/pgx/v4"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/migalabs/armiarma/pkg/db/models"
-	"github.com/migalabs/armiarma/pkg/db/peerstore"
 	"github.com/migalabs/armiarma/pkg/utils"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
@@ -233,7 +232,7 @@ func (c *DBClient) GetFullHostInfo(pID peer.ID) (*models.HostInfo, error) {
 	return hInfo, nil
 }
 
-func (c *DBClient) GetPersistable(pID string) (peerstore.PersistablePeer, error) {
+func (c *DBClient) GetPersistable(pID string) (models.RemoteConnectablePeer, error) {
 	log.Tracef("reading persistable info for peer %s", pID)
 
 	var maddresses []string
@@ -252,7 +251,7 @@ func (c *DBClient) GetPersistable(pID string) (peerstore.PersistablePeer, error)
 	)
 	// Check if there was any error reading the peer from the SQL table
 	if err != nil && err != pgx.ErrNoRows {
-		return peerstore.PersistablePeer{}, errors.Wrap(err, "unable to retrieve full peer_info")
+		return models.RemoteConnectablePeer{}, errors.Wrap(err, "unable to retrieve full peer_info")
 	}
 
 	// parse the multiaddresses from the []string
@@ -261,22 +260,22 @@ func (c *DBClient) GetPersistable(pID string) (peerstore.PersistablePeer, error)
 	for _, maStr := range maddresses {
 		mAddr, err := ma.NewMultiaddr(maStr)
 		if err != nil {
-			return peerstore.PersistablePeer{}, errors.Wrap(err, "unable to parse mAddrs reading full peer_info")
+			return models.RemoteConnectablePeer{}, errors.Wrap(err, "unable to parse mAddrs reading full peer_info")
 		}
 		mAddrs = append(mAddrs, mAddr)
 	}
 
 	peerID, err := peer.Decode(pID)
 	if err != nil {
-		return peerstore.PersistablePeer{}, err
+		return models.RemoteConnectablePeer{}, err
 	}
 
-	persistable := peerstore.NewPersistable(
+	connectable := models.NewRemoteConnectablePeer(
 		peerID,
 		mAddrs,
 		network,
 	)
-	return *persistable, nil
+	return *connectable, nil
 }
 
 func (c *DBClient) PeerInfoExists(pID peer.ID) bool {
@@ -311,9 +310,9 @@ func (c *DBClient) UpdateLastActivityTimestamp(peerID peer.ID, t time.Time) (que
 	return query, args
 }
 
-func (c *DBClient) GetNonDeprecatedPeers() ([]*peerstore.PersistablePeer, error) {
+func (c *DBClient) GetNonDeprecatedPeers() ([]*models.RemoteConnectablePeer, error) {
 	log.Tracef("retrieving the list of peer_ids from the DB that are not deprecated\n")
-	var persisPeers []*peerstore.PersistablePeer
+	var connectPeers []*models.RemoteConnectablePeer
 
 	rows, err := c.psqlPool.Query(c.ctx, `
 		SELECT
@@ -325,7 +324,7 @@ func (c *DBClient) GetNonDeprecatedPeers() ([]*peerstore.PersistablePeer, error)
 
 	// If there are no rows, don't panic
 	if err != nil && err != pgx.ErrNoRows {
-		return persisPeers, errors.Wrap(err, "unable to retrieve peers in the network")
+		return connectPeers, errors.Wrap(err, "unable to retrieve peers in the network")
 	}
 	defer rows.Close()
 
@@ -336,7 +335,7 @@ func (c *DBClient) GetNonDeprecatedPeers() ([]*peerstore.PersistablePeer, error)
 
 		err := rows.Scan(&peerIDStr, &networkStr, &mAddrsStr)
 		if err != nil {
-			return persisPeers, err
+			return connectPeers, err
 		}
 
 		// persist peerID
@@ -360,14 +359,14 @@ func (c *DBClient) GetNonDeprecatedPeers() ([]*peerstore.PersistablePeer, error)
 			maddrs = append(maddrs, mAddr)
 		}
 		// create the persistable instance
-		persistable := peerstore.NewPersistable(
+		connectable := models.NewRemoteConnectablePeer(
 			peerID,
 			maddrs,
 			network,
 		)
 
 		// decode peerID to have proper OBJ
-		persisPeers = append(persisPeers, persistable)
+		connectPeers = append(connectPeers, connectable)
 	}
-	return persisPeers, nil
+	return connectPeers, nil
 }

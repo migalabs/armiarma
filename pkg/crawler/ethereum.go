@@ -165,7 +165,6 @@ func NewEthereumCrawler(mainCtx *cli.Context, conf config.EthereumCrawlerConfig)
 	pStrategy, err := peering.NewPruningStrategy(
 		ctx,
 		ethNode.Network(),
-		conf.LocalPeerstorePath,
 		dbClient,
 	)
 	if err != nil {

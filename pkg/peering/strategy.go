@@ -1,8 +1,6 @@
 package peering
 
 import (
-	"sync"
-
 	"github.com/migalabs/armiarma/pkg/db/models"
 	"github.com/migalabs/armiarma/pkg/hosts"
 )
@@ -20,8 +18,7 @@ type PeeringStrategy interface {
 	NewIdentificationEvent(hosts.IdentificationEvent)
 	// Prometheus Export Calls
 	LastIterTime() float64
-	IterForcingNextConnTime() string
 	AttemptedPeersSinceLastIter() int64
-	ControlDistribution() map[string]int
-	GetErrorAttemptDistribution() sync.Map
+	ControlDistribution() map[string]int64
+	GetErrorAttemptDistribution() map[string]int64
 }

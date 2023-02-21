@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/migalabs/armiarma/pkg/db/peerstore"
 	"github.com/migalabs/armiarma/pkg/utils"
 	ma "github.com/multiformats/go-multiaddr"
 	log "github.com/sirupsen/logrus"
@@ -21,6 +20,22 @@ const (
 	// unless discv5 says the opposite
 	LeftNetworkTime = 24 * time.Hour * 60
 )
+
+type RemoteConnectablePeer struct {
+	ID      peer.ID
+	Addrs   []ma.Multiaddr
+	Network utils.NetworkType
+}
+
+func NewRemoteConnectablePeer(pid peer.ID, addrss []ma.Multiaddr, network utils.NetworkType) *RemoteConnectablePeer {
+	connectable := &RemoteConnectablePeer{
+		ID:      pid,
+		Addrs:   make([]ma.Multiaddr, 0),
+		Network: network,
+	}
+	connectable.Addrs = addrss
+	return connectable
+}
 
 // HostInfo is the basic struct that contains all the information needed to connect, identify and monitor a Peer
 type HostInfo struct {
@@ -74,7 +89,7 @@ func WithIPAndPorts(ip string, port int) RemoteHostOptions {
 		h.IP = ip
 		h.Port = port
 
-		// Compose Muliaddress from data
+		// Compose Multiaddress from data
 		mAddr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%d", ip, port))
 		if err != nil {
 			return err
@@ -128,8 +143,8 @@ func (h *HostInfo) ComposeAddrsInfo() peer.AddrInfo {
 	return addrInfo
 }
 
-func (h *HostInfo) ComposePersistable() peerstore.PersistablePeer {
-	return *peerstore.NewPersistable(
+func (h *HostInfo) ComposePersistable() RemoteConnectablePeer {
+	return *NewRemoteConnectablePeer(
 		h.ID,
 		h.MAddrs,
 		h.Network,

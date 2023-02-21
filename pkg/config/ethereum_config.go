@@ -40,7 +40,6 @@ type EthereumCrawlerConfig struct {
 	ActivePeersBackupInterval string   `json:ActivePeersBackupInterval`
 	ForkDigest                string   `json:"fork-digest"`
 	Bootnodes                 []string `json:"bootnodes"`
-	LocalPeerstorePath        string   `json:"local-peerstore-path"`
 	GossipTopics              []string `json:"gossip-topics"`
 	Subnets                   []int    `json:"subnets"`
 	PersistMsgs               bool     `json:"persist-msgs"`
@@ -61,7 +60,6 @@ func NewEthereumCrawlerConfig() *EthereumCrawlerConfig {
 		ActivePeersBackupInterval: DefaultActivePeersBackupInterval,
 		ForkDigest:                DefaultMainnetForkDigest,
 		Bootnodes:                 DefaultEthereumBootnodes,
-		LocalPeerstorePath:        DefaultLocalPeerstorePath,
 		Subnets:                   DefaultSubnets,
 		GossipTopics:              DefaultEthereumGossipTopics,
 		PersistMsgs:               false,
@@ -132,14 +130,6 @@ func (c *EthereumCrawlerConfig) Apply(ctx *cli.Context) {
 	if ctx.IsSet("bootnode") {
 		c.Bootnodes = ctx.StringSlice("bootnode")
 	}
-	// local peerstore path
-	if ctx.IsSet("local-peerstore") {
-		c.LocalPeerstorePath = ctx.String("local-peerstore")
-	}
-	err := validateOrCreatePeerstore(c.LocalPeerstorePath)
-	if err != nil {
-		log.Panic("unable to create folder for local-peerstore" + err.Error())
-	}
 
 	// gossip topics
 	if ctx.IsSet("gossip-topic") {
@@ -195,7 +185,6 @@ func (c *EthereumCrawlerConfig) Apply(ctx *cli.Context) {
 		"fork-digest":     c.ForkDigest,
 		"cl-endpoint":     c.EthCLRemoteEndpoint,
 		"bootnodes":       c.Bootnodes,
-		"peerstore":       c.LocalPeerstorePath,
 		"gossip-topics":   c.GossipTopics,
 		"subnets":         c.Subnets,
 		"persist-msgs":    c.PersistMsgs,
