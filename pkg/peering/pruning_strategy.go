@@ -235,11 +235,12 @@ func (c *PruningStrategy) eventRecorderRoutine() {
 			// update the local info about the peer
 			p, ok := c.PeerQueue.GetPeer(connAttempt.RemotePeer)
 			if !ok {
-				// check if the connectionwas successful or not
+				// we shoould never receive a connection attempt of a peer that is not in the list
+				// thus, raise a error log with the attempt status
 				if connAttempt.Status == models.NegativeAttempt {
-					log.Debugf("we received a negative attempt of connection to %s - that was probably deprecated", connAttempt.RemotePeer.String())
+					log.Errorf("we received a negative attempt of connection to %s - that was probably deprecated", connAttempt.RemotePeer.String())
 				} else {
-					log.Debugf("we received a possitive attempt of connection to %s - but was probably deprecated", connAttempt.RemotePeer.String())
+					log.Errorf("we received a possitive attempt of connection to %s - but was probably deprecated", connAttempt.RemotePeer.String())
 				}
 			} else {
 				p.ConnEventHandler(connAttempt.Error)
@@ -249,8 +250,8 @@ func (c *PruningStrategy) eventRecorderRoutine() {
 					connAttempt.Deprecable = true
 					// remove p from list of peers to ping (if it appears again in the discovery, it will be updated as undeprecated in the DB)
 					c.PeerQueue.RemovePeer(connAttempt.RemotePeer)
-					c.DBClient.PersistToDB(connAttempt)
 				}
+				c.DBClient.PersistToDB(connAttempt)
 			}
 
 		// Receive a notification of a connection event
@@ -589,15 +590,12 @@ func (c *PrunedPeer) IsReadyForConnection() bool {
 
 // NextConnection returns the time where the pPeer needs to be connected (based on previous connAttempts)
 func (c *PrunedPeer) NextConnection() time.Time {
-
 	if c.delayObj.dtype == Minus1Delay { // in case of Minus1, this is new peer and we want it to connect as soon as possible
 		return time.Time{}
 	}
-
 	if c.delayObj.CalculateDelay() > MaxDelayTime {
 		return c.baseConnectionTimestamp.Add(MaxDelayTime)
 	}
-
 	// nextConnection should be from first event + the applied delay
 	return c.baseConnectionTimestamp.Add(c.delayObj.CalculateDelay())
 }
@@ -608,7 +606,6 @@ func (c *PrunedPeer) Deprecable() bool {
 	if time.Now().Sub(c.baseDeprecationTimestamp) >= DeprecationTime {
 		return true
 	}
-
 	return false
 }
 
