@@ -8,35 +8,26 @@ services:
                         - POSTGRES_USER=user
                         - POSTGRES_PASSWORD=password
                 volumes: 
-                        - ./data/init-armiarma.sql:/docker-entrypoint-initdb.d/docker_postgres_init.sql
-                        - ./data:/var/lib/postgresql
+                        - type: bind
+                          source: ./data/init-armiarma.sql
+                          target: /docker-entrypoint-initdb.d/docker_postgres_init.sql
+                        - type: bind
+                          source: ./data
+                          target: /var/lib/postgresql
                 network_mode: 'host'
-        eth2-crawler:
-                image: "armiarma-eth2-crawler:latest"
-                build:
-                        context: .
-                        dockerfile: Dockerfile
-                network_mode: 'host'
-                volumes: ["./peerstore:/armiarma/peerstore", "./config-files:/armiarma/config-files", "./bootstrap_nodes/official-eth2-bootnodes.json:/armiarma/bootstrap_nodes/official-eth2-bootnodes.json"]
-                environment:
-                        - DB_URL=Api:5000
-                entrypoint: "/armiarma/armiarma-client eth2 --config-file=./config-files/eth2-config.json"
-                depends_on:
-                        - "db"
-                deploy:
-                        restart_policy:
-                                condition: on-failure
-                                delay: 3s
+
         
         prometheus:
                 image: prom/prometheus:v2.36.2
                 volumes:
-                - ./prometheus/:/etc/prometheus/
+                        - type: bind
+                          source: ./prometheus/
+                          target: /etc/prometheus/
                 command:
-                - '--config.file=/etc/prometheus/prometheus.yml'
-                - '--storage.tsdb.path=/prometheus'
-                - '--web.console.libraries=/usr/share/prometheus/console_libraries'
-                - '--web.console.templates=/usr/share/prometheus/consoles'
+                        - '--config.file=/etc/prometheus/prometheus.yml'
+                        - '--storage.tsdb.path=/prometheus'
+                        - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+                        - '--web.console.templates=/usr/share/prometheus/consoles'
                 network_mode: 'host'
                 restart: always
 
@@ -47,3 +38,22 @@ services:
                 environment:
                         - GF_INSTALL_PLUGINS=grafana-worldmap-panel
                         - Datasource=Armiarma
+
+        armiarma:
+                image: "armiarma:latest"
+                build:
+                        context: .
+                        dockerfile: Dockerfile
+                network_mode: 'host'
+                command: |
+                        eth2
+                        --psql-endpoint="postgresql://user:password@localhost:5432/armiarmadb"
+                        --fork-digest="0x4a26c58b"
+                        --gossip-topic="beacon_block" 
+                        --subnet="all"
+                depends_on:
+                        - "db"
+                deploy:
+                        restart_policy:
+                                condition: on-failure
+                                delay: 5s

@@ -1,30 +1,23 @@
 # syntax=docker/dockerfile:1
 
 # chosen buster image for
-FROM golang:1.17.3-buster AS builder
+FROM golang:1.17.13-buster AS builder
 
 COPY ./ /armiarma
 
 WORKDIR /armiarma 
-RUN go get
-RUN go build -o ./armiarma-client
+#RUN make dependencies
+RUN make build
 
 # FINAL STAGE -> copy the binary and few config files
 FROM debian:buster-slim
 
-RUN mkdir /armiarma
-# Generate the peerstore folder where the peerstore and the metrics will be stored
-RUN mkdir /armiarma/peerstore
-RUN mkdir /armiarma/config-file
+RUN mkdir /crawler
+COPY --from=builder /armiarma/build/ /crawler
 
-COPY --from=builder /armiarma/src /armiarma/src
-COPY --from=builder /armiarma/armiarma-client /armiarma/armiarma-client
-
-
-WORKDIR /armiarma
 # Crawler exposed Port
 EXPOSE 9020 
 # Crawler exposed Port for Prometheus data export
 EXPOSE 9080
 # Arguments coming from the docker call: (1)->armiarma-client (2)->flags
-ENTRYPOINT ["./armiarma-client"]
+ENTRYPOINT ["/crawler/armiarma"]
