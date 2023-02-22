@@ -101,6 +101,11 @@ Currently supported protocols:
 Ethereum CL      Different networks or forks can be crawled by defining the 'ForkDigest' in the --fork-digest flag  
 ```
 
+List of fork digests:
+- Bellatrix (Mainnet):       "0x4a26c58b",
+- Prater Bellatrix (Goerli): "0xc2ce3aa8",
+
+
 ### Custom configuration of the tool
 The crawler has several fields that can be customized anytime before the launch of the crawler. The fields correspond to the following flags:
 
