@@ -3,10 +3,13 @@
 # chosen buster image for
 FROM golang:1.17.13-buster AS builder
 
+WORKDIR /
+RUN apt-get install git
 COPY ./ /armiarma
 
-WORKDIR /armiarma 
 #RUN make dependencies
+WORKDIR /armiarma
+RUN make dependencies
 RUN make build
 
 # FINAL STAGE -> copy the binary and few config files

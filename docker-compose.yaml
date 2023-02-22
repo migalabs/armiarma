@@ -39,7 +39,7 @@ services:
                         - GF_INSTALL_PLUGINS=grafana-worldmap-panel
                         - Datasource=Armiarma
 
-        armiarma:
+        crawler:
                 image: "armiarma:latest"
                 build:
                         context: .
