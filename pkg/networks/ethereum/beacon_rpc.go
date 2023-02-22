@@ -33,6 +33,7 @@ func (en *LocalEthereumNode) ServeBeaconPing(h host.Host) {
 			}
 		}
 		m := methods.PingRPCv1
+		m.Protocol = m.Protocol + "_snappy" // TODO: add snappy support for RPC calls
 		streamHandler := m.MakeStreamHandler(sCtxFn, comp, listenReq)
 		h.SetStreamHandler(m.Protocol, streamHandler)
 		log.Info("Started serving ping")
@@ -64,6 +65,7 @@ func (en *LocalEthereumNode) ServeBeaconGoodbye(h host.Host) {
 			}
 		}
 		m := methods.GoodbyeRPCv1
+		m.Protocol = m.Protocol + "_snappy" // TODO: add snappy support for RPC calls
 		streamHandler := m.MakeStreamHandler(sCtxFn, comp, listenReq)
 		h.SetStreamHandler(m.Protocol, streamHandler)
 		log.Info("Started serving goodbye")

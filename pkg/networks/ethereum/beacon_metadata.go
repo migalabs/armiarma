@@ -91,6 +91,7 @@ func (en *LocalEthereumNode) ServeBeaconMetadata(h host.Host) {
 			}
 		}
 		m := methods.MetaDataRPCv1
+		m.Protocol = m.Protocol + "_snappy" // TODO: add snappy support for RPC calls
 		streamHandler := m.MakeStreamHandler(sCtxFn, comp, listenReq)
 		h.SetStreamHandler(m.Protocol, streamHandler)
 		log.Info("Started serving Beacon Metadata")

@@ -95,6 +95,9 @@ func (c *PruningStrategy) composeDelayDistFromAttemptedPeers(prunedPeers map[pee
 	c.m.Lock()
 	defer c.m.Unlock()
 
+	// reset the delay list
+	c.attemptedPeers = make(map[Delay]int64, 0)
+
 	for _, pPeer := range prunedPeers {
 		_, ok := c.attemptedPeers[pPeer.delayObj.dtype]
 		if !ok {

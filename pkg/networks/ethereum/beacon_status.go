@@ -80,6 +80,7 @@ func (en *LocalEthereumNode) ServeBeaconStatus(h host.Host) {
 			}
 		}
 		m := methods.StatusRPCv1
+		m.Protocol = m.Protocol + "_snappy" // TODO: add snappy support for RPC calls
 		streamHandler := m.MakeStreamHandler(sCtxFn, comp, listenReq)
 		h.SetStreamHandler(m.Protocol, streamHandler)
 		log.Info("Started serving Beacon Status")
