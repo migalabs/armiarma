@@ -29,7 +29,7 @@ func (en *LocalEthereumNode) ReqBeaconStatus(
 	var remoteStatus common.Status
 
 	var resCode reqresp.ResponseCode // error by default
-	err := methods.StatusRPCv1.RunRequest(ctx, h.NewStream, peerID, new(reqresp.SnappyCompression),
+	err := methods.StatusRPCv1NoSnappy.RunRequest(ctx, h.NewStream, peerID, new(reqresp.SnappyCompression),
 		reqresp.RequestSSZInput{Obj: &en.LocalStatus}, 1,
 		func() error {
 			return nil
@@ -80,7 +80,6 @@ func (en *LocalEthereumNode) ServeBeaconStatus(h host.Host) {
 			}
 		}
 		m := methods.StatusRPCv1
-		m.Protocol = m.Protocol + "_snappy" // TODO: add snappy support for RPC calls
 		streamHandler := m.MakeStreamHandler(sCtxFn, comp, listenReq)
 		h.SetStreamHandler(m.Protocol, streamHandler)
 		log.Info("Started serving Beacon Status")

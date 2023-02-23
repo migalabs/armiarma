@@ -42,7 +42,7 @@ func (en *LocalEthereumNode) ReqBeaconMetadata(
 	// Generate the Server Error Code
 	var resCode reqresp.ResponseCode // error by default
 	// record the error into the error channel
-	err = methods.MetaDataRPCv1.RunRequest(ctx, h.NewStream, peerID, new(reqresp.SnappyCompression),
+	err = methods.MetaDataRPCv2NoSnappy.RunRequest(ctx, h.NewStream, peerID, new(reqresp.SnappyCompression),
 		reqresp.RequestSSZInput{Obj: nil}, 1,
 		func() error {
 			return nil
@@ -90,8 +90,7 @@ func (en *LocalEthereumNode) ServeBeaconMetadata(h host.Host) {
 				}
 			}
 		}
-		m := methods.MetaDataRPCv1
-		m.Protocol = m.Protocol + "_snappy" // TODO: add snappy support for RPC calls
+		m := methods.MetaDataRPCv2
 		streamHandler := m.MakeStreamHandler(sCtxFn, comp, listenReq)
 		h.SetStreamHandler(m.Protocol, streamHandler)
 		log.Info("Started serving Beacon Metadata")
