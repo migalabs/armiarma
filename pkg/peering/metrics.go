@@ -2,7 +2,9 @@ package peering
 
 import (
 	"github.com/migalabs/armiarma/pkg/metrics"
+	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
+	log "github.com/sirupsen/logrus"
 )
 
 // List of metrics that we are going to export
@@ -31,6 +33,13 @@ var (
 		Name:      "peerstore_iteration_time_secs",
 		Help:      "The time that the crawler takes to connect the entire peerstore in secs",
 	})
+	ConnectionErrorDistribution = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "peering",
+		Name:      "conn_error_distribution",
+		Help:      "The error distribtuion of the attempted to connect peers since the last iteration",
+	},
+		[]string{"error_type"},
+	)
 )
 
 // ServeMetrics:
@@ -48,6 +57,7 @@ func (p *PeeringService) GetMetrics() *metrics.MetricsModule {
 	metricsMod.AddIndvMetric(p.getErrorAttemptDistribtuion())
 	metricsMod.AddIndvMetric(p.getAttemptedPeersInLastIteration())
 	metricsMod.AddIndvMetric(p.getPeerstoreIterTime())
+	metricsMod.AddIndvMetric(p.getConnErrorDistribution())
 
 	return metricsMod
 
@@ -77,6 +87,7 @@ func (p *PeeringService) getPrunedErrorDistribtuion() *metrics.IndvMetrics {
 		updateFn,
 	)
 	if err != nil {
+		log.Error(errors.Wrap(err, "unable to init pruned_error_distribution"))
 		return nil
 	}
 
@@ -107,6 +118,7 @@ func (p *PeeringService) getErrorAttemptDistribtuion() *metrics.IndvMetrics {
 		updateFn,
 	)
 	if err != nil {
+		log.Error(errors.Wrap(err, "unable to init iteration_attempts_by_category_distribution"))
 		return nil
 	}
 
@@ -133,6 +145,7 @@ func (p *PeeringService) getAttemptedPeersInLastIteration() *metrics.IndvMetrics
 		updateFn,
 	)
 	if err != nil {
+		log.Error(errors.Wrap(err, "unable to init peers_attempted_last_iteration"))
 		return nil
 	}
 
@@ -159,8 +172,39 @@ func (p *PeeringService) getPeerstoreIterTime() *metrics.IndvMetrics {
 		updateFn,
 	)
 	if err != nil {
+		log.Error(errors.Wrap(err, "unable to init peerstore_iteration_time_secs"))
 		return nil
 	}
 
 	return indvMetr
+}
+
+func (p *PeeringService) getConnErrorDistribution() *metrics.IndvMetrics {
+
+	initFn := func() error {
+		prometheus.MustRegister(ConnectionErrorDistribution)
+		return nil
+	}
+
+	updateFn := func() (interface{}, error) {
+		summary := make(map[string]interface{})
+		errDist := p.strategy.GetConnErrorDistribution()
+		for key, val := range errDist {
+			summary[key] = val
+			ConnectionErrorDistribution.WithLabelValues(key).Set(float64(val))
+		}
+		return summary, nil
+	}
+	IndvMetr, err := metrics.NewIndvMetrics(
+		"conn_error_distribution",
+		"The error distribtuion of the attempted to connect peers since the last iteration",
+		initFn,
+		updateFn,
+	)
+	if err != nil {
+		log.Error(errors.Wrap(err, "unable to init conn_error_distribution"))
+		return nil
+	}
+
+	return IndvMetr
 }

@@ -51,6 +51,7 @@ type PruningStrategy struct {
 	m              sync.RWMutex
 	lastIterTime   time.Duration
 	attemptedPeers map[Delay]int64
+	connErrors     map[string]int64
 }
 
 // NewPruningStrategy is a constructor that will offer a models.Peer stream for the
@@ -71,6 +72,7 @@ func NewPruningStrategy(
 		connEventNot:   make(chan *models.EventTrace),
 		identEventNot:  make(chan hosts.IdentificationEvent),
 		attemptedPeers: make(map[Delay]int64, 0),
+		connErrors:     make(map[string]int64, 0),
 	}, nil
 }
 
@@ -106,6 +108,32 @@ func (c *PruningStrategy) composeDelayDistFromAttemptedPeers(prunedPeers map[pee
 		c.attemptedPeers[pPeer.delayObj.dtype]++
 	}
 }
+
+func (c *PruningStrategy) composeConnErrorsFromAttemptedPeers(prunedPeers map[peer.ID]*PrunedPeer) {
+	c.m.Lock()
+	defer c.m.Unlock()
+
+	// reset the delay list
+	c.connErrors = make(map[string]int64, 0)
+
+	for _, pPeer := range prunedPeers {
+		_, ok := c.connErrors[pPeer.connError]
+		if !ok {
+			c.connErrors[pPeer.connError] = int64(0)
+		}
+		c.connErrors[pPeer.connError]++
+	}
+
+}
+
+// add the attempted error to the metrics
+// c.m.Lock()
+// _, ok := c.errorDistribution[attError]
+// if !ok {
+// c.errorDistribution[attError] = 0
+// }
+// c.errorDistribution[attError]++
+// c.m.Unlock()
 
 // peerstoreIterator private function that is in charge of iterating through the peerstore,
 // receive connections/disconnections, and fetch info comming from the peering service into the db.
@@ -178,6 +206,8 @@ func (c *PruningStrategy) peerstoreIteratorRoutine() {
 
 				// save attempted peers' values and reset the map
 				c.composeDelayDistFromAttemptedPeers(attemptedPeers)
+				c.composeConnErrorsFromAttemptedPeers(attemptedPeers)
+				// reset the attempted peers for the next iteration
 				attemptedPeers = make(map[peer.ID]*PrunedPeer)
 
 				// reset the pointer
@@ -253,6 +283,7 @@ func (c *PruningStrategy) eventRecorderRoutine() {
 				}
 				c.DBClient.PersistToDB(connAttempt)
 			}
+			// Keep track of the
 
 		// Receive a notification of a connection event
 		case eventTrace := <-c.connEventNot:
@@ -350,6 +381,16 @@ func (c *PruningStrategy) GetErrorAttemptDistribution() map[string]int64 {
 		attemptDist[string(k)] = v
 	}
 	return attemptDist
+}
+
+func (c *PruningStrategy) GetConnErrorDistribution() map[string]int64 {
+	c.m.RLock()
+	defer c.m.RUnlock()
+	errDistr := make(map[string]int64, 0)
+	for k, v := range c.connErrors {
+		errDistr[k] = v
+	}
+	return errDistr
 }
 
 // PeerQueue is an auxiliar peer array and map list to keep the list of peers sorted
@@ -559,9 +600,11 @@ func (c *PeerQueue) UpdatePeerListFromRemoteDB() error {
 }
 
 type PrunedPeer struct {
-	iD                       peer.ID
-	addr                     []ma.Multiaddr
-	network                  utils.NetworkType
+	iD      peer.ID
+	addr    []ma.Multiaddr
+	network utils.NetworkType
+	// control variables
+	connError                string
 	delayObj                 DelayObject // define the delay to connect based on error
 	baseConnectionTimestamp  time.Time   // define the first event. To calculate the next connection we sum this with delay.
 	baseDeprecationTimestamp time.Time   // this + DeprecationTime defines when we are ready to deprecate
@@ -572,6 +615,7 @@ func NewPrunedPeer(id peer.ID, maddrs []ma.Multiaddr, network utils.NetworkType,
 	pp := PrunedPeer{
 		iD:                       id,
 		addr:                     maddrs,
+		connError:                "--", // init connError to undefined
 		network:                  network,
 		delayObj:                 NewDelayObject(delay),
 		baseConnectionTimestamp:  t,
@@ -611,11 +655,16 @@ func (c *PrunedPeer) Deprecable() bool {
 
 // RecErrorHandler selects actuation method for each of the possible errors while actively dialing peers.
 func (c *PrunedPeer) ConnEventHandler(recErr string) {
-	c.UpdateDelay(ErrorToDelayType(recErr))
+	c.UpdateDelay(recErr)
 }
 
 // NewEvent will reevaluate the delay in case of a new Positive or NegativeDelay happens
-func (c *PrunedPeer) UpdateDelay(newDelayType Delay) {
+func (c *PrunedPeer) UpdateDelay(recErr string) {
+	// update the connError to the latest recorded one
+	c.connError = recErr
+	// parse the error
+	newDelayType := ErrorToDelayType(recErr)
+
 	// if the delaytype is different, always refresh the object
 	c.baseConnectionTimestamp = time.Now()
 

@@ -9,6 +9,7 @@ With this interface, the given host will be able to retreive and connect a set o
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/migalabs/armiarma/pkg/db/models"
@@ -36,6 +37,10 @@ type PeeringService struct {
 	// Control Flags
 	Timeout    time.Duration
 	MaxRetries int
+
+	// metrics
+	m                 sync.RWMutex
+	errorDistribution map[string]int
 }
 
 // Constructor
@@ -46,11 +51,12 @@ func NewPeeringService(
 	opts ...PeeringOption) (PeeringService, error) {
 
 	pServ := PeeringService{
-		ctx:        ctx,
-		host:       h,
-		DBClient:   dbClient,
-		Timeout:    ConnectionRefuseTimeout,
-		MaxRetries: MaxRetries,
+		ctx:               ctx,
+		host:              h,
+		DBClient:          dbClient,
+		Timeout:           ConnectionRefuseTimeout,
+		MaxRetries:        MaxRetries,
+		errorDistribution: make(map[string]int, 0),
 	}
 	// iterate through the Options given as args
 	for _, opt := range opts {
