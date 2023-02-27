@@ -40,6 +40,13 @@ var (
 	},
 		[]string{"error_type"},
 	)
+	TotalConnectionErrorDistribution = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "peering",
+		Name:      "total_conn_error_distribution",
+		Help:      "The total error distribtuion the active peers",
+	},
+		[]string{"error_type"},
+	)
 )
 
 // ServeMetrics:
@@ -58,6 +65,7 @@ func (p *PeeringService) GetMetrics() *metrics.MetricsModule {
 	metricsMod.AddIndvMetric(p.getAttemptedPeersInLastIteration())
 	metricsMod.AddIndvMetric(p.getPeerstoreIterTime())
 	metricsMod.AddIndvMetric(p.getConnErrorDistribution())
+	metricsMod.AddIndvMetric(p.getTotalConnErrorDistribution())
 
 	return metricsMod
 
@@ -203,6 +211,36 @@ func (p *PeeringService) getConnErrorDistribution() *metrics.IndvMetrics {
 	)
 	if err != nil {
 		log.Error(errors.Wrap(err, "unable to init conn_error_distribution"))
+		return nil
+	}
+
+	return IndvMetr
+}
+
+func (p *PeeringService) getTotalConnErrorDistribution() *metrics.IndvMetrics {
+
+	initFn := func() error {
+		prometheus.MustRegister(TotalConnectionErrorDistribution)
+		return nil
+	}
+
+	updateFn := func() (interface{}, error) {
+		summary := make(map[string]interface{})
+		errDist := p.strategy.GetTotalConnErrorDistribution()
+		for key, val := range errDist {
+			summary[key] = val
+			TotalConnectionErrorDistribution.WithLabelValues(key).Set(float64(val))
+		}
+		return summary, nil
+	}
+	IndvMetr, err := metrics.NewIndvMetrics(
+		"total_conn_error_distribution",
+		"The total error distribtuion of the active peers",
+		initFn,
+		updateFn,
+	)
+	if err != nil {
+		log.Error(errors.Wrap(err, "unable to init total_conn_error_distribution"))
 		return nil
 	}
 

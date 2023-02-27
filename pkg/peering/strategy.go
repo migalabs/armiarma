@@ -20,6 +20,7 @@ type PeeringStrategy interface {
 	LastIterTime() float64
 	AttemptedPeersSinceLastIter() int64
 	ControlDistribution() map[string]int64
+	GetTotalConnErrorDistribution() map[string]int64
 	GetErrorAttemptDistribution() map[string]int64
 	GetConnErrorDistribution() map[string]int64
 }

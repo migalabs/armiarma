@@ -23,12 +23,12 @@ var (
 
 	// define the initial delay we apply in each of the types
 	initialDelayTime = map[Delay]time.Duration{
-		PositiveDelay:           4 * time.Minute,
+		PositiveDelay:           2 * time.Minute,
 		NegativeWithHopeDelay:   2 * time.Minute,
-		NegativeWithNoHopeDelay: 120 * time.Minute,
+		NegativeWithNoHopeDelay: 16 * time.Minute,
 		ZeroDelay:               0 * time.Minute,
 		Minus1Delay:             -1000 * time.Hour,
-		TimeoutDelay:            60 * time.Minute, //experimental
+		TimeoutDelay:            32 * time.Minute, //experimental
 	}
 )
 
@@ -86,12 +86,12 @@ func (d *DelayObject) SetDegree(newDegree int) {
 func (d *DelayObject) CalculateDelay() time.Duration {
 	var delay time.Duration
 	switch d.dtype {
-	case PositiveDelay, ZeroDelay, Minus1Delay:
+	case PositiveDelay, ZeroDelay, Minus1Delay, NegativeWithHopeDelay, NegativeWithNoHopeDelay:
 		// return 2 hours * the degree (6,12,18...)
 		//return time.Duration(d.DelayDegree) * InitialDelayTime[d.Type]
 		delay = initialDelayTime[d.dtype]
 
-	case NegativeWithHopeDelay, NegativeWithNoHopeDelay, TimeoutDelay:
+	case TimeoutDelay:
 		// if there are no attempts, there is no delay
 		if d.delayDegree == 0 {
 			delay = time.Duration(0)

@@ -20,7 +20,7 @@ import (
 
 var (
 	// Default Delays
-	DeprecationTime = 4 * time.Hour   // mMinutes after first negative connection that has to pass to deprecate a peer.
+	DeprecationTime = 3 * time.Hour   // mMinutes after first negative connection that has to pass to deprecate a peer.
 	StartExpD       = 2 * time.Minute // Starting delay that will serve for the Exponential Delay.
 	// Control variables
 	MinIterTime = 5 * time.Second // Minimum time that has to pass before iterating again.
@@ -125,15 +125,6 @@ func (c *PruningStrategy) composeConnErrorsFromAttemptedPeers(prunedPeers map[pe
 	}
 
 }
-
-// add the attempted error to the metrics
-// c.m.Lock()
-// _, ok := c.errorDistribution[attError]
-// if !ok {
-// c.errorDistribution[attError] = 0
-// }
-// c.errorDistribution[attError]++
-// c.m.Unlock()
 
 // peerstoreIterator private function that is in charge of iterating through the peerstore,
 // receive connections/disconnections, and fetch info comming from the peering service into the db.
@@ -383,6 +374,10 @@ func (c *PruningStrategy) GetErrorAttemptDistribution() map[string]int64 {
 	return attemptDist
 }
 
+func (c *PruningStrategy) GetTotalConnErrorDistribution() map[string]int64 {
+	return c.PeerQueue.TotalConnErrorDistribution()
+}
+
 func (c *PruningStrategy) GetConnErrorDistribution() map[string]int64 {
 	c.m.RLock()
 	defer c.m.RUnlock()
@@ -444,15 +439,6 @@ func (c *PeerQueue) GetNextPeer() *PrunedPeer {
 
 	nextPeer := c.peerList[c.peerPtr]
 	c.peerPtr++
-	// check if the pointer went beyond the limits
-	// if c.peerPtr >= c.Len() {
-	// 	// reset counter
-	// 	c.peerPtr = 0
-	// 	err := c.UpdatePeerListFromRemoteDB()
-	// 	if err != nil {
-	// 		log.Error(errors.Wrap(err, "exceeded number of peers in list"))
-	// 	}
-	// }
 	return nextPeer
 }
 
@@ -484,19 +470,15 @@ func (c *PeerQueue) AddPeer(pPeer *PrunedPeer) {
 func (c *PeerQueue) RemovePeer(id peer.ID) {
 	c.Lock()
 	defer c.Unlock()
-
 	// check if we have the peer in our local peerqueue
 	_, ok := c.peerMap[id]
 	if !ok {
 		log.Debugf("peer %s not in local peerstore", id.String())
 		return
 	}
-
 	// proceed to delete the peer from our queue
 	log.Debugf("total len of queue %d - removing peer %s", c.Len(), id.String())
-
 	delete(c.peerMap, id)
-
 	var idx int = -1
 	for index, pInfo := range c.peerList {
 		if pInfo.iD == id {
@@ -504,14 +486,12 @@ func (c *PeerQueue) RemovePeer(id peer.ID) {
 			break
 		}
 	}
-
 	if idx > -1 {
 		c.peerList = append(c.peerList[:idx], c.peerList[idx+1:]...)
 	} else {
 		log.Debugf("unable to find peer %s inside queued peers", id.String())
 		return
 	}
-
 	log.Debugf("total len of queue %d post removing peer", c.Len())
 }
 
@@ -541,6 +521,20 @@ func (c *PeerQueue) DelayDistribution() map[string]int64 {
 		distribution[string(val.delayObj.dtype)]++
 	}
 	return distribution
+}
+
+func (c *PeerQueue) TotalConnErrorDistribution() map[string]int64 {
+	c.RLock()
+	defer c.RUnlock()
+	totConnErrors := make(map[string]int64, 0)
+	for _, val := range c.peerMap {
+		_, ok := totConnErrors[val.connError]
+		if !ok {
+			totConnErrors[val.connError] = int64(0)
+		}
+		totConnErrors[val.connError]++
+	}
+	return totConnErrors
 }
 
 // SortPeerList sorts the PeerQueue array leaving at the beginning the peers
