@@ -17,15 +17,16 @@ services:
         
         prometheus:
                 image: prom/prometheus:v2.36.2
+                user: root
                 volumes:
-                        - ./app-data/prometheus_db:/prometheus
+                        - ./app-data/prometheus_db:/prom-data
                         - type: bind
                           source: ./prometheus/
                           target: /etc/prometheus/
 
                 command:
                         - '--config.file=/etc/prometheus/prometheus.yml'
-                        - '--storage.tsdb.path=/prometheus'
+                        - '--storage.tsdb.path=/prom-data'
                         - '--web.console.libraries=/usr/share/prometheus/console_libraries'
                         - '--web.console.templates=/usr/share/prometheus/consoles'
                 network_mode: 'host'

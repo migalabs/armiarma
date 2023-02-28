@@ -1,9 +1,10 @@
 # do not include the binary
-**/armiarma
+**/build/
+
 # do not include unnecesary files such as:
 # log .txt s
 **/*.txt
-# database files
-**/*.db
-# csv metric files
-**/*.csv
+# launchers
+**/*.sh
+# docker-compose volumes
+app-data/*_db
