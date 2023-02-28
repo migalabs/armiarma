@@ -121,7 +121,7 @@ func NewEthereumCrawler(mainCtx *cli.Context, conf config.EthereumCrawlerConfig)
 		gethPrivKey,
 		dv5.ParseBootnodesFromStringSlice(conf.Bootnodes),
 		conf.ForkDigest,
-		9006)
+		conf.Port)
 	if err != nil {
 		cancel()
 		return nil, err
@@ -235,10 +235,9 @@ func (c *EthereumCrawler) Run() {
 }
 
 func (c *EthereumCrawler) Close() {
-	c.Host.Host().Close()
 	c.Disc.Stop()
+	c.Host.Host().Close()
 	c.DB.Close()
 	c.Metrics.Close()
 	c.cancel()
-
 }

@@ -17,15 +17,10 @@ var (
 	DefaultPort                      int    = 9020
 	DefaultMetricsPort               int    = 9080
 	DefaultUserAgent                 string = "Armiarma Crawler"
-	DefaultPSQLEndpoint              string = "postgres://user:password@ip:port/database"
+	DefaultPSQLEndpoint              string = "postgres://user:password@localhost:5432/armiarmadb"
 	DefaultActivePeersBackupInterval string = "12h"
 
-	// ETH2
-	DefaultEth2Network string = "mainnet"
-
-	// IPFS
-	DefaultIpfsNetwork string = "ipfs"
-	Ipfsprotocols             = []string{
+	Ipfsprotocols = []string{
 		"/ipfs/kad/1.0.0",
 		"/ipfs/kad/2.0.0",
 	}

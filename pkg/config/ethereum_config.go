@@ -13,12 +13,6 @@ import (
 )
 
 var (
-	// Ethereum Mainnet
-	DefaultMainnetForkDigest string = eth.ForkDigests[eth.BellatrixKey]
-
-	// Genosis Mainnet
-	DefaultGnosisForkDigest string = eth.ForkDigests[eth.GnosisBellatrixKey]
-
 	// GossipSub Topics
 	DefaultEthereumGossipTopics []string = []string{}
 	AllEthereumGossipTopics     []string = eth.MessageTypes
@@ -60,7 +54,7 @@ func NewEthereumCrawlerConfig() *EthereumCrawlerConfig {
 		EthCLRemoteEndpoint:       DefaultCLRemoteEndpoint,
 		PsqlEndpoint:              DefaultPSQLEndpoint,
 		ActivePeersBackupInterval: DefaultActivePeersBackupInterval,
-		ForkDigest:                DefaultMainnetForkDigest,
+		ForkDigest:                eth.DefaultForkDigest,
 		Bootnodes:                 DefaultEthereumBootnodes,
 		Subnets:                   DefaultSubnets,
 		GossipTopics:              DefaultEthereumGossipTopics,

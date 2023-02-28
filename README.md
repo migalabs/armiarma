@@ -72,7 +72,7 @@ List of ports that are going to be used:
 | Armiarma | `9020` & `9080` | - |
 | PostgreSQL | `5432` | default=`password` | 
 | Prometheus | `9090` | - | 
-| Grafana | `3030` | default=`admin` | 
+| Grafana | `3000` | default=`admin` | 
 
 Tested Requirements:
 | Instance | Version | 
@@ -101,9 +101,7 @@ Currently supported protocols:
 Ethereum CL      Different networks or forks can be crawled by defining the 'ForkDigest' in the --fork-digest flag  
 ```
 
-List of fork digests:
-- Bellatrix (Mainnet):       "0x4a26c58b",
-- Prater Bellatrix (Goerli): "0xc2ce3aa8",
+[List](./pkg/networks/ethereum/network_info.go) of fork digests.
 
 
 ### Custom configuration of the tool
@@ -119,7 +117,7 @@ OPTIONS:
    --ip value                  IP in the machine that we want to asign to the crawler (default: 0.0.0.0) [$ARMIARMA_IP]
    --port value                TCP and UDP port that the crawler with advertise to establish connections (default: 9020) [$ARMIARMA_PORT]
    --user-agent value          Agent name that will identify the crawler in the network (default: Armiarma Crawler) [$ARMIARMA_USER_AGENT]
-   --psql-endpoint value       PSQL enpoint where the crwaler will submit the all the gathered info (default: postgres://user:password@ip:port/database) [$ARMIARMA_PSQL]
+   --psql-endpoint value       PSQL enpoint where the crwaler will submit the all the gathered info (default: postgres://user:password@localhost:5432/armiarmadb) [$ARMIARMA_PSQL]
    --peers-backup value        Time interval that will be use to backup the peer_ids into a single table - allowing to recontruct the network in past-crawled times (default: 12h) [$ARMIARMA_BACKUP_INTERVAL]
    --gossip-topic value        List of gossipsub topics that the crawler will subscribe to [$ARMIARMA_GOSSIP_TOPICS]
    --remote-cl-endpoint value  Remote Ethereum Consensus Layer Client to request metadata (experimental) [$ARMIARMA_REMOTE_CL_ENDPOINT]

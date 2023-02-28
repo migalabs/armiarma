@@ -8,23 +8,23 @@ import (
 )
 
 var (
-	// new
 	ForkDigestPrefix string = "0x"
 	ForkDigestSize   int    = 8 // without the ForkDigestPrefix
 	BlockchainName   string = "eth2"
 
-	// mainnet
+	// default fork_digests
+	DefaultForkDigest string = ForkDigests[BellatrixKey]
+	AllForkDigest     string = "All"
+
+	// Mainnet
 	Phase0Key    string = "Mainnet"
 	AltairKey    string = "Altair"
 	BellatrixKey string = "Bellatrix"
-
-	AllForkDigest string = "All"
-
 	// Gnosis
 	GnosisPhase0Key    string = "GnosisPhase0"
 	GnosisAltairKey    string = "GnosisAltair"
 	GnosisBellatrixKey string = "Gnosisbellatrix"
-
+	// Goerli / Prater
 	PraterPhase0Key    string = "PraterPhase0"
 	PraterBellatrixKey string = "PraterBellatrix"
 

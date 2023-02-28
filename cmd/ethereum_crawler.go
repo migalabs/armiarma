@@ -14,6 +14,7 @@ import (
 
 	"github.com/migalabs/armiarma/pkg/config"
 	"github.com/migalabs/armiarma/pkg/crawler"
+	eth "github.com/migalabs/armiarma/pkg/networks/ethereum"
 )
 
 // CrawlCommand contains the crawl sub-command configuration.
@@ -79,7 +80,7 @@ var Eth2CrawlerCommand = &cli.Command{
 			Name:        "fork-digest",
 			Usage:       "Fork Digest of the Ethereum Consensus Layer network that we want to crawl",
 			EnvVars:     []string{"ARMIARMA_FORK_DIGEST"},
-			DefaultText: config.DefaultMainnetForkDigest,
+			DefaultText: eth.DefaultForkDigest,
 		},
 		&cli.StringSliceFlag{
 			Name:    "bootnode",
