@@ -7,7 +7,7 @@ BIN="./build/armiarma"
 
 DOCKER_VOLUMES="./app-data/"
 
-.PHONY: build dependencies install clean
+.PHONY: build dependencies install clean clean-volumes
 
 build:
 	$(GOCC) get
@@ -23,6 +23,7 @@ install:
 	
 clean:
 	rm -r $(BIN_PATH)
-	# remove also the docker-related volumes if they exist
+
+clean-volumes:
 	sudo rm -rf $(DOCKER_VOLUMES)*_db
 
