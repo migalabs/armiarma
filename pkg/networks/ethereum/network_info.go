@@ -21,21 +21,24 @@ var (
 	AllForkDigest string = "All"
 
 	// Gnosis
-	GnosisKey          string = "Gnosis"
+	GnosisPhase0Key    string = "GnosisPhase0"
 	GnosisAltairKey    string = "GnosisAltair"
-	GnosisBellatrixKey string = "Genosisbellatrix"
+	GnosisBellatrixKey string = "Gnosisbellatrix"
 
 	PraterPhase0Key    string = "PraterPhase0"
 	PraterBellatrixKey string = "PraterBellatrix"
 
 	ForkDigests = map[string]string{
-		AllForkDigest:      "all",
-		Phase0Key:          "0xb5303f2a",
-		AltairKey:          "0xafcaaba0",
-		BellatrixKey:       "0x4a26c58b",
-		GnosisKey:          "0xf925ddc5",
+		AllForkDigest: "all",
+		// Mainnet
+		Phase0Key:    "0xb5303f2a",
+		AltairKey:    "0xafcaaba0",
+		BellatrixKey: "0x4a26c58b",
+		// Gnosis
+		GnosisPhase0Key:    "0xf925ddc5",
 		GnosisAltairKey:    "0x56fdb5e0",
-		GnosisBellatrixKey: "",
+		GnosisBellatrixKey: "0x56fdb5e0",
+		// Goerli
 		PraterPhase0Key:    "0x79df0428",
 		PraterBellatrixKey: "0xc2ce3aa8",
 	}
@@ -62,6 +65,7 @@ var (
 var (
 	MainnetGenesis time.Time     = time.Unix(1606824023, 0)
 	GoerliGenesis  time.Time     = time.Unix(1616508000, 0)
+	GnosisGenesis  time.Time     = time.Unix(1638968400, 0) // Dec 08, 2021, 13:00 UTC
 	SecondsPerSlot time.Duration = 12 * time.Second
 )
 

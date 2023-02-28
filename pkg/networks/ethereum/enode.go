@@ -48,14 +48,17 @@ func NewLocalEthereumNode(
 	// select network based on the network that we are participating in
 	var genesis time.Time
 	switch forkDigest {
+	// Mainnet
 	case ForkDigests[Phase0Key], ForkDigests[AltairKey], ForkDigests[BellatrixKey]:
-		// Mainnet
 		genesis = MainnetGenesis
+	// Prater
 	case ForkDigests[PraterPhase0Key], ForkDigests[PraterBellatrixKey]:
-		// Prater
 		genesis = GoerliGenesis
+	// Gnosis
+	case ForkDigests[GnosisPhase0Key], ForkDigests[GnosisAltairKey], ForkDigests[GnosisBellatrixKey]:
+		genesis = GnosisGenesis
+	// Mainnet
 	default:
-		// Mainnet
 		genesis = MainnetGenesis
 	}
 
