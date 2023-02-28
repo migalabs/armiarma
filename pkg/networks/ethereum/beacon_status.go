@@ -53,6 +53,8 @@ func (en *LocalEthereumNode) ReqBeaconStatus(
 		})
 	*finErr = err
 	*result = remoteStatus
+	// update the local status with the remote one if the local on is older
+	en.UpdateStatus(remoteStatus)
 }
 
 func (en *LocalEthereumNode) ServeBeaconStatus(h host.Host) {

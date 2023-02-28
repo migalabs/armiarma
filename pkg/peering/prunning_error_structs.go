@@ -25,7 +25,7 @@ var (
 	initialDelayTime = map[Delay]time.Duration{
 		PositiveDelay:           2 * time.Minute,
 		NegativeWithHopeDelay:   2 * time.Minute,
-		NegativeWithNoHopeDelay: 16 * time.Minute,
+		
 		ZeroDelay:               0 * time.Minute,
 		Minus1Delay:             -1000 * time.Hour,
 		TimeoutDelay:            32 * time.Minute, //experimental

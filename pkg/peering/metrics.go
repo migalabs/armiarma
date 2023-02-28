@@ -90,7 +90,6 @@ func (p *PeeringService) getPrunedErrorDistribtuion() *metrics.IndvMetrics {
 
 	indvMetr, err := metrics.NewIndvMetrics(
 		"pruned_error_distribution",
-		"Filter peers in Peer Queue by errors that were tracked",
 		initFn,
 		updateFn,
 	)
@@ -121,7 +120,6 @@ func (p *PeeringService) getErrorAttemptDistribtuion() *metrics.IndvMetrics {
 
 	indvMetr, err := metrics.NewIndvMetrics(
 		"iteration_attempts_by_category_distribution",
-		"Filter attempts in Peer Queue by errors that were tracked",
 		initFn,
 		updateFn,
 	)
@@ -148,7 +146,6 @@ func (p *PeeringService) getAttemptedPeersInLastIteration() *metrics.IndvMetrics
 
 	indvMetr, err := metrics.NewIndvMetrics(
 		"peers_attempted_last_iteration",
-		"The number of discovered peers with the crawler",
 		initFn,
 		updateFn,
 	)
@@ -175,7 +172,6 @@ func (p *PeeringService) getPeerstoreIterTime() *metrics.IndvMetrics {
 
 	indvMetr, err := metrics.NewIndvMetrics(
 		"peerstore_iteration_time_secs",
-		"Time that the crawler took to connect the entire peerstore in secs",
 		initFn,
 		updateFn,
 	)
@@ -205,7 +201,6 @@ func (p *PeeringService) getConnErrorDistribution() *metrics.IndvMetrics {
 	}
 	IndvMetr, err := metrics.NewIndvMetrics(
 		"conn_error_distribution",
-		"The error distribtuion of the attempted to connect peers since the last iteration",
 		initFn,
 		updateFn,
 	)
@@ -235,7 +230,6 @@ func (p *PeeringService) getTotalConnErrorDistribution() *metrics.IndvMetrics {
 	}
 	IndvMetr, err := metrics.NewIndvMetrics(
 		"total_conn_error_distribution",
-		"The total error distribtuion of the active peers",
 		initFn,
 		updateFn,
 	)

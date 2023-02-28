@@ -63,9 +63,7 @@ func (m *MetricsModule) Details() string {
 
 type IndvMetrics struct {
 	// TODO: add metrics to the export (time¿?)
-	name    string // name the defines the exporter (Example Peer-Prometheus-Exporter)
-	details string
-
+	name     string                      // name the defines the exporter (Example Peer-Prometheus-Exporter)
 	initFn   func() error                // Initialization of the exporter
 	updateFn func() (interface{}, error) // function that will be executed in the running loop (the func needs to run a go routine)
 }
@@ -73,7 +71,6 @@ type IndvMetrics struct {
 // NewIndvMetrics
 func NewIndvMetrics(
 	name string,
-	details string,
 	initFn func() error,
 	updateFn func() (interface{}, error)) (*IndvMetrics, error) {
 
@@ -84,7 +81,6 @@ func NewIndvMetrics(
 
 	module := &IndvMetrics{
 		name:     name,
-		details:  details,
 		initFn:   initFn,
 		updateFn: updateFn,
 	}
@@ -104,8 +100,4 @@ func (m *IndvMetrics) UpdateMetrics() (interface{}, error) {
 
 func (m *IndvMetrics) Name() string {
 	return m.name
-}
-
-func (m *IndvMetrics) Details() string {
-	return m.details
 }
