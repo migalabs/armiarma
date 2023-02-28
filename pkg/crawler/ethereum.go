@@ -82,7 +82,7 @@ func NewEthereumCrawler(mainCtx *cli.Context, conf config.EthereumCrawlerConfig)
 	ethNode.SetForkDigest(strings.Trim(conf.ForkDigest, "0x"))
 
 	// generate the central exporting service
-	promethMetrics := metrics.NewPrometheusMetrics(ctx)
+	promethMetrics := metrics.NewPrometheusMetrics(ctx, conf.MetricsPort)
 
 	// generate/connect to PSQL Database
 	backupInterval, err := time.ParseDuration(conf.ActivePeersBackupInterval)

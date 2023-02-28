@@ -34,10 +34,10 @@ type PrometheusMetrics struct {
 	closeC chan struct{}
 }
 
-func NewPrometheusMetrics(ctx context.Context) *PrometheusMetrics {
+func NewPrometheusMetrics(ctx context.Context, port int) *PrometheusMetrics {
 	return &PrometheusMetrics{
 		ctx:             ctx,
-		ExposePort:      ExposedPort,
+		ExposePort:      fmt.Sprintf("%d", port),
 		EndpointUrl:     EndpointUrl,
 		RefreshInterval: MetricLoopInterval,
 		Modules:         make([]*MetricsModule, 0),

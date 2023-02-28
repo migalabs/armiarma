@@ -15,6 +15,7 @@ var (
 	DefaultPrivKey                   string = ""
 	DefaultIP                        string = "0.0.0.0"
 	DefaultPort                      int    = 9020
+	DefaultMetricsPort               int    = 9080
 	DefaultUserAgent                 string = "Armiarma Crawler"
 	DefaultPSQLEndpoint              string = "postgres://user:password@ip:port/database"
 	DefaultActivePeersBackupInterval string = "12h"

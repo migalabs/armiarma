@@ -34,6 +34,7 @@ type EthereumCrawlerConfig struct {
 	PrivateKey                string   `json:"priv-key"`
 	IP                        string   `json:"ip"`
 	Port                      int      `json:"port"`
+	MetricsPort               int      `json:"metrics-port"`
 	UserAgent                 string   `json:"user-agent"`
 	EthCLRemoteEndpoint       string   `json:"remote-cl-endpoint"`
 	PsqlEndpoint              string   `json:"psql-endpoint"`
@@ -54,6 +55,7 @@ func NewEthereumCrawlerConfig() *EthereumCrawlerConfig {
 		PrivateKey:                DefaultPrivKey,
 		IP:                        DefaultIP,
 		Port:                      DefaultPort,
+		MetricsPort:               DefaultMetricsPort,
 		UserAgent:                 DefaultUserAgent,
 		EthCLRemoteEndpoint:       DefaultCLRemoteEndpoint,
 		PsqlEndpoint:              DefaultPSQLEndpoint,
@@ -86,6 +88,13 @@ func (c *EthereumCrawlerConfig) Apply(ctx *cli.Context) {
 		port := ctx.Int("port")
 		if checkValidPort(port) {
 			c.Port = port
+		}
+	}
+	// metrics-port (pprof + prometheus)
+	if ctx.IsSet("metrics-port") {
+		mPort := ctx.Int("metrics-port")
+		if checkValidPort(mPort) {
+			c.MetricsPort = mPort
 		}
 	}
 	// user agent

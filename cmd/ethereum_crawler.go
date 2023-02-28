@@ -45,6 +45,12 @@ var Eth2CrawlerCommand = &cli.Command{
 			EnvVars:     []string{"ARMIARMA_PORT"},
 			DefaultText: fmt.Sprintf("%d", config.DefaultPort),
 		},
+		&cli.IntFlag{
+			Name:        "metrics-port",
+			Usage:       "Port that the crawler with to expose pprof and prometheus metrics",
+			EnvVars:     []string{"ARMIARMA_METRICS_PORT"},
+			DefaultText: fmt.Sprintf("%d", config.DefaultMetricsPort),
+		},
 		&cli.StringFlag{
 			Name:        "user-agent",
 			Usage:       "Agent name that will identify the crawler in the network",

@@ -9,10 +9,10 @@ services:
                         - POSTGRES_PASSWORD=password
                 volumes: 
                         - type: bind
-                          source: ./data/init-armiarma.sql
+                          source: ./app-data/init-armiarma.sql
                           target: /docker-entrypoint-initdb.d/docker_postgres_init.sql
                         - type: bind
-                          source: ./data
+                          source: ./app-data/postgresql_db
                           target: /var/lib/postgresql
                 network_mode: 'host'
 
@@ -23,6 +23,10 @@ services:
                         - type: bind
                           source: ./prometheus/
                           target: /etc/prometheus/
+                        - type: bind 
+                          source: ./app-data/prometheus_db
+                          target: /var/lib/prometheus
+                        
                 command:
                         - '--config.file=/etc/prometheus/prometheus.yml'
                         - '--storage.tsdb.path=/prometheus'
@@ -36,7 +40,6 @@ services:
                 container_name: 'grafana'
                 network_mode: 'host'
                 environment:
-                        - GF_INSTALL_PLUGINS=grafana-worldmap-panel
                         - Datasource=Armiarma
 
         crawler:
