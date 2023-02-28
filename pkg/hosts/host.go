@@ -13,6 +13,7 @@ import (
 	conmgr "github.com/libp2p/go-libp2p-connmgr"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
+	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	noise "github.com/libp2p/go-libp2p-noise"
 	"github.com/libp2p/go-libp2p/p2p/protocol/identify"
@@ -72,6 +73,9 @@ func NewBasicLibp2pEth2Host(
 	hi := 7000
 	graceTime := 30 * time.Minute
 	conMngr := conmgr.NewConnManager(low, hi, graceTime)
+
+	// prevent the dial backoff
+	ctx = network.WithForceDirectDial(ctx, "prevent backoff")
 
 	// Generate the main Libp2p host that will be exposed to the network
 	host, err := libp2p.New(

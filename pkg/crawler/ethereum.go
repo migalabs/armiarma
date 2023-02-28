@@ -213,6 +213,9 @@ func NewEthereumCrawler(mainCtx *cli.Context, conf config.EthereumCrawlerConfig)
 	gossipMetricsMod := gs.GetMetrics()
 	promethMetrics.AddMeticsModule(gossipMetricsMod)
 
+	ethNodeMetricsMod := ethNode.GetMetrics()
+	promethMetrics.AddMeticsModule(ethNodeMetricsMod)
+
 	return crawler, nil
 }
 

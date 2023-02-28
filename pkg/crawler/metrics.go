@@ -39,29 +39,49 @@ var (
 		Namespace: modName,
 		Name:      "node_distribution",
 		Help:      "Number of peers from each of the crawled countries",
-	},
-	)
+	})
 	DeprecatedCount = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: modName,
 		Name:      "deprecated_nodes",
 		Help:      "Total number of deprecated peers",
+	})
+	OsDistribution = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: modName,
+		Name:      "os_distribution",
+		Help:      "Distribution of OS used by the connected peers",
 	},
+		[]string{"os"},
+	)
+	ArchDistribution = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: modName,
+		Name:      "arch_distribution",
+		Help:      "Architecture distribution of the active peers in the network",
+	},
+		[]string{"arch"},
+	)
+	HostedPeers = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: modName,
+		Name:      "hosted_peers_distribution",
+		Help:      "Distribution of IPs hosting the nodes in the network",
+	},
+		[]string{"ip_host"},
 	)
 )
 
 func (c *EthereumCrawler) GetMetrics() *metrics.MetricsModule {
-
 	metricsMod := metrics.NewMetricsModule(
 		modName,
 		modDetails,
 	)
-
 	// compose all the metrics
 	metricsMod.AddIndvMetric(c.clientDistributionMetrics())
 	metricsMod.AddIndvMetric(c.versionDistributionMetrics())
 	metricsMod.AddIndvMetric(c.geoDistributionMetrics())
 	metricsMod.AddIndvMetric(c.nodeDistributionMetrics())
 	metricsMod.AddIndvMetric(c.deprecatedNodeMetrics())
+	metricsMod.AddIndvMetric(c.getPeersOs())
+	metricsMod.AddIndvMetric(c.getPeersArch())
+	metricsMod.AddIndvMetric(c.getHostedPeers())
 
 	return metricsMod
 }
@@ -71,7 +91,6 @@ func (c *EthereumCrawler) clientDistributionMetrics() *metrics.IndvMetrics {
 		prometheus.MustRegister(ClientDistribution)
 		return nil
 	}
-
 	updateFn := func() (interface{}, error) {
 		summary, err := c.DB.GetClientDistribution()
 		if err != nil {
@@ -82,10 +101,8 @@ func (c *EthereumCrawler) clientDistributionMetrics() *metrics.IndvMetrics {
 		}
 		return summary, nil
 	}
-
 	cliDist, err := metrics.NewIndvMetrics(
 		"client_distribution",
-		"Number of non-deprecated and attempted peers from each of client type in the network",
 		initFn,
 		updateFn,
 	)
@@ -100,7 +117,6 @@ func (c *EthereumCrawler) versionDistributionMetrics() *metrics.IndvMetrics {
 		prometheus.MustRegister(VersionDistribution)
 		return nil
 	}
-
 	updateFn := func() (interface{}, error) {
 		summary, err := c.DB.GetVersionDistribution()
 		if err != nil {
@@ -111,10 +127,8 @@ func (c *EthereumCrawler) versionDistributionMetrics() *metrics.IndvMetrics {
 		}
 		return summary, nil
 	}
-
 	versDist, err := metrics.NewIndvMetrics(
 		"client_version_distribution",
-		"Number of peers from each of the clients versions observed",
 		initFn,
 		updateFn,
 	)
@@ -129,7 +143,6 @@ func (c *EthereumCrawler) geoDistributionMetrics() *metrics.IndvMetrics {
 		prometheus.MustRegister(GeoDistribution)
 		return nil
 	}
-
 	updateFn := func() (interface{}, error) {
 		summary, err := c.DB.GetGeoDistribution()
 		if err != nil {
@@ -141,10 +154,8 @@ func (c *EthereumCrawler) geoDistributionMetrics() *metrics.IndvMetrics {
 		}
 		return summary, nil
 	}
-
 	versDist, err := metrics.NewIndvMetrics(
 		"geographical_distribution",
-		"Number of peers from each of the crawled countries",
 		initFn,
 		updateFn,
 	)
@@ -159,7 +170,6 @@ func (c *EthereumCrawler) nodeDistributionMetrics() *metrics.IndvMetrics {
 		prometheus.MustRegister(NodeDistribution)
 		return nil
 	}
-
 	updateFn := func() (interface{}, error) {
 		peerLs, err := c.DB.GetNonDeprecatedPeers()
 		if err != nil {
@@ -170,10 +180,8 @@ func (c *EthereumCrawler) nodeDistributionMetrics() *metrics.IndvMetrics {
 
 		return len(peerLs), nil
 	}
-
 	nodeDist, err := metrics.NewIndvMetrics(
 		"geographical_distribution",
-		"Number of peers from each of the crawled countries",
 		initFn,
 		updateFn,
 	)
@@ -188,7 +196,6 @@ func (c *EthereumCrawler) deprecatedNodeMetrics() *metrics.IndvMetrics {
 		prometheus.MustRegister(DeprecatedCount)
 		return nil
 	}
-
 	updateFn := func() (interface{}, error) {
 		nodeCnt, err := c.DB.GetDeprecatedNodes()
 		if err != nil {
@@ -197,10 +204,8 @@ func (c *EthereumCrawler) deprecatedNodeMetrics() *metrics.IndvMetrics {
 		DeprecatedCount.Set(float64(nodeCnt))
 		return nodeCnt, nil
 	}
-
 	depNodes, err := metrics.NewIndvMetrics(
 		"deprecated_nodes",
-		"Total number of deprecated peers",
 		initFn,
 		updateFn,
 	)
@@ -208,4 +213,82 @@ func (c *EthereumCrawler) deprecatedNodeMetrics() *metrics.IndvMetrics {
 		return nil
 	}
 	return depNodes
+}
+
+func (c *EthereumCrawler) getPeersOs() *metrics.IndvMetrics {
+	initFn := func() error {
+		prometheus.MustRegister(OsDistribution)
+		return nil
+	}
+	updateFn := func() (interface{}, error) {
+		osDist, err := c.DB.GetOsDistribution()
+		if err != nil {
+			return nil, err
+		}
+		for key, val := range osDist {
+			OsDistribution.WithLabelValues(key).Set(float64(val.(int)))
+		}
+		return osDist, nil
+	}
+	osMetr, err := metrics.NewIndvMetrics(
+		"os_distribution",
+		initFn,
+		updateFn,
+	)
+	if err != nil {
+		return nil
+	}
+	return osMetr
+}
+
+func (c *EthereumCrawler) getPeersArch() *metrics.IndvMetrics {
+	initFn := func() error {
+		prometheus.MustRegister(ArchDistribution)
+		return nil
+	}
+	updateFn := func() (interface{}, error) {
+		archDist, err := c.DB.GetArchDistribution()
+		if err != nil {
+			return nil, err
+		}
+		for key, val := range archDist {
+			ArchDistribution.WithLabelValues(key).Set(float64(val.(int)))
+		}
+		return archDist, nil
+	}
+	archMetr, err := metrics.NewIndvMetrics(
+		"arch_distribution",
+		initFn,
+		updateFn,
+	)
+	if err != nil {
+		return nil
+	}
+	return archMetr
+}
+
+func (c *EthereumCrawler) getHostedPeers() *metrics.IndvMetrics {
+	initFn := func() error {
+		prometheus.MustRegister(HostedPeers)
+		return nil
+	}
+	updateFn := func() (interface{}, error) {
+		ipSummary, err := c.DB.GetHostingDistribution()
+		if err != nil {
+			return nil, err
+		}
+		for key, val := range ipSummary {
+			HostedPeers.WithLabelValues(key).Set(float64(val.(int)))
+		}
+		return ipSummary, nil
+	}
+	ipHosting, err := metrics.NewIndvMetrics(
+		"hosted_peer_distribution",
+		initFn,
+		updateFn,
+	)
+	if err != nil {
+		return nil
+	}
+	return ipHosting
 }

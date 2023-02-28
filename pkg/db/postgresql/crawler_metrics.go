@@ -122,3 +122,132 @@ func (db *DBClient) GetGeoDistribution() (map[string]interface{}, error) {
 
 	return geoDist, nil
 }
+
+func (db *DBClient) GetOsDistribution() (map[string]interface{}, error) {
+	summary := make(map[string]interface{}, 0)
+	rows, err := db.psqlPool.Query(
+		db.ctx,
+		`
+		SELECT
+			client_os,
+			count(client_os) as nodes
+		FROM peer_info
+		WHERE deprecated='false' and attempted='true' and client_name IS NOT NULL
+		GROUP BY client_os
+		ORDER BY nodes DESC;
+		`)
+	if err != nil {
+		return summary, err
+	}
+	for rows.Next() {
+		var os string
+		var count int
+		err = rows.Scan(&os, &count)
+		summary[os] = count
+	}
+	return summary, nil
+}
+
+func (db *DBClient) GetArchDistribution() (map[string]interface{}, error) {
+	summary := make(map[string]interface{}, 0)
+	rows, err := db.psqlPool.Query(
+		db.ctx,
+		`
+		SELECT
+			client_arch,
+			count(client_arch) as nodes
+		FROM peer_info
+		WHERE deprecated='false' and attempted='true' and client_name IS NOT NULL
+		GROUP BY client_arch
+		ORDER BY nodes DESC;
+		`)
+	if err != nil {
+		return summary, err
+	}
+	for rows.Next() {
+		var arch string
+		var count int
+		err = rows.Scan(&arch, &count)
+		summary[arch] = count
+	}
+	return summary, nil
+}
+
+func (db *DBClient) GetHostingDistribution() (map[string]interface{}, error) {
+	summary := make(map[string]interface{})
+	// get the number of mobile hosts
+	var mobile int
+	err := db.psqlPool.QueryRow(
+		db.ctx,
+		`
+		SELECT 
+			count(aux.mobile) as mobile
+		FROM (
+			SELECT
+				pi.peer_id,
+				pi.attempted,
+				pi.client_name,
+				pi.deprecated,
+				pi.ip,
+				ips.mobile
+			FROM peer_info as pi
+			INNER JOIN ips ON pi.ip=ips.ip
+			WHERE pi.deprecated='false' and attempted = 'true' and client_name IS NOT NULL and ips.mobile='true'
+		) as aux
+		`).Scan(&mobile)
+	if err != nil {
+		return summary, err
+	}
+	summary["mobile_ips"] = mobile
+
+	// get the number of proxy peers
+	var proxy int
+	err = db.psqlPool.QueryRow(
+		db.ctx,
+		`
+		SELECT 
+			count(aux.proxy) as under_proxy
+		FROM (
+			SELECT
+				pi.peer_id,
+				pi.attempted,
+				pi.client_name,
+				pi.deprecated,
+				pi.ip,
+				ips.proxy
+			FROM peer_info as pi
+			INNER JOIN ips ON pi.ip=ips.ip
+			WHERE pi.deprecated='false' and attempted = 'true' and client_name IS NOT NULL and ips.proxy='true'
+		) as aux
+		`).Scan(&proxy)
+	if err != nil {
+		return summary, err
+	}
+	summary["under_proxy"] = proxy
+
+	// get the number of hosted IPs
+	var hosted int
+	err = db.psqlPool.QueryRow(
+		db.ctx,
+		`
+		SELECT 
+			count(aux.hosting) as hosted_ips
+		FROM (
+			SELECT
+				pi.peer_id,
+				pi.attempted,
+				pi.client_name,
+				pi.deprecated,
+				pi.ip,
+				ips.hosting
+			FROM peer_info as pi
+			INNER JOIN ips ON pi.ip=ips.ip
+			WHERE pi.deprecated='false' and attempted = 'true' and client_name IS NOT NULL and ips.hosting='true'
+		) as aux		
+		`).Scan(&hosted)
+	if err != nil {
+		return summary, err
+	}
+	summary["hosted_ips"] = hosted
+	return summary, nil
+}

@@ -60,7 +60,6 @@ func (d *Discovery) nodesPerForkMetrics() *metrics.IndvMetrics {
 
 	nodeDist, err := metrics.NewIndvMetrics(
 		"node_per_fork_distribution",
-		"Number of non-deprecated nodes per fork in the Ethereum network",
 		initFn,
 		updateFn,
 	)
@@ -89,7 +88,6 @@ func (c *Discovery) AttnetsDistMetrics() *metrics.IndvMetrics {
 
 	nodeDist, err := metrics.NewIndvMetrics(
 		"attnets_distribution",
-		"Distribution of number of nodes subscribed to number of subnets",
 		initFn,
 		updateFn,
 	)

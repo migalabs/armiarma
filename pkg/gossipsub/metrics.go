@@ -60,7 +60,6 @@ func (gs *GossipSub) peersPerTopic() *metrics.IndvMetrics {
 
 	peersTop, err := metrics.NewIndvMetrics(
 		"peers_per_topic",
-		"Number of peers that we have connected per topic",
 		initFn,
 		updateFn,
 	)
