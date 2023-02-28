@@ -11,22 +11,18 @@ services:
                         - type: bind
                           source: ./app-data/init-armiarma.sql
                           target: /docker-entrypoint-initdb.d/docker_postgres_init.sql
-                        - type: bind
-                          source: ./app-data/postgresql_db
-                          target: /var/lib/postgresql
+                        - ./app-data/postgresql_db:/var/lib/postgresql/data
                 network_mode: 'host'
 
         
         prometheus:
                 image: prom/prometheus:v2.36.2
                 volumes:
+                        - ./app-data/prometheus_db:/prometheus
                         - type: bind
                           source: ./prometheus/
                           target: /etc/prometheus/
-                        - type: bind 
-                          source: ./app-data/prometheus_db
-                          target: /var/lib/prometheus
-                        
+
                 command:
                         - '--config.file=/etc/prometheus/prometheus.yml'
                         - '--storage.tsdb.path=/prometheus'
