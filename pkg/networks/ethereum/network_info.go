@@ -36,7 +36,6 @@ var (
 		BellatrixKey: "0x4a26c58b",
 		// Gnosis
 		GnosisPhase0Key:    "0xf925ddc5",
-		GnosisAltairKey:    "0x56fdb5e0",
 		GnosisBellatrixKey: "0x56fdb5e0",
 		// Goerli
 		PraterPhase0Key:    "0x79df0428",

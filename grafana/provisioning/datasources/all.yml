@@ -4,4 +4,4 @@ datasources:
   - name: Armiarma
     type: prometheus
     access: direct
-    url: http://localhost:9090
+    url: http://prometheus:9090

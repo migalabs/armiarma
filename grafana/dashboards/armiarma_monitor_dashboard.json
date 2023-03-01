@@ -29,11 +29,184 @@
   "liveNow": false,
   "panels": [
     {
+      "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
         "y": 0
+      },
+      "id": 76,
+      "panels": [],
+      "title": "Crawlers",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${Host}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 9,
+        "x": 0,
+        "y": 1
+      },
+      "id": 74,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "groupWidth": 1,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "orientation": "auto",
+        "showValue": "auto",
+        "stacking": "none",
+        "text": {},
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${Host}"
+          },
+          "editorMode": "builder",
+          "exemplar": false,
+          "expr": "up",
+          "instant": true,
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Up Running Crawlers",
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "/.*job=\"(.*)\".*/",
+            "renamePattern": "$1"
+          }
+        }
+      ],
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${Host}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 9,
+        "y": 1
+      },
+      "id": 54,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "9.0.9",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${Host}"
+          },
+          "editorMode": "builder",
+          "expr": "sum by(job) (crawler_observed_client_distribution)",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Total active nodes",
+      "type": "stat"
+    },
+    {
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 7
       },
       "id": 52,
       "title": "General view",
@@ -42,7 +215,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${Crawler}"
+        "uid": "${Host}"
       },
       "description": "Client distribution observed by the tool crawling the Eth2 Beaconchain network",
       "fieldConfig": {
@@ -326,7 +499,7 @@
         "h": 10,
         "w": 10,
         "x": 0,
-        "y": 1
+        "y": 8
       },
       "id": 50,
       "maxDataPoints": 3000,
@@ -347,11 +520,11 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${Crawler}"
+            "uid": "${Host}"
           },
-          "editorMode": "code",
+          "editorMode": "builder",
           "exemplar": false,
-          "expr": "crawler_observed_client_distribution",
+          "expr": "crawler_observed_client_distribution{job=\"$Crawler\"}",
           "format": "time_series",
           "instant": false,
           "interval": "",
@@ -362,12 +535,21 @@
         }
       ],
       "title": "Client Observed Distribution",
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": ".*client=\"(.*)\", instance.*",
+            "renamePattern": "$1"
+          }
+        }
+      ],
       "type": "timeseries"
     },
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${Crawler}"
+        "uid": "${Host}"
       },
       "fieldConfig": {
         "defaults": {
@@ -523,7 +705,7 @@
         "h": 10,
         "w": 6,
         "x": 10,
-        "y": 1
+        "y": 8
       },
       "id": 48,
       "options": {
@@ -555,11 +737,11 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${Crawler}"
+            "uid": "${Host}"
           },
           "editorMode": "builder",
           "exemplar": false,
-          "expr": "crawler_observed_client_distribution",
+          "expr": "crawler_observed_client_distribution{job=\"$Crawler\"}",
           "instant": true,
           "legendFormat": "__auto",
           "range": false,
@@ -567,77 +749,21 @@
         }
       ],
       "title": "Current Client Share",
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": ".*client=\"(.*)\", instance.*",
+            "renamePattern": "$1"
+          }
+        }
+      ],
       "type": "piechart"
     },
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${Crawler}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 8,
-        "x": 16,
-        "y": 1
-      },
-      "id": 54,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "pluginVersion": "9.0.9",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${Crawler}"
-          },
-          "editorMode": "builder",
-          "expr": "sum by(job) (crawler_observed_client_distribution)",
-          "legendFormat": "__auto",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "title": "Total active nodes",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${Crawler}"
+        "uid": "${Host}"
       },
       "fieldConfig": {
         "defaults": {
@@ -690,16 +816,16 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 6,
+        "h": 10,
         "w": 8,
         "x": 16,
-        "y": 5
+        "y": 8
       },
       "id": 46,
       "options": {
         "legend": {
           "calcs": [],
-          "displayMode": "hidden",
+          "displayMode": "list",
           "placement": "bottom",
           "showLegend": false
         },
@@ -712,22 +838,31 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${Crawler}"
+            "uid": "${Host}"
           },
           "editorMode": "builder",
-          "expr": "host_connected_peers",
+          "expr": "host_connected_peers{job=\"$Crawler\"}",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
         }
       ],
       "title": "Connected Nodes",
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "/.*job=\"(.*)\".*/",
+            "renamePattern": "$1"
+          }
+        }
+      ],
       "type": "timeseries"
     },
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${Crawler}"
+        "uid": "${Host}"
       },
       "fieldConfig": {
         "defaults": {
@@ -819,9 +954,9 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 6,
+        "w": 4,
         "x": 0,
-        "y": 11
+        "y": 18
       },
       "id": 70,
       "options": {
@@ -845,11 +980,11 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${Crawler}"
+            "uid": "${Host}"
           },
-          "editorMode": "code",
+          "editorMode": "builder",
           "exemplar": false,
-          "expr": "host_supported_protocols{}",
+          "expr": "host_supported_protocols{job=\"$Crawler\"}",
           "format": "table",
           "instant": true,
           "legendFormat": "__auto",
@@ -863,7 +998,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${Crawler}"
+        "uid": "${Host}"
       },
       "fieldConfig": {
         "defaults": {
@@ -918,8 +1053,8 @@
       "gridPos": {
         "h": 8,
         "w": 8,
-        "x": 6,
-        "y": 11
+        "x": 4,
+        "y": 18
       },
       "id": 72,
       "options": {
@@ -938,13 +1073,24 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${Crawler}"
+            "uid": "${Host}"
           },
-          "expr": "local_node_local_head_slot{}",
+          "editorMode": "builder",
+          "expr": "local_node_local_head_slot{job=\"$Crawler\"}",
+          "range": true,
           "refId": "A"
         }
       ],
       "title": "Head Slot of the crawler",
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": ".*job=\"(.*)\".*",
+            "renamePattern": "$1"
+          }
+        }
+      ],
       "type": "timeseries"
     },
     {
@@ -953,7 +1099,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 19
+        "y": 26
       },
       "id": 38,
       "panels": [],
@@ -963,7 +1109,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${Crawler}"
+        "uid": "${Host}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1024,7 +1170,7 @@
         "h": 9,
         "w": 9,
         "x": 0,
-        "y": 20
+        "y": 27
       },
       "id": 40,
       "options": {
@@ -1043,22 +1189,31 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${Crawler}"
+            "uid": "${Host}"
           },
           "editorMode": "builder",
-          "expr": "gossipsub_peers_per_topic",
+          "expr": "gossipsub_peers_per_topic{job=\"$Crawler\"}",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
         }
       ],
       "title": "Peers per GossipSub Topics",
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": ".*topic=\"(.*)\"}.*",
+            "renamePattern": "$1"
+          }
+        }
+      ],
       "type": "timeseries"
     },
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${Crawler}"
+        "uid": "${Host}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1069,14 +1224,14 @@
             "axisLabel": "Peers",
             "axisPlacement": "left",
             "axisSoftMax": 8,
-            "fillOpacity": 80,
+            "fillOpacity": 78,
             "gradientMode": "none",
             "hideFrom": {
               "legend": false,
               "tooltip": false,
               "viz": false
             },
-            "lineWidth": 6,
+            "lineWidth": 0,
             "scaleDistribution": {
               "type": "linear"
             }
@@ -1106,12 +1261,12 @@
         "h": 9,
         "w": 9,
         "x": 9,
-        "y": 20
+        "y": 27
       },
       "id": 42,
       "options": {
         "barRadius": 0,
-        "barWidth": 0.97,
+        "barWidth": 0.68,
         "groupWidth": 1,
         "legend": {
           "calcs": [],
@@ -1122,6 +1277,7 @@
         "orientation": "auto",
         "showValue": "always",
         "stacking": "none",
+        "text": {},
         "tooltip": {
           "mode": "single",
           "sort": "asc"
@@ -1133,11 +1289,11 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${Crawler}"
+            "uid": "${Host}"
           },
           "editorMode": "builder",
           "exemplar": false,
-          "expr": "gossipsub_peers_per_topic",
+          "expr": "gossipsub_peers_per_topic{job=\"$Crawler\"}",
           "instant": true,
           "legendFormat": "__auto",
           "range": false,
@@ -1145,12 +1301,21 @@
         }
       ],
       "title": "Current peers per topic",
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": ".*topic=\"(.*)\"}.*",
+            "renamePattern": "$1"
+          }
+        }
+      ],
       "type": "barchart"
     },
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${Crawler}"
+        "uid": "${Host}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1234,7 +1399,7 @@
             "properties": [
               {
                 "id": "custom.width",
-                "value": 313
+                "value": 332
               }
             ]
           }
@@ -1244,7 +1409,7 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 20
+        "y": 27
       },
       "id": 44,
       "options": {
@@ -1268,11 +1433,11 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${Crawler}"
+            "uid": "${Host}"
           },
           "editorMode": "builder",
           "exemplar": false,
-          "expr": "gossipsub_peers_per_topic",
+          "expr": "gossipsub_peers_per_topic{job=\"$Crawler\"}",
           "format": "table",
           "instant": true,
           "interval": "",
@@ -1289,7 +1454,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 29
+        "y": 36
       },
       "id": 8,
       "title": "Crawler",
@@ -1298,7 +1463,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${Crawler}"
+        "uid": "${Host}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1354,13 +1519,13 @@
         "h": 10,
         "w": 12,
         "x": 0,
-        "y": 30
+        "y": 37
       },
       "id": 10,
       "options": {
         "legend": {
           "calcs": [],
-          "displayMode": "hidden",
+          "displayMode": "list",
           "placement": "bottom",
           "showLegend": false
         },
@@ -1373,22 +1538,31 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${Crawler}"
+            "uid": "${Host}"
           },
           "editorMode": "builder",
-          "expr": "crawler_observed_client_distribution",
+          "expr": "crawler_observed_client_distribution{job=\"$Crawler\"}",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
         }
       ],
       "title": "Client Distribution",
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": ".*client=\"(.*)\", instance.*",
+            "renamePattern": "$1"
+          }
+        }
+      ],
       "type": "timeseries"
     },
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${Crawler}"
+        "uid": "${Host}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1444,7 +1618,7 @@
         "h": 10,
         "w": 9,
         "x": 12,
-        "y": 30
+        "y": 37
       },
       "id": 12,
       "options": {
@@ -1464,22 +1638,31 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${Crawler}"
+            "uid": "${Host}"
           },
           "editorMode": "builder",
-          "expr": "crawler_observed_client_version_distribution",
+          "expr": "crawler_observed_client_version_distribution{job=\"$Crawler\"}",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
         }
       ],
       "title": "Client Version Distribution",
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": ".*client_version=\"(.*)\", instance.*",
+            "renamePattern": "$1"
+          }
+        }
+      ],
       "type": "timeseries"
     },
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${Crawler}"
+        "uid": "${Host}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1566,7 +1749,7 @@
         "h": 10,
         "w": 3,
         "x": 21,
-        "y": 30
+        "y": 37
       },
       "id": 14,
       "options": {
@@ -1593,11 +1776,11 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${Crawler}"
+            "uid": "${Host}"
           },
           "editorMode": "builder",
           "exemplar": false,
-          "expr": "crawler_observed_client_version_distribution",
+          "expr": "crawler_observed_client_version_distribution{job=\"$Crawler\"}",
           "format": "table",
           "instant": true,
           "legendFormat": "{{label_name}}",
@@ -1612,7 +1795,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${Crawler}"
+        "uid": "${Host}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1681,7 +1864,7 @@
         "h": 9,
         "w": 8,
         "x": 0,
-        "y": 40
+        "y": 47
       },
       "id": 22,
       "options": {
@@ -1700,22 +1883,31 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${Crawler}"
+            "uid": "${Host}"
           },
           "editorMode": "builder",
-          "expr": "sum by(instance) (crawler_observed_client_distribution)",
+          "expr": "sum by(instance) (crawler_observed_client_distribution{job=\"$Crawler\"})",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Total Active Nodes",
+      "title": "Active Nodes",
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(.*):(.*)",
+            "renamePattern": "$1"
+          }
+        }
+      ],
       "type": "timeseries"
     },
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${Crawler}"
+        "uid": "${Host}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1771,13 +1963,13 @@
         "h": 9,
         "w": 7,
         "x": 8,
-        "y": 40
+        "y": 47
       },
       "id": 56,
       "options": {
         "legend": {
           "calcs": [],
-          "displayMode": "hidden",
+          "displayMode": "list",
           "placement": "bottom"
         },
         "tooltip": {
@@ -1789,22 +1981,31 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${Crawler}"
+            "uid": "${Host}"
           },
           "editorMode": "builder",
-          "expr": "crawler_deprecated_nodes",
+          "expr": "crawler_deprecated_nodes{job=\"$Crawler\"}",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Deprecated Peers",
+      "title": "Total Deprecated Peers",
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": ".*job=\"(.*)\"}.*",
+            "renamePattern": "$1"
+          }
+        }
+      ],
       "type": "timeseries"
     },
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${Crawler}"
+        "uid": "${Host}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1860,13 +2061,13 @@
         "h": 9,
         "w": 7,
         "x": 15,
-        "y": 40
+        "y": 47
       },
       "id": 34,
       "options": {
         "legend": {
           "calcs": [],
-          "displayMode": "hidden",
+          "displayMode": "list",
           "placement": "bottom",
           "showLegend": false
         },
@@ -1879,22 +2080,31 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${Crawler}"
+            "uid": "${Host}"
           },
           "editorMode": "builder",
-          "expr": "crawler_node_distribution",
+          "expr": "crawler_node_distribution{job=\"$Crawler\"}",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Total Node Count",
+      "title": "Non-Deprecated Node Count",
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": ".*job=\"(.*)\"}.*",
+            "renamePattern": "$1"
+          }
+        }
+      ],
       "type": "timeseries"
     },
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${Crawler}"
+        "uid": "${Host}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1988,7 +2198,7 @@
         "h": 9,
         "w": 2,
         "x": 22,
-        "y": 40
+        "y": 47
       },
       "id": 36,
       "options": {
@@ -2012,11 +2222,11 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${Crawler}"
+            "uid": "${Host}"
           },
           "editorMode": "builder",
           "exemplar": false,
-          "expr": "crawler_geographical_distribution",
+          "expr": "crawler_geographical_distribution{job=\"$Crawler\"}",
           "format": "table",
           "instant": true,
           "legendFormat": "__auto",
@@ -2030,7 +2240,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${Crawler}"
+        "uid": "${Host}"
       },
       "fieldConfig": {
         "defaults": {
@@ -2073,7 +2283,7 @@
         "h": 10,
         "w": 8,
         "x": 0,
-        "y": 49
+        "y": 56
       },
       "id": 64,
       "options": {
@@ -2103,11 +2313,11 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${Crawler}"
+            "uid": "${Host}"
           },
           "editorMode": "builder",
           "exemplar": false,
-          "expr": "crawler_os_distribution",
+          "expr": "crawler_os_distribution{job=\"$Crawler\"}",
           "format": "time_series",
           "instant": true,
           "interval": "",
@@ -2117,12 +2327,21 @@
         }
       ],
       "title": "Os Distribution",
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": ".*os=\"(.*)\"}.*",
+            "renamePattern": "$1"
+          }
+        }
+      ],
       "type": "barchart"
     },
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${Crawler}"
+        "uid": "${Host}"
       },
       "fieldConfig": {
         "defaults": {
@@ -2165,7 +2384,7 @@
         "h": 10,
         "w": 8,
         "x": 8,
-        "y": 49
+        "y": 56
       },
       "id": 65,
       "options": {
@@ -2193,11 +2412,11 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${Crawler}"
+            "uid": "${Host}"
           },
           "editorMode": "builder",
           "exemplar": false,
-          "expr": "crawler_arch_distribution",
+          "expr": "crawler_arch_distribution{job=\"$Crawler\"}",
           "format": "time_series",
           "instant": true,
           "interval": "",
@@ -2207,12 +2426,21 @@
         }
       ],
       "title": "CPU Architecture Distribution",
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": ".*arch=\"(.*)\", instance.*",
+            "renamePattern": "$1"
+          }
+        }
+      ],
       "type": "barchart"
     },
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${Crawler}"
+        "uid": "${Host}"
       },
       "fieldConfig": {
         "defaults": {
@@ -2255,7 +2483,7 @@
         "h": 10,
         "w": 8,
         "x": 16,
-        "y": 49
+        "y": 56
       },
       "id": 68,
       "options": {
@@ -2283,11 +2511,11 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${Crawler}"
+            "uid": "${Host}"
           },
           "editorMode": "builder",
           "exemplar": false,
-          "expr": "crawler_hosted_peers_distribution",
+          "expr": "crawler_hosted_peers_distribution{job=\"$Crawler\"}",
           "format": "time_series",
           "instant": true,
           "interval": "",
@@ -2297,6 +2525,15 @@
         }
       ],
       "title": "Ip Hosting distribution",
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": ".*ip_host=\"(.*)\", job.*",
+            "renamePattern": "$1"
+          }
+        }
+      ],
       "type": "barchart"
     },
     {
@@ -2305,7 +2542,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 59
+        "y": 66
       },
       "id": 6,
       "panels": [],
@@ -2315,7 +2552,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${Crawler}"
+        "uid": "${Host}"
       },
       "fieldConfig": {
         "defaults": {
@@ -2371,13 +2608,13 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 60
+        "y": 67
       },
       "id": 16,
       "options": {
         "legend": {
           "calcs": [],
-          "displayMode": "hidden",
+          "displayMode": "list",
           "placement": "bottom",
           "showLegend": false
         },
@@ -2390,22 +2627,31 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${Crawler}"
+            "uid": "${Host}"
           },
           "editorMode": "builder",
-          "expr": "peering_peers_attempted_last_iteration",
+          "expr": "peering_peers_attempted_last_iteration{job=\"$Crawler\"}",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
         }
       ],
       "title": "Attempted To Connect peers",
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": ".*job=\"(.*)\"}.*",
+            "renamePattern": "$1"
+          }
+        }
+      ],
       "type": "timeseries"
     },
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${Crawler}"
+        "uid": "${Host}"
       },
       "fieldConfig": {
         "defaults": {
@@ -2461,13 +2707,13 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 60
+        "y": 67
       },
       "id": 18,
       "options": {
         "legend": {
           "calcs": [],
-          "displayMode": "hidden",
+          "displayMode": "list",
           "placement": "bottom",
           "showLegend": false
         },
@@ -2480,22 +2726,31 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${Crawler}"
+            "uid": "${Host}"
           },
           "editorMode": "builder",
-          "expr": "peering_peerstore_iteration_time_secs",
+          "expr": "peering_peerstore_iteration_time_secs{job=\"$Crawler\"}",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
         }
       ],
       "title": "Iteration Time",
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": ".*job=\"(.*)\"}.*",
+            "renamePattern": "$1"
+          }
+        }
+      ],
       "type": "timeseries"
     },
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${Crawler}"
+        "uid": "${Host}"
       },
       "fieldConfig": {
         "defaults": {
@@ -2551,13 +2806,13 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 69
+        "y": 76
       },
       "id": 32,
       "options": {
         "legend": {
           "calcs": [],
-          "displayMode": "hidden",
+          "displayMode": "list",
           "placement": "bottom",
           "showLegend": false
         },
@@ -2570,22 +2825,31 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${Crawler}"
+            "uid": "${Host}"
           },
           "editorMode": "builder",
-          "expr": "peering_iteration_attempts_by_category_distribution",
+          "expr": "peering_iteration_attempts_by_category_distribution{job=\"$Crawler\"}",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
         }
       ],
       "title": "Attempted Peers Distribution",
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": ".*controlAttemptdist=\"(.*)\", instance.*",
+            "renamePattern": "$1"
+          }
+        }
+      ],
       "type": "timeseries"
     },
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${Crawler}"
+        "uid": "${Host}"
       },
       "fieldConfig": {
         "defaults": {
@@ -2641,13 +2905,13 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 69
+        "y": 76
       },
       "id": 20,
       "options": {
         "legend": {
           "calcs": [],
-          "displayMode": "hidden",
+          "displayMode": "list",
           "placement": "bottom",
           "showLegend": false
         },
@@ -2660,22 +2924,31 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${Crawler}"
+            "uid": "${Host}"
           },
           "editorMode": "builder",
-          "expr": "peering_pruned_error_distribution",
+          "expr": "peering_pruned_error_distribution{job=\"$Crawler\"}",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
         }
       ],
       "title": "Total Error Category Distribution ",
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": ".*controldist=\"(.*)\", instance.*",
+            "renamePattern": "$1"
+          }
+        }
+      ],
       "type": "timeseries"
     },
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${Crawler}"
+        "uid": "${Host}"
       },
       "fieldConfig": {
         "defaults": {
@@ -2731,7 +3004,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 78
+        "y": 85
       },
       "id": 58,
       "options": {
@@ -2756,22 +3029,31 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${Crawler}"
+            "uid": "${Host}"
           },
           "editorMode": "builder",
-          "expr": "peering_conn_error_distribution",
+          "expr": "peering_conn_error_distribution{job=\"$Crawler\"}",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
         }
       ],
       "title": "Error distribution on connection attempt",
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": ".*error_type=\"(.*)\", instance.*",
+            "renamePattern": "$1"
+          }
+        }
+      ],
       "type": "timeseries"
     },
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${Crawler}"
+        "uid": "${Host}"
       },
       "fieldConfig": {
         "defaults": {
@@ -2826,7 +3108,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 87
+        "y": 94
       },
       "id": 60,
       "options": {
@@ -2838,7 +3120,9 @@
             "sum"
           ],
           "displayMode": "table",
-          "placement": "right"
+          "placement": "right",
+          "sortBy": "Total",
+          "sortDesc": true
         },
         "orientation": "auto",
         "showValue": "auto",
@@ -2854,11 +3138,11 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${Crawler}"
+            "uid": "${Host}"
           },
           "editorMode": "builder",
           "exemplar": false,
-          "expr": "peering_total_conn_error_distribution{error_type!=\"--\"}",
+          "expr": "peering_total_conn_error_distribution{job=\"$Crawler\", error_type!=\"--\"}",
           "instant": true,
           "legendFormat": "__auto",
           "range": false,
@@ -2866,6 +3150,15 @@
         }
       ],
       "title": "Current error distribution",
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": ".*error_type=\"(.*)\", instance.*",
+            "renamePattern": "$1"
+          }
+        }
+      ],
       "type": "barchart"
     },
     {
@@ -2873,7 +3166,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 96
+        "y": 103
       },
       "id": 4,
       "title": "Peer Discovery",
@@ -2882,7 +3175,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${Crawler}"
+        "uid": "${Host}"
       },
       "fieldConfig": {
         "defaults": {
@@ -2923,27 +3216,28 @@
       },
       "gridPos": {
         "h": 9,
-        "w": 11,
+        "w": 12,
         "x": 0,
-        "y": 97
+        "y": 104
       },
       "id": 62,
       "options": {
         "barRadius": 0,
         "barWidth": 0.97,
-        "groupWidth": 0.7,
+        "groupWidth": 1,
         "legend": {
           "calcs": [
             "sum"
           ],
           "displayMode": "table",
-          "placement": "bottom",
+          "placement": "right",
           "sortBy": "Total",
           "sortDesc": true
         },
         "orientation": "auto",
         "showValue": "auto",
         "stacking": "none",
+        "text": {},
         "tooltip": {
           "mode": "single",
           "sort": "none"
@@ -2955,11 +3249,11 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${Crawler}"
+            "uid": "${Host}"
           },
           "editorMode": "builder",
           "exemplar": false,
-          "expr": "discovery_attnets_distribution",
+          "expr": "discovery_attnets_distribution{job=\"$Crawler\"}",
           "instant": true,
           "legendFormat": "__auto",
           "range": false,
@@ -2967,149 +3261,21 @@
         }
       ],
       "title": "Panel Title",
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": ".*att_number=\"(.*)\", instance.*",
+            "renamePattern": "$1"
+          }
+        }
+      ],
       "type": "barchart"
     },
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${Crawler}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "custom": {
-            "align": "auto",
-            "displayMode": "auto",
-            "inspect": false
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 1
-              }
-            ]
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "__name__"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Time"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "instance"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "job"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "att_number"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "short"
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 9,
-        "w": 4,
-        "x": 11,
-        "y": 97
-      },
-      "id": 24,
-      "options": {
-        "footer": {
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
-        },
-        "showHeader": true,
-        "sortBy": [
-          {
-            "desc": true,
-            "displayName": "Value"
-          }
-        ]
-      },
-      "pluginVersion": "9.0.9",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${Crawler}"
-          },
-          "editorMode": "builder",
-          "exemplar": false,
-          "expr": "discovery_attnets_distribution",
-          "format": "table",
-          "instant": true,
-          "interval": "",
-          "legendFormat": "__auto",
-          "range": false,
-          "refId": "A"
-        }
-      ],
-      "title": "Attnets Distribution",
-      "type": "table"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${Crawler}"
+        "uid": "${Host}"
       },
       "fieldConfig": {
         "defaults": {
@@ -3163,15 +3329,15 @@
       },
       "gridPos": {
         "h": 9,
-        "w": 9,
-        "x": 15,
-        "y": 97
+        "w": 12,
+        "x": 12,
+        "y": 104
       },
       "id": 26,
       "options": {
         "legend": {
           "calcs": [],
-          "displayMode": "hidden",
+          "displayMode": "list",
           "placement": "bottom",
           "showLegend": false
         },
@@ -3184,16 +3350,25 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${Crawler}"
+            "uid": "${Host}"
           },
           "editorMode": "builder",
-          "expr": "discovery_node_per_fork_distribution",
+          "expr": "discovery_node_per_fork_distribution{job=\"$Crawler\"}",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
         }
       ],
       "title": "Discovered Peers",
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": ".*job=\"(.*)\"}.*",
+            "renamePattern": "$1"
+          }
+        }
+      ],
       "type": "timeseries"
     },
     {
@@ -3202,7 +3377,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 106
+        "y": 113
       },
       "id": 2,
       "panels": [],
@@ -3212,7 +3387,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${Crawler}"
+        "uid": "${Host}"
       },
       "fieldConfig": {
         "defaults": {
@@ -3281,7 +3456,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 107
+        "y": 114
       },
       "id": 28,
       "options": {
@@ -3300,10 +3475,10 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${Crawler}"
+            "uid": "${Host}"
           },
           "editorMode": "builder",
-          "expr": "go_memstats_heap_alloc_bytes{job=\"armiarma\"}",
+          "expr": "go_memstats_heap_alloc_bytes{job=\"$Crawler\"}",
           "hide": false,
           "legendFormat": "__auto",
           "range": true,
@@ -3316,7 +3491,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${Crawler}"
+        "uid": "${Host}"
       },
       "fieldConfig": {
         "defaults": {
@@ -3372,7 +3547,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 107
+        "y": 114
       },
       "id": 30,
       "options": {
@@ -3391,10 +3566,10 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${Crawler}"
+            "uid": "${Host}"
           },
           "editorMode": "builder",
-          "expr": "go_threads{job=\"armiarma\"}",
+          "expr": "go_threads{job=\"$Crawler\"}",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -3419,7 +3594,7 @@
         "hide": 0,
         "includeAll": false,
         "multi": false,
-        "name": "Crawler",
+        "name": "Host",
         "options": [],
         "query": "prometheus",
         "queryValue": "",
@@ -3427,17 +3602,48 @@
         "regex": "",
         "skipUrlSync": false,
         "type": "datasource"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "mainnet_crawler"
+          ],
+          "value": [
+            "mainnet_crawler"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${Host}"
+        },
+        "definition": "up",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Crawler",
+        "multi": true,
+        "name": "Crawler",
+        "options": [],
+        "query": {
+          "query": "up",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 1,
+        "regex": "/.*job=\"(.*)\".*/",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
       }
     ]
   },
   "time": {
-    "from": "now-5m",
+    "from": "now-1h",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "Armiarma Monitor",
   "uid": "VAcjQa04k",
-  "version": 14,
+  "version": 21,
   "weekStart": ""
 }

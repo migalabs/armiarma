@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"encoding/hex"
-	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
@@ -55,7 +54,7 @@ func NewLocalEthereumNode(
 	case ForkDigests[PraterPhase0Key], ForkDigests[PraterBellatrixKey]:
 		genesis = GoerliGenesis
 	// Gnosis
-	case ForkDigests[GnosisPhase0Key], ForkDigests[GnosisAltairKey], ForkDigests[GnosisBellatrixKey]:
+	case ForkDigests[GnosisPhase0Key], ForkDigests[GnosisBellatrixKey]:
 		genesis = GnosisGenesis
 	// Mainnet
 	default:
@@ -113,11 +112,7 @@ func (en *LocalEthereumNode) EthNode() *enode.LocalNode {
 
 func ComposeQuickBeaconStatus(forkDigest string) common.Status {
 	frkDgst := new(common.ForkDigest)
-	b, err := hex.DecodeString(strings.Trim(forkDigest, "0x"))
-	if err != nil {
-		log.Panic("unable to decode ForkDigest", err.Error())
-	}
-	frkDgst.UnmarshalText(b)
+	frkDgst.UnmarshalText([]byte(forkDigest))
 
 	return common.Status{
 		ForkDigest:     *frkDgst,
