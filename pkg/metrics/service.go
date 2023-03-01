@@ -15,7 +15,6 @@ import (
 
 var (
 	// TODO: Just hardcoded, move to config
-	ExposedPort string = "9080"
 	EndpointUrl string = "metrics"
 
 	MetricLoopInterval time.Duration = 15 * time.Second
@@ -24,7 +23,8 @@ var (
 type PrometheusMetrics struct {
 	ctx context.Context
 
-	ExposePort      string
+	ExposedIp       string
+	ExposedPort     string
 	EndpointUrl     string
 	RefreshInterval time.Duration
 
@@ -34,10 +34,11 @@ type PrometheusMetrics struct {
 	closeC chan struct{}
 }
 
-func NewPrometheusMetrics(ctx context.Context, port int) *PrometheusMetrics {
+func NewPrometheusMetrics(ctx context.Context, ip string, port int) *PrometheusMetrics {
 	return &PrometheusMetrics{
 		ctx:             ctx,
-		ExposePort:      fmt.Sprintf("%d", port),
+		ExposedIp:       ip,
+		ExposedPort:     fmt.Sprintf("%d", port),
 		EndpointUrl:     EndpointUrl,
 		RefreshInterval: MetricLoopInterval,
 		Modules:         make([]*MetricsModule, 0),
@@ -52,7 +53,7 @@ func (p *PrometheusMetrics) AddMeticsModule(newMod *MetricsModule) {
 func (p *PrometheusMetrics) Start() error {
 	http.Handle("/"+p.EndpointUrl, promhttp.Handler())
 	go func() {
-		log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", p.ExposePort), nil))
+		log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%s", p.ExposedIp, p.ExposedPort), nil))
 	}()
 
 	err := p.initPrometheusMetrics()

@@ -14,6 +14,7 @@ var (
 	DefaultLogLevel                  string = "info"
 	DefaultPrivKey                   string = ""
 	DefaultIP                        string = "0.0.0.0"
+	DefaultMetricsIP                 string = "0.0.0.0"
 	DefaultPort                      int    = 9020
 	DefaultMetricsPort               int    = 9080
 	DefaultUserAgent                 string = "Armiarma Crawler"
