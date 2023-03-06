@@ -85,7 +85,7 @@
       },
       "gridPos": {
         "h": 6,
-        "w": 9,
+        "w": 13,
         "x": 0,
         "y": 1
       },
@@ -165,8 +165,8 @@
       },
       "gridPos": {
         "h": 6,
-        "w": 6,
-        "x": 9,
+        "w": 11,
+        "x": 13,
         "y": 1
       },
       "id": 54,
@@ -198,7 +198,7 @@
           "refId": "A"
         }
       ],
-      "title": "Total active nodes",
+      "title": "Total Active Nodes per Crawler",
       "type": "stat"
     },
     {
@@ -847,7 +847,7 @@
           "refId": "A"
         }
       ],
-      "title": "Connected Nodes",
+      "title": "Distribution of Directly Connected Nodes ",
       "transformations": [
         {
           "id": "renameByRegex",
@@ -1081,7 +1081,7 @@
           "refId": "A"
         }
       ],
-      "title": "Head Slot of the crawler",
+      "title": "Head Slot of the Crawler",
       "transformations": [
         {
           "id": "renameByRegex",
@@ -1300,7 +1300,7 @@
           "refId": "A"
         }
       ],
-      "title": "Current peers per topic",
+      "title": "Directly Connected Peers per Topic",
       "transformations": [
         {
           "id": "renameByRegex",
@@ -1446,7 +1446,7 @@
           "refId": "A"
         }
       ],
-      "title": "Peers per topic Table",
+      "title": "Directly Connected Peers per Topic (Table)",
       "type": "table"
     },
     {
@@ -1797,6 +1797,7 @@
         "type": "prometheus",
         "uid": "${Host}"
       },
+      "description": "Nodes that are not deprecated, that we identified ",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1909,6 +1910,7 @@
         "type": "prometheus",
         "uid": "${Host}"
       },
+      "description": "distribution of the total of nodes that we have deprecated since the crawler was launched.\nNOTE: the distribution shows unique peers.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2007,6 +2009,7 @@
         "type": "prometheus",
         "uid": "${Host}"
       },
+      "description": "From all the peers discovered in the network, the distribution shows the number of peers that are not deprected.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2554,6 +2557,7 @@
         "type": "prometheus",
         "uid": "${Host}"
       },
+      "description": "",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2636,7 +2640,7 @@
           "refId": "A"
         }
       ],
-      "title": "Attempted To Connect peers",
+      "title": "Peers Attempted to Connect on Last Peerstore Iteration",
       "transformations": [
         {
           "id": "renameByRegex",
@@ -2735,7 +2739,7 @@
           "refId": "A"
         }
       ],
-      "title": "Iteration Time",
+      "title": "Taken Time to Perform the Iterations",
       "transformations": [
         {
           "id": "renameByRegex",
@@ -2834,7 +2838,7 @@
           "refId": "A"
         }
       ],
-      "title": "Attempted Peers Distribution",
+      "title": " Distribution of the Error Category that Peers reported in the last Iterations",
       "transformations": [
         {
           "id": "renameByRegex",
@@ -2933,7 +2937,7 @@
           "refId": "A"
         }
       ],
-      "title": "Total Error Category Distribution ",
+      "title": "Total Error Category Distribution Over the Non-Deprecated Peers",
       "transformations": [
         {
           "id": "renameByRegex",
@@ -3038,7 +3042,7 @@
           "refId": "A"
         }
       ],
-      "title": "Error distribution on connection attempt",
+      "title": "Dialling Error Distribution on Connection Attempts in Last Iteration",
       "transformations": [
         {
           "id": "renameByRegex",
@@ -3149,7 +3153,7 @@
           "refId": "A"
         }
       ],
-      "title": "Current error distribution",
+      "title": "Error Distribution of the Non-Deprecated Peers",
       "transformations": [
         {
           "id": "renameByRegex",
@@ -3177,6 +3181,7 @@
         "type": "prometheus",
         "uid": "${Host}"
       },
+      "description": "The number of attetation subnets that peers active in the last day advertise in their ENR.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -3226,9 +3231,7 @@
         "barWidth": 0.97,
         "groupWidth": 1,
         "legend": {
-          "calcs": [
-            "sum"
-          ],
+          "calcs": [],
           "displayMode": "table",
           "placement": "right",
           "sortBy": "Total",
@@ -3237,7 +3240,9 @@
         "orientation": "auto",
         "showValue": "auto",
         "stacking": "none",
-        "text": {},
+        "text": {
+          "valueSize": 1
+        },
         "tooltip": {
           "mode": "single",
           "sort": "none"
@@ -3260,7 +3265,7 @@
           "refId": "A"
         }
       ],
-      "title": "Panel Title",
+      "title": "Advertised Attesnets from Active peers",
       "transformations": [
         {
           "id": "renameByRegex",
@@ -3277,6 +3282,7 @@
         "type": "prometheus",
         "uid": "${Host}"
       },
+      "description": "Distributions of how many ENR (nodes) where discovered in the last 24 hours",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -3478,14 +3484,14 @@
             "uid": "${Host}"
           },
           "editorMode": "builder",
-          "expr": "go_memstats_heap_alloc_bytes{job=\"$Crawler\"}",
+          "expr": "go_memstats_heap_alloc_bytes{job=\"$Crawler\"} / 1048576",
           "hide": false,
           "legendFormat": "__auto",
           "range": true,
           "refId": "B"
         }
       ],
-      "title": "Allocated Memory Bytes ",
+      "title": "Allocated Memory (MB) ",
       "type": "timeseries"
     },
     {
@@ -3587,9 +3593,9 @@
     "list": [
       {
         "current": {
-          "selected": true,
-          "text": "Local",
-          "value": "Local"
+          "selected": false,
+          "text": "Production Crawler",
+          "value": "Production Crawler"
         },
         "hide": 0,
         "includeAll": false,
@@ -3605,7 +3611,7 @@
       },
       {
         "current": {
-          "selected": true,
+          "selected": false,
           "text": [
             "mainnet_crawler"
           ],
@@ -3637,13 +3643,13 @@
     ]
   },
   "time": {
-    "from": "now-1h",
+    "from": "now-7d",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "Armiarma Monitor",
   "uid": "VAcjQa04k",
-  "version": 21,
+  "version": 22,
   "weekStart": ""
 }
