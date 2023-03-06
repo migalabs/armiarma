@@ -72,7 +72,7 @@ List of ports that are going to be used:
 | Armiarma | `9020` & `9080` | - |
 | PostgreSQL | `5432` | user=`user` & password=`password` | 
 | Prometheus | `9090` | - | 
-| Grafana | `3000` | user=`admin` & password=`password` | 
+| Grafana | `3000` | user=`admin` & password=`admin` | 
 
 
 To spawn up the entire set-up, just run the following command in the root directory
