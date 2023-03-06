@@ -16,7 +16,7 @@ import (
 )
 
 var (
-	Version = "v2.0.0-beta\n"
+	Version = "v2.0.0\n"
 	// logging variables
 	log = logrus.WithField(
 		"module", "ARMIARMA",
