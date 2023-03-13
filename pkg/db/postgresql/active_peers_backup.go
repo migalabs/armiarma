@@ -26,10 +26,10 @@ func (c *DBClient) InitActivePeersTable() error {
 		`
 			CREATE TABLE IF NOT EXISTS active_peers(
 				id SERIAL,
-				timestamp TIME,
+				timestamp TIMESTAMP,
 				peers BIGINT[],
 
-				PRIMARY KEY(id)			
+				PRIMARY KEY(timestamp)			
 			);
 		`,
 	)
