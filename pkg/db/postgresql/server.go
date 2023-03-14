@@ -112,6 +112,8 @@ func NewDBClient(
 	for i := 0; i < maxPersisters; i++ {
 		go dbClient.launchPersister()
 	}
+	// launch the daily backup heartbeat
+	go dbClient.dailyBackupheartbeat()
 	return dbClient, nil
 }
 
@@ -325,9 +327,6 @@ func (c *DBClient) launchPersister() {
 			}
 		}
 	}()
-
-	// launch the daily backup heartbeat
-	go c.dailyBackupheartbeat()
 }
 
 func (c *DBClient) dailyBackupheartbeat() {

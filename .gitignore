@@ -8,3 +8,5 @@
 **/*.sh
 # docker-compose volumes
 app-data/*_db
+
+*.env
