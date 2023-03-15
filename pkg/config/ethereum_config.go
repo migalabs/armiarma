@@ -38,6 +38,7 @@ type EthereumCrawlerConfig struct {
 	Bootnodes                 []string `json:"bootnodes"`
 	GossipTopics              []string `json:"gossip-topics"`
 	Subnets                   []int    `json:"subnets"`
+	PersistConnEvents	  bool 	   `json:"persist-connevents"`
 	PersistMsgs               bool     `json:"persist-msgs"`
 	ValPubkeys                []string `json:"val-pubkeys"`
 }
@@ -60,6 +61,7 @@ func NewEthereumCrawlerConfig() *EthereumCrawlerConfig {
 		Bootnodes:                 DefaultEthereumBootnodes,
 		Subnets:                   DefaultSubnets,
 		GossipTopics:              DefaultEthereumGossipTopics,
+		PersistConnEvents: 	   DefaultPersistConnEvents,
 		PersistMsgs:               false,
 		ValPubkeys:                DefaultValPubkeys,
 	}
@@ -168,6 +170,9 @@ func (c *EthereumCrawlerConfig) Apply(ctx *cli.Context) {
 			}
 		}
 	}
+	if ctx.IsSet("persist-connevents") {
+		c.PersistConnEvents = ctx.Bool("persist-connevents")
+	}
 
 	// check if we want to track the Msgs in the SQL database
 	if ctx.IsSet("persist-msgs") {
@@ -197,6 +202,7 @@ func (c *EthereumCrawlerConfig) Apply(ctx *cli.Context) {
 		"bootnodes":       c.Bootnodes,
 		"gossip-topics":   c.GossipTopics,
 		"subnets":         c.Subnets,
+		"persist-connevents": c.PersistConnEvents,
 		"persist-msgs":    c.PersistMsgs,
 		"val-pubkeys":     len(c.ValPubkeys),
 	}).Info("config for the Ethereum crawler")

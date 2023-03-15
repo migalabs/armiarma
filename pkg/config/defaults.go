@@ -20,6 +20,7 @@ var (
 	DefaultUserAgent                 string = "Armiarma Crawler"
 	DefaultPSQLEndpoint              string = "postgres://user:password@localhost:5432/armiarmadb"
 	DefaultActivePeersBackupInterval string = "12h"
+	DefaultPersistConnEvents 	 bool 	= true
 
 	Ipfsprotocols = []string{
 		"/ipfs/kad/1.0.0",

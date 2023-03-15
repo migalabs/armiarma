@@ -18,6 +18,11 @@ services:
                 networks: [ cluster ]
                 ports:
                         - "127.0.0.1:5432:5432"
+                healthcheck:
+                  test: pg_isready -U user -d armiarmadb
+                  interval: 10s
+                  timeout: 3s
+                  retries: 3
 
         prometheus:
                 image: prom/prometheus:v2.36.2
@@ -58,7 +63,11 @@ services:
                         --fork-digest=${CRAWLER_FORK_DIGEST}
                         --gossip-topic=${CRAWLER_GOSSIP_TOPIC}
                         --subnet=${CRAWLER_SUBNET}
+                        --persist-connevents=${CRAWLER_PERSIST_CONNEVENTS}
                 restart: unless-stopped
+                depends_on: 
+                  db:
+                    condition: service_healthy
                 networks: [ cluster ]
                 ports: 
                         - "9020:9020"
