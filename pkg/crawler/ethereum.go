@@ -90,7 +90,14 @@ func NewEthereumCrawler(mainCtx *cli.Context, conf config.EthereumCrawlerConfig)
 		cancel()
 		return nil, err
 	}
-	dbClient, err := psql.NewDBClient(ctx, ethNode.Network(), conf.PsqlEndpoint, backupInterval, true)
+	dbClient, err := psql.NewDBClient(
+			ctx,
+			ethNode.Network(), 
+			conf.PsqlEndpoint, 
+			backupInterval, 
+			psql.InitializeTables(true),
+			psql.WithConnectionEventsPersist(conf.PersistConnEvents),
+	)
 	if err != nil {
 		cancel()
 		return nil, err

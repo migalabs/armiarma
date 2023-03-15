@@ -26,6 +26,7 @@ var (
 	noQueryResult string = "no result"
 )
 
+
 type DBClient struct {
 	// Control Variables
 	ctx                 context.Context
@@ -42,14 +43,17 @@ type DBClient struct {
 	persistC chan interface{}
 	doneC    chan struct{}
 	wg       *sync.WaitGroup
+
+	// Control Variables
+	persistConnEvents bool
 }
 
 func NewDBClient(
-	ctx context.Context,
-	p2pNetwork utils.NetworkType,
-	loginStr string,
-	dailyBackupInt time.Duration,
-	initialized bool) (*DBClient, error) {
+ctx context.Context,
+p2pNetwork utils.NetworkType,
+loginStr string,
+dailyBackupInt time.Duration,
+options ...DBOption) (*DBClient, error) {
 	// check if the login string has enough len
 	if len(loginStr) == 0 {
 		return nil, errors.New("empty db-endpoint provided")
@@ -98,13 +102,14 @@ func NewDBClient(
 		persistC:            persistC,
 		doneC:               make(chan struct{}),
 		wg:                  &wg,
+		persistConnEvents: true,
 	}
 
-	// initialize all the tables
-	if initialized {
-		err = dbClient.initTables()
+	// Check for all the available options
+	for _, opt := range options {
+		err := opt(dbClient)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to initialize the SQL tables at "+loginStr)
+			return nil, err
 		}
 	}
 
@@ -273,12 +278,13 @@ func (c *DBClient) launchPersister() {
 				case (*models.ConnEvent):
 					connEvent := obj.(*models.ConnEvent)
 					logEntry.Tracef("persisting conn_event for peer %s\n", connEvent.PeerID.String())
-					q, args := c.InsertNewConnEvent(connEvent)
-					batch.AddQuery(q, args...)
-
+					if c.persistConnEvents {
+						q, args := c.InsertNewConnEvent(connEvent)
+						batch.AddQuery(q, args...)
+					}
 					// Control Info LastActivity based on last disconnection
 					// get the disconnection time to update the LastActivity timestamp in the peer_info table
-					q, args = c.UpdateLastActivityTimestamp(connEvent.PeerID, connEvent.DiscTime)
+					q, args := c.UpdateLastActivityTimestamp(connEvent.PeerID, connEvent.DiscTime)
 					batch.AddQuery(q, args...)
 
 				case (models.IpInfo):
