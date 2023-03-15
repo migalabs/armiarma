@@ -46,7 +46,7 @@ func (c *DBClient) getActivePeers() ([]int, error) {
 			id,
 			peer_id
 		FROM peer_info
-		WHERE deprecated='false'
+		WHERE deprecated = 'false' and attempted = 'true' and client_name IS NOT NULL
 		`,
 	)
 	if err != nil {
