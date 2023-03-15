@@ -105,6 +105,11 @@ var Eth2CrawlerCommand = &cli.Command{
 			EnvVars: []string{"ARMIARMA_SUBNETS"},
 		},
 		&cli.BoolFlag{
+			Name:    "persist-connevents",
+			Usage:   "Decide whether we want to track the connection-events into the DB (Disk intense)",
+			EnvVars: []string{"ARMIARMA_PERSIST_CONNEVENTS"},
+		},
+		&cli.BoolFlag{
 			Name:    "persist-msgs",
 			Usage:   "Decide whether we want to track the msgs-metadata into the DB",
 			EnvVars: []string{"ARMIARMA_PERSIST_MSGS"},
