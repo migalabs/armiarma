@@ -1,6 +1,7 @@
 package postgresql
 
 import (
+	"fmt"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
@@ -249,5 +250,97 @@ func (db *DBClient) GetHostingDistribution() (map[string]interface{}, error) {
 		return summary, err
 	}
 	summary["hosted_ips"] = hosted
+	return summary, nil
+}
+
+func (db *DBClient) GetRTTDistribution() (map[string]interface{}, error) {
+	summary := make(map[string]interface{}, 0)
+
+	rows, err := db.psqlPool.Query(
+		db.ctx,
+		`
+		SELECT 
+			t.latency as latency_range,
+			count(*) as nodes 
+		FROM (
+			SELECT
+				CASE
+					WHEN latency between 0 and 100 THEN ' 0-100ms'
+					WHEN latency between 101 and 200 THEN '101-200ms'
+					WHEN latency between 201 and 300 THEN '201-300ms'
+					WHEN latency between 301 and 400 THEN '301-400ms'     
+					WHEN latency between 401 and 500 THEN '401-500ms'     
+					WHEN latency between 501 and 600 THEN '501-600ms'      
+					WHEN latency between 601 and 700 THEN '601-700ms'     
+					WHEN latency between 701 and 800 THEN '701-800ms'
+					WHEN latency between 801 and 900 THEN '801-900ms'
+					WHEN latency between 901 and 1000 THEN '901-1000ms'     
+					ELSE '+1s' 
+				END as latency    
+			FROM peer_info 
+			WHERE deprecated=false and client_name IS NOT NULL 
+		) as t 
+		GROUP BY t.latency 
+		ORDER BY nodes DESC;	
+			
+		`,
+	)
+	if err != nil {
+		return summary, err
+	}
+
+	for rows.Next() {
+		var rttRange string
+		var rttValue int
+		err = rows.Scan(
+			&rttRange,
+			&rttValue,
+		) 
+		if err != nil {
+			return summary, err	
+		}
+		summary[rttRange] = rttValue	
+	}
+	return summary, nil
+}
+
+func (db *DBClient) GetIPDistribution() (map[string]interface{}, error) {
+	summary := make(map[string]interface{}, 0)
+
+	rows, err := db.psqlPool.Query(
+		db.ctx,
+		`
+		SELECT 
+			nodes as nodes_per_ip, 
+			count(t.nodes) as number_of_ips 
+		FROM ( 
+			SELECT 
+				ip, 
+				count(ip) as nodes 
+			FROM peer_info 
+			WHERE deprecated = false and client_name IS NOT NULL 
+			GROUP BY ip 
+			ORDER BY nodes DESC 
+		) as t 
+		GROUP BY nodes 
+		ORDER BY number_of_ips DESC;	
+		`,
+	)
+	if err != nil {
+		return summary, err
+	}
+
+	for rows.Next() {
+		var nodesPerIP int
+		var ips int
+		err = rows.Scan(
+			&nodesPerIP,
+			&ips,
+		) 
+		if err != nil {
+			return summary, err	
+		}
+		summary[fmt.Sprintf("%d", nodesPerIP)] = ips	
+	}
 	return summary, nil
 }
