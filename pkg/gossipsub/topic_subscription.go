@@ -64,7 +64,7 @@ func (c *TopicSubscription) MessageReadingLoop(selfId peer.ID, dbClient database
 				// use the msg handler for that specific topic that we have
 				content, err := c.handlerFn(msg)
 				if err != nil {
-					log.Error(errors.Wrap(err, "unable to unwrap message on topic"+c.sub.Topic()))
+					log.Error(errors.Wrap(err, "unable to unwrap message on topic " + c.sub.Topic()))
 					continue
 				}
 				if !content.IsZero() && c.persistMsgs {
