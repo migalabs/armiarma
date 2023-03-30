@@ -134,8 +134,8 @@ func (d *Discovery5) nodeIterator() {
 		if d.Iterator.Next() {
 			// fill the given DiscoveredPeer interface with the next found peer
 			node := d.Iterator.Node()
-
 			log.WithFields(log.Fields{
+				"enr": node.String(),
 				"node_id": node.ID().String(),
 				"module":  "Discv5",
 			}).Debug("new ENR discovered")
