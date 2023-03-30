@@ -62,9 +62,23 @@ var (
 	HostedPeers = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: modName,
 		Name:      "hosted_peers_distribution",
-		Help:      "Distribution of IPs hosting the nodes in the network",
+		Help:      "Distribution of nodes that are hosted on non-residential networks",
 	},
 		[]string{"ip_host"},
+	)
+	RttDist = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: modName,
+		Name:      "observed_rtt_distribution",
+		Help:      "Distribution of RTT between our tool and nodes in the network",
+	},
+		[]string{"secs"},
+	)
+	IPDist = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: modName,
+		Name:      "observed_ip_distribution",
+		Help:      "Distribution of IPs hosting nodes in the network",
+	},
+		[]string{"numbernodes"},
 	)
 )
 
@@ -82,6 +96,8 @@ func (c *EthereumCrawler) GetMetrics() *metrics.MetricsModule {
 	metricsMod.AddIndvMetric(c.getPeersOs())
 	metricsMod.AddIndvMetric(c.getPeersArch())
 	metricsMod.AddIndvMetric(c.getHostedPeers())
+	metricsMod.AddIndvMetric(c.getRTTDist())
+	metricsMod.AddIndvMetric(c.getIPDist())
 
 	return metricsMod
 }
@@ -291,4 +307,57 @@ func (c *EthereumCrawler) getHostedPeers() *metrics.IndvMetrics {
 		return nil
 	}
 	return ipHosting
+}
+
+
+func (c *EthereumCrawler) getRTTDist() *metrics.IndvMetrics {
+	initFn := func() error {
+		prometheus.MustRegister(RttDist)
+		return nil
+	}
+	updateFn := func() (interface{}, error) {
+		summary, err := c.DB.GetRTTDistribution()
+		if err != nil {
+			return nil, err
+		}
+		for key, val := range summary {
+			RttDist.WithLabelValues(key).Set(float64(val.(int)))
+		}
+		return summary, nil
+	}
+	indvMetric, err := metrics.NewIndvMetrics(
+		"rtt_distribution",
+		initFn,
+		updateFn,
+	)
+	if err != nil {
+		return nil
+	}
+	return indvMetric
+}
+
+func (c *EthereumCrawler) getIPDist() *metrics.IndvMetrics {
+	initFn := func() error {
+		prometheus.MustRegister(IPDist)
+		return nil
+	}
+	updateFn := func() (interface{}, error) {
+		summary, err := c.DB.GetIPDistribution()
+		if err != nil {
+			return nil, err
+		}
+		for key, val := range summary {
+			IPDist.WithLabelValues(key).Set(float64(val.(int)))
+		}
+		return summary, nil
+	}
+	indvMetric, err := metrics.NewIndvMetrics(
+		"ip_distribution",
+		initFn,
+		updateFn,
+	)
+	if err != nil {
+		return nil
+	}
+	return indvMetric
 }
