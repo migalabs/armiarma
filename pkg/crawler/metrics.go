@@ -71,14 +71,14 @@ var (
 		Name:      "observed_rtt_distribution",
 		Help:      "Distribution of RTT between our tool and nodes in the network",
 	},
-		[]string{"rtt_range"},
+		[]string{"secs"},
 	)
 	IPDist = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: modName,
 		Name:      "observed_ip_distribution",
 		Help:      "Distribution of IPs hosting nodes in the network",
 	},
-		[]string{"repeated_ips"},
+		[]string{"numbernodes"},
 	)
 )
 
