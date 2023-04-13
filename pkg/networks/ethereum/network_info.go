@@ -13,13 +13,14 @@ var (
 	BlockchainName   string = "eth2"
 
 	// default fork_digests
-	DefaultForkDigest string = ForkDigests[BellatrixKey]
+	DefaultForkDigest string = ForkDigests[CapellaKey]
 	AllForkDigest     string = "All"
 
 	// Mainnet
 	Phase0Key    string = "Mainnet"
 	AltairKey    string = "Altair"
 	BellatrixKey string = "Bellatrix"
+	CapellaKey	 string = "Capella"
 	// Gnosis
 	GnosisPhase0Key    string = "GnosisPhase0"
 	GnosisAltairKey    string = "GnosisAltair"
@@ -27,6 +28,7 @@ var (
 	// Goerli / Prater
 	PraterPhase0Key    string = "PraterPhase0"
 	PraterBellatrixKey string = "PraterBellatrix"
+	PraterCapellaKey   string = "PraterCapella"
 
 	ForkDigests = map[string]string{
 		AllForkDigest: "all",
@@ -34,12 +36,14 @@ var (
 		Phase0Key:    "0xb5303f2a",
 		AltairKey:    "0xafcaaba0",
 		BellatrixKey: "0x4a26c58b",
+		CapellaKey:   "0xbba4da96",
 		// Gnosis
 		GnosisPhase0Key:    "0xf925ddc5",
 		GnosisBellatrixKey: "0x56fdb5e0",
 		// Goerli
 		PraterPhase0Key:    "0x79df0428",
 		PraterBellatrixKey: "0xc2ce3aa8",
+		PraterCapellaKey:	"0x628941ef",
 	}
 
 	MessageTypes = []string{

@@ -112,20 +112,22 @@ func (c *EthereumCrawlerConfig) Apply(ctx *cli.Context) {
 		if valid {
 			c.ForkDigest = validForkDigest
 		}
-		// check if fork-digest is not empty -> eth-cl endpoint
-		if forkDigest == "" && ctx.IsSet("remote-cl-endpoint") {
-			c.EthCLRemoteEndpoint = ctx.String("remote-cl-endpoint")
-			log.Warnf("fork_digest not provided - fetching latest one from %s", c.EthCLRemoteEndpoint)
-			clEndp, err := rendp.NewInfuraClient(c.EthCLRemoteEndpoint)
-			if err != nil {
-				log.Panic(errors.Wrap(err, "unable to determine the latest fork_digest"))
-			}
-			forkD, err := rendp.GetForkDigetsOfEth2Head(ctx.Context, &clEndp)
-			if err != nil {
-				log.Panic(errors.Wrap(err, "unable to retreive the fork_digests from given rndp"))
-			}
-			c.ForkDigest = forkD.String()
+		
+	}
+
+	// Check if the eth-cl endpoint
+	if ctx.IsSet("remote-cl-endpoint") {
+		c.EthCLRemoteEndpoint = ctx.String("remote-cl-endpoint")
+		log.Warnf("fork_digest not provided - fetching latest one from %s", c.EthCLRemoteEndpoint)
+		clEndp, err := rendp.NewInfuraClient(c.EthCLRemoteEndpoint)
+		if err != nil {
+			log.Panic(errors.Wrap(err, "unable to determine the latest fork_digest"))
 		}
+		forkD, err := rendp.GetForkDigetsOfEth2Head(ctx.Context, &clEndp)
+		if err != nil {
+			log.Panic(errors.Wrap(err, "unable to retreive the fork_digests from given rndp"))
+		}
+		c.ForkDigest = forkD.String()
 	}
 
 	// postgresql endpoint
