@@ -8,7 +8,7 @@ import (
 	// bls "github.com/phoreproject/github.com/bls/g1pubs"
 
 	"github.com/migalabs/armiarma/pkg/gossipsub"
-	"github.com/protolambda/zrnt/eth2/beacon/bellatrix"
+	"github.com/protolambda/zrnt/eth2/beacon/capella"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/protolambda/zrnt/eth2/beacon/phase0"
 	"github.com/protolambda/zrnt/eth2/configs"
@@ -123,7 +123,7 @@ func (mh *EthMessageHandler) BeaconBlockMessageHandler(msg *pubsub.Message) (gos
 		return nil, err
 	}
 	msgBuf := bytes.NewBuffer(msgBytes)
-	bblock := new(bellatrix.SignedBeaconBlock)
+	bblock := new(capella.SignedBeaconBlock)
 
 	err = bblock.Deserialize(configs.Mainnet, codec.NewDecodingReader(msgBuf, uint64(len(msgBuf.Bytes()))))
 	if err != nil {
