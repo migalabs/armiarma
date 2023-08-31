@@ -18,13 +18,9 @@ To use the tool, the following requirements need to be installed in the machine:
 - gcc - C compiler
 - [go](https://go.dev/doc/install) on its 1.17 version (upper versions might fail to compile, we are working on it). Go needs to be executable from the terminal. Lower versions will report a dependency import error for the package `io/fs`.
 - PostgreSQL DB 
-- Docker version
-- Docker-Compose 
-
 
 Alternatively, the tool can also be executed from:
-- [docker](https://docs.docker.com/get-docker/)
-- [docker-compose](https://docs.docker.com/compose/install/)
+- [docker](https://docs.docker.com/get-docker/) / [docker-compose](https://docs.docker.com/compose/install/)
 
 OPTIONAL for data visualization:
 - [prometheus](https://prometheus.io/docs/prometheus/latest/installation/) time-series database.
@@ -75,12 +71,11 @@ List of ports that are going to be used:
 | Grafana | `3000` | user=`admin` & password=`admin` | 
 
 
-To spawn up the entire set-up, just run the following command in the root directory
+To spawn up the entire set-up, make a copy of the `.env_template` to configure it at your wish, and just run the following command in the root directory
 
 ```
 # Call docker-compose in the root of the repository, and that's all
-docker-compose up 
-
+docker-compose up --env-file <.env-copy-path> 
 ```
 Docker-compose will generate the Docker images for you and will run the crawler and its requirements in your machine. 
 Please note that, by running the tool through the `docker-compose --env-file <.env-file-name> up` command.
