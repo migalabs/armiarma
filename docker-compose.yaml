@@ -17,7 +17,7 @@ services:
                         - ./app-data/postgresql_db:/var/lib/postgresql/data
                 networks: [ cluster ]
                 ports:
-                        - "127.0.0.1:5432:5432"
+                        - "127.0.0.1:${DB_PORT}:5432"
                 healthcheck:
                   test: pg_isready -U user -d armiarmadb
                   interval: 10s
@@ -70,5 +70,5 @@ services:
                     condition: service_healthy
                 networks: [ cluster ]
                 ports: 
-                        - "9020:9020"
-                        - "127.0.0.1:9080:9080"
+                        - "${CRAWLER_PORT}:9020"
+                        - "127.0.0.1:${CRAWLER_METRICS_PORT}:9080"

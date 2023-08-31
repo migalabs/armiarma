@@ -4,9 +4,15 @@
 # do not include unnecesary files such as:
 # log .txt s
 **/*.txt
+
 # launchers
 **/*.sh
+
 # docker-compose volumes
 app-data/*_db
 
+# configurations
 *.env
+
+# IDE configuration
+.idea
