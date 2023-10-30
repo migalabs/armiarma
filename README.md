@@ -6,8 +6,7 @@ Distributed p2p networks are gaining popularity with the popularization of block
 With this idea in mind, from Miga Labs, we want to provide a tool able to join p2p networks (check the protocol compatibility list), share, and adopt the used protocols to provide the datasets and the tools to study the new blockchain networks generation.
 
 ## Who are we?
-[Miga Labs](http://migalabs.es/) is a young department of the Barcelona Supercomputing Center (BSC), specialized in next-generation Blockchain technology, focusing on Sharding and Proof-of-Stake protocols.
-
+[MigaLabs](https://migalabs.io/) is a research group specialized in next-generation Blockchain technology, focusing on in-depth studies and solutions for Blockchain Scalability, Security, and Sustainability. Our team comprises technical experts in the Ethereum protocol, offering consulting services covering all technical aspects of Blockchain technology.
 
 ## Getting started
 The project offers a network crawler able to monitor the Eth2 p2p network. 
