@@ -46,8 +46,9 @@ func (c *DBClient) getActivePeers() ([]int, error) {
 			id,
 			peer_id
 		FROM peer_info
-		WHERE deprecated = 'false' and attempted = 'true' and client_name IS NOT NULL
+		WHERE deprecated = 'false' and attempted = 'true' and client_name IS NOT NULL and to_timestamp(last_activity) > CURRENT_TIMESTAMP - INTERVAL '$1 DAY'
 		`,
+		LastActivityValidRange,
 	)
 	if err != nil {
 		return activePeers, errors.Wrap(err, "unable to retrieve active peer's ids")
