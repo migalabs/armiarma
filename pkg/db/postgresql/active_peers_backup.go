@@ -74,6 +74,10 @@ func (c *DBClient) activePeersBackup() error {
 	if err != nil {
 		return errors.Wrap(err, "unable to backup active peers")
 	}
+	if len(activePeers) <= 0 {
+		log.Infof("tried to persist %d active peers (skipped)", len(activePeers))
+		return nil
+	}
 
 	// backup the list of active peers
 	_, err = c.psqlPool.Exec(
