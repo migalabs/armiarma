@@ -223,7 +223,8 @@ func (db *DBClient) GetHostingDistribution() (map[string]interface{}, error) {
 			WHERE pi.deprecated='false' and 
 			      attempted = 'true' and 
 			      client_name IS NOT NULL and 
-			      ips.mobile='true' and to_timestamp(last_activity) > CURRENT_TIMESTAMP - ($1 * INTERVAL '1 DAY')
+			      ips.mobile='true' and 
+			      to_timestamp(last_activity) > CURRENT_TIMESTAMP - ($1 * INTERVAL '1 DAY')
 		) as aux
 		`,
 		LastActivityValidRange,
@@ -283,7 +284,8 @@ func (db *DBClient) GetHostingDistribution() (map[string]interface{}, error) {
 			WHERE pi.deprecated='false' and 
 			      attempted = 'true' and 
 			      client_name IS NOT NULL and 
-			      ips.hosting='true' and to_timestamp(last_activity) > CURRENT_TIMESTAMP - ($1 * INTERVAL '1 DAY')
+			      ips.hosting='true' and 
+			      to_timestamp(last_activity) > CURRENT_TIMESTAMP - ($1 * INTERVAL '1 DAY')
 		) as aux		
 		`,
 		LastActivityValidRange,
