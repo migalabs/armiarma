@@ -26,7 +26,6 @@ var (
 	noQueryResult string = "no result"
 )
 
-
 type DBClient struct {
 	// Control Variables
 	ctx                 context.Context
@@ -49,11 +48,11 @@ type DBClient struct {
 }
 
 func NewDBClient(
-ctx context.Context,
-p2pNetwork utils.NetworkType,
-loginStr string,
-dailyBackupInt time.Duration,
-options ...DBOption) (*DBClient, error) {
+	ctx context.Context,
+	p2pNetwork utils.NetworkType,
+	loginStr string,
+	dailyBackupInt time.Duration,
+	options ...DBOption) (*DBClient, error) {
 	// check if the login string has enough len
 	if len(loginStr) == 0 {
 		return nil, errors.New("empty db-endpoint provided")
@@ -102,7 +101,7 @@ options ...DBOption) (*DBClient, error) {
 		persistC:            persistC,
 		doneC:               make(chan struct{}),
 		wg:                  &wg,
-		persistConnEvents: true,
+		persistConnEvents:   true,
 	}
 
 	// Check for all the available options
@@ -336,6 +335,11 @@ func (c *DBClient) launchPersister() {
 }
 
 func (c *DBClient) dailyBackupheartbeat() {
+	// make a first backup of the active peers(if any)
+	err := c.activePeersBackup()
+	if err != nil {
+		log.Error(err)
+	}
 	ticker := time.NewTicker(c.dailyBackupInterval)
 	for {
 		select {
