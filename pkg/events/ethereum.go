@@ -11,7 +11,8 @@ type EthereumAttestation struct {
 	Attestation *phase0.Attestation `json:"attestation"`
 }
 
-// TimedEthereumAttestation contains extra data for an Ethereum Attestation
+// TimedEthereumAttestation contains the data for an Ethereum Attestation that was received
+// along with extra data such as when it arrived and who sent it
 type TimedEthereumAttestation struct {
 	Attestation          *phase0.Attestation   `json:"attestation"`
 	AttestationExtraData *AttestationExtraData `json:"attestation_extra_data"`

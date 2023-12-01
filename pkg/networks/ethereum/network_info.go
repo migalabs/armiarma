@@ -20,7 +20,7 @@ var (
 	Phase0Key    string = "Mainnet"
 	AltairKey    string = "Altair"
 	BellatrixKey string = "Bellatrix"
-	CapellaKey	 string = "Capella"
+	CapellaKey   string = "Capella"
 	// Gnosis
 	GnosisPhase0Key    string = "GnosisPhase0"
 	GnosisAltairKey    string = "GnosisAltair"
@@ -29,6 +29,12 @@ var (
 	PraterPhase0Key    string = "PraterPhase0"
 	PraterBellatrixKey string = "PraterBellatrix"
 	PraterCapellaKey   string = "PraterCapella"
+	// Sepolia
+	SepoliaCapellaKey string = "SepoliaCapella"
+	// Holesky
+	HoleskyCapellaKey string = "HoleskyCapella"
+	// Deneb
+	DenebCancunKey string = "DenebCancun"
 
 	ForkDigests = map[string]string{
 		AllForkDigest: "all",
@@ -40,10 +46,16 @@ var (
 		// Gnosis
 		GnosisPhase0Key:    "0xf925ddc5",
 		GnosisBellatrixKey: "0x56fdb5e0",
-		// Goerli
+		// Goerli-Prater
 		PraterPhase0Key:    "0x79df0428",
 		PraterBellatrixKey: "0xc2ce3aa8",
-		PraterCapellaKey:	"0x628941ef",
+		PraterCapellaKey:   "0x628941ef",
+		// Sepolia
+		SepoliaCapellaKey: "0x47eb72b3",
+		// Holesky
+		HoleskyCapellaKey: "0x17e2dad3",
+		// Deneb
+		DenebCancunKey: "0xee7b3a32",
 	}
 
 	MessageTypes = []string{
