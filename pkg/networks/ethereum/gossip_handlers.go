@@ -15,7 +15,6 @@ import (
 	"github.com/protolambda/ztyp/codec"
 
 	"github.com/golang/snappy"
-	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -37,7 +36,6 @@ type EthMessageHandler struct {
 	pubkeys     []*common.BLSPubkey // pubkeys of those validators we want to track
 
 	attestationCallbacks []func(event *AttestationReceievedEvent)
-	blockClallbacks      []func(block *TrackedBeaconBlock, peerID peer.ID)
 }
 
 func NewEthMessageHandler(genesis time.Time, pubkeysStr []string) (*EthMessageHandler, error) {
@@ -62,10 +60,6 @@ func NewEthMessageHandler(genesis time.Time, pubkeysStr []string) (*EthMessageHa
 
 func (s *EthMessageHandler) OnAttestation(fn func(event *AttestationReceievedEvent)) {
 	s.attestationCallbacks = append(s.attestationCallbacks, fn)
-}
-
-func (s *EthMessageHandler) OnBlock(fn func(block *TrackedBeaconBlock, peerID peer.ID)) {
-	s.blockClallbacks = append(s.blockClallbacks, fn)
 }
 
 // as reference https://github.com/protolambda/zrnt/blob/4ecaadfe0cb3c0a90d85e6a6dddcd3ebed0411b9/eth2/beacon/phase0/indexed.go#L99
@@ -123,7 +117,8 @@ func (s *EthMessageHandler) SubnetMessageHandler(msg *pubsub.Message) (gossipsub
 
 	// Publish the event
 	for _, fn := range s.attestationCallbacks {
-		// Warning: blocking call, but the only consumer should be the top-level crawler, which will throw it in to a buffered channel.
+		// Warning: blocking call, but the only consumers of these "internal" events should be the "events" forwarder which will throw it
+		// in to a buffered channel.
 		fn(&AttestationReceievedEvent{
 			Attestation:        &attestation,
 			TrackedAttestation: trackedAttestation,
@@ -151,8 +146,6 @@ func (mh *EthMessageHandler) BeaconBlockMessageHandler(msg *pubsub.Message) (gos
 	if err != nil {
 		return nil, err
 	}
-
-	log.Info("Got a beacon block", bblock.Message.Slot, bblock.Message.ProposerIndex)
 
 	trackedBlock := &TrackedBeaconBlock{
 		MsgID:       msg.ID,
