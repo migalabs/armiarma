@@ -2,6 +2,7 @@ package postgresql
 
 import (
 	"fmt"
+
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
@@ -24,19 +25,14 @@ func (db *DBClient) GetClientDistribution() (map[string]interface{}, error) {
 			client_name, count(client_name) as count
 		FROM peer_info
 		WHERE 
-			deprecated = 'false' and 
-		    attempted = 'true' and 
-		    client_name IS NOT NULL and 
-		    to_timestamp(last_activity) > CURRENT_TIMESTAMP - ($1 * INTERVAL '1 DAY')
+			deprecated = 'false' and attempted = 'true' and client_name IS NOT NULL
 		GROUP BY client_name
 		ORDER BY count DESC;
 		`,
-		LastActivityValidRange,
 	)
 	// make sure we close the rows and we free the connection/session
 	defer rows.Close()
 	if err != nil {
-		fmt.Print("\n", err.Error())
 		return cliDist, errors.Wrap(err, "unable to fetch client distribution")
 	}
 
@@ -66,14 +62,10 @@ func (db *DBClient) GetVersionDistribution() (map[string]interface{}, error) {
 			count(client_version) as cnt
 		FROM peer_info
 		WHERE 
-			deprecated = 'false' and 
-			attempted = 'true' and 
-			client_name IS NOT NULL and 
-			to_timestamp(last_activity) > CURRENT_TIMESTAMP - ($1 * INTERVAL '1 DAY')
+			deprecated = 'false' and attempted = 'true' and client_name IS NOT NULL
 		GROUP BY client_name, client_version
 		ORDER BY client_name DESC, cnt DESC;
 		`,
-		LastActivityValidRange,
 	)
 	// make sure we close the rows and we free the connection/session
 	defer rows.Close()
@@ -112,15 +104,11 @@ func (db *DBClient) GetGeoDistribution() (map[string]interface{}, error) {
 				ips.country_code
 			FROM peer_info
 			RIGHT JOIN ips on peer_info.ip = ips.ip
-			WHERE deprecated = 'false' and 
-			      attempted = 'true' and 
-			      client_name IS NOT NULL and 
-			      to_timestamp(last_activity) > CURRENT_TIMESTAMP - ($1 * INTERVAL '1 DAY')
+			WHERE deprecated = 'false' and attempted = 'true' and client_name IS NOT NULL
 		) as aux 
 		GROUP BY country_code
 		ORDER BY cnt DESC;
 		`,
-		LastActivityValidRange,
 	)
 	// make sure we close the rows and we free the connection/session
 	defer rows.Close()
@@ -150,15 +138,10 @@ func (db *DBClient) GetOsDistribution() (map[string]interface{}, error) {
 			client_os,
 			count(client_os) as nodes
 		FROM peer_info
-		WHERE deprecated='false' and 
-		      attempted='true' and 
-		      client_name IS NOT NULL and 
-		      to_timestamp(last_activity) > CURRENT_TIMESTAMP - ($1 * INTERVAL '1 DAY')
+		WHERE deprecated='false' and attempted='true' and client_name IS NOT NULL
 		GROUP BY client_os
 		ORDER BY nodes DESC;
-		`,
-		LastActivityValidRange,
-	)
+		`)
 	if err != nil {
 		return summary, err
 	}
@@ -180,15 +163,10 @@ func (db *DBClient) GetArchDistribution() (map[string]interface{}, error) {
 			client_arch,
 			count(client_arch) as nodes
 		FROM peer_info
-		WHERE deprecated='false' and 
-		      attempted='true' and 
-		      client_name IS NOT NULL and 
-		      to_timestamp(last_activity) > CURRENT_TIMESTAMP - ($1 * INTERVAL '1 DAY')
+		WHERE deprecated='false' and attempted='true' and client_name IS NOT NULL
 		GROUP BY client_arch
 		ORDER BY nodes DESC;
-		`,
-		LastActivityValidRange,
-	)
+		`)
 	if err != nil {
 		return summary, err
 	}
@@ -220,15 +198,9 @@ func (db *DBClient) GetHostingDistribution() (map[string]interface{}, error) {
 				ips.mobile
 			FROM peer_info as pi
 			INNER JOIN ips ON pi.ip=ips.ip
-			WHERE pi.deprecated='false' and 
-			      attempted = 'true' and 
-			      client_name IS NOT NULL and 
-			      ips.mobile='true' and 
-			      to_timestamp(last_activity) > CURRENT_TIMESTAMP - ($1 * INTERVAL '1 DAY')
+			WHERE pi.deprecated='false' and attempted = 'true' and client_name IS NOT NULL and ips.mobile='true'
 		) as aux
-		`,
-		LastActivityValidRange,
-	).Scan(&mobile)
+		`).Scan(&mobile)
 	if err != nil {
 		return summary, err
 	}
@@ -251,14 +223,9 @@ func (db *DBClient) GetHostingDistribution() (map[string]interface{}, error) {
 				ips.proxy
 			FROM peer_info as pi
 			INNER JOIN ips ON pi.ip=ips.ip
-			WHERE pi.deprecated='false' and 
-			      attempted = 'true' and 
-			      client_name IS NOT NULL and ips.proxy='true' and 
-			      to_timestamp(last_activity) > CURRENT_TIMESTAMP - ($1 * INTERVAL '1 DAY')
+			WHERE pi.deprecated='false' and attempted = 'true' and client_name IS NOT NULL and ips.proxy='true'
 		) as aux
-		`,
-		LastActivityValidRange,
-	).Scan(&proxy)
+		`).Scan(&proxy)
 	if err != nil {
 		return summary, err
 	}
@@ -281,15 +248,9 @@ func (db *DBClient) GetHostingDistribution() (map[string]interface{}, error) {
 				ips.hosting
 			FROM peer_info as pi
 			INNER JOIN ips ON pi.ip=ips.ip
-			WHERE pi.deprecated='false' and 
-			      attempted = 'true' and 
-			      client_name IS NOT NULL and 
-			      ips.hosting='true' and 
-			      to_timestamp(last_activity) > CURRENT_TIMESTAMP - ($1 * INTERVAL '1 DAY')
+			WHERE pi.deprecated='false' and attempted = 'true' and client_name IS NOT NULL and ips.hosting='true'
 		) as aux		
-		`,
-		LastActivityValidRange,
-	).Scan(&hosted)
+		`).Scan(&hosted)
 	if err != nil {
 		return summary, err
 	}
@@ -322,14 +283,12 @@ func (db *DBClient) GetRTTDistribution() (map[string]interface{}, error) {
 					ELSE '+1s' 
 				END as latency    
 			FROM peer_info 
-			WHERE deprecated=false and 
-			      client_name IS NOT NULL and 
-			      to_timestamp(last_activity) > CURRENT_TIMESTAMP - ($1 * INTERVAL '1 DAY')
+			WHERE deprecated=false and client_name IS NOT NULL 
 		) as t 
 		GROUP BY t.latency 
 		ORDER BY nodes DESC;	
+			
 		`,
-		LastActivityValidRange,
 	)
 	if err != nil {
 		return summary, err
@@ -364,16 +323,13 @@ func (db *DBClient) GetIPDistribution() (map[string]interface{}, error) {
 				ip, 
 				count(ip) as nodes 
 			FROM peer_info 
-			WHERE deprecated = false and 
-			      client_name IS NOT NULL and 
-			      to_timestamp(last_activity) > CURRENT_TIMESTAMP - ($1 * INTERVAL '1 DAY')
+			WHERE deprecated = false and client_name IS NOT NULL 
 			GROUP BY ip 
 			ORDER BY nodes DESC 
 		) as t 
 		GROUP BY nodes 
 		ORDER BY number_of_ips DESC;	
 		`,
-		LastActivityValidRange,
 	)
 	if err != nil {
 		return summary, err
