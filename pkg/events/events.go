@@ -12,8 +12,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-type Topic string
-
+// Forwarder subscribes to internal events that Armiarma emits, hydrates them
+// with extra data, and publishes a new sanitized event to a SSE server.
 type Forwarder struct {
 	ctx  context.Context
 	ip   string
@@ -30,6 +30,7 @@ type Forwarder struct {
 	once sync.Once
 }
 
+// NewForwarder creates a new Forwarder
 func NewForwarder(ip string, port int, db *postgresql.DBClient, ethMsgHandler *ethereum.EthMessageHandler) *Forwarder {
 	server := sse.New()
 
@@ -46,6 +47,7 @@ func NewForwarder(ip string, port int, db *postgresql.DBClient, ethMsgHandler *e
 	}
 }
 
+// Start initializes the Forwarder by starting the SSE server and subscribing to downstream events.
 func (f *Forwarder) Start(ctx context.Context) error {
 	f.ctx = ctx
 
@@ -70,10 +72,12 @@ func (f *Forwarder) Start(ctx context.Context) error {
 	return err
 }
 
+// Stop terminates the SSE server and stops the Forwarder.
 func (f *Forwarder) Stop() {
 	f.server.Close()
 }
 
+// startHTTPServer starts the HTTP server for SSE events.
 func (f *Forwarder) startHTTPServer() error {
 	// Create a new Mux and set the handler
 	sseMux := http.NewServeMux()
@@ -94,12 +98,14 @@ func (f *Forwarder) startHTTPServer() error {
 	return <-errCh
 }
 
+// subscribeDownstream subscribes to downstream "internal" events
 func (f *Forwarder) subscribeDownstream(ctx context.Context) {
 	f.ethMsgHandler.OnAttestation(func(event *ethereum.AttestationReceievedEvent) {
 		f.attestationCh <- event
 	})
 }
 
+// startWorkers initializes the workers that process events out of the channels
 func (f *Forwarder) startWorkers() {
 	// start the event workers that process events out of the channels
 	for i := 0; i < 10; i++ {
@@ -107,6 +113,7 @@ func (f *Forwarder) startWorkers() {
 	}
 }
 
+// eventWorker is a worker that processes internal events
 func (f *Forwarder) eventWorker() {
 	for {
 		select {
@@ -118,6 +125,7 @@ func (f *Forwarder) eventWorker() {
 	}
 }
 
+// processAttestationEvent processes a single attestation event and creates SSE events
 func (f *Forwarder) processAttestationEvent(e *ethereum.AttestationReceievedEvent) {
 	// Publish the raw attestation straight away
 	if err := f.publishEthereumAttestation(&EthereumAttestation{

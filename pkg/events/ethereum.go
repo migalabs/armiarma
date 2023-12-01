@@ -6,13 +6,6 @@ import (
 	"github.com/protolambda/zrnt/eth2/beacon/phase0"
 )
 
-const (
-	// TopicEthereumAttestation is the topic for Ethereum Attestation events
-	TopicEthereumAttestation string = "ethereum_attestation"
-	// TopicTimedEthereumAttestation is the topic for Timed Ethereum Attestation events
-	TopicTimedEthereumAttestation string = "timed_ethereum_attestation"
-)
-
 // EthereumAttestation contains the data for an Ethereum Attestation that was received
 type EthereumAttestation struct {
 	Attestation *phase0.Attestation `json:"attestation"`
@@ -25,6 +18,7 @@ type TimedEthereumAttestation struct {
 	PeerInfo             *PeerInfo             `json:"peer_info"`
 }
 
+// PeerInfo contains information about a peer
 type PeerInfo struct {
 	ID              string        `json:"id"`
 	IP              string        `json:"ip"`
@@ -35,6 +29,7 @@ type PeerInfo struct {
 	ProtocolVersion string        `json:"protocol_version"`
 }
 
+// AttestationExtraData contains extra data for an attestation
 type AttestationExtraData struct {
 	ArrivedAt  time.Time     `json:"arrived_at"`
 	P2PMsgID   string        `json:"peer_msg_id"`
