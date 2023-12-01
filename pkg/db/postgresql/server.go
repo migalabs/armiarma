@@ -299,7 +299,7 @@ func (c *DBClient) launchPersister() {
 					switch prsMsg.(type) {
 					case (*eth.TrackedAttestation):
 						attMsg := prsMsg.(*eth.TrackedAttestation)
-						log.Infof("persisting eth_attestation %s", attMsg.MsgID)
+						log.Tracef("persisting eth_attestation %s", attMsg.MsgID)
 						q, args := c.InsertNewEthereumAttestation(attMsg)
 						batch.AddQuery(q, args...)
 					case (*eth.TrackedBeaconBlock):
@@ -335,6 +335,11 @@ func (c *DBClient) launchPersister() {
 }
 
 func (c *DBClient) dailyBackupheartbeat() {
+	// make a first backup of the active peers(if any)
+	err := c.activePeersBackup()
+	if err != nil {
+		log.Error(err)
+	}
 	ticker := time.NewTicker(c.dailyBackupInterval)
 	for {
 		select {
