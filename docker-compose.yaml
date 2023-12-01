@@ -72,4 +72,4 @@ services:
                 ports: 
                         - "${CRAWLER_PORT}:9020"
                         - "127.0.0.1:${CRAWLER_METRICS_PORT}:9080"
-                        - "127.0.0.1:${CRAWLER_SSE_PORT}:9099"
+                        - "${CRAWLER_SSE_PORT}:9099"

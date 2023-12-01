@@ -160,6 +160,7 @@ func NewEthereumCrawler(mainCtx *cli.Context, conf config.EthereumCrawlerConfig)
 		default:
 			log.Error("untraceable gossipsub topic", top)
 			continue
+
 		}
 		topic := eth.ComposeTopic(conf.ForkDigest, top)
 		gs.JoinAndSubscribe(topic, msgHandler, conf.PersistMsgs)

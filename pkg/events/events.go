@@ -61,7 +61,12 @@ func (f *Forwarder) Start(ctx context.Context) error {
 	var err error
 
 	f.once.Do(func() {
+		f.startWorkers()
+
 		f.subscribeDownstream(ctx)
+
+		f.server.CreateStream(TopicEthereumAttestation)
+		f.server.CreateStream(TopicTimedEthereumAttestation)
 
 		err = f.startHTTPServer()
 		if err != nil {
@@ -83,19 +88,17 @@ func (f *Forwarder) startHTTPServer() error {
 	sseMux := http.NewServeMux()
 	sseMux.HandleFunc("/events", f.server.ServeHTTP)
 
-	log.WithField("address", f.ip).WithField("port", f.port).Info("Starting SSE server")
-
-	errCh := make(chan error, 1)
+	log.WithField("address", f.ip).WithField("port", f.port).Info("Starting SSE server!")
 
 	// Start the HTTP server
 	go func() {
 		err := http.ListenAndServe(fmt.Sprintf("%s:%d", f.ip, f.port), sseMux)
 		if err != nil {
-			errCh <- err
+			log.Fatal(err)
 		}
 	}()
 
-	return <-errCh
+	return nil
 }
 
 // subscribeDownstream subscribes to downstream "internal" events
