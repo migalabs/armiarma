@@ -41,7 +41,6 @@ type EthereumCrawlerConfig struct {
 	PersistConnEvents         bool     `json:"persist-connevents"`
 	PersistMsgs               bool     `json:"persist-msgs"`
 	ValPubkeys                []string `json:"val-pubkeys"`
-	AttestationBufferSize     int      `json:"attestation-buffer-size"`
 	SSEIP                     string   `json:"sse-ip"`
 	SSEPort                   int      `json:"sse-port"`
 }
@@ -67,7 +66,6 @@ func NewEthereumCrawlerConfig() *EthereumCrawlerConfig {
 		PersistConnEvents:         DefaultPersistConnEvents,
 		PersistMsgs:               false,
 		ValPubkeys:                DefaultValPubkeys,
-		AttestationBufferSize:     DefaultAttestationBufferSize,
 		SSEIP:                     DefaultSSEIP,
 		SSEPort:                   DefaultSSEPort,
 	}
@@ -118,7 +116,6 @@ func (c *EthereumCrawlerConfig) Apply(ctx *cli.Context) {
 		if valid {
 			c.ForkDigest = validForkDigest
 		}
-
 	}
 
 	// Check if the eth-cl endpoint
@@ -197,11 +194,6 @@ func (c *EthereumCrawlerConfig) Apply(ctx *cli.Context) {
 		c.ValPubkeys = append(c.ValPubkeys, valKeys...)
 	}
 
-	// read attestation-buffer-size
-	if ctx.IsSet("attestation-buffer-size") {
-		c.AttestationBufferSize = ctx.Int("attestation-buffer-size")
-	}
-
 	// read SSE IP
 	if ctx.IsSet("sse-ip") {
 		c.SSEIP = ctx.String("sse-ip")
@@ -213,23 +205,22 @@ func (c *EthereumCrawlerConfig) Apply(ctx *cli.Context) {
 	}
 
 	log.WithFields(log.Fields{
-		"log-level":               c.LogLevel,
-		"priv-key":                c.PrivateKey,
-		"ip":                      c.IP,
-		"port":                    c.Port,
-		"user-agent":              c.UserAgent,
-		"psql":                    c.PsqlEndpoint,
-		"backup-interval":         c.ActivePeersBackupInterval,
-		"fork-digest":             c.ForkDigest,
-		"cl-endpoint":             c.EthCLRemoteEndpoint,
-		"bootnodes":               c.Bootnodes,
-		"gossip-topics":           c.GossipTopics,
-		"subnets":                 c.Subnets,
-		"persist-connevents":      c.PersistConnEvents,
-		"persist-msgs":            c.PersistMsgs,
-		"val-pubkeys":             len(c.ValPubkeys),
-		"attestation-buffer-size": c.AttestationBufferSize,
-		"sse-ip":                  c.SSEIP,
-		"sse-port":                c.SSEPort,
+		"log-level":          c.LogLevel,
+		"priv-key":           c.PrivateKey,
+		"ip":                 c.IP,
+		"port":               c.Port,
+		"user-agent":         c.UserAgent,
+		"psql":               c.PsqlEndpoint,
+		"backup-interval":    c.ActivePeersBackupInterval,
+		"fork-digest":        c.ForkDigest,
+		"cl-endpoint":        c.EthCLRemoteEndpoint,
+		"bootnodes":          c.Bootnodes,
+		"gossip-topics":      c.GossipTopics,
+		"subnets":            c.Subnets,
+		"persist-connevents": c.PersistConnEvents,
+		"persist-msgs":       c.PersistMsgs,
+		"val-pubkeys":        len(c.ValPubkeys),
+		"sse-ip":             c.SSEIP,
+		"sse-port":           c.SSEPort,
 	}).Info("config for the Ethereum crawler")
 }

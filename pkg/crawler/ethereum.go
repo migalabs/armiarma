@@ -154,7 +154,6 @@ func NewEthereumCrawler(mainCtx *cli.Context, conf config.EthereumCrawlerConfig)
 	// subscribe the topics
 	for _, top := range conf.GossipTopics {
 		var msgHandler gossipsub.MessageHandler
-
 		switch top {
 		case eth.BeaconBlockTopicBase:
 			msgHandler = ethMsgHandler.BeaconBlockMessageHandler
@@ -193,7 +192,7 @@ func NewEthereumCrawler(mainCtx *cli.Context, conf config.EthereumCrawlerConfig)
 		return nil, err
 	}
 
-	// Build the SSE server
+	// Build the event forwarder
 	eventHandler := events.NewForwarder(conf.SSEIP, conf.SSEPort, dbClient, ethMsgHandler)
 
 	// generate the CrawlerBase

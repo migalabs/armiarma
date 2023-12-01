@@ -46,8 +46,7 @@ func (c *DBClient) getActivePeers() ([]int, error) {
 			id,
 			peer_id
 		FROM peer_info
-		WHERE deprecated = 'false' and attempted = 'true' and client_name IS NOT NULL and to_timestamp(last_activity) > CURRENT_TIMES
-TAMP - ($1 * INTERVAL '1 DAY')
+		WHERE deprecated = 'false' and attempted = 'true' and client_name IS NOT NULL and to_timestamp(last_activity) > CURRENT_TIMESTAMP - ($1 * INTERVAL '1 DAY')
 		`,
 		LastActivityValidRange,
 	)
@@ -64,7 +63,6 @@ TAMP - ($1 * INTERVAL '1 DAY')
 		}
 		activePeers = append(activePeers, id)
 	}
-
 	return activePeers, nil
 }
 
