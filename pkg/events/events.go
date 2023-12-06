@@ -155,7 +155,7 @@ func (f *Forwarder) processAttestationEvent(e *ethereum.AttestationReceievedEven
 			TimeInSlot: e.TrackedAttestation.TimeInSlot,
 		},
 		PeerInfo: &PeerInfo{
-			ID:              string(info.ID),
+			ID:              fmt.Sprintf("%s", info.ID),
 			IP:              info.IP,
 			Port:            info.Port,
 			UserAgent:       info.PeerInfo.UserAgent,
