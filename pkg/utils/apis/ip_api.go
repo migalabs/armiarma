@@ -7,10 +7,13 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math"
+	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -84,13 +87,13 @@ func newIpQueue(queueSize int) *ipQueue {
 // ----------------------------------------------------------- //
 
 const (
-	DatabaseDir          = "./database/"
-	IP2LocationToken     = "IP2LOCATION_TOKEN"
-	InApiEndpoint        = "https://www.ip2location.com/download/?token=%s&file=%s"
-	UpdateThreshold      = 24 * time.Hour
-	IPv4DbName           = "PX11LITEBIN"
-	IPv6DbName           = "PX11LITEBINIPV6"
-	UncompressedFileName = "IP2LOCATION-LITE-DB11.BIN"
+	DatabaseDir           = "./database/"
+	IP2LocationToken      = "IP2LOCATION_TOKEN"
+	DBDownloadApiEndpoint = "https://www.ip2location.com/download/?token=%s&file=%s"
+	UpdateThreshold       = 24 * time.Hour
+	IPDbName              = "PX11LITEBIN"
+	UncompressedFileName  = "IP2PROXY-LITE-PX11.BIN"
+	TimestampFormat       = "20060102-150405"
 )
 
 func unzip(zipFile, destDir string) error {
@@ -128,23 +131,29 @@ func unzip(zipFile, destDir string) error {
 	return nil
 }
 
-func downloadAndSave(url, baseFilename string) error {
-	version := func() string {
-		if strings.Contains(baseFilename, "IPV6") {
-			return "IPv6"
-		}
-		return "IPv4"
-	}()
+func downloadAndSaveZippedDB() error {
+	dbToken := os.Getenv(IP2LocationToken)
+	if dbToken == "" {
+		return errors.New("IP2LOCATION_TOKEN environment variable not set")
+	}
 
-	timestamp := time.Now().Format("20060102-150405") // Format: YYYYMMDD-HHMMSS
-
-	filename := fmt.Sprintf("%s-%s.BIN", baseFilename, timestamp)
-
+	url := fmt.Sprintf(DBDownloadApiEndpoint, dbToken, IPDbName)
 	resp, err := http.Get(url)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
+
+	contentDisposition := resp.Header.Get("Content-Disposition")
+	_, params, err := mime.ParseMediaType(contentDisposition)
+	if err != nil {
+		return err
+	}
+
+	filename := params["filename"]
+	if filename == "" {
+		filename = "PX11LITEBIN.zip"
+	}
 
 	file, err := os.Create(filename)
 	if err != nil {
@@ -152,56 +161,43 @@ func downloadAndSave(url, baseFilename string) error {
 	}
 	defer file.Close()
 
-	fmt.Println("Starting download of IP2Location DB for " + version)
+	fmt.Printf("Starting download of IP2Proxy DB to %s\n", filename)
 	_, err = io.Copy(file, resp.Body)
 	if err != nil {
-		fmt.Println("Error while downloading IP2Location DB for " + version)
+		fmt.Printf("Error while downloading IP2Proxy DB to %s\n", filename)
 		return err
 	}
-	fmt.Println("Download completed for IP2Location DB for " + version)
+	fmt.Printf("Download completed for IP2Proxy DB to %s\n", filename)
 
 	return nil
 }
 
-func updateSpecificDb(dbName, dbToken string) {
-	dbLink := fmt.Sprintf(InApiEndpoint, dbToken, dbName)
-	if needsUpdate(dbName) {
-		if err := downloadAndSave(dbLink, dbName); err != nil {
-			log.Printf("Failed to update database %s: %v\n", dbName, err)
-		}
-	}
-	cleanupOldDatabases(dbName)
-}
-
 // checks if the database needs to be updated
-func needsUpdate(baseFilename string) bool {
+func needsUpdate() bool {
 	fmt.Println("Ip2Location DB: checking time since last update...")
 	files, err := ioutil.ReadDir(DatabaseDir)
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println("Finished checking directory...")
 
 	latest := time.Time{}
 	for _, f := range files {
-		if strings.HasPrefix(f.Name(), baseFilename) && strings.HasSuffix(f.Name(), ".BIN") {
-			nameParts := strings.Split(f.Name(), "-")
-			if len(nameParts) >= 2 {
-				timestampPart := nameParts[len(nameParts)-1]
-				timestampPart = strings.TrimSuffix(timestampPart, ".BIN")
-				fileTime, err := time.Parse("20060102-150405", timestampPart)
-				if err == nil && fileTime.After(latest) {
-					latest = fileTime
-				}
+		if strings.HasPrefix(f.Name(), "IP2PROXY-LITE-PX11") && strings.HasSuffix(f.Name(), ".BIN") {
+			timestampPart := strings.TrimSuffix(f.Name(), ".BIN")
+			timestampPart = strings.TrimPrefix(timestampPart, "IP2PROXY-LITE-PX11")
+			fileTime, err := time.Parse(TimestampFormat, timestampPart)
+			if err == nil && fileTime.After(latest) {
+				latest = fileTime
 			}
 		}
 	}
+	fmt.Println("Finished checking directory...")
 
-	return time.Since(latest) > UpdateThreshold
+	return latest.IsZero() || time.Since(latest) > UpdateThreshold
 }
 
 // finds the latest database file in the directory to see if it's older than 24 hours
-func findLatestDbFile(baseFilename string) string {
+func findLatestDbFile() string {
 	files, err := ioutil.ReadDir(DatabaseDir)
 	if err != nil {
 		log.Fatal(err)
@@ -210,7 +206,7 @@ func findLatestDbFile(baseFilename string) string {
 	latestFile := ""
 	latest := time.Time{}
 	for _, f := range files {
-		if strings.HasPrefix(f.Name(), baseFilename) && strings.HasSuffix(f.Name(), ".BIN") {
+		if strings.HasPrefix(f.Name(), UncompressedFileName) && strings.HasSuffix(f.Name(), ".BIN") {
 			nameParts := strings.Split(f.Name(), "-")
 			if len(nameParts) >= 2 {
 				timestampPart := nameParts[len(nameParts)-1]
@@ -227,70 +223,148 @@ func findLatestDbFile(baseFilename string) string {
 	return latestFile
 }
 
-func cleanupDatabases(dbNames ...string) {
-	for _, dbName := range dbNames {
-		cleanupOldDatabases(dbName)
-	}
-}
-
-func cleanupOldDatabases(baseFilename string) {
+func cleanupOldDatabases() error {
 	files, err := ioutil.ReadDir(DatabaseDir)
 	if err != nil {
-		log.Fatal(err)
+		return err
+	}
+
+	if len(files) <= 1 {
+		return nil
 	}
 
 	timestampToFile := make(map[time.Time]string)
+	var latestTime time.Time
 
-	var latest time.Time
-
-	for _, f := range files {
-		if strings.HasPrefix(f.Name(), baseFilename) && strings.HasSuffix(f.Name(), ".BIN") {
-			nameParts := strings.Split(f.Name(), "-")
-			if len(nameParts) >= 2 {
-				timestampPart := nameParts[len(nameParts)-1]
-				timestampPart = strings.TrimSuffix(timestampPart, ".BIN")
-				fileTime, err := time.Parse("20060102-150405", timestampPart)
+	for _, file := range files {
+		if strings.HasPrefix(file.Name(), "IP2PROXY-LITE-PX11-") && strings.HasSuffix(file.Name(), ".BIN") {
+			nameParts := strings.Split(file.Name(), "-")
+			if len(nameParts) >= 3 {
+				timestampPart := strings.TrimSuffix(nameParts[len(nameParts)-1], ".BIN")
+				fileTime, err := time.Parse("20060102150405", timestampPart)
 				if err != nil {
-					log.Printf("Failed to parse time from filename '%s': %s\n", f.Name(), err)
+					log.Printf("Failed to parse time from filename '%s': %s\n", file.Name(), err)
 					continue
 				}
 
-				timestampToFile[fileTime] = f.Name()
-
-				if fileTime.After(latest) {
-					latest = fileTime
+				timestampToFile[fileTime] = file.Name()
+				if fileTime.After(latestTime) {
+					latestTime = fileTime
 				}
 			}
 		}
 	}
 
-	for t, name := range timestampToFile {
-		if t.Before(latest) {
-			err := os.Remove(filepath.Join(DatabaseDir, name))
+	for fileTime, fileName := range timestampToFile {
+		if fileTime.Before(latestTime) {
+			err := os.Remove(filepath.Join(DatabaseDir, fileName))
 			if err != nil {
-				log.Printf("Failed to remove old database file: %s\n", name)
+				log.Printf("Failed to remove old database file: %s\n", fileName)
 			} else {
-				log.Printf("Removed old database file: %s\n", name)
+				log.Printf("Removed old database file: %s\n", fileName)
 			}
 		}
 	}
+
+	return nil
 }
 
-func getDatabaseFile(ip string) string {
-	var baseFilename string
-	if isIPv4(ip) {
-		baseFilename = "PX11LITEBIN"
-	} else {
-		baseFilename = "PX11LITEBINIPV6"
+func cleanupFolder() error {
+	targetFiles := []string{"LICENSE", "README", ".zip"}
+
+	files, err := ioutil.ReadDir(DatabaseDir)
+	if err != nil {
+		return err
 	}
 
-	latestFile := findLatestDbFile(baseFilename)
-	if latestFile == "" || needsUpdate(latestFile) {
-		updateDb()
-		latestFile = findLatestDbFile(baseFilename)
+	for _, file := range files {
+		shouldRemove := false
+		for _, target := range targetFiles {
+			if strings.Contains(file.Name(), target) {
+				if file.Name() == "IP2PROXY-LITE-PX11.BIN" || strings.Contains(file.Name(), "IP2PROXY") {
+					shouldRemove = false
+				} else {
+					shouldRemove = true
+				}
+				break
+			}
+		}
+
+		if shouldRemove {
+			err := os.Remove(filepath.Join(DatabaseDir, file.Name()))
+			if err != nil {
+				log.Printf("Failed to remove file: %s\n", file.Name())
+			} else {
+				log.Printf("Removed file: %s\n", file.Name())
+			}
+		}
 	}
 
-	return latestFile
+	return nil
+}
+
+func isNumeric(s string) bool {
+	f, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return false
+	}
+	return !math.IsNaN(f) && !math.IsInf(f, 0)
+}
+
+func verifyDbFile() (bool, error) {
+	files, err := ioutil.ReadDir(DatabaseDir)
+	if err != nil {
+		return false, err
+	}
+	if len(files) == 0 {
+		return false, errors.New("No database file found")
+	}
+
+	// Check if "PX11LITEBIN.zip" file exists
+	found := false
+	for _, file := range files {
+		if file.Name() == "PX11LITEBIN.zip" {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		return false, errors.New("File PX11LITEBIN.zip not found")
+	}
+
+	// unzip file and check validity of db
+	err = unzip("PX11LITEBIN.zip", DatabaseDir)
+	if err != nil {
+		return false, err
+	}
+	dbPath := filepath.Join(DatabaseDir, "IP2PROXY-LITE-PX11.BIN") // name of the file after unzipping
+	db, err := ip2proxy.OpenDB(dbPath)
+	version := db.DatabaseVersion()
+	if version == "" || !isNumeric(version) {
+		return false, errors.New("Invalid database version")
+	}
+	return true, nil
+}
+
+func renameDbFile() error {
+	files, err := ioutil.ReadDir(DatabaseDir)
+	if err != nil {
+		return err
+	}
+	if len(files) == 0 {
+		return errors.New("No database file found")
+	}
+	timeStamp := time.Now().Format(TimestampFormat)
+	for _, file := range files {
+		if file.Name() == "IP2PROXY-LITE-PX11.BIN" {
+			err := os.Rename(filepath.Join(DatabaseDir, file.Name()), filepath.Join(DatabaseDir, "IP2PROXY-LITE-PX11-"+timeStamp+".BIN"))
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func updateDb() error {
@@ -298,36 +372,38 @@ func updateDb() error {
 	if dbToken == "" {
 		return errors.New("IP2LOCATION_TOKEN environment variable not set")
 	}
+	if err := downloadAndSaveZippedDB(); err != nil {
+		log.Printf("Failed to download DB: %v\n", err)
+		return err
+	}
+	valid, err := verifyDbFile()
+	if err != nil {
+		return err
+	}
+	if !valid {
+		return errors.New("Invalid database file")
+	}
 
-	IPv4DbLink := fmt.Sprintf(inApiEndpoint, dbToken, IPv4DbName)
-	IPv6DbLink := fmt.Sprintf(inApiEndpoint, dbToken, IPv6DbName)
+	err = renameDbFile()
+	if err != nil {
+		return err
+	}
 
-	var wg sync.WaitGroup
-	wg.Add(2)
-
-	go func() {
-		defer wg.Done()
-		if needsUpdate(IPv4DbName) {
-			if err := downloadAndSave(IPv4DbLink, IPv4DbName); err != nil {
-				log.Println(err)
-			}
-		}
-	}()
-
-	go func() {
-		defer wg.Done()
-		if needsUpdate(IPv6DbName) {
-			if err := downloadAndSave(IPv6DbLink, IPv6DbName); err != nil {
-				log.Println(err)
-			}
-		}
-	}()
-
-	wg.Wait()
-
-	cleanupDatabases(IPv4DbName, IPv6DbName)
+	cleanupOldDatabases() // removes all the old versions of the db file and leaves the one with the latest timestamp
+	cleanupFolder()       // cleans the folder from all the other files that are not needed (zip, readme, license)
 
 	return nil
+}
+
+// NEW VERSION
+func getDatabaseFile() string {
+	latestFile := findLatestDbFile()
+
+	if latestFile == "" || needsUpdate() {
+		updateDb()
+	}
+	return findLatestDbFile()
+
 }
 
 // ------------------------------------------------- //
@@ -342,6 +418,31 @@ func isIPv6(ip string) bool {
 	ipv6Pattern := `^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$`
 	match, _ := regexp.MatchString(ipv6Pattern, ip)
 	return match
+}
+
+// some fields are commented because we don't have data for them
+func mapTempIpInfoToApiMsg(data ip2proxy.IP2ProxyRecord, ip string) models.IpApiMsg {
+	return models.IpApiMsg{
+		IP:     ip,
+		Status: "success",
+		// Continent:    	"",
+		// ContinentCode: 	"",
+		Country:     data.CountryLong,
+		CountryCode: data.CountryShort,
+		Region:      data.Region,
+		// RegionName:    	"",
+		City: data.City,
+		// Zip:           	"",
+		// Lat: 			"",
+		// Lon: 			"",
+		Isp: data.Isp,
+		// Org:           	"",
+		// As:            	"",
+		// AsName:       	"",
+		Mobile: data.UsageType == "MOB",
+		Proxy:  data.ProxyType != "",
+		// Hosting:       	false,
+	}
 }
 
 // ------------------------------------------------- //
@@ -422,8 +523,7 @@ func locate(ip string) (ip2proxy.IP2ProxyRecord, error) {
 		return ip2proxy.IP2ProxyRecord{}, fmt.Errorf("invalid IP address")
 	}
 
-	dbFile := getDatabaseFile(ip)
-	//todo: unzip db file and clean up and use the new name of the db
+	dbFile := getDatabaseFile()
 	db, err := ip2proxy.OpenDB(DatabaseDir + dbFile)
 	if err != nil {
 		return ip2proxy.IP2ProxyRecord{}, err
@@ -461,6 +561,16 @@ func (c *IpLocator) locatorRoutine() {
 			select {
 			case ip := <-c.locationRequest:
 				respC := c.locateIp(ip)
+				resp := <-respC
+				if resp.Err != nil {
+					log.Error("error while locating IP -", resp.Err.Error())
+					continue
+				}
+				if resp.IpInfo.IsEmpty() {
+					log.Error("empty response from IP-API")
+					continue
+				}
+				c.dbClient.PersistToDB(resp.IpInfo)
 			case <-c.ctx.Done():
 				return
 			}
@@ -491,7 +601,7 @@ func CallIpApi(ip string) (ipInfo models.IpInfo, delay time.Duration, err error)
 	}
 
 	var apiMsg models.IpApiMsg
-	apiMsg = models.mapTempIpInfoToApiMsg(tempInfo, ip)
+	apiMsg = mapTempIpInfoToApiMsg(tempInfo, ip)
 
 	ipInfo.ExpirationTime = time.Now().UTC().Add(defaultIpTTL)
 	ipInfo.IpApiMsg = apiMsg
