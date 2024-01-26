@@ -1,6 +1,8 @@
 package models
 
-import "time"
+import (
+	"time"
+)
 
 const (
 	IpInfoTTL = 30 * 24 * time.Hour // 30 days
@@ -35,10 +37,9 @@ func (m *IpApiMsg) IsEmpty() bool {
 }
 
 type ApiResp struct {
-	IpInfo       IpInfo
-	DelayTime    time.Duration
-	AttemptsLeft int
-	Err          error
+	IpInfo    IpInfo
+	DelayTime time.Duration
+	Err       error
 }
 
 type IpInfo struct {

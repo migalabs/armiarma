@@ -56,6 +56,8 @@ require (
 	github.com/hashicorp/golang-lru v0.5.5-0.20210104140557-80c98217689d // indirect
 	github.com/holiman/uint256 v1.2.0 // indirect
 	github.com/huin/goupnp v1.0.2 // indirect
+	github.com/ip2location/ip2location-go/v9 v9.6.1 // indirect
+	github.com/ip2location/ip2proxy-go/v4 v4.0.1 // indirect
 	github.com/ipfs/go-cid v0.0.7 // indirect
 	github.com/ipfs/go-datastore v0.5.0 // indirect
 	github.com/ipfs/go-ipfs-util v0.0.2 // indirect
@@ -159,6 +161,7 @@ require (
 	google.golang.org/protobuf v1.27.1 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
+	lukechampine.com/uint128 v1.2.0 // indirect
 )
 
 replace github.com/libp2p/go-libp2p-pubsub v0.5.5 => ./go-libp2p-pubsub

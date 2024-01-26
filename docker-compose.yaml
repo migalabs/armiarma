@@ -55,6 +55,7 @@ services:
                 build:
                         context: .
                         dockerfile: Dockerfile
+                env_file: .env
                 command: |
                         eth2
                         --log-level=${CRAWLER_LOG_LEVEL}
@@ -72,3 +73,5 @@ services:
                 ports: 
                         - "${CRAWLER_PORT}:9020"
                         - "127.0.0.1:${CRAWLER_METRICS_PORT}:9080"
+                volumes:
+                        - ./pkg/utils/apis/database:/app/database
