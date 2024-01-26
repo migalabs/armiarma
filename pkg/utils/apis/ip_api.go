@@ -1,31 +1,37 @@
 package apis
 
 import (
+	"archive/zip"
 	"context"
-	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
-	"strconv"
+	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
+	"github.com/ip2location/ip2proxy-go/v4"
 	"github.com/migalabs/armiarma/pkg/db/models"
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+)
+
+var (
+	ErrorQueueFull  = errors.New("queue is full")
+	ErrorQueueEmpty = errors.New("queue is emtpy")
 )
 
 const (
 	defaultIpTTL   = 30 * 24 * time.Hour // 30 days
 	ipChanBuffSize = 45                  // number of ips that can be buffered unto the channel
 	ipBuffSize     = 8192                // number of ip queries that can be queued in the ipQueue
-	ipApiEndpoint  = "http://ip-api.com/json/{__ip__}?fields=status,continent,continentCode,country,countryCode,region,regionName,city,zip,lat,lon,isp,org,as,asname,mobile,proxy,hosting,query"
+	inApiEndpoint  = "https://www.ip2location.com/download/?token=%s&file=%s"
 	minIterTime    = 100 * time.Millisecond
 )
-
-var TooManyRequestError error = fmt.Errorf("error HTTP 429")
 
 // DB Interface for DBWriter
 type DBWriter interface {
@@ -35,13 +41,18 @@ type DBWriter interface {
 	GetExpiredIpInfo() ([]string, error)
 }
 
+type ipQueue struct {
+	sync.RWMutex
+	queueSize int
+	ipList    []string
+}
+
 // PEER LOCALIZER
 type IpLocator struct {
 	ctx context.Context
-	// Request channels
+	// Request channel	s
 	locationRequest chan string
 
-	// dbClient
 	dbClient DBWriter
 
 	ipQueue *ipQueue
@@ -61,113 +72,280 @@ func NewIpLocator(ctx context.Context, dbCli DBWriter) *IpLocator {
 	}
 }
 
-// Run the necessary routines to locate the IPs
-func (c *IpLocator) Run() {
-	//l.SetLevel(Logrus.TraceLevel)
-	c.locatorRoutine()
+func newIpQueue(queueSize int) *ipQueue {
+	return &ipQueue{
+		queueSize: queueSize,
+		ipList:    make([]string, 0, queueSize),
+	}
 }
 
-// locatorRoutine is the main routine that will wait until an request to identify an IP arrives
-// or if the routine gets canceled
-func (c *IpLocator) locatorRoutine() {
-	log.Info("IP locator routine started")
-	// ip queue reading routine
-	go func() {
-		ticker := time.NewTicker(minIterTime)
-		for {
-			ip, err := c.ipQueue.readItem()
-			if err == nil {
-				// put the request in the Queue
-				c.locationRequest <- ip
-			}
-			select {
-			case <-ticker.C:
-				ticker.Reset(minIterTime)
+// ----------------------------------------------------------- //
+// ------------------ DB UPDATE UTILITIES -------------------- //
+// ----------------------------------------------------------- //
 
-			case <-c.ctx.Done():
-				return
+const (
+	DatabaseDir          = "./database/"
+	IP2LocationToken     = "IP2LOCATION_TOKEN"
+	InApiEndpoint        = "https://www.ip2location.com/download/?token=%s&file=%s"
+	UpdateThreshold      = 24 * time.Hour
+	IPv4DbName           = "PX11LITEBIN"
+	IPv6DbName           = "PX11LITEBINIPV6"
+	UncompressedFileName = "IP2LOCATION-LITE-DB11.BIN"
+)
+
+func unzip(zipFile, destDir string) error {
+	r, err := zip.OpenReader(zipFile)
+	if err != nil {
+		return err
+	}
+	defer r.Close()
+
+	for _, f := range r.File {
+		fpath := filepath.Join(destDir, f.Name)
+		if f.FileInfo().IsDir() {
+			os.MkdirAll(fpath, os.ModePerm)
+			continue
+		}
+
+		outFile, err := os.OpenFile(fpath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+		if err != nil {
+			return err
+		}
+
+		rc, err := f.Open()
+		if err != nil {
+			outFile.Close()
+			return err
+		}
+
+		_, err = io.Copy(outFile, rc)
+		outFile.Close()
+		rc.Close()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func downloadAndSave(url, baseFilename string) error {
+	version := func() string {
+		if strings.Contains(baseFilename, "IPV6") {
+			return "IPv6"
+		}
+		return "IPv4"
+	}()
+
+	timestamp := time.Now().Format("20060102-150405") // Format: YYYYMMDD-HHMMSS
+
+	filename := fmt.Sprintf("%s-%s.BIN", baseFilename, timestamp)
+
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	file, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	fmt.Println("Starting download of IP2Location DB for " + version)
+	_, err = io.Copy(file, resp.Body)
+	if err != nil {
+		fmt.Println("Error while downloading IP2Location DB for " + version)
+		return err
+	}
+	fmt.Println("Download completed for IP2Location DB for " + version)
+
+	return nil
+}
+
+func updateSpecificDb(dbName, dbToken string) {
+	dbLink := fmt.Sprintf(InApiEndpoint, dbToken, dbName)
+	if needsUpdate(dbName) {
+		if err := downloadAndSave(dbLink, dbName); err != nil {
+			log.Printf("Failed to update database %s: %v\n", dbName, err)
+		}
+	}
+	cleanupOldDatabases(dbName)
+}
+
+// checks if the database needs to be updated
+func needsUpdate(baseFilename string) bool {
+	fmt.Println("Ip2Location DB: checking time since last update...")
+	files, err := ioutil.ReadDir(DatabaseDir)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("Finished checking directory...")
+
+	latest := time.Time{}
+	for _, f := range files {
+		if strings.HasPrefix(f.Name(), baseFilename) && strings.HasSuffix(f.Name(), ".BIN") {
+			nameParts := strings.Split(f.Name(), "-")
+			if len(nameParts) >= 2 {
+				timestampPart := nameParts[len(nameParts)-1]
+				timestampPart = strings.TrimSuffix(timestampPart, ".BIN")
+				fileTime, err := time.Parse("20060102-150405", timestampPart)
+				if err == nil && fileTime.After(latest) {
+					latest = fileTime
+				}
+			}
+		}
+	}
+
+	return time.Since(latest) > UpdateThreshold
+}
+
+// finds the latest database file in the directory to see if it's older than 24 hours
+func findLatestDbFile(baseFilename string) string {
+	files, err := ioutil.ReadDir(DatabaseDir)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	latestFile := ""
+	latest := time.Time{}
+	for _, f := range files {
+		if strings.HasPrefix(f.Name(), baseFilename) && strings.HasSuffix(f.Name(), ".BIN") {
+			nameParts := strings.Split(f.Name(), "-")
+			if len(nameParts) >= 2 {
+				timestampPart := nameParts[len(nameParts)-1]
+				timestampPart = strings.TrimSuffix(timestampPart, ".BIN")
+				fileTime, err := time.Parse("20060102-150405", timestampPart)
+				if err == nil && fileTime.After(latest) {
+					latest = fileTime
+					latestFile = f.Name()
+				}
+			}
+		}
+	}
+
+	return latestFile
+}
+
+func cleanupDatabases(dbNames ...string) {
+	for _, dbName := range dbNames {
+		cleanupOldDatabases(dbName)
+	}
+}
+
+func cleanupOldDatabases(baseFilename string) {
+	files, err := ioutil.ReadDir(DatabaseDir)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	timestampToFile := make(map[time.Time]string)
+
+	var latest time.Time
+
+	for _, f := range files {
+		if strings.HasPrefix(f.Name(), baseFilename) && strings.HasSuffix(f.Name(), ".BIN") {
+			nameParts := strings.Split(f.Name(), "-")
+			if len(nameParts) >= 2 {
+				timestampPart := nameParts[len(nameParts)-1]
+				timestampPart = strings.TrimSuffix(timestampPart, ".BIN")
+				fileTime, err := time.Parse("20060102-150405", timestampPart)
+				if err != nil {
+					log.Printf("Failed to parse time from filename '%s': %s\n", f.Name(), err)
+					continue
+				}
+
+				timestampToFile[fileTime] = f.Name()
+
+				if fileTime.After(latest) {
+					latest = fileTime
+				}
+			}
+		}
+	}
+
+	for t, name := range timestampToFile {
+		if t.Before(latest) {
+			err := os.Remove(filepath.Join(DatabaseDir, name))
+			if err != nil {
+				log.Printf("Failed to remove old database file: %s\n", name)
+			} else {
+				log.Printf("Removed old database file: %s\n", name)
+			}
+		}
+	}
+}
+
+func getDatabaseFile(ip string) string {
+	var baseFilename string
+	if isIPv4(ip) {
+		baseFilename = "PX11LITEBIN"
+	} else {
+		baseFilename = "PX11LITEBINIPV6"
+	}
+
+	latestFile := findLatestDbFile(baseFilename)
+	if latestFile == "" || needsUpdate(latestFile) {
+		updateDb()
+		latestFile = findLatestDbFile(baseFilename)
+	}
+
+	return latestFile
+}
+
+func updateDb() error {
+	dbToken := os.Getenv(IP2LocationToken)
+	if dbToken == "" {
+		return errors.New("IP2LOCATION_TOKEN environment variable not set")
+	}
+
+	IPv4DbLink := fmt.Sprintf(inApiEndpoint, dbToken, IPv4DbName)
+	IPv6DbLink := fmt.Sprintf(inApiEndpoint, dbToken, IPv6DbName)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		if needsUpdate(IPv4DbName) {
+			if err := downloadAndSave(IPv4DbLink, IPv4DbName); err != nil {
+				log.Println(err)
 			}
 		}
 	}()
 
-	// ip locating routien
 	go func() {
-		var nextDelayRequest time.Duration
-		for {
-			select {
-			// New request to identify an IP
-			case reqIp := <-c.locationRequest:
-				log.Trace("new request has been received for ip:", reqIp)
-			reqLoop:
-				for {
-					// since it didn't exist or did expire, request the ip
-					// new API call needs to be done
-					log.Tracef(" making API call for %s", reqIp)
-					atomic.AddInt32(c.apiCalls, 1)
-					respC := c.locateIp(reqIp)
-					select {
-					case apiResp := <-respC:
-						nextDelayRequest = apiResp.DelayTime
-						log.WithFields(log.Fields{
-							"delay":         nextDelayRequest,
-							"attempts left": apiResp.AttemptsLeft,
-						}).Debug("got response from IP-API request ")
-						// check if there is an error
-						switch apiResp.Err {
-						case TooManyRequestError:
-							// if the error reports that we tried too many calls on the API, sleep given time and try again
-							log.Debug("call ", reqIp, " -> error received: ", apiResp.Err.Error(), "\nwaiting ", nextDelayRequest+(5*time.Second))
-							ticker := time.NewTicker(nextDelayRequest + (5 * time.Second))
-							select {
-							case <-ticker.C:
-								continue
-							case <-c.ctx.Done():
-								log.Info("context closure has been detecting, closing IpApi caller")
-								return
-							}
-						case nil:
-							// if the error is different from TooManyRequestError break loop and store the request
-							log.Debugf("call %s-> api req success", reqIp)
-							// Upsert the IP into the db
-							c.dbClient.PersistToDB(apiResp.IpInfo)
-							break reqLoop
-
-						default:
-							log.Debug("call ", reqIp, " -> diff error received: ", apiResp.Err.Error())
-							break reqLoop
-
-						}
-
-					case <-c.ctx.Done():
-						log.Info("context closure has been detecting, closing IpApi caller")
-						return
-					}
-				}
-				// check if there is any waiting time that we have to respect before next connection
-				if nextDelayRequest != time.Duration(0) {
-					log.Debug("number of allowed requests has been exceed, waiting ", nextDelayRequest+(2*time.Second))
-					// set req delay to true, noone can make requests
-					ticker := time.NewTicker(nextDelayRequest + (2 * time.Second))
-					select {
-					case <-ticker.C:
-						continue
-					case <-c.ctx.Done():
-						log.Info("context closure has been detecting, closing IpApi caller")
-						return
-					}
-				}
-
-			// the context has been deleted, end go routine
-			case <-c.ctx.Done():
-				// close the channels
-				close(c.locationRequest)
-				return
+		defer wg.Done()
+		if needsUpdate(IPv6DbName) {
+			if err := downloadAndSave(IPv6DbLink, IPv6DbName); err != nil {
+				log.Println(err)
 			}
 		}
 	}()
+
+	wg.Wait()
+
+	cleanupDatabases(IPv4DbName, IPv6DbName)
+
+	return nil
 }
 
-// LocateIP is an externa request that any module could do to identify an IP
+// ------------------------------------------------- //
+
+func isIPv4(ip string) bool {
+	ipv4Pattern := `^(\d{1,3}\.){3}\d{1,3}$`
+	match, _ := regexp.MatchString(ipv4Pattern, ip)
+	return match
+}
+
+func isIPv6(ip string) bool {
+	ipv6Pattern := `^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$`
+	match, _ := regexp.MatchString(ipv6Pattern, ip)
+	return match
+}
+
+// ------------------------------------------------- //
+
 func (c *IpLocator) LocateIP(ip string) {
 	// check first if IP is already in queue (to queue same ip)
 	if c.ipQueue.ipExists(ip) {
@@ -199,98 +377,7 @@ func (c *IpLocator) LocateIP(ip string) {
 	ticker.Stop()
 }
 
-func (c *IpLocator) Close() {
-	log.Info("closing IP-API service")
-	// close the context for ending up the routine
-
-}
-
-func (c *IpLocator) locateIp(ip string) chan models.ApiResp {
-	respC := make(chan models.ApiResp)
-	go callIpApi(ip, respC)
-	return respC
-}
-
-// get location country and City from the multiaddress of the peer on the peerstore
-func callIpApi(ip string, respC chan models.ApiResp) {
-	var apiResponse models.ApiResp
-	apiResponse.IpInfo, apiResponse.DelayTime, apiResponse.AttemptsLeft, apiResponse.Err = CallIpApi(ip)
-	respC <- apiResponse
-	// defer ^
-}
-
-func CallIpApi(ip string) (ipInfo models.IpInfo, delay time.Duration, attemptsLeft int, err error) {
-
-	url := strings.Replace(ipApiEndpoint, "{__ip__}", ip, 1)
-
-	// Make the IP-APi request
-	resp, err := http.Get(url)
-	if err != nil {
-		err = errors.Wrap(err, "unable to locate IP"+ip)
-		return
-	}
-	timeLeft, _ := strconv.Atoi(resp.Header["X-Ttl"][0])
-	// check if the error that we are receiving means that we exeeded the request limit
-	if resp.StatusCode == 429 {
-		log.Debugf("limit of requests per minute has been exeeded, wait for next call %s secs", resp.Header["X-Ttl"][0])
-		err = TooManyRequestError
-		delay = time.Duration(timeLeft) * time.Second
-		return
-	}
-
-	// Check the attempts left that we have to call the api
-	attemptsLeft, _ = strconv.Atoi(resp.Header["X-Rl"][0])
-	if attemptsLeft <= 0 {
-		// if there are no more attempts left against the api, check how much time do we have to wait
-		// until we can call it again
-		// set the delayTime that we return to the given seconds to wait
-		delay = time.Duration(timeLeft) * time.Second
-	}
-
-	// check if the response was success or not
-	defer resp.Body.Close()
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		err = errors.Wrap(err, "could not read response body")
-		return
-	}
-
-	var apiMsg models.IpApiMsg
-	// Convert response body to struct
-	err = json.Unmarshal(bodyBytes, &apiMsg)
-	if err != nil {
-		err = errors.Wrap(err, "could not unmarshall response")
-		return
-	}
-	// Check if the status of the request has been succesful
-	if apiMsg.Status != "success" {
-		err = errors.New(fmt.Sprintf("status from ip different than success, resp header:\n %#v \n %+v", resp, apiMsg))
-		return
-	}
-
-	ipInfo.ExpirationTime = time.Now().UTC().Add(defaultIpTTL)
-	ipInfo.IpApiMsg = apiMsg
-	return
-}
-
-func newIpQueue(queueSize int) *ipQueue {
-	return &ipQueue{
-		queueSize: queueSize,
-		ipList:    make([]string, 0, queueSize),
-	}
-}
-
-var (
-	ErrorQueueFull  = errors.New("queue is full")
-	ErrorQueueEmpty = errors.New("queue is emtpy")
-)
-
-type ipQueue struct {
-	sync.RWMutex
-	queueSize int
-	ipList    []string
-}
-
+// add an item to the IP queue
 func (q *ipQueue) addItem(newItem string) error {
 	q.Lock()
 	defer q.Unlock()
@@ -311,6 +398,7 @@ func (q *ipQueue) addItem(newItem string) error {
 	return nil
 }
 
+// reads items from the IP queue
 func (q *ipQueue) readItem() (string, error) {
 	q.Lock()
 	defer q.Unlock()
@@ -326,6 +414,102 @@ func (q *ipQueue) readItem() (string, error) {
 	q.ipList = append(q.ipList[:0], q.ipList[0+1:]...)
 
 	return item, nil
+}
+
+// this function replaces the API call in the old version of the script
+func locate(ip string) (ip2proxy.IP2ProxyRecord, error) {
+	if !isIPv4(ip) && !isIPv6(ip) {
+		return ip2proxy.IP2ProxyRecord{}, fmt.Errorf("invalid IP address")
+	}
+
+	dbFile := getDatabaseFile(ip)
+	//todo: unzip db file and clean up and use the new name of the db
+	db, err := ip2proxy.OpenDB(DatabaseDir + dbFile)
+	if err != nil {
+		return ip2proxy.IP2ProxyRecord{}, err
+	}
+	defer db.Close()
+
+	results, err := db.GetAll(ip)
+	if err != nil {
+		return ip2proxy.IP2ProxyRecord{}, err
+	}
+
+	return results, err
+}
+
+func (c *IpLocator) locatorRoutine() {
+	go func() {
+		ticker := time.NewTicker(minIterTime)
+		for {
+			ip, err := c.ipQueue.readItem()
+			if err == nil {
+				c.locationRequest <- ip
+			}
+			select {
+			case <-ticker.C:
+				ticker.Reset(minIterTime)
+
+			case <-c.ctx.Done():
+				return
+			}
+		}
+	}()
+
+	go func() {
+		for {
+			select {
+			case ip := <-c.locationRequest:
+				respC := c.locateIp(ip)
+			case <-c.ctx.Done():
+				return
+			}
+		}
+	}()
+}
+
+func (c *IpLocator) locateIp(ip string) chan models.ApiResp {
+	respC := make(chan models.ApiResp)
+	go callIpApi(ip, respC)
+	return respC
+}
+
+// get location country and City from the multiaddress of the peer on the peerstore
+func callIpApi(ip string, respC chan models.ApiResp) {
+	var apiResponse models.ApiResp
+	apiResponse.IpInfo, apiResponse.DelayTime, apiResponse.Err = CallIpApi(ip)
+	respC <- apiResponse
+	// defer ^
+}
+
+func CallIpApi(ip string) (ipInfo models.IpInfo, delay time.Duration, err error) {
+
+	var tempInfo ip2proxy.IP2ProxyRecord
+	tempInfo, err = locate(ip)
+	if err != nil {
+		return
+	}
+
+	var apiMsg models.IpApiMsg
+	apiMsg = models.mapTempIpInfoToApiMsg(tempInfo, ip)
+
+	ipInfo.ExpirationTime = time.Now().UTC().Add(defaultIpTTL)
+	ipInfo.IpApiMsg = apiMsg
+	return
+}
+
+// ------------------------------------------------- //
+
+func (c *IpLocator) Run() {
+	//l.SetLevel(Logrus.TraceLevel)
+	c.locatorRoutine()
+}
+
+func (c *IpLocator) Close() {
+	log.Info("closing IP-API service")
+	// close the context for ending up the routine
+	c.ctx.Done()
+
 }
 
 func (q *ipQueue) ipExists(target string) bool {
