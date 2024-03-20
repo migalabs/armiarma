@@ -15,7 +15,7 @@ build:
 
 dependencies:
 	$(GIT_SUBM) update --init
-	cd go-libp2p-pubsub && git checkout origin/armiarma && git pull origin armiarma
+	cd go-libp2p-pubsub && git checkout origin/armiarma-v2 && git pull origin armiarma-v2
 	cd ../
 
 install:
