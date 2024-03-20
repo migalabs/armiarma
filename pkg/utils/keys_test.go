@@ -7,7 +7,6 @@ import (
 )
 
 func TestKeyConverters(t *testing.T) {
-
 	// Basic Geth privKey
 	ogECDSA, err := GenerateECDSAPrivKey()
 	require.NoError(t, err)

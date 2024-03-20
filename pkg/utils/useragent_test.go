@@ -102,14 +102,14 @@ var Eth2TestClients []clientInfoTest = []clientInfoTest{
 	},
 	{
 		userAgent:     "erigon/lightclient",
-		clientname:    "erigon",
+		clientName:    "erigon",
 		clientVersion: "unknown",
 		clientOS:      "unknown",
 		clientArch:    "unknown",
 	},
 	{
 		userAgent:     "erigon",
-		clientname:    "erigon",
+		clientName:    "erigon",
 		clientVersion: "unknown",
 		clientOS:      "unknown",
 		clientArch:    "unknown",
