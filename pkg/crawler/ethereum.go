@@ -16,6 +16,7 @@ import (
 	psql "github.com/migalabs/armiarma/pkg/db/postgresql"
 	"github.com/migalabs/armiarma/pkg/discovery"
 	"github.com/migalabs/armiarma/pkg/discovery/dv5"
+	"github.com/migalabs/armiarma/pkg/events"
 	"github.com/migalabs/armiarma/pkg/gossipsub"
 	"github.com/migalabs/armiarma/pkg/hosts"
 	"github.com/migalabs/armiarma/pkg/metrics"
@@ -38,6 +39,7 @@ type EthereumCrawler struct {
 	Gossipsub *gossipsub.GossipSub
 	IpLocator *apis.IpLocator
 	Metrics   *metrics.PrometheusMetrics
+	Events    *events.Forwarder
 }
 
 func NewEthereumCrawler(mainCtx *cli.Context, conf config.EthereumCrawlerConfig) (*EthereumCrawler, error) {
@@ -91,12 +93,12 @@ func NewEthereumCrawler(mainCtx *cli.Context, conf config.EthereumCrawlerConfig)
 		return nil, err
 	}
 	dbClient, err := psql.NewDBClient(
-			ctx,
-			ethNode.Network(), 
-			conf.PsqlEndpoint, 
-			backupInterval, 
-			psql.InitializeTables(true),
-			psql.WithConnectionEventsPersist(conf.PersistConnEvents),
+		ctx,
+		ethNode.Network(),
+		conf.PsqlEndpoint,
+		backupInterval,
+		psql.InitializeTables(true),
+		psql.WithConnectionEventsPersist(conf.PersistConnEvents),
 	)
 	if err != nil {
 		cancel()
@@ -158,6 +160,7 @@ func NewEthereumCrawler(mainCtx *cli.Context, conf config.EthereumCrawlerConfig)
 		default:
 			log.Error("untraceable gossipsub topic", top)
 			continue
+
 		}
 		topic := eth.ComposeTopic(conf.ForkDigest, top)
 		gs.JoinAndSubscribe(topic, msgHandler, conf.PersistMsgs)
@@ -190,6 +193,9 @@ func NewEthereumCrawler(mainCtx *cli.Context, conf config.EthereumCrawlerConfig)
 		return nil, err
 	}
 
+	// Build the event forwarder
+	eventHandler := events.NewForwarder(conf.SSEIP, conf.SSEPort, dbClient, ethMsgHandler)
+
 	// generate the CrawlerBase
 	crawler := &EthereumCrawler{
 		ctx:       ctx,
@@ -202,6 +208,7 @@ func NewEthereumCrawler(mainCtx *cli.Context, conf config.EthereumCrawlerConfig)
 		Gossipsub: gs,
 		IpLocator: ipLocator,
 		Metrics:   promethMetrics,
+		Events:    eventHandler,
 	}
 
 	// Register the metrics for the crawler and submodules
@@ -234,6 +241,7 @@ func (c *EthereumCrawler) Run() {
 	c.EthNode.ServeBeaconMetadata(c.Host.Host())
 
 	// initialization secuence for the crawler
+	c.Events.Start(c.ctx)
 	c.IpLocator.Run()
 	c.Host.Start()
 	c.Disc.Start()
@@ -246,5 +254,6 @@ func (c *EthereumCrawler) Close() {
 	c.Host.Host().Close()
 	c.DB.Close()
 	c.Metrics.Close()
+	c.Events.Stop()
 	c.cancel()
 }

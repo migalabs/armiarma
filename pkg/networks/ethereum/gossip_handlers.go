@@ -34,6 +34,8 @@ func EthMessageBaseHandler(topic string, msg *pubsub.Message) ([]byte, error) {
 type EthMessageHandler struct {
 	genesisTime time.Time
 	pubkeys     []*common.BLSPubkey // pubkeys of those validators we want to track
+
+	attestationCallbacks []func(event *AttestationReceievedEvent)
 }
 
 func NewEthMessageHandler(genesis time.Time, pubkeysStr []string) (*EthMessageHandler, error) {
@@ -54,6 +56,10 @@ func NewEthMessageHandler(genesis time.Time, pubkeysStr []string) (*EthMessageHa
 		subHandler.pubkeys = append(subHandler.pubkeys, blsKey)
 	}
 	return subHandler, nil
+}
+
+func (s *EthMessageHandler) OnAttestation(fn func(event *AttestationReceievedEvent)) {
+	s.attestationCallbacks = append(s.attestationCallbacks, fn)
 }
 
 // as reference https://github.com/protolambda/zrnt/blob/4ecaadfe0cb3c0a90d85e6a6dddcd3ebed0411b9/eth2/beacon/phase0/indexed.go#L99
@@ -107,6 +113,17 @@ func (s *EthMessageHandler) SubnetMessageHandler(msg *pubsub.Message) (gossipsub
 		TimeInSlot:  GetTimeInSlot(s.genesisTime, msg.ArrivalTime, int64(attestation.Data.Slot)),
 		Sender:      msg.ReceivedFrom,
 		ValPubkey:   "",
+	}
+
+	// Publish the event
+	for _, fn := range s.attestationCallbacks {
+		// Warning: blocking call, but the only consumers of these "internal" events should be the "events" forwarder which will throw it
+		// in to a buffered channel.
+		fn(&AttestationReceievedEvent{
+			Attestation:        &attestation,
+			TrackedAttestation: trackedAttestation,
+			PeerID:             msg.ReceivedFrom,
+		})
 	}
 
 	return trackedAttestation, nil

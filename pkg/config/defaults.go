@@ -15,12 +15,16 @@ var (
 	DefaultPrivKey                   string = ""
 	DefaultIP                        string = "0.0.0.0"
 	DefaultMetricsIP                 string = "0.0.0.0"
+	DefaultSSEIP                     string = "0.0.0.0"
 	DefaultPort                      int    = 9020
 	DefaultMetricsPort               int    = 9080
+	DefaultSSEPort                   int    = 9099
 	DefaultUserAgent                 string = "Armiarma Crawler"
 	DefaultPSQLEndpoint              string = "postgres://user:password@localhost:5432/armiarmadb"
 	DefaultActivePeersBackupInterval string = "12h"
-	DefaultPersistConnEvents 	 bool 	= true
+	DefaultPersistConnEvents         bool   = true
+
+	DefaultAttestationBufferSize = 10000
 
 	Ipfsprotocols = []string{
 		"/ipfs/kad/1.0.0",

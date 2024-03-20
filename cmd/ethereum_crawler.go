@@ -119,6 +119,16 @@ var Eth2CrawlerCommand = &cli.Command{
 			Usage:   "Path of the file that has the pubkeys of those validators that we want to track (experimental)",
 			EnvVars: []string{"ARMIARMA_VAL_PUBKEYS"},
 		},
+		&cli.StringFlag{
+			Name:    "sse-ip",
+			Usage:   "IP to expose the SSE server",
+			EnvVars: []string{"ARMIARMA_SSE_IP"},
+		},
+		&cli.StringFlag{
+			Name:    "sse-port",
+			Usage:   "Port to expose the SSE server",
+			EnvVars: []string{"ARMIARMA_SSE_PORT"},
+		},
 	},
 }
 

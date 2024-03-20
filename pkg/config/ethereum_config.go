@@ -38,9 +38,11 @@ type EthereumCrawlerConfig struct {
 	Bootnodes                 []string `json:"bootnodes"`
 	GossipTopics              []string `json:"gossip-topics"`
 	Subnets                   []int    `json:"subnets"`
-	PersistConnEvents	  bool 	   `json:"persist-connevents"`
+	PersistConnEvents         bool     `json:"persist-connevents"`
 	PersistMsgs               bool     `json:"persist-msgs"`
 	ValPubkeys                []string `json:"val-pubkeys"`
+	SSEIP                     string   `json:"sse-ip"`
+	SSEPort                   int      `json:"sse-port"`
 }
 
 // TODO: read from config-file
@@ -61,9 +63,11 @@ func NewEthereumCrawlerConfig() *EthereumCrawlerConfig {
 		Bootnodes:                 DefaultEthereumBootnodes,
 		Subnets:                   DefaultSubnets,
 		GossipTopics:              DefaultEthereumGossipTopics,
-		PersistConnEvents: 	   DefaultPersistConnEvents,
+		PersistConnEvents:         DefaultPersistConnEvents,
 		PersistMsgs:               false,
 		ValPubkeys:                DefaultValPubkeys,
+		SSEIP:                     DefaultSSEIP,
+		SSEPort:                   DefaultSSEPort,
 	}
 }
 
@@ -112,7 +116,6 @@ func (c *EthereumCrawlerConfig) Apply(ctx *cli.Context) {
 		if valid {
 			c.ForkDigest = validForkDigest
 		}
-		
 	}
 
 	// Check if the eth-cl endpoint
@@ -191,21 +194,33 @@ func (c *EthereumCrawlerConfig) Apply(ctx *cli.Context) {
 		c.ValPubkeys = append(c.ValPubkeys, valKeys...)
 	}
 
+	// read SSE IP
+	if ctx.IsSet("sse-ip") {
+		c.SSEIP = ctx.String("sse-ip")
+	}
+
+	// read SSE Port
+	if ctx.IsSet("sse-port") {
+		c.SSEPort = ctx.Int("sse-port")
+	}
+
 	log.WithFields(log.Fields{
-		"log-level":       c.LogLevel,
-		"priv-key":        c.PrivateKey,
-		"ip":              c.IP,
-		"port":            c.Port,
-		"user-agent":      c.UserAgent,
-		"psql":            c.PsqlEndpoint,
-		"backup-interval": c.ActivePeersBackupInterval,
-		"fork-digest":     c.ForkDigest,
-		"cl-endpoint":     c.EthCLRemoteEndpoint,
-		"bootnodes":       c.Bootnodes,
-		"gossip-topics":   c.GossipTopics,
-		"subnets":         c.Subnets,
+		"log-level":          c.LogLevel,
+		"priv-key":           c.PrivateKey,
+		"ip":                 c.IP,
+		"port":               c.Port,
+		"user-agent":         c.UserAgent,
+		"psql":               c.PsqlEndpoint,
+		"backup-interval":    c.ActivePeersBackupInterval,
+		"fork-digest":        c.ForkDigest,
+		"cl-endpoint":        c.EthCLRemoteEndpoint,
+		"bootnodes":          c.Bootnodes,
+		"gossip-topics":      c.GossipTopics,
+		"subnets":            c.Subnets,
 		"persist-connevents": c.PersistConnEvents,
-		"persist-msgs":    c.PersistMsgs,
-		"val-pubkeys":     len(c.ValPubkeys),
+		"persist-msgs":       c.PersistMsgs,
+		"val-pubkeys":        len(c.ValPubkeys),
+		"sse-ip":             c.SSEIP,
+		"sse-port":           c.SSEPort,
 	}).Info("config for the Ethereum crawler")
 }
