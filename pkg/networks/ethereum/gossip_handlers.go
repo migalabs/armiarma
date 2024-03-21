@@ -3,14 +3,14 @@ package ethereum
 import (
 	"bytes"
 	"fmt"
+	"github.com/protolambda/zrnt/eth2/beacon/phase0"
 	"time"
 
 	// bls "github.com/phoreproject/github.com/bls/g1pubs"
 
 	"github.com/migalabs/armiarma/pkg/gossipsub"
-	"github.com/protolambda/zrnt/eth2/beacon/capella"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
-	"github.com/protolambda/zrnt/eth2/beacon/phase0"
+	"github.com/protolambda/zrnt/eth2/beacon/deneb"
 	"github.com/protolambda/zrnt/eth2/configs"
 	"github.com/protolambda/ztyp/codec"
 
@@ -140,7 +140,7 @@ func (mh *EthMessageHandler) BeaconBlockMessageHandler(msg *pubsub.Message) (gos
 		return nil, err
 	}
 	msgBuf := bytes.NewBuffer(msgBytes)
-	bblock := new(capella.SignedBeaconBlock)
+	bblock := new(deneb.SignedBeaconBlock)
 
 	err = bblock.Deserialize(configs.Mainnet, codec.NewDecodingReader(msgBuf, uint64(len(msgBuf.Bytes()))))
 	if err != nil {
