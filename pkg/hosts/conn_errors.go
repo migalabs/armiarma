@@ -3,7 +3,7 @@ package hosts
 import (
 	"strings"
 
-	swarm "github.com/libp2p/go-libp2p-swarm"
+	"github.com/libp2p/go-libp2p/p2p/net/swarm"
 )
 
 // Much easier/prettier way of filtering the Error returned by the libp2p.Host.Connect

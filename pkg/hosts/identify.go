@@ -62,9 +62,13 @@ func ReqHostInfo(ctx context.Context, wg *sync.WaitGroup, h host.Host, ipLoc *ap
 		hInfo.PeerInfo.ProtocolVersion = pv.(string)
 	}
 
-	prot, err := h.Peerstore().GetProtocols(peerID)
+	prots, err := h.Peerstore().GetProtocols(peerID)
 	if err == nil {
-		hInfo.PeerInfo.Protocols = prot
+		supportedProtocols := make([]string, len(prots))
+		for i, prot := range prots {
+			supportedProtocols[i] = string(prot)
+		}
+		hInfo.PeerInfo.Protocols = supportedProtocols
 	}
 	// Update the values of the
 	hInfo.PeerInfo.Latency = rtt

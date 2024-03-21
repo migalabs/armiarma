@@ -3,8 +3,8 @@ package ethereum
 import (
 	"context"
 
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/migalabs/armiarma/pkg/networks/ethereum/rpc/methods"
 	"github.com/migalabs/armiarma/pkg/networks/ethereum/rpc/reqresp"
 	"github.com/protolambda/zrnt/eth2/beacon/common"

@@ -3,7 +3,7 @@ package models
 import (
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 type ConnDirection int8
@@ -32,7 +32,6 @@ func DirectionIndexToString(connDir ConnDirection) string {
 // 2. while we identify the peer or the metadata, the disconnection might come
 // 3. persist the Metadata or the disconn to the prev added
 
-//
 type EventTrace struct {
 	PeerID peer.ID
 	Event  interface{}

@@ -4,7 +4,7 @@ import (
 	"time"
 
 	pgx "github.com/jackc/pgx/v4"
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/migalabs/armiarma/pkg/db/models"
 	"github.com/migalabs/armiarma/pkg/utils"
 	ma "github.com/multiformats/go-multiaddr"
