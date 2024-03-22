@@ -7,12 +7,12 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/libp2p/go-libp2p-core/host"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/p2p/protocol/identify"
+
 	"github.com/migalabs/armiarma/pkg/db/models"
 	"github.com/migalabs/armiarma/pkg/utils/apis"
-
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p/p2p/protocol/identify"
 )
 
 // Identify the peer from the Libp2p Identify Service
@@ -62,9 +62,13 @@ func ReqHostInfo(ctx context.Context, wg *sync.WaitGroup, h host.Host, ipLoc *ap
 		hInfo.PeerInfo.ProtocolVersion = pv.(string)
 	}
 
-	prot, err := h.Peerstore().GetProtocols(peerID)
+	prots, err := h.Peerstore().GetProtocols(peerID)
 	if err == nil {
-		hInfo.PeerInfo.Protocols = prot
+		supportedProtocols := make([]string, len(prots))
+		for i, prot := range prots {
+			supportedProtocols[i] = string(prot)
+		}
+		hInfo.PeerInfo.Protocols = supportedProtocols
 	}
 	// Update the values of the
 	hInfo.PeerInfo.Latency = rtt

@@ -13,12 +13,14 @@ import (
 	"context"
 	"encoding/base64"
 
-	"github.com/libp2p/go-libp2p-core/host"
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
-	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
-	"github.com/migalabs/armiarma/pkg/metrics"
 	"github.com/minio/sha256-simd"
 	log "github.com/sirupsen/logrus"
+
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
+	"github.com/libp2p/go-libp2p/core/host"
+
+	"github.com/migalabs/armiarma/pkg/metrics"
 )
 
 type database interface {

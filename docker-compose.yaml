@@ -5,11 +5,12 @@ networks:
 
 services:
         db:
-                image: postgres:14.1-alpine
+                image: postgres:latest
                 restart: unless-stopped
                 environment:
                         - POSTGRES_USER=user
                         - POSTGRES_PASSWORD=password
+                        - POSTGRES_DATABASE=armiarmadb
                 volumes: 
                         - type: bind
                           source: ./app-data/init-armiarma.sql

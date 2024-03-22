@@ -3,24 +3,26 @@ package hosts
 import (
 	"context"
 	"fmt"
-	"time"
 
-	"github.com/migalabs/armiarma/pkg/db/models"
-	"github.com/migalabs/armiarma/pkg/utils"
-	"github.com/migalabs/armiarma/pkg/utils/apis"
-
-	libp2p "github.com/libp2p/go-libp2p"
-	conmgr "github.com/libp2p/go-libp2p-connmgr"
-	"github.com/libp2p/go-libp2p-core/crypto"
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/peer"
-	noise "github.com/libp2p/go-libp2p-noise"
+	"github.com/libp2p/go-libp2p"
+	mplex "github.com/libp2p/go-libp2p-mplex"
+	"github.com/libp2p/go-libp2p/core/connmgr"
+	"github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/peer"
+	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
+	"github.com/libp2p/go-libp2p/p2p/muxer/yamux"
 	"github.com/libp2p/go-libp2p/p2p/protocol/identify"
-	tcp_transport "github.com/libp2p/go-tcp-transport"
+	"github.com/libp2p/go-libp2p/p2p/security/noise"
+	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
 
 	log "github.com/sirupsen/logrus"
 
 	ma "github.com/multiformats/go-multiaddr"
+
+	"github.com/migalabs/armiarma/pkg/db/models"
+	"github.com/migalabs/armiarma/pkg/utils"
+	"github.com/migalabs/armiarma/pkg/utils/apis"
 
 	"github.com/pkg/errors"
 )
@@ -56,7 +58,7 @@ func NewBasicLibp2pEth2Host(
 	ctx context.Context,
 	ip string,
 	port int,
-	privKey *crypto.Secp256k1PrivateKey,
+	privKey crypto.PrivKey,
 	userAgent string,
 	netNode P2pNetwork,
 	ipLocator *apis.IpLocator) (*BasicLibp2pHost, error) {
@@ -67,21 +69,25 @@ func NewBasicLibp2pEth2Host(
 		return nil, errors.Wrap(err, fmt.Sprintf("couldn't generate multiaddress from ip %s and tcp %s", ip, port))
 	}
 
-	// connection manager
-	low := 5000
-	hi := 7000
-	graceTime := 30 * time.Minute
-	conMngr := conmgr.NewConnManager(low, hi, graceTime)
+	// resource manager we don't want the host to be limited by anything
+	limiter := rcmgr.NewFixedLimiter(rcmgr.InfiniteLimits)
+	rm, err := rcmgr.NewResourceManager(limiter)
+	if err != nil {
+		return nil, fmt.Errorf("new resource manager: %w", err)
+	}
 
 	// Generate the main Libp2p host that will be exposed to the network
 	host, err := libp2p.New(
 		libp2p.ListenAddrs(multiaddr),
 		libp2p.Identity(privKey),
 		libp2p.UserAgent(userAgent),
-		libp2p.Transport(tcp_transport.NewTCPTransport),
+		libp2p.Transport(tcp.NewTCPTransport),
 		libp2p.Security(noise.ID, noise.New),
+		libp2p.Muxer(mplex.ID, mplex.DefaultTransport),
+		libp2p.Muxer(yamux.ID, yamux.DefaultTransport),
 		libp2p.NATPortMap(),
-		libp2p.ConnectionManager(conMngr),
+		libp2p.ResourceManager(rm),
+		libp2p.ConnectionManager(connmgr.NullConnMgr{}),
 	)
 	if err != nil {
 		return nil, err

@@ -1,5 +1,5 @@
 /*
-	Copyright © 2021 Miga Labs
+Copyright © 2021 Miga Labs
 */
 package kdht
 
@@ -15,16 +15,16 @@ import (
 
 	"github.com/pkg/errors"
 
-	net "github.com/libp2p/go-libp2p-core/network"
+	net "github.com/libp2p/go-libp2p/core/network"
 	"github.com/migalabs/armiarma/pkg/db/models"
 	"github.com/migalabs/armiarma/pkg/discovery"
 	"github.com/migalabs/armiarma/pkg/utils"
 
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/protocol"
 	kdht "github.com/libp2p/go-libp2p-kad-dht"
 	pb "github.com/libp2p/go-libp2p-kad-dht/pb"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -338,7 +338,6 @@ func (d *discoveredPeers) getNextPeer() peer.AddrInfo {
 	return *addinfo
 }
 
-//
 func (d *discoveredPeers) getLen() int {
 	d.m.Lock()
 	l := len(d.pArray)

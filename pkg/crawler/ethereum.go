@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/crypto"
+	"github.com/libp2p/go-libp2p/core/crypto"
 	cli "github.com/urfave/cli/v2"
 
 	"github.com/migalabs/armiarma/pkg/config"
@@ -51,7 +51,7 @@ func NewEthereumCrawler(mainCtx *cli.Context, conf config.EthereumCrawlerConfig)
 
 	// parse or create a private key for the host
 	var gethPrivKey *ecdsa.PrivateKey
-	var libp2pPrivKey *crypto.Secp256k1PrivateKey
+	var libp2pPrivKey crypto.PrivKey
 	if conf.PrivateKey == "" {
 		gethPrivKey, err = utils.GenerateECDSAPrivKey()
 		if err != nil {

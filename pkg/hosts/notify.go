@@ -5,11 +5,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/migalabs/armiarma/pkg/db/models"
 	eth "github.com/migalabs/armiarma/pkg/networks/ethereum"
 	"github.com/migalabs/armiarma/pkg/utils"
 
+	"github.com/libp2p/go-libp2p/core/network"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 	log "github.com/sirupsen/logrus"
@@ -169,14 +169,6 @@ func (c *BasicLibp2pHost) standardDisconnectF(net network.Network, conn network.
 	})
 }
 
-func (c *BasicLibp2pHost) standardOpenedStreamF(net network.Network, str network.Stream) {
-	log.Trace("Open Stream")
-}
-
-func (c *BasicLibp2pHost) standardClosedF(net network.Network, str network.Stream) {
-	log.Trace("Close Stream")
-}
-
 // SetCustomNotifications:
 // Set all notification handlers
 func (c *BasicLibp2pHost) SetCustomNotifications() error {
@@ -186,8 +178,6 @@ func (c *BasicLibp2pHost) SetCustomNotifications() error {
 		ListenCloseF:  c.standardListenCloseF,
 		ConnectedF:    c.standardConnectF,
 		DisconnectedF: c.standardDisconnectF,
-		OpenedStreamF: c.standardOpenedStreamF,
-		ClosedStreamF: c.standardClosedF,
 	}
 	// read host from main struct
 	h := c.Host()

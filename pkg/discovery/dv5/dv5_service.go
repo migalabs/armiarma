@@ -16,12 +16,12 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/migalabs/armiarma/pkg/db/models"
 	"github.com/migalabs/armiarma/pkg/discovery"
 	eth "github.com/migalabs/armiarma/pkg/networks/ethereum"
 	"github.com/migalabs/armiarma/pkg/utils"
-	log "github.com/sirupsen/logrus"
 
 	gethlog "github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/discover"
@@ -80,9 +80,6 @@ func NewDiscovery5(
 
 	// Set custom logger for the discovery5 service (Debug)
 	gethLogger := gethlog.New()
-	gethLogger.SetHandler(gethlog.FuncHandler(func(r *gethlog.Record) error {
-		return nil
-	}))
 
 	// configuration of the discovery5
 	cfg := discover.Config{
@@ -135,7 +132,7 @@ func (d *Discovery5) nodeIterator() {
 			// fill the given DiscoveredPeer interface with the next found peer
 			node := d.Iterator.Node()
 			log.WithFields(log.Fields{
-				"enr": node.String(),
+				"enr":     node.String(),
 				"node_id": node.ID().String(),
 				"module":  "Discv5",
 			}).Debug("new ENR discovered")

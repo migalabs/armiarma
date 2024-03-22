@@ -66,8 +66,9 @@ func (bh *BasicLibp2pHost) supportedProtocols() *metrics.IndvMetrics {
 		summary := make(map[string]int8)
 		SupportedProtocols.Reset()
 		for _, prot := range protocols {
-			summary[prot] = int8(1)
-			SupportedProtocols.WithLabelValues(prot).Set(float64(1))
+			protStr := string(prot)
+			summary[protStr] = int8(1)
+			SupportedProtocols.WithLabelValues(protStr).Set(float64(1))
 		}
 		return summary, nil
 	}

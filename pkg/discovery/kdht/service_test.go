@@ -6,7 +6,7 @@ import (
 
 	"github.com/migalabs/armiarma/pkg/utils"
 
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
 
 	"github.com/sirupsen/logrus"

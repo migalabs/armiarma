@@ -1,10 +1,11 @@
 # syntax=docker/dockerfile:1
 
 # chosen buster image for
-FROM golang:1.17.13-buster AS builder
+FROM golang:1.21-alpine AS builder
 
 WORKDIR /
-RUN apt-get install git
+RUN apk add --no-cache git
+RUN apk add --no-cache make
 COPY ./ /armiarma
 
 #RUN make dependencies

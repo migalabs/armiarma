@@ -21,6 +21,7 @@ var (
 	AltairKey    string = "Altair"
 	BellatrixKey string = "Bellatrix"
 	CapellaKey   string = "Capella"
+	DenebKey     string = "Deneb"
 	// Gnosis
 	GnosisPhase0Key    string = "GnosisPhase0"
 	GnosisAltairKey    string = "GnosisAltair"
@@ -43,6 +44,7 @@ var (
 		AltairKey:    "0xafcaaba0",
 		BellatrixKey: "0x4a26c58b",
 		CapellaKey:   "0xbba4da96",
+		DenebKey:     "0x6a95a1a9",
 		// Gnosis
 		GnosisPhase0Key:    "0xf925ddc5",
 		GnosisBellatrixKey: "0x56fdb5e0",
