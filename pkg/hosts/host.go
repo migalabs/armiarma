@@ -220,3 +220,33 @@ func (b *BasicLibp2pHost) RecIdentEvent(identEvent IdentificationEvent) {
 func (b *BasicLibp2pHost) IdentEventNotChannel() chan IdentificationEvent {
 	return b.identNotChannel
 }
+
+func (b *BasicLibp2pHost) GetHostInfo(peerID peer.ID) (models.HostInfo, error) {
+	var hostInfo models.HostInfo
+
+	// Connectivity of the node
+	hostInfo.MAddrs = b.host.Peerstore().Addrs(peerID)
+	addr := utils.GetPublicAddrsFromAddrArray(hostInfo.MAddrs)
+	hostInfo.IP = utils.ExtractIPFromMAddr(addr).String()
+	hostInfo.Port = utils.GetPortFromMaddrs(addr)
+
+	// Protocols
+	pv, err := b.host.Peerstore().Get(peerID, "ProtocolVersion")
+	if err == nil {
+		hostInfo.PeerInfo.ProtocolVersion = pv.(string)
+	}
+	prots, err := b.host.Peerstore().GetProtocols(peerID)
+	if err == nil {
+		supportedProtocols := make([]string, len(prots))
+		for i, prot := range prots {
+			supportedProtocols[i] = string(prot)
+		}
+		hostInfo.PeerInfo.Protocols = supportedProtocols
+	}
+	// Get user agent
+	ua, err := b.host.Peerstore().Get(peerID, "AgentVersion")
+	if err == nil {
+		hostInfo.PeerInfo.UserAgent = ua.(string)
+	}
+	return hostInfo, nil
+}

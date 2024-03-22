@@ -194,7 +194,7 @@ func NewEthereumCrawler(mainCtx *cli.Context, conf config.EthereumCrawlerConfig)
 	}
 
 	// Build the event forwarder
-	eventHandler := events.NewForwarder(conf.SSEIP, conf.SSEPort, dbClient, ethMsgHandler)
+	eventHandler := events.NewForwarder(conf.SSEIP, conf.SSEPort, host, ethMsgHandler)
 
 	// generate the CrawlerBase
 	crawler := &EthereumCrawler{

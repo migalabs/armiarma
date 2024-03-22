@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/migalabs/armiarma/pkg/db/postgresql"
+	"github.com/migalabs/armiarma/pkg/hosts"
 	"github.com/migalabs/armiarma/pkg/networks/ethereum"
 	"github.com/r3labs/sse/v2"
 	log "github.com/sirupsen/logrus"
@@ -20,7 +20,7 @@ type Forwarder struct {
 	port int
 
 	server        *sse.Server
-	db            *postgresql.DBClient
+	h             *hosts.BasicLibp2pHost
 	ethMsgHandler *ethereum.EthMessageHandler
 
 	// Store downstream attestation events in a channel so
@@ -31,7 +31,7 @@ type Forwarder struct {
 }
 
 // NewForwarder creates a new Forwarder
-func NewForwarder(ip string, port int, db *postgresql.DBClient, ethMsgHandler *ethereum.EthMessageHandler) *Forwarder {
+func NewForwarder(ip string, port int, h *hosts.BasicLibp2pHost, ethMsgHandler *ethereum.EthMessageHandler) *Forwarder {
 	server := sse.New()
 
 	// Disable auto replay. If a consumer is not connected, it will never receive the event.
@@ -41,7 +41,7 @@ func NewForwarder(ip string, port int, db *postgresql.DBClient, ethMsgHandler *e
 		ip:            ip,
 		port:          port,
 		server:        server,
-		db:            db,
+		h:             h,
 		ethMsgHandler: ethMsgHandler,
 		attestationCh: make(chan *ethereum.AttestationReceievedEvent, 10000),
 	}
@@ -137,12 +137,10 @@ func (f *Forwarder) processAttestationEvent(e *ethereum.AttestationReceievedEven
 		log.WithError(err).Error("error publishing raw attestation to SSE server")
 	}
 
-	// Build the timed attestation event
-	info, err := f.db.GetFullHostInfo(e.PeerID)
+	// compose the info of the remote peer sending the attestation
+	hostInfo, err := f.h.GetHostInfo(e.PeerID)
 	if err != nil {
-		log.WithError(err).Error("error getting host info from DB when handling a new attestation")
-
-		return
+		log.WithError(err).Error("unable to extract info from peer that shared attestation")
 	}
 
 	// Publish the timed event
@@ -155,13 +153,13 @@ func (f *Forwarder) processAttestationEvent(e *ethereum.AttestationReceievedEven
 			TimeInSlot: e.TrackedAttestation.TimeInSlot,
 		},
 		PeerInfo: &PeerInfo{
-			ID:              fmt.Sprintf("%s", info.ID),
-			IP:              info.IP,
-			Port:            info.Port,
-			UserAgent:       info.PeerInfo.UserAgent,
-			Latency:         info.PeerInfo.Latency,
-			Protocols:       info.PeerInfo.Protocols,
-			ProtocolVersion: info.PeerInfo.ProtocolVersion,
+			ID:              e.PeerID.String(),
+			IP:              hostInfo.IP,
+			Port:            hostInfo.Port,
+			UserAgent:       hostInfo.PeerInfo.UserAgent,
+			Latency:         hostInfo.PeerInfo.Latency,
+			Protocols:       hostInfo.PeerInfo.Protocols,
+			ProtocolVersion: hostInfo.PeerInfo.ProtocolVersion,
 		},
 	}); err != nil {
 		log.WithError(err).Error("error publishing timed attestation to SSE server")
