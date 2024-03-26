@@ -237,8 +237,13 @@ func NewEthereumCrawler(mainCtx *cli.Context, conf config.EthereumCrawlerConfig)
 func (c *EthereumCrawler) Run() {
 	// init all the eth_protocols
 	c.EthNode.ServeBeaconPing(c.Host.Host())
+	c.EthNode.ServeBeaconGoodbye(c.Host.Host())
 	c.EthNode.ServeBeaconStatus(c.Host.Host())
 	c.EthNode.ServeBeaconMetadata(c.Host.Host())
+	c.EthNode.ServeBeaconBlocksByRootV2(c.Host.Host())
+	c.EthNode.ServeBeaconBlocksByRangeV2(c.Host.Host())
+	c.EthNode.ServeBeaconBlobsByRootV1(c.Host.Host())
+	c.EthNode.ServeBeaconBlobsByRangeV1(c.Host.Host())
 
 	// initialization secuence for the crawler
 	c.Events.Start(c.ctx)
