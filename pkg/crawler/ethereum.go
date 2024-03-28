@@ -145,30 +145,11 @@ func NewEthereumCrawler(mainCtx *cli.Context, conf config.EthereumCrawlerConfig)
 	// create a gossipsub routing
 	gs := gossipsub.NewGossipSub(ctx, host.Host(), dbClient)
 
-	// generate a new subnets-handler
-	ethMsgHandler, err := eth.NewEthMessageHandler(ethNode.GetNetworkGenesis(), conf.ValPubkeys)
+	// subscribe to all the network topics
+	ethMsgHandler, err := subscribeToGossipSubTopics(gs)
 	if err != nil {
 		cancel()
 		return nil, err
-	}
-	// subscribe the topics
-	for _, top := range conf.GossipTopics {
-		var msgHandler gossipsub.MessageHandler
-		switch top {
-		case eth.BeaconBlockTopicBase:
-			msgHandler = ethMsgHandler.BeaconBlockMessageHandler
-		default:
-			log.Error("untraceable gossipsub topic", top)
-			continue
-
-		}
-		topic := eth.ComposeTopic(conf.ForkDigest, top)
-		gs.JoinAndSubscribe(topic, msgHandler, conf.PersistMsgs)
-	}
-	// subcribe to attestation subnets
-	for _, subnet := range conf.Subnets {
-		subTopics := eth.ComposeAttnetsTopic(conf.ForkDigest, subnet)
-		gs.JoinAndSubscribe(subTopics, ethMsgHandler.SubnetMessageHandler, conf.PersistMsgs)
 	}
 
 	// generate the peering strategy
@@ -237,8 +218,13 @@ func NewEthereumCrawler(mainCtx *cli.Context, conf config.EthereumCrawlerConfig)
 func (c *EthereumCrawler) Run() {
 	// init all the eth_protocols
 	c.EthNode.ServeBeaconPing(c.Host.Host())
+	c.EthNode.ServeBeaconGoodbye(c.Host.Host())
 	c.EthNode.ServeBeaconStatus(c.Host.Host())
 	c.EthNode.ServeBeaconMetadata(c.Host.Host())
+	c.EthNode.ServeBeaconBlocksByRootV2(c.Host.Host())
+	c.EthNode.ServeBeaconBlocksByRangeV2(c.Host.Host())
+	c.EthNode.ServeBeaconBlobsByRootV1(c.Host.Host())
+	c.EthNode.ServeBeaconBlobsByRangeV1(c.Host.Host())
 
 	// initialization secuence for the crawler
 	c.Events.Start(c.ctx)
@@ -257,3 +243,67 @@ func (c *EthereumCrawler) Close() {
 	c.Events.Stop()
 	c.cancel()
 }
+
+
+func subscribeToGossipSubTopics(gs *gossipsub.GossipSub) (*EthMessageHandler, error) {
+
+	// generate a new subnets-handler
+	ethMsgHandler, err := eth.NewEthMessageHandler(ethNode.GetNetworkGenesis(), conf.ValPubkeys)
+	if err != nil {
+		return nil, err
+	}
+
+	emptyhandler := func(msg *pubsub.Message) (PersistableMsg, error) {
+		return &DummyMessage, nil
+	} 
+
+	// subscribe to all topics
+	for _, top := range ethereum.EthereumValidTopics {
+		var msgHandler gossipsub.MessageHandler
+		switch top {
+		case eth.BeaconBlockTopicBase:
+			msgHandler = ethMsgHandler.BeaconBlockMessageHandler
+		case eth.BeaconAggregationAndProofMessageHandler:
+			msgHandler = ethMsgHandler.BeaconAggregationAndProofMessageHandler
+		case eth.AttestationSubnetsTopicBase:
+			for _, subnet := range conf.AttestationSubnetLimit {
+				t := eth.ComposeSubnetTopic(eth.AttestationSubnetsTopicBase, conf.ForkDigest, subnet)
+				gs.JoinAndSubscribe(t, ethMsgHandler.SubnetMessageHandler, conf.PersistMsgs)
+			}
+		case eth.VoluntaryExitTopicBase:
+
+		case eth.ProposerSlashingTopicBase:
+
+		case eth.AttesterSlashingTopicBase:
+
+		case eth.SyncCommitteeAggregationsTopicBase:
+
+		case eth.SyncCommitteeSubnetsTopicBase:
+			for _, subnet := range conf.SyncCommitteeSubnetLimit {
+				t := eth.ComposeSubnetTopic(eth.SyncCommitteeSubnetsTopicBase, conf.ForkDigest, subnet)
+				gs.JoinAndSubscribe(t, ethMsgHandler.SubnetMessageHandler, conf.PersistMsgs)
+			}
+		case eth.BLStoExectionChangeTopicBase:
+
+		case eth.BlobsSubnetsTopicBase:
+			for _, subnet := range conf.BlobSubnetLimit {
+				t := eth.ComposeSubnetTopic(eth.BlobsSubnetsTopicBase, conf.ForkDigest, subnet)
+				gs.JoinAndSubscribe(t, ethMsgHandler.SubnetMessageHandler, conf.PersistMsgs)
+			}
+
+		default:
+			log.Error("untraceable gossipsub topic", top)
+			continue
+		}
+		topic := eth.ComposeTopic(conf.ForkDigest, top)
+		gs.JoinAndSubscribe(topic, msgHandler, conf.PersistMsgs)
+	}
+	// subcribe to attestation subnets
+	for _, subnet := range conf.Subnets {
+		subTopics := eth.ComposeAttnetsTopic(conf.ForkDigest, subnet)
+		gs.JoinAndSubscribe(subTopics, ethMsgHandler.SubnetMessageHandler, conf.PersistMsgs)
+	}
+
+	return ethMsgHandler, nil
+}
+

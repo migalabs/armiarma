@@ -147,7 +147,7 @@ func (f *Forwarder) processAttestationEvent(e *ethereum.AttestationReceievedEven
 	if err := f.publishTimedEthereumAttestation(&TimedEthereumAttestation{
 		Attestation: e.Attestation,
 		AttestationExtraData: &AttestationExtraData{
-			ArrivedAt:  e.TrackedAttestation.ArrivalTime,
+			ArrivedAt:  e.TrackedAttestation.Time,
 			P2PMsgID:   e.TrackedAttestation.MsgID,
 			Subnet:     e.TrackedAttestation.Subnet,
 			TimeInSlot: e.TrackedAttestation.TimeInSlot,

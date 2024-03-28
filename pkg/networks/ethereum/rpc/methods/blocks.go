@@ -3,43 +3,21 @@ package methods
 import (
 	"encoding/hex"
 	"fmt"
-
 	"github.com/migalabs/armiarma/pkg/networks/ethereum/rpc/reqresp"
-	"github.com/protolambda/zrnt/eth2/beacon"
-	"github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/protolambda/ztyp/codec"
 	"github.com/protolambda/ztyp/tree"
 	"github.com/protolambda/ztyp/view"
 )
 
-// instead of parsing the whole body, we can just leave it as bytes.
-type BeaconBlockBodyRaw []byte
+const MAX_REQUEST_BLOCKS_DENEB int = 128
 
-func (b *BeaconBlockBodyRaw) Limit() uint64 {
-	// just cap block body size at 1 MB
-	return 1 << 20
-}
-
-type BeaconBlock struct {
-	Slot          Slot
-	ProposerIndex ValidatorIndex
-	ParentRoot    Root
-	StateRoot     Root
-	Body          BeaconBlockBodyRaw
-}
-
-type SignedBeaconBlock struct {
-	Message   BeaconBlock
-	Signature BLSSignature
-}
-
-type BlocksByRangeReqV1 struct {
+type BlocksByRangeReqV2 struct {
 	StartSlot Slot
 	Count     view.Uint64View
 	Step      view.Uint64View
 }
 
-func (r *BlocksByRangeReqV1) Data() map[string]interface{} {
+func (r *BlocksByRangeReqV2) Data() map[string]interface{} {
 	return map[string]interface{}{
 		"start_slot": r.StartSlot,
 		"count":      r.Count,
@@ -47,39 +25,30 @@ func (r *BlocksByRangeReqV1) Data() map[string]interface{} {
 	}
 }
 
-func (d *BlocksByRangeReqV1) Deserialize(dr *codec.DecodingReader) error {
+func (d *BlocksByRangeReqV2) Deserialize(dr *codec.DecodingReader) error {
 	return dr.FixedLenContainer(&d.StartSlot, &d.Count, &d.Step)
 }
 
-func (d *BlocksByRangeReqV1) Serialize(w *codec.EncodingWriter) error {
+func (d *BlocksByRangeReqV2) Serialize(w *codec.EncodingWriter) error {
 	return w.FixedLenContainer(&d.StartSlot, &d.Count, &d.Step)
 }
 
 const blocksByRangeReqByteLen = 8 + 8 + 8
 
-func (d BlocksByRangeReqV1) ByteLength() uint64 {
+func (d *BlocksByRangeReqV2) ByteLength() uint64 {
 	return blocksByRangeReqByteLen
 }
 
-func (*BlocksByRangeReqV1) FixedLength() uint64 {
+func (*BlocksByRangeReqV2) FixedLength() uint64 {
 	return blocksByRangeReqByteLen
 }
 
-func (d *BlocksByRangeReqV1) HashTreeRoot(hFn tree.HashFn) Root {
+func (d *BlocksByRangeReqV2) HashTreeRoot(hFn tree.HashFn) Root {
 	return hFn.HashTreeRoot(&d.StartSlot, &d.Count, &d.Step)
 }
 
-func (r *BlocksByRangeReqV1) String() string {
+func (r *BlocksByRangeReqV2) String() string {
 	return fmt.Sprintf("%v", *r)
-}
-
-func BlocksByRangeRPCv1(spec *common.Spec, opcBlock beacon.OpaqueBlock) *reqresp.RPCMethod {
-	return &reqresp.RPCMethod{
-		Protocol:                  "/eth2/beacon_chain/req/beacon_blocks_by_range/1/ssz_snappy",
-		RequestCodec:              reqresp.NewSSZCodec(func() reqresp.SerDes { return new(BlocksByRangeReqV1) }, blocksByRangeReqByteLen, blocksByRangeReqByteLen),
-		ResponseChunkCodec:        reqresp.NewSSZCodec(func() reqresp.SerDes { return spec.Wrap(opcBlock) }, 0, opcBlock.ByteLength(spec)),
-		DefaultResponseChunkCount: 20,
-	}
 }
 
 const MAX_REQUEST_BLOCKS_BY_ROOT = 1024
@@ -123,11 +92,18 @@ func (r BlocksByRootReq) String() string {
 	return "blocks-by-root requested: " + string(out[:len(out)-1])
 }
 
-func BlocksByRootRPCv1(spec *common.Spec, opcBlock beacon.OpaqueBlock) *reqresp.RPCMethod {
-	return &reqresp.RPCMethod{
-		Protocol:                  "/eth2/beacon_chain/req/beacon_blocks_by_root/1/ssz",
-		RequestCodec:              reqresp.NewSSZCodec(func() reqresp.SerDes { return new(BlocksByRootReq) }, 0, 32*MAX_REQUEST_BLOCKS_BY_ROOT),
-		ResponseChunkCodec:        reqresp.NewSSZCodec(func() reqresp.SerDes { return spec.Wrap(opcBlock) }, 0, opcBlock.ByteLength(spec)),
-		DefaultResponseChunkCount: 20,
-	}
+// methods
+
+var BlocksByRangeRPCv2 = reqresp.RPCMethod{
+	Protocol:                  "/eth2/beacon_chain/req/beacon_blocks_by_range/2/ssz_snappy",
+	RequestCodec:              reqresp.NewSSZCodec(func() reqresp.SerDes { return new(BlocksByRangeReqV2) }, blocksByRangeReqByteLen, blocksByRangeReqByteLen),
+	ResponseChunkCodec:        reqresp.NewSSZCodec(func() reqresp.SerDes { return new(BlocksByRangeReqV2) }, 0, uint64(0)),
+	DefaultResponseChunkCount: 20,
+}
+
+var BlocksByRootRPCv2 = reqresp.RPCMethod{
+	Protocol:                  "/eth2/beacon_chain/req/beacon_blocks_by_root/2/ssz_snappy",
+	RequestCodec:              reqresp.NewSSZCodec(func() reqresp.SerDes { return new(BlocksByRootReq) }, 0, 32*MAX_REQUEST_BLOCKS_BY_ROOT),
+	ResponseChunkCodec:        reqresp.NewSSZCodec(func() reqresp.SerDes { return new(BlocksByRootReq) }, 0, uint64(0)),
+	DefaultResponseChunkCount: 20,
 }
