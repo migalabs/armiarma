@@ -3,21 +3,23 @@ package ethereum
 import (
 	"bytes"
 	"fmt"
-	"github.com/protolambda/zrnt/eth2/beacon/altair"
-	"github.com/protolambda/zrnt/eth2/beacon/deneb"
-	"github.com/protolambda/zrnt/eth2/beacon/phase0"
 	"sync"
 	"time"
 
-	// bls "github.com/phoreproject/github.com/bls/g1pubs"
-
-	"github.com/migalabs/armiarma/pkg/gossipsub"
+	"github.com/protolambda/zrnt/eth2/beacon/altair"
+	"github.com/protolambda/zrnt/eth2/beacon/deneb"
+	"github.com/protolambda/zrnt/eth2/beacon/phase0"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/protolambda/zrnt/eth2/configs"
 	"github.com/protolambda/ztyp/codec"
+	attdeneb "github.com/attestantio/go-eth2-client/spec/deneb"
+
+	// bls "github.com/phoreproject/github.com/bls/g1pubs"
+
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/migalabs/armiarma/pkg/gossipsub"
 
 	"github.com/golang/snappy"
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
@@ -37,6 +39,7 @@ type EthMessageHandler struct {
 	genesisTime time.Time
 	pubkeys     []*common.BLSPubkey // pubkeys of those validators we want to track
 
+	// SubHanndlers for each gossipsub topic (Oriented mostly for HTTP SSE)
 	callbackM        sync.RWMutex
 	messageCallbacks map[EthereumGossipTopic][]func(event interface{})
 }
@@ -321,6 +324,7 @@ func (mh *EthMessageHandler) TrackedSyncAggregate(msg *pubsub.Message) (gossipsu
 	}
 	trackedSyncAggregate := &TrackedSyncAggregate{
 		TrackedMessage: TrackedMessage{
+			Msg: 	syncContribution,
 			MsgID:  msg.ID,
 			Time:   msg.ArrivalTime,
 			Sender: msg.ReceivedFrom,
@@ -350,21 +354,61 @@ func (mh *EthMessageHandler) TrackedSyncVotes(msg *pubsub.Message) (gossipsub.Pe
 		return nil, err
 	}
 	msgBuf := bytes.NewBuffer(msgBytes)
-	syncContribution := new(altair.SyncCommitteeMessage)
+	syncVote := new(altair.SyncCommitteeMessage)
 
-	err = syncContribution.Deserialize(codec.NewDecodingReader(msgBuf, uint64(len(msgBuf.Bytes()))))
+	err = syncVote.Deserialize(codec.NewDecodingReader(msgBuf, uint64(len(msgBuf.Bytes()))))
 	if err != nil {
 		return nil, err
 	}
 	trackedSyncMsg := &TrackedSyncMessage{
 		TrackedMessage: TrackedMessage{
+			Msg: 	syncVote,
 			MsgID:  msg.ID,
 			Time:   msg.ArrivalTime,
 			Sender: msg.ReceivedFrom,
 		},
-		ValIndex:   uint64(syncContribution.ValidatorIndex),
-		TimeInSlot: GetTimeInSlot(mh.genesisTime, msg.ArrivalTime, int64(syncContribution.Slot)),
-		Slot:       uint64(syncContribution.Slot),
+		ValIndex:   uint64(syncVote.ValidatorIndex),
+		TimeInSlot: GetTimeInSlot(mh.genesisTime, msg.ArrivalTime, int64(syncVote.Slot)),
+		Slot:       uint64(syncVote.Slot),
+	}
+	// check if there is any callback
+	callbacks, ok := mh.getCallBacks(BeaconSubnetSyncCommitteeVoteTopic)
+	if ok {
+		for _, callback := range callbacks {
+			callback(trackedSyncMsg) // TODO: update to submite the event
+		}
+	}
+	return trackedSyncMsg, nil
+}
+
+
+func (mh *EthMessageHandler) TrackedBlobSidecars(msg *pubsub.Message) (gossipsub.PersistableMsg, error) {
+	t := time.Now()
+	defer log.Trace("total time to handle msg:", time.Since(t))
+	topic := *msg.Topic
+
+	// extract the data from the raw message
+	msgBytes, err := EthMessageBaseHandler(topic, msg)
+	if err != nil {
+		return nil, err
+	}
+	msgBuf := bytes.NewBuffer(msgBytes)
+	blobSidecar := new(attdeneb.BlobSidecar)
+
+	err = blobSidecar.UnmarshalSSZ(msgBuf.Bytes())
+	if err != nil {
+		return nil, err
+	}
+	trackedSyncMsg := &TrackedBlobSidecards{
+		TrackedMessage: TrackedMessage{
+			Msg: 	blobSidecar,
+			MsgID:  msg.ID,
+			Time:   msg.ArrivalTime,
+			Sender: msg.ReceivedFrom,
+		},
+		BlobIndex:   uint64(blobSidecar.Index),
+		BeaconBlockRoot: blobSidecar.SignedBlockHeader.Message.Root.String(), 
+
 	}
 	// check if there is any callback
 	callbacks, ok := mh.getCallBacks(BeaconSubnetSyncCommitteeVoteTopic)

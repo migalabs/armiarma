@@ -31,16 +31,31 @@ const (
 	ProposerSlashingTopicBase          string = "proposer_slashing"
 	AttesterSlashingTopicBase          string = "attester_slashing"
 	AttestationSubnetsTopicBase        string = "beacon_attestation_{__subnet_id__}"
-	SubnetLimit                               = 64
+	AttestationSubnetLimit             = 64
 	SyncCommitteeAggregationsTopicBase string = "sync_committee_contribution_and_proof"
 	SyncCommitteeSubnetsTopicBase      string = "sync_committee_{__subnet_id__}"
-	SyncCommitteeLimit                        = 4
+	SyncCommitteeSubnetLimit           = 4
 	BLStoExectionChangeTopicBase       string = "bls_to_execution_change"
 	BlobsSubnetsTopicBase              string = "blob_sidecar_{__subnet_id__}"
+	BlobSubnetLimit 				   = 6  
 
 	// encoding-compression
 	Encoding string = "ssz_snappy"
 )
+
+// valid ethereum topics
+var EthereumValidTopics = []string{
+	BeaconBlockTopicBase,
+	BeaconAggregateAndProofTopicBase,
+	AttestationSubnetsTopicBase,
+	VoluntaryExitTopicBase,
+	ProposerSlashingTopicBase,
+	AttesterSlashingTopicBase,
+	SyncCommitteeAggregationsTopicBase,
+	SyncCommitteeSubnetsTopicBase,
+	BLStoExectionChangeTopicBase,
+	BlobsSubnetsTopicBase,	
+}
 
 // EthTopicPretty returns the topic based on its message type in a pretty version of it.
 // It would return "beacon_block" out of the given "/eth2/b5303f2a/beacon_block/ssz_snappy" topic
@@ -60,7 +75,7 @@ func ComposeTopic(forkDigest string, messageTypeName string) string {
 
 // ComposeSubnetTopic generates the GossipSub topic for the given ForkDigest, base, and subnet
 func ComposeSubnetTopic(base, forkDigest string, subnet int) string {
-	if subnet > SubnetLimit || subnet <= 0 {
+	if subnet <= 0 {
 		return ""
 	}
 

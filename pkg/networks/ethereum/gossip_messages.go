@@ -39,8 +39,18 @@ func (m *TrackedMessage) ArrivalTime() peer.ID {
 	return m.Sender
 }
 
-func (m *TrackedMessage) Message() any {
+func (m *TrackedMessage) Message() any { // any = Marshaleable
 	return m.Msg
+}
+
+
+// Dummy message (For not yet ready topics)
+type DummyMessage struct {
+	TrackedMessage
+}
+
+func (m *DummyMessage) IsZero() bool {
+	return true
 }
 
 // Ethereum Message-Specifics
@@ -140,6 +150,13 @@ func (a *TrackedSyncMessage) IsZero() bool {
 // BLS_Changes (TODO)
 
 // blobs (TODO: - zrnt doesn't include the blob struct, still looking for the time to implement the entire structure, the SSZ serialization, the view, the tree hashing, etc)
+// Experimental using the Eth2Clients library from attestant -> https://github.com/attestantio/go-eth2-client/blob/2d68bcd60d23ca11bbf073332f86a15b83b7a265/spec/deneb/blobsidecar.go#L24
 type TrackedBlobSidecards struct {
 	TrackedMessage
+	BlobIndex uint64
+	BeaconBlockRoot string
+}
+
+func (a *TrackedBlobSidecards) IsZero() bool {
+	return a.BeaconBlockRoot != ""
 }
