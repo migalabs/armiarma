@@ -2,7 +2,6 @@ package ethereum
 
 import (
 	"encoding/hex"
-	"fmt"
 	"strings"
 	"time"
 )
@@ -59,24 +58,6 @@ var (
 		// Deneb
 		DenebCancunKey: "0xee7b3a32",
 	}
-
-	MessageTypes = []string{
-		BeaconBlockTopicBase,
-		BeaconAggregateAndProofTopicBase,
-		VoluntaryExitTopicBase,
-		ProposerSlashingTopicBase,
-		AttesterSlashingTopicBase,
-	}
-
-	BeaconBlockTopicBase             string = "beacon_block"
-	BeaconAggregateAndProofTopicBase string = "beacon_aggregate_and_proof"
-	VoluntaryExitTopicBase           string = "voluntary_exit"
-	ProposerSlashingTopicBase        string = "proposer_slashing"
-	AttesterSlashingTopicBase        string = "attester_slashing"
-	AttestationTopicBase             string = "beacon_attestation_{__subnet_id__}"
-	SubnetLimit                             = 64
-
-	Encoding string = "ssz_snappy"
 )
 
 var (
@@ -86,72 +67,7 @@ var (
 	SecondsPerSlot time.Duration = 12 * time.Second
 )
 
-// GenerateEth2Topic returns the built topic out of the given arguments.
-// You may check the commented examples above.nstants.
-func ComposeTopic(forkDigest string, messageTypeName string) string {
-	forkDigest = strings.Trim(forkDigest, ForkDigestPrefix)
-	// if we reach here, inputs were okay
-	return "/" + BlockchainName +
-		"/" + forkDigest +
-		"/" + messageTypeName +
-		"/" + Encoding
-}
-
-// ComposeAttnetsTopic generates the GossipSub topic for the given ForkDigest and subnet
-func ComposeAttnetsTopic(forkDigest string, subnet int) string {
-	if subnet > SubnetLimit || subnet <= 0 {
-		return ""
-	}
-
-	// trim "0x" if exists
-	forkDigest = strings.Trim(forkDigest, "0x")
-	name := strings.Replace(AttestationTopicBase, "{__subnet_id__}", fmt.Sprintf("%d", subnet), -1)
-	return "/" + BlockchainName +
-		"/" + forkDigest +
-		"/" + name +
-		"/" + Encoding
-}
-
-// Eth2TopicPretty:
-// This method returns the topic based on it's message type
-// in a pretty version of it.
-// It would return "beacon_block" out of the given "/eth2/b5303f2a/beacon_block/ssz_snappy" topic
-// @param eth2topic:the entire composed eth2 topic with fork digest and compression.
-// @return topic pretty.
-func Eth2TopicPretty(eth2topic string) string {
-	return strings.Split(eth2topic, "/")[3]
-}
-
-// ReturnAllTopics:
-// This method will iterate over the mesagetype map and return any possible topic for the
-// given fork digest.
-// @return the array of topics.
-func ReturnAllTopics(inputForkDigest string) []string {
-	result_array := make([]string, 0)
-	for _, messageValue := range MessageTypes {
-		result_array = append(result_array, ComposeTopic(inputForkDigest, messageValue))
-	}
-	return result_array
-}
-
-// ReturnTopics:
-// Returns topics for the given parameters.
-// @param forkDigest: the forkDigest to use in the topic.
-// @param messageTypeName: the type of topic.
-// @return the list of generated topics with the given parameters (several messageTypes).
-func ComposeTopics(forkDigest string, messageTypeName []string) []string {
-	result_array := make([]string, 0)
-
-	for _, messageTypeTmp := range messageTypeName {
-		result_array = append(result_array, ComposeTopic(forkDigest, messageTypeTmp))
-	}
-	return result_array
-}
-
-// CheckValidForkDigest:
-// This method will check if Fork Digest exists in the corresponding map (ForkDigests).
-// @return the fork digest of the given network.
-// @return a boolean (true for valid, false for not valid).
+// CheckValidForkDigest checks if Fork Digest exists in the corresponding map (ForkDigests).
 func CheckValidForkDigest(inStr string) (string, bool) {
 	for forkDigestKey, forkDigest := range ForkDigests {
 		if strings.ToLower(forkDigestKey) == inStr {
@@ -170,3 +86,5 @@ func CheckValidForkDigest(inStr string) (string, bool) {
 	}
 	return inStr, true
 }
+
+// utils

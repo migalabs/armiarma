@@ -1,8 +1,6 @@
 package ethereum
 
 import (
-	"regexp"
-	"strconv"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -14,52 +12,134 @@ var (
 	ErrorNotParsableSubnet = errors.New("not parseable subnet int")
 )
 
-type TrackedAttestation struct {
+// Tracked Message basis
+type GossipSubTrackedMessage interface {
+	ReceivedFrom() peer.ID
+	MessageID() string
+	ArrivalTime() time.Time
+	Message() any // Not safe, but will work (should be marshaleable anyways)
+}
+
+type TrackedMessage struct {
 	MsgID  string
 	Sender peer.ID
-	Subnet int
-
-	ArrivalTime time.Time     // time of arrival
-	TimeInSlot  time.Duration // exact time inside the slot (range between 0secs and 12s*32slots)
-
-	ValPubkey string
-	Slot      int64
+	Time   time.Time
+	Msg    any // Not safe, but will work (same as before)
 }
 
-func (a *TrackedAttestation) IsZero() bool {
-	return a.Slot == 0
+func (m *TrackedMessage) ReceivedFrom() peer.ID {
+	return m.Sender
 }
 
+func (m *TrackedMessage) MessageID() string {
+	return m.MsgID
+}
+
+func (m *TrackedMessage) ArrivalTime() peer.ID {
+	return m.Sender
+}
+
+func (m *TrackedMessage) Message() any {
+	return m.Msg
+}
+
+// Ethereum Message-Specifics
+// Beacon Block
 type TrackedBeaconBlock struct {
-	MsgID  string
-	Sender peer.ID
-
-	ArrivalTime time.Time     // time of arrival
-	TimeInSlot  time.Duration // exact time inside the slot (range between 0secs and 12s*32slots)
-
-	ValIndex int64
-	Slot     int64
+	TrackedMessage
+	TimeInSlot time.Duration // exact time inside the slot (range between 0secs and 12s*32slots)
+	ValIndex   uint64
+	Slot       uint64
 }
 
 func (a *TrackedBeaconBlock) IsZero() bool {
 	return a.Slot == 0
 }
 
-func GetSubnetFromTopic(topic string) (int, error) {
-	re := regexp.MustCompile(`attestation_([0-9]+)`)
-	match := re.FindAllString(topic, -1)
-	if len(match) < 1 {
-		return -1, ErrorNoSubnet
-	}
+// Attestations
+type TrackedAttestation struct {
+	TrackedMessage
+	TimeInSlot time.Duration // exact time inside the slot (range between 0secs and 12s*32slots)
+	Subnet     int
+	ValPubkey  string
+	Slot       uint64
+}
 
-	re2 := regexp.MustCompile("([0-9]+)")
-	match = re2.FindAllString(match[0], -1)
-	if len(match) < 1 {
-		return -1, ErrorNotParsableSubnet
-	}
-	subnet, err := strconv.Atoi(match[0])
-	if err != nil {
-		return -1, errors.Wrap(err, "unable to conver subnet to int")
-	}
-	return subnet, nil
+func (a *TrackedAttestation) IsZero() bool {
+	return a.Slot == 0
+}
+
+// Aggregations and Proofs
+type TrackedAggregateAndProof struct {
+	TrackedMessage
+	TimeInSlot time.Duration // exact time inside the slot (range between 0secs and 12s*32slots)
+	Slot       uint64
+}
+
+func (a *TrackedAggregateAndProof) IsZero() bool {
+	return a.Slot == 0
+}
+
+// Voluntarý Exits
+type TrackedVoluntaryExit struct {
+	TrackedMessage
+	Epoch    uint64
+	ValIndex uint64
+}
+
+func (a *TrackedVoluntaryExit) IsZero() bool {
+	return a.Epoch == 0
+}
+
+// Propose Slashing
+type TrackedProposerSlashing struct {
+	TrackedMessage
+	Slot          uint64
+	ProposerIndex uint64
+}
+
+func (a *TrackedProposerSlashing) IsZero() bool {
+	return a.Slot == 0
+}
+
+// Attester Slashing
+type TrackedAttesterSlashing struct {
+	TrackedMessage
+	Epoch    uint64
+	ValIndex uint64
+}
+
+func (a *TrackedAttesterSlashing) IsZero() bool {
+	return a.Epoch == 0
+}
+
+// SyncAggregations: https://github.com/protolambda/zrnt/blob/6bc42739f502a06171cc6f2378ec7aa556e41182/eth2/beacon/altair/sync_contribution.go#L14
+type TrackedSyncAggregate struct {
+	TrackedMessage
+	AggragatorIndex uint64
+	TimeInSlot      time.Duration
+	Slot            uint64
+}
+
+func (a *TrackedSyncAggregate) IsZero() bool {
+	return a.Slot == 0
+}
+
+// SyncVote
+type TrackedSyncMessage struct {
+	TrackedMessage
+	ValIndex   uint64
+	TimeInSlot time.Duration
+	Slot       uint64
+}
+
+func (a *TrackedSyncMessage) IsZero() bool {
+	return a.Slot == 0
+}
+
+// BLS_Changes (TODO)
+
+// blobs (TODO: - zrnt doesn't include the blob struct, still looking for the time to implement the entire structure, the SSZ serialization, the view, the tree hashing, etc)
+type TrackedBlobSidecards struct {
+	TrackedMessage
 }
