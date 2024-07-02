@@ -54,7 +54,7 @@ func NewLocalEthereumNode(
 	case ForkDigests[PraterPhase0Key], ForkDigests[PraterBellatrixKey]:
 		genesis = GoerliGenesis
 	// Gnosis
-	case ForkDigests[GnosisPhase0Key], ForkDigests[GnosisBellatrixKey]:
+	case ForkDigests[GnosisPhase0Key], ForkDigests[GnosisAltairKey], ForkDigests[GnosisBellatrixKey], ForkDigests[GnosisCapellaKey], ForkDigests[GnosisDenebKey]:
 		genesis = GnosisGenesis
 	// Mainnet
 	default:
