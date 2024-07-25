@@ -13,7 +13,8 @@ import (
 	"time"
 
 	"github.com/migalabs/armiarma/pkg/db/models"
-	psql "github.com/migalabs/armiarma/pkg/db/postgresql"
+//	psql "github.com/migalabs/armiarma/pkg/db/postgresql"
+	psql "github.com/hdser/armiarma/pkg/db/redshift"
 	"github.com/migalabs/armiarma/pkg/hosts"
 	log "github.com/sirupsen/logrus"
 )
