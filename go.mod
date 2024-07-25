@@ -1,4 +1,4 @@
-module github.com/migalabs/armiarma
+module github.com/hdser/armiarma
 
 go 1.21
 
