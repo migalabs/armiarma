@@ -1,13 +1,13 @@
-package postgresql
+package redshift
 
 import (
 	"context"
+	"database/sql"
 	"time"
 
-	"github.com/jackc/pgx/v4"
-	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	_ "github.com/lib/pq"
 )
 
 var (
@@ -15,34 +15,38 @@ var (
 	MaxRetries   = 2
 
 	ErrorNoConnFree = "no connection adquirable"
+	ErrorNoRows     = "sql: no rows in result set"
 )
 
 type QueryBatch struct {
-	ctx     context.Context
-	pgxPool *pgxpool.Pool
-	batch   *pgx.Batch
-	size    int
+	ctx      context.Context
+	sqlDB    *sql.DB
+	queries  []string
+	args     [][]interface{}
+	size     int
 }
 
-func NewQueryBatch(ctx context.Context, pgxPool *pgxpool.Pool, batchSize int) *QueryBatch {
+func NewQueryBatch(ctx context.Context, sqlDB *sql.DB, batchSize int) *QueryBatch {
 	return &QueryBatch{
-		ctx:     ctx,
-		pgxPool: pgxPool,
-		batch:   &pgx.Batch{},
-		size:    batchSize,
+		ctx:      ctx,
+		sqlDB:    sqlDB,
+		queries:  make([]string, 0, batchSize),
+		args:     make([][]interface{}, 0, batchSize),
+		size:     batchSize,
 	}
 }
 
 func (q *QueryBatch) IsReadyToPersist() bool {
-	return q.batch.Len() >= q.size
+	return len(q.queries) >= q.size
 }
 
 func (q *QueryBatch) AddQuery(query string, args ...interface{}) {
-	q.batch.Queue(query, args...)
+	q.queries = append(q.queries, query)
+	q.args = append(q.args, args)
 }
 
 func (q *QueryBatch) Len() int {
-	return q.batch.Len()
+	return len(q.queries)
 }
 
 func (q *QueryBatch) PersistBatch() error {
@@ -82,36 +86,27 @@ func (q *QueryBatch) persistBatch() error {
 	ctx, cancel := context.WithTimeout(q.ctx, QueryTimeout)
 	defer cancel()
 
-	// begin pgx.Tx
-	logEntry.Trace("beginning a new transaction to store the batched queries")
-	tx, err := q.pgxPool.Begin(ctx)
+	tx, err := q.sqlDB.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
-	// Add batch to TX
-	logEntry.Trace("sending batch over transaction")
-	batchResults := tx.SendBatch(ctx, q.batch)
 
-	// Exec the queries
-	var qerr error
-	var rows pgx.Rows
-	var cnt int
-	for qerr == nil {
-		rows, qerr = batchResults.Query()
-		rows.Close()
-		cnt++
+	for i, query := range q.queries {
+		_, err := tx.ExecContext(ctx, query, q.args[i]...)
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
 	}
-	logEntry.Trace("readed all the result of the queries inside the batch")
-	// check if there was any error
-	if qerr.Error() != noQueryResult {
-		log.Errorf("unable to persist betch because an error on row %d \n %+v \n %+v", cnt, rows, err)
-		errRollback := tx.Commit(q.ctx)
-		log.Errorf("rolled back with err %+v", errRollback)
+
+	if err := tx.Commit(); err != nil {
 		return err
 	}
-	return tx.Commit(q.ctx)
+
+	return nil
 }
 
 func (q *QueryBatch) cleanBatch() {
-	q.batch = &pgx.Batch{}
+	q.queries = q.queries[:0]
+	q.args = q.args[:0]
 }

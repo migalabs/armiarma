@@ -7,17 +7,13 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var (
-	LastActivityValidRange = 180 // 6 Months
-)
-
 
 // GetClientDistribution fetches client distribution metrics from Redshift
 func (db *DBClient) GetClientDistribution() (map[string]interface{}, error) {
 	log.Debug("fetching client distribution metrics")
 	cliDist := make(map[string]interface{})
 
-	rows, err := db.psqlPool.QueryContext(
+	rows, err := db.redshiftDB.QueryContext(
 		db.ctx,
 		`
 		SELECT 
@@ -57,7 +53,7 @@ func (db *DBClient) GetVersionDistribution() (map[string]interface{}, error) {
 	log.Debug("fetching client distribution metrics")
 	verDist := make(map[string]interface{})
 
-	rows, err := db.psqlPool.QueryContext(
+	rows, err := db.redshiftDB.QueryContext(
 		db.ctx,
 		`
 		SELECT client_name,
@@ -98,7 +94,7 @@ func (db *DBClient) GetGeoDistribution() (map[string]interface{}, error) {
 	log.Debug("fetching geo distribution metrics")
 	geoDist := make(map[string]interface{})
 
-	rows, err := db.psqlPool.QueryContext(
+	rows, err := db.redshiftDB.QueryContext(
 		db.ctx,
 		`
 		SELECT 
@@ -141,7 +137,7 @@ func (db *DBClient) GetGeoDistribution() (map[string]interface{}, error) {
 // GetOsDistribution fetches OS distribution metrics from Redshift
 func (db *DBClient) GetOsDistribution() (map[string]interface{}, error) {
 	summary := make(map[string]interface{})
-	rows, err := db.psqlPool.QueryContext(
+	rows, err := db.redshiftDB.QueryContext(
 		db.ctx,
 		`
 		SELECT
@@ -176,7 +172,7 @@ func (db *DBClient) GetOsDistribution() (map[string]interface{}, error) {
 // GetArchDistribution fetches architecture distribution metrics from Redshift
 func (db *DBClient) GetArchDistribution() (map[string]interface{}, error) {
 	summary := make(map[string]interface{})
-	rows, err := db.psqlPool.QueryContext(
+	rows, err := db.redshiftDB.QueryContext(
 		db.ctx,
 		`
 		SELECT
@@ -214,7 +210,7 @@ func (db *DBClient) GetHostingDistribution() (map[string]interface{}, error) {
 
 	// get the number of mobile hosts
 	var mobile int
-	err := db.psqlPool.QueryRowContext(
+	err := db.redshiftDB.QueryRowContext(
 		db.ctx,
 		`
 		SELECT 
@@ -245,7 +241,7 @@ func (db *DBClient) GetHostingDistribution() (map[string]interface{}, error) {
 
 	// get the number of proxy peers
 	var proxy int
-	err = db.psqlPool.QueryRowContext(
+	err = db.redshiftDB.QueryRowContext(
 		db.ctx,
 		`
 		SELECT 
@@ -276,7 +272,7 @@ func (db *DBClient) GetHostingDistribution() (map[string]interface{}, error) {
 
 	// get the number of hosted IPs
 	var hosted int
-	err = db.psqlPool.QueryRowContext(
+	err = db.redshiftDB.QueryRowContext(
 		db.ctx,
 		`
 		SELECT 
@@ -311,7 +307,7 @@ func (db *DBClient) GetHostingDistribution() (map[string]interface{}, error) {
 func (db *DBClient) GetRTTDistribution() (map[string]interface{}, error) {
 	summary := make(map[string]interface{})
 
-	rows, err := db.psqlPool.QueryContext(
+	rows, err := db.redshiftDB.QueryContext(
 		db.ctx,
 		`
 		SELECT 
@@ -366,7 +362,7 @@ func (db *DBClient) GetRTTDistribution() (map[string]interface{}, error) {
 func (db *DBClient) GetIPDistribution() (map[string]interface{}, error) {
 	summary := make(map[string]interface{})
 
-	rows, err := db.psqlPool.QueryContext(
+	rows, err := db.redshiftDB.QueryContext(
 		db.ctx,
 		`
 		SELECT 

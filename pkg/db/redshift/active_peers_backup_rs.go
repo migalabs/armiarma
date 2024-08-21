@@ -1,8 +1,8 @@
 package redshift
 
 import (
-	"context"
-	"database/sql"
+	//"context"
+	//"database/sql"
 	"time"
 
 	"github.com/pkg/errors"
@@ -17,7 +17,7 @@ var (
 // DropActivePeersTable drops the active_peers table in Redshift
 func (c *DBClient) DropActivePeersTable() error {
 	log.Info("dropping table active_peers")
-	_, err := c.psqlPool.ExecContext(
+	_, err := c.redshiftDB.ExecContext(
 		c.ctx,
 		`
 		DROP TABLE IF EXISTS active_peers;
@@ -30,16 +30,16 @@ func (c *DBClient) DropActivePeersTable() error {
 func (c *DBClient) InitActivePeersTable() error {
 	log.Info("init active_peers table")
 
-	_, err := c.psqlPool.ExecContext(
+	_, err := c.redshiftDB.ExecContext(
 		c.ctx,
 		`
-		CREATE TABLE IF NOT EXISTS active_peers(
-			id INTEGER IDENTITY(1,1),
-			timestamp TIMESTAMP,
-			peers BIGINT[],
+			CREATE TABLE IF NOT EXISTS active_peers(
+				id INTEGER IDENTITY(1,1),
+				timestamp TIMESTAMP,
+				peers VARCHAR(MAX), -- Using VARCHAR to store array as Redshift doesn't support array types
 
-			PRIMARY KEY(timestamp)			
-		);
+				PRIMARY KEY(timestamp)			
+			);
 		`,
 	)
 	return err
@@ -49,7 +49,7 @@ func (c *DBClient) InitActivePeersTable() error {
 func (c *DBClient) getActivePeers() ([]int, error) {
 	activePeers := make([]int, 0)
 
-	rows, err := c.psqlPool.QueryContext(
+	rows, err := c.redshiftDB.QueryContext(
 		c.ctx,
 		`
 		SELECT
@@ -91,7 +91,7 @@ func (c *DBClient) activePeersBackup() error {
 	}
 
 	// backup the list of active peers
-	_, err = c.psqlPool.ExecContext(
+	_, err = c.redshiftDB.ExecContext(
 		c.ctx,
 		`
 		INSERT INTO active_peers(

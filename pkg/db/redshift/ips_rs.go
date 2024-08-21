@@ -1,7 +1,7 @@
 package redshift
 
 import (
-	"context"
+	//"context"
 	"database/sql"
 	"time"
 
@@ -15,7 +15,7 @@ import (
 // InitIpTable initializes the IP table in Redshift
 func (c *DBClient) InitIpTable() error {
 	log.Debug("init ips table in Redshift")
-	_, err := c.psqlPool.ExecContext(c.ctx, `
+	_, err := c.redshiftDB.ExecContext(c.ctx, `
 		CREATE TABLE IF NOT EXISTS ips(
 			id INTEGER IDENTITY(1,1),
 			ip TEXT NOT NULL,
@@ -122,7 +122,7 @@ func (c *DBClient) UpsertIpInfo(ipInfo models.IpInfo) (query string, args []inte
 func (c *DBClient) ReadIpInfo(ip string) (models.IpInfo, error) {
 	log.Tracef("reading ip_info for ip %s from Redshift", ip)
 	var ipInfo models.IpInfo
-	err := c.psqlPool.QueryRowContext(c.ctx, `
+	err := c.redshiftDB.QueryRowContext(c.ctx, `
 		SELECT 
 			ip,
 			expiration_time,
@@ -177,7 +177,7 @@ func (c *DBClient) ReadIpInfo(ip string) (models.IpInfo, error) {
 func (c *DBClient) GetExpiredIpInfo() ([]string, error) {
 	log.Trace("fetching expired ips from Redshift")
 	expIps := make([]string, 0)
-	ipRows, err := c.psqlPool.QueryContext(c.ctx, `
+	ipRows, err := c.redshiftDB.QueryContext(c.ctx, `
 		SELECT ip 
 		FROM ips
 		WHERE expiration_time < NOW();
@@ -206,7 +206,7 @@ func (c *DBClient) CheckIpRecords(ip string) (exists bool, expired bool, err err
 	var readIp string
 	var expTime time.Time
 
-	row := c.psqlPool.QueryRowContext(c.ctx, `
+	row := c.redshiftDB.QueryRowContext(c.ctx, `
 		SELECT 
 			ip,
 			expiration_time

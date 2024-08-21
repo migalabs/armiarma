@@ -1,7 +1,10 @@
-package postgresql
+package redshift
 
 import (
 	"context"
+	"database/sql"
+	//"strconv"
+	//"strings"
 	"sync"
 	"time"
 
@@ -10,8 +13,7 @@ import (
 	eth "github.com/migalabs/armiarma/pkg/networks/ethereum"
 	"github.com/migalabs/armiarma/pkg/utils"
 	log "github.com/sirupsen/logrus"
-
-	"github.com/jackc/pgx/v4/pgxpool"
+	_ "github.com/lib/pq"
 	"github.com/pkg/errors"
 )
 
@@ -34,9 +36,9 @@ type DBClient struct {
 	// Network that we are Crawling
 	Network utils.NetworkType
 
-	// Pgx Postgres variables
-	loginStr string
-	psqlPool *pgxpool.Pool
+	// SQL DB variables
+	loginStr   string
+	redshiftDB *sql.DB
 
 	// Request channels
 	persistC chan interface{}
@@ -58,32 +60,17 @@ func NewDBClient(
 		return nil, errors.New("empty db-endpoint provided")
 	}
 
-	// setup the configuration for the pgx.Pool
-	pgxConf, err := pgxpool.ParseConfig(loginStr)
-	if err != nil {
-		return nil, err
-	}
-	// update the number of concurrent connections
-	pgxConf.MinConns = 0
-	pgxConf.MaxConns = 1
-
-	// try connecting to the DB from the given logingStr
-	psqlPool, err := pgxpool.ConnectConfig(ctx, pgxConf)
+	// try connecting to the DB from the given loginStr
+	redshiftDB, err := sql.Open("postgres", loginStr)
 	if err != nil {
 		return nil, err
 	}
 	log.WithFields(log.Fields{"endpoint": loginStr}).Debug("successful connection to DB")
 
 	// check if the connection is successful
-	err = psqlPool.Ping(ctx)
+	err = redshiftDB.PingContext(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to ping db through dbWriter")
-	}
-
-	// check if the connection is successful
-	err = psqlPool.Ping(ctx)
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to ping db through dbReader")
 	}
 
 	// generate all the necessary/control channels
@@ -97,7 +84,7 @@ func NewDBClient(
 		dailyBackupInterval: dailyBackupInt,
 		Network:             p2pNetwork,
 		loginStr:            loginStr,
-		psqlPool:            psqlPool,
+		redshiftDB:          redshiftDB,
 		persistC:            persistC,
 		doneC:               make(chan struct{}),
 		wg:                  &wg,
@@ -122,7 +109,7 @@ func NewDBClient(
 }
 
 func (c *DBClient) initTables() error {
-	// initialize all the necesary tables to perform the crawl
+	// initialize all the necessary tables to perform the crawl
 
 	var err error
 
@@ -167,12 +154,12 @@ func (c *DBClient) initTables() error {
 
 		// gossipsub messages
 		// eth_attestation
-		err = c.initEthereumAttestationsTable()
+		err = c.InitEthereumAttestationsTable()
 		if err != nil {
 			return errors.Wrap(err, "initializing eth_attestations table")
 		}
 		// eth blocks
-		err = c.initEthereumBeaconBlocksTable()
+		err = c.InitEthereumBeaconBlocksTable()
 		if err != nil {
 			return errors.Wrap(err, "initializing eth_blocks table")
 		}
@@ -194,7 +181,7 @@ func (c *DBClient) launchPersister() {
 		defer c.wg.Done()
 
 		// batch to aggregate all the queries
-		batch := NewQueryBatch(c.ctx, c.psqlPool, batchSize)
+		batch := NewQueryBatch(c.ctx, c.redshiftDB, batchSize)
 
 		// batch flushing ticker
 		ticker := time.NewTicker(batchFlushingTimeout)
@@ -210,10 +197,10 @@ func (c *DBClient) launchPersister() {
 			// check with higher priority if the main-ctx died
 			select {
 			case <-c.ctx.Done(): // check if the context of the tool died
-				logEntry.Info("context died, clossing persister")
+				logEntry.Info("context died, closing persister")
 				readyToFinish = true
 			case <-c.doneC:
-				logEntry.Info("closed detected, clossing persister")
+				logEntry.Info("closed detected, closing persister")
 				readyToFinish = true
 			default:
 			}
@@ -221,7 +208,7 @@ func (c *DBClient) launchPersister() {
 			// load  or flush after
 			select {
 			case obj := <-c.persistC: // persist any kind of item
-				// Every item/SQL query  has to return (string. []interfaces)
+				// Every item/SQL query  has to return (string, []interface{})
 				switch obj.(type) {
 				case (*models.HostInfo):
 					hostInfo := obj.(*models.HostInfo)
@@ -364,10 +351,10 @@ func (c *DBClient) Close() {
 	if err != nil {
 		log.Error(err)
 	}
-	// close safelly the connection with PSQL
-	c.psqlPool.Close()
+	// close safely the connection with Redshift
+	c.redshiftDB.Close()
 
-	// close all the exisiting channels
+	// close all the existing channels
 	close(c.persistC)
 }
 
@@ -376,5 +363,7 @@ func (c *DBClient) PersistToDB(persItem interface{}) {
 }
 
 func (c *DBClient) SingleQuery(query string, args ...interface{}) (interface{}, error) {
-	return c.psqlPool.Exec(c.ctx, query, args...)
+	return c.redshiftDB.ExecContext(c.ctx, query, args...)
 }
+
+

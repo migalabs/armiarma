@@ -1,8 +1,8 @@
 package redshift
 
 import (
-	"context"
-	"database/sql"
+	//"context"
+	//"database/sql"
 	"fmt"
 
 	"github.com/pkg/errors"
@@ -16,7 +16,7 @@ func (db *DBClient) GetNodePerForkDistribution() (map[string]interface{}, error)
 	log.Debug("fetching node per fork distribution")
 	nodeDist := make(map[string]interface{})
 
-	rows, err := db.psqlPool.QueryContext(
+	rows, err := db.redshiftDB.QueryContext(
 		db.ctx,
 		`
 		SELECT 
@@ -57,7 +57,7 @@ func (db *DBClient) GetAttnetsDistribution() (map[string]interface{}, error) {
 	log.Debug("fetching attnets distribution")
 	nodeDist := make(map[string]interface{})
 
-	rows, err := db.psqlPool.QueryContext(
+	rows, err := db.redshiftDB.QueryContext(
 		db.ctx,
 		`
 		SELECT aux.attnets_number as attnets,
@@ -98,7 +98,7 @@ func (db *DBClient) GetDeprecatedNodes() (int, error) {
 	log.Debug("fetching deprecated node count")
 
 	var deprecatedCount int
-	err := db.psqlPool.QueryRowContext(
+	err := db.redshiftDB.QueryRowContext(
 		db.ctx,
 		`
 		SELECT

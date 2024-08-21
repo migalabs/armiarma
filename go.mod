@@ -158,4 +158,4 @@ require (
 )
 
 replace github.com/libp2p/go-libp2p-pubsub => ./go-libp2p-pubsub
-replace github.com/migalabs/armiarma => github.com/hdser/armiarma
+replace github.com/migalabs/armiarma => ../armiarma

@@ -1,12 +1,13 @@
 package redshift
 
 import (
-	"context"
-	"database/sql"
-	"strconv"
+	//"context"
+	//"database/sql"
+	//"strconv"
 	"strings"
 	"time"
 
+	pgx "github.com/jackc/pgx/v4"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/migalabs/armiarma/pkg/db/models"
 	"github.com/migalabs/armiarma/pkg/utils"
@@ -21,7 +22,7 @@ import (
 func (c *DBClient) InitPeerInfoTable() error {
 	log.Debug("initializing peer_info table in Redshift")
 
-	_, err := c.psqlPool.ExecContext(c.ctx, `
+	_, err := c.redshiftDB.ExecContext(c.ctx, `
 		CREATE TABLE IF NOT EXISTS peer_info(
 			id INTEGER IDENTITY(1,1),
 			peer_id TEXT NOT NULL,
@@ -59,7 +60,15 @@ func (c *DBClient) InitPeerInfoTable() error {
 // UpsertHostInfo inserts or updates host information in the peer_info table
 func (c *DBClient) UpsertHostInfo(hInfo *models.HostInfo) (q string, args []interface{}) {
 	log.Trace("upserting host in peer_info table")
-	multiAddrs := strings.Join(hInfo.MAddrs, ",")
+
+	// Convert multiaddr.Multiaddr to string
+	multiAddrsStrings := make([]string, len(hInfo.MAddrs))
+	for i, addr := range hInfo.MAddrs {
+		multiAddrsStrings[i] = addr.String() // Assuming there is a String() method for multiaddr.Multiaddr
+	}
+	multiAddrs := strings.Join(multiAddrsStrings, ",") // Join all string representations with a comma
+
+	//multiAddrs := strings.Join(hInfo.MAddrs, ",")
 	// compose the query
 	q = `INSERT INTO peer_info (
 			peer_id,
@@ -179,7 +188,7 @@ func (c *DBClient) GetFullHostInfo(pID peer.ID) (*models.HostInfo, error) {
 	var latencyMillis int64
 
 	// read the Peer from the SQL database
-	err := c.psqlPool.QueryRowContext(c.ctx, `
+	err := c.redshiftDB.QueryRowContext(c.ctx, `
 		SELECT
 			network,
 			multi_addrs,
@@ -247,7 +256,7 @@ func (c *DBClient) GetPersistable(pID string) (models.RemoteConnectablePeer, err
 	var network utils.NetworkType
 
 	// read the Peer from the SQL database
-	err := c.psqlPool.QueryRowContext(c.ctx, `
+	err := c.redshiftDB.QueryRowContext(c.ctx, `
 		SELECT
 				network,
 				multi_addrs
@@ -258,7 +267,7 @@ func (c *DBClient) GetPersistable(pID string) (models.RemoteConnectablePeer, err
 		&maddresses,
 	)
 	// Check if there was any error reading the peer from the SQL table
-	if err != nil && err != sql.ErrNoRows {
+	if err != nil && err != pgx.ErrNoRows {
 		return models.RemoteConnectablePeer{}, errors.Wrap(err, "unable to retrieve full peer_info")
 	}
 
@@ -289,14 +298,14 @@ func (c *DBClient) GetPersistable(pID string) (models.RemoteConnectablePeer, err
 func (c *DBClient) PeerInfoExists(pID peer.ID) bool {
 	// get the ip
 	var id string
-	err := c.psqlPool.QueryRowContext(c.ctx, `
+	err := c.redshiftDB.QueryRowContext(c.ctx, `
 		SELECT 
 			peer_id
 		FROM peer_info
 		WHERE peer_id=$1;
 	`, pID).Scan(&id)
 
-	if err != nil && err != sql.ErrNoRows {
+	if err != nil && err != pgx.ErrNoRows {
 		log.Debugf("peer %s doesn't exist", id)
 		return false
 	}
@@ -324,7 +333,7 @@ func (c *DBClient) GetNonDeprecatedPeers() ([]*models.RemoteConnectablePeer, err
 	log.Tracef("retrieving the list of peer_ids from the DB that are not deprecated\n")
 	var connectPeers []*models.RemoteConnectablePeer
 
-	rows, err := c.psqlPool.QueryContext(c.ctx, `
+	rows, err := c.redshiftDB.QueryContext(c.ctx, `
 		SELECT
 			peer_id,
 			network,
@@ -333,7 +342,7 @@ func (c *DBClient) GetNonDeprecatedPeers() ([]*models.RemoteConnectablePeer, err
 		WHERE deprecated='false';`)
 
 	// If there are no rows, don't panic
-	if err != nil && err != sql.ErrNoRows {
+	if err != nil && err != pgx.ErrNoRows {
 		return connectPeers, errors.Wrap(err, "unable to retrieve peers in the network")
 	}
 	defer rows.Close()

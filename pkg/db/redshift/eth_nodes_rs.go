@@ -1,8 +1,8 @@
 package redshift
 
 import (
-	"context"
-	"database/sql"
+	//"context"
+	//"database/sql"
 
 	"github.com/pkg/errors"
 	eth "github.com/migalabs/armiarma/pkg/networks/ethereum"
@@ -14,7 +14,7 @@ import (
 func (d *DBClient) dropEthNodesTable() error {
 	log.Debugf("dropping eth_nodes table in Redshift")
 
-	_, err := d.psqlPool.ExecContext(d.ctx, `
+	_, err := d.redshiftDB.ExecContext(d.ctx, `
 		DROP TABLE IF EXISTS eth_nodes;
 	`)
 	return err
@@ -25,7 +25,7 @@ func (d *DBClient) InitEthNodesTable() error {
 	log.Debugf("init eth_nodes table in Redshift")
 
 	// try create the table in the DB
-	_, err := d.psqlPool.ExecContext(
+	_, err := d.redshiftDB.ExecContext(
 		d.ctx, `
 		CREATE TABLE IF NOT EXISTS eth_nodes(
 			id INTEGER IDENTITY(1,1),

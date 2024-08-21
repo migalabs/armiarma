@@ -1,8 +1,8 @@
 package redshift
 
 import (
-	"context"
-	"database/sql"
+	//"context"
+	//"database/sql"
 
 	eth "github.com/migalabs/armiarma/pkg/networks/ethereum"
 	log "github.com/sirupsen/logrus"
@@ -13,7 +13,7 @@ import (
 // DropEthereumNodeStatus drops the eth_status table from Redshift
 func (d *DBClient) DropEthereumNodeStatus() error {
 	log.Debug("dropping eth_status table from Redshift")
-	_, err := d.psqlPool.ExecContext(
+	_, err := d.redshiftDB.ExecContext(
 		d.ctx, `
 			DROP TABLE IF EXISTS eth_status;
 	`)
@@ -23,7 +23,7 @@ func (d *DBClient) DropEthereumNodeStatus() error {
 // InitEthereumNodeStatus initializes the eth_status table in Redshift
 func (d *DBClient) InitEthereumNodeStatus() error {
 	log.Debug("init eth_status table in Redshift")
-	_, err := d.psqlPool.ExecContext(
+	_, err := d.redshiftDB.ExecContext(
 		d.ctx, `
 		CREATE TABLE IF NOT EXISTS eth_status(
 			id INTEGER IDENTITY(1,1),

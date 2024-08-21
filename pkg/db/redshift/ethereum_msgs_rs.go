@@ -12,7 +12,7 @@ import (
 // DropEthereumAttestationsTable drops the eth_attestations table
 func (c *DBClient) DropEthereumAttestationsTable() error {
 	log.Info("dropping the eth_attestations table")
-	_, err := c.psqlPool.ExecContext(
+	_, err := c.redshiftDB.ExecContext(
 		c.ctx,
 		`
 		DROP TABLE IF EXISTS eth_attestations;
@@ -23,7 +23,7 @@ func (c *DBClient) DropEthereumAttestationsTable() error {
 // InitEthereumAttestationsTable initializes the eth_attestations table in Redshift
 func (c *DBClient) InitEthereumAttestationsTable() error {
 	log.Info("init eth_attestations table in Redshift")
-	_, err := c.psqlPool.ExecContext(
+	_, err := c.redshiftDB.ExecContext(
 		c.ctx,
 		`
 		CREATE TABLE IF NOT EXISTS eth_attestations(
@@ -74,7 +74,7 @@ func (c *DBClient) InsertNewEthereumAttestation(attMsg *eth.TrackedAttestation) 
 // DropEthereumBeaconBlocksTable drops the eth_blocks table
 func (c *DBClient) DropEthereumBeaconBlocksTable() error {
 	log.Info("dropping the eth_blocks table")
-	_, err := c.psqlPool.ExecContext(
+	_, err := c.redshiftDB.ExecContext(
 		c.ctx,
 		`
 		DROP TABLE IF EXISTS eth_blocks;
@@ -85,7 +85,7 @@ func (c *DBClient) DropEthereumBeaconBlocksTable() error {
 // InitEthereumBeaconBlocksTable initializes the eth_blocks table in Redshift
 func (c *DBClient) InitEthereumBeaconBlocksTable() error {
 	log.Info("init eth_blocks table in Redshift")
-	_, err := c.psqlPool.ExecContext(
+	_, err := c.redshiftDB.ExecContext(
 		c.ctx,
 		`
 		CREATE TABLE IF NOT EXISTS eth_blocks(

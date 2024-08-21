@@ -1,8 +1,8 @@
 package redshift
 
 import (
-	"context"
-	"database/sql"
+	//"context"
+	//"database/sql"
 
 	"github.com/migalabs/armiarma/pkg/db/models"
 	"github.com/pkg/errors"
@@ -15,7 +15,7 @@ import (
 func (c *DBClient) InitConnEventTable() error {
 	log.Debugf("init conn_events table in Redshift\n")
 
-	_, err := c.psqlPool.ExecContext(c.ctx, `
+	_, err := c.redshiftDB.ExecContext(c.ctx, `
 		CREATE TABLE IF NOT EXISTS conn_events(
 			id INTEGER IDENTITY(1,1),
 			peer_id TEXT NOT NULL,

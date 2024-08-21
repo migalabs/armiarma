@@ -13,7 +13,8 @@ import (
 	cli "github.com/urfave/cli/v2"
 
 	"github.com/migalabs/armiarma/pkg/config"
-	psql "github.com/migalabs/armiarma/pkg/db/postgresql"
+//	psql "github.com/migalabs/armiarma/pkg/db/postgresql"
+	psql "github.com/hdser/armiarma/pkg/db/redshift"
 	"github.com/migalabs/armiarma/pkg/discovery"
 	"github.com/migalabs/armiarma/pkg/discovery/dv5"
 	"github.com/migalabs/armiarma/pkg/events"

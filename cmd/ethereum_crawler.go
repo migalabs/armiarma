@@ -65,10 +65,22 @@ var Eth2CrawlerCommand = &cli.Command{
 			DefaultText: config.DefaultUserAgent,
 		},
 		&cli.StringFlag{
+			Name:        "database-type",
+			Usage:       "Selected Database",
+			EnvVars:     []string{"ARMIARMA_DATABASE_TYPE"},
+			DefaultText: config.DefaultDatabaseType,
+		},
+		&cli.StringFlag{
 			Name:        "psql-endpoint",
 			Usage:       "PSQL enpoint where the crwaler will submit the all the gathered info",
 			EnvVars:     []string{"ARMIARMA_PSQL"},
 			DefaultText: config.DefaultPSQLEndpoint,
+		},
+		&cli.StringFlag{
+			Name:        "redshift-endpoint",
+			Usage:       "REDSHIFT enpoint where the crwaler will submit the all the gathered info",
+			EnvVars:     []string{"ARMIARMA_REDSHIFT"},
+			DefaultText: config.DefaultRedShiftEndpoint,
 		},
 		&cli.StringFlag{
 			Name:        "peers-backup",

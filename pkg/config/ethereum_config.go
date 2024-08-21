@@ -32,7 +32,9 @@ type EthereumCrawlerConfig struct {
 	MetricsPort               int      `json:"metrics-port"`
 	UserAgent                 string   `json:"user-agent"`
 	EthCLRemoteEndpoint       string   `json:"remote-cl-endpoint"`
+	DatabaseType 			  string   `json:"database-type"`
 	PsqlEndpoint              string   `json:"psql-endpoint"`
+	RedShiftEndpoint          string   `json:"redshift-endpoint"`
 	ActivePeersBackupInterval string   `json:ActivePeersBackupInterval`
 	ForkDigest                string   `json:"fork-digest"`
 	Bootnodes                 []string `json:"bootnodes"`
@@ -58,6 +60,7 @@ func NewEthereumCrawlerConfig() *EthereumCrawlerConfig {
 		UserAgent:                 DefaultUserAgent,
 		EthCLRemoteEndpoint:       DefaultCLRemoteEndpoint,
 		PsqlEndpoint:              DefaultPSQLEndpoint,
+		RedShiftEndpoint:          DefaultRedShiftEndpoint,
 		ActivePeersBackupInterval: DefaultActivePeersBackupInterval,
 		ForkDigest:                eth.DefaultForkDigest,
 		Bootnodes:                 DefaultEthereumBootnodes,
@@ -134,8 +137,18 @@ func (c *EthereumCrawlerConfig) Apply(ctx *cli.Context) {
 	}
 
 	// postgresql endpoint
+	if ctx.IsSet("database-type") {
+		c.PsqlEndpoint = ctx.String("database-type")
+	}
+
+	// postgresql endpoint
 	if ctx.IsSet("psql-endpoint") {
 		c.PsqlEndpoint = ctx.String("psql-endpoint")
+	}
+
+	// redshift endpoint
+	if ctx.IsSet("redshift-endpoint") {
+		c.RedShiftEndpoint = ctx.String("redshift-endpoint")
 	}
 
 	// active peers' backup interval
@@ -210,7 +223,8 @@ func (c *EthereumCrawlerConfig) Apply(ctx *cli.Context) {
 		"ip":                 c.IP,
 		"port":               c.Port,
 		"user-agent":         c.UserAgent,
-		"psql":               c.PsqlEndpoint,
+		//"psql":               c.PsqlEndpoint,
+		"psql":               c.RedShiftEndpoint,
 		"backup-interval":    c.ActivePeersBackupInterval,
 		"fork-digest":        c.ForkDigest,
 		"cl-endpoint":        c.EthCLRemoteEndpoint,
