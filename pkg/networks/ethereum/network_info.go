@@ -87,7 +87,7 @@ var (
 var (
 	MainnetGenesis time.Time     = time.Unix(1606824023, 0)
 	GoerliGenesis  time.Time     = time.Unix(1616508000, 0)
-	GnosisGenesis  time.Time     = time.Unix(1638968400, 0) // Dec 08, 2021, 13:00 UTC
+	GnosisGenesis  time.Time     = time.Unix(1638993340, 0)
 	SecondsPerSlotMainnet time.Duration = 12 * time.Second
 	SecondsPerSlotGnosis  time.Duration = 5 * time.Second
 )
