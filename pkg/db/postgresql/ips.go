@@ -2,6 +2,7 @@ package postgresql
 
 import (
 	"time"
+    "strings"
 
 	"github.com/jackc/pgx/v4"
 	"github.com/migalabs/armiarma/pkg/db/models"
@@ -9,6 +10,68 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
+
+var ispCleaner = []struct {
+	substr, name string
+}{
+    {"amazon", "Amazon"},
+    {"google", "Google"},
+    {"microsoft", "Microsoft"},
+    {"oracle", "Oracle"},
+    {"at&t", "AT&T"},
+    {"vodafone", "Vodafone"},
+    {"orange", "Orange"},
+    {"china mobile", "China Mobile"},
+    {"china telecom", "China Telecom"},
+    {"alibaba", "Alibaba"},
+    {"pt comunicacoes", "PT Comunicacoes"},
+    {"swisscom", "Swisscom"},
+    {"sony", "Sony"},
+    {"telecom argentina", "Telecom Argentina"},
+    {"ovh", "OVH"},
+    {"t-mobile", "T-Mobile"},
+    {"hetzner", "Hetzner"},
+    {"digitalocean", "DigitalOcean"},
+    {"verizon", "Verizon"},
+    {"virgin media", "Virgin Media"},
+    {"hostinger", "Hostinger"},
+    {"telefonica", "Telefonica"},
+    {"contabo", "Contabo"},
+    {"mevspace", "Mevspace"},
+    {"chinanet", "Chinanet"},
+    {"kamatera", "Kamatera"},
+    {"teraswitch", "TeraSwitch"},
+    {"emirates telecommunications", "Etisalat"},
+    {"emirates integrated telecommunications", "du"},
+    {"centurylink", "CenturyLink"},
+    {"huawei", "Huawei"},
+    {"frontier communications", "Frontier Communications"},
+    {"charter communications", "Charter Communications"},
+    {"digi ", "DIGI"},
+    {"akamai", "Akamai Technologies"},
+    {"china unicom", "China Unicom"},
+    {"telus communications", "TELUS Communications"},
+    {"datacamp limited", "DataCamp"},
+    {"limestone", "Limestone Networks"},
+    {"hong kong telecommunications", "Hong Kong Telecommunications"},
+    {"velia.net", "velia.net"},
+    {"comcast", "Comcast"},
+    {"init7", "Init7"},
+    {"hivelocity", "Hivelocity"},
+    {"leaseweb", "LeaseWeb"},
+    {"fornex hosting", "Fornex Hosting"},
+    {"servers.com", "Servers.com"},
+    {"nos comunicacoes", "NOS Comunicacoes"},
+}
+
+func CleanISP(isp string) (string) {
+	for _, ispClean := range ispCleaner{
+		if strings.Contains(strings.ToLower(isp), ispClean.substr){
+			return ispClean.name
+		}
+	}
+	return isp
+}
 
 func (c *DBClient) InitIpTable() error {
 	log.Debug("init ips table in psql-db")
@@ -104,7 +167,7 @@ func (c *DBClient) UpsertIpInfo(ipInfo models.IpInfo) (query string, args []inte
 	args = append(args, ipInfo.Zip)
 	args = append(args, ipInfo.Lat)
 	args = append(args, ipInfo.Lon)
-	args = append(args, ipInfo.Isp)
+	args = append(args, CleanISP(ipInfo.Isp))
 	args = append(args, ipInfo.Org)
 	args = append(args, ipInfo.As)
 	args = append(args, ipInfo.AsName)

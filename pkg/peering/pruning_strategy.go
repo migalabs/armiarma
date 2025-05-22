@@ -20,7 +20,7 @@ import (
 
 var (
 	// Default Delays
-	DeprecationTime = 3 * time.Hour   // mMinutes after first negative connection that has to pass to deprecate a peer.
+	DeprecationTime = 30 * 24 * time.Hour   // mMinutes after first negative connection that has to pass to deprecate a peer.
 	StartExpD       = 2 * time.Minute // Starting delay that will serve for the Exponential Delay.
 	// Control variables
 	MinIterTime = 5 * time.Second // Minimum time that has to pass before iterating again.
