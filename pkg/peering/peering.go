@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"sync"
 	"time"
+	"math/rand"
 
 	"github.com/migalabs/armiarma/pkg/db/models"
 	psql "github.com/migalabs/armiarma/pkg/db/postgresql"
@@ -20,8 +21,9 @@ import (
 
 var (
 	ConnectionRefuseTimeout = 20 * time.Second
-	MaxRetries              = 1
-	DefaultWorkers          = 500
+	MaxRetries              = 3
+	DefaultWorkers          = 2000
+	MaxBackoffDuration		= 1 * time.Minute
 )
 
 type PeeringOption func(*PeeringService) error
@@ -77,6 +79,24 @@ func WithPeeringStrategy(strategy PeeringStrategy) PeeringOption {
 		p.strategy = strategy
 		return nil
 	}
+}
+
+func dynamicBackoff(attempt int, errorType string) time.Duration {
+	var baseDelay time.Duration
+
+	switch errorType {
+	case "io_timeout", "context_deadline_exceeded", "connection_refused":
+        baseDelay = 5 * time.Second
+    case "backoff", "no_addresses":
+        baseDelay = 10 * time.Second
+    default:
+        baseDelay = 2 * time.Second
+	}
+
+	maxJitter := 500 * time.Millisecond
+	delay := baseDelay * time.Duration(1<<attempt)
+	jitter := time.Duration(rand.Int63n(int64(maxJitter)))
+	return delay + jitter
 }
 
 // Run:
@@ -137,30 +157,44 @@ func (c *PeeringService) peeringWorker(workerID string, peerStreamChan chan *mod
 			addrInfo := nextPeer.ComposeAddrsInfo()
 
 			// control info for the attempt
-			var attStatus models.AttemptStatus = models.NegativeAttempt
-			var attError string = ""
-			var deprecable bool = false
-			var leftNet bool = false
+			attStatus := models.NegativeAttempt
+			attError := hosts.NoConnError
+			deprecable := false
+			leftNet := false
+			attempts := 0
 
 			// try to connect the peer
 			logEntry.Debugf("%s addrs %s attempting connection to peer", workerID, addrInfo.Addrs)
-			attempts := 0
-			timeoutctx, cancel := context.WithTimeout(c.ctx, c.Timeout)
-			for attempts < c.MaxRetries {
-				if err := h.Connect(timeoutctx, addrInfo); err != nil { // there was an error
+
+			for {
+				timeoutctx, cancel := context.WithTimeout(c.ctx, c.Timeout)
+				err := h.Connect(timeoutctx, addrInfo)
+
+				if err != nil { // there was an error
 					logEntry.WithError(err).Debugf("%s attempts %d failed connection attempt to %+v",
 						workerID, attempts+1, addrInfo)
+
 					attError = hosts.ParseConError(err)
+
+					backoffDuration := dynamicBackoff(attempts, attError)
+					if backoffDuration > MaxBackoffDuration {
+						logEntry.Debugf("Max backoff duration exceeded, stopping retries for peer %s", nextPeer.ID.String())
+						break
+					}
+
+					time.Sleep(backoffDuration)
+
 					attempts++
+					cancel()
 					continue
 				} else { // connection successfuly made
 					logEntry.Debugf("successful connection to %s", nextPeer.ID.String())
 					attStatus = models.PossitiveAttempt
 					attError = hosts.NoConnError
+					cancel()
 					break
 				}
 			}
-			cancel()
 
 			// generate the connectionAttempt
 			connAttempt := models.NewConnAttempt(
@@ -173,6 +207,7 @@ func (c *PeeringService) peeringWorker(workerID string, peerStreamChan chan *mod
 
 			// send it to the strategy
 			c.strategy.NewConnectionAttempt(connAttempt)
+
 			// Request the next peer when case is over
 			c.strategy.NextPeer()
 

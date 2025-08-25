@@ -13,7 +13,7 @@ var (
 	BlockchainName   string = "eth2"
 
 	// default fork_digests
-	DefaultForkDigest string = ForkDigests[CapellaKey]
+	DefaultForkDigest string = ForkDigests[AllForkDigest]
 	AllForkDigest     string = "All"
 
 	// Mainnet
@@ -22,6 +22,7 @@ var (
 	BellatrixKey string = "Bellatrix"
 	CapellaKey   string = "Capella"
 	DenebKey     string = "Deneb"
+	ElectraKey   string = "Electra"
 	// Gnosis
 	GnosisPhase0Key    string = "GnosisPhase0"
 	GnosisAltairKey    string = "GnosisAltair"
@@ -45,6 +46,7 @@ var (
 		BellatrixKey: "0x4a26c58b",
 		CapellaKey:   "0xbba4da96",
 		DenebKey:     "0x6a95a1a9",
+		ElectraKey:   "0xad532ceb",
 		// Gnosis
 		GnosisPhase0Key:    "0xf925ddc5",
 		GnosisBellatrixKey: "0x56fdb5e0",

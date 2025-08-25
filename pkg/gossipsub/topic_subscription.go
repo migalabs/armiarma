@@ -5,7 +5,7 @@ import (
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/pkg/errors"
+	// "github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -64,7 +64,7 @@ func (c *TopicSubscription) MessageReadingLoop(selfId peer.ID, dbClient database
 				// use the msg handler for that specific topic that we have
 				content, err := c.handlerFn(msg)
 				if err != nil {
-					log.Error(errors.Wrap(err, "unable to unwrap message on topic "+c.sub.Topic()))
+					// log.Error(errors.Wrap(err, "unable to unwrap message on topic "+c.sub.Topic()))
 					continue
 				}
 				if !content.IsZero() && c.persistMsgs {

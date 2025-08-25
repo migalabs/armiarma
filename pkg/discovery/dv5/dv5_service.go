@@ -167,16 +167,28 @@ func (d *Discovery5) handleENR(node *ethenode.Node) (*models.HostInfo, error) {
 		return nil, errors.Wrap(err, "unable to parse new discovered ENR")
 	}
 
-	// check if there is any fork digest filter only if the flag All is not set
-	if enr.Eth2Data.ForkDigest.String() != d.FilterDigest && d.FilterDigest != eth.ForkDigests[eth.AllForkDigest] {
-		log.Tracef("new node discovered - wrong fork %s - looking for %s", enr.Eth2Data.ForkDigest.String(), d.FilterDigest)
-		return nil, ErrorNotValidNode
+	// Check fork digest filter only if not set to AllForkDigest
+	if d.FilterDigest != eth.ForkDigests[eth.AllForkDigest] {
+		// Try to get fork digest
+		forkDigest, err := enr.GetForkDigest()
+		if err != nil {
+			// No valid eth2 data - skip this node
+			log.Tracef("node %s: no valid eth2 data: %v", enr.ID, err)
+			return nil, ErrorNotValidNode
+		}
+		
+		// Check if fork digest matches
+		if forkDigest != d.FilterDigest {
+			log.Tracef("node %s: wrong fork %s - looking for %s", 
+				enr.ID, forkDigest, d.FilterDigest)
+			return nil, ErrorNotValidNode
+		}
 	}
 
 	// Generate the peer ID from the pubkey
 	peerID, err := enr.GetPeerID()
 	if err != nil {
-		return &models.HostInfo{}, errors.Wrap(err, "unable to convert Geth pubkey to Libp2p")
+		return nil, errors.Wrap(err, "unable to convert Geth pubkey to Libp2p")
 	}
 	// gen the HostInfo
 	hInfo := models.NewHostInfo(
@@ -189,6 +201,7 @@ func (d *Discovery5) handleENR(node *ethenode.Node) (*models.HostInfo, error) {
 	)
 	// add the enr as an attribute
 	hInfo.AddAtt(eth.EnrHostInfoAttribute, enr)
+	
 	return hInfo, nil
 }
 

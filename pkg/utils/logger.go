@@ -46,7 +46,12 @@ func ParseLogOutput(lvl string) io.Writer {
 func ParseLogFormatter(lvl string) logrus.Formatter {
 	switch lvl {
 	case "text":
-		return &logrus.TextFormatter{}
+		return &logrus.TextFormatter{
+            FullTimestamp:   true,
+            TimestampFormat: "02/01/2006 15:04:05",
+            ForceColors:     true,
+            PadLevelText:    true,
+        }
 	default:
 		return DefaultFormater
 	}

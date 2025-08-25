@@ -5,6 +5,8 @@ import (
 	"crypto/ecdsa"
 	"encoding/hex"
 	"time"
+	"fmt"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/enr"
@@ -16,6 +18,9 @@ import (
 
 const (
 	RPCTimeout time.Duration = 20 * time.Second
+	ETH2_DATA_HEX_LENGTH = 32 // 16 bytes = 32 hex chars
+	FORK_DIGEST_HEX_LENGTH = 8 // 4 bytes = 8 hex chars
+	ATTNETS_HEX_LENGTH = 16 // 8 bytes = 16 hex chars
 )
 
 type LocalEthereumNode struct {
@@ -90,15 +95,84 @@ func (en *LocalEthereumNode) Network() utils.NetworkType {
 }
 
 // SetForkDigest adds any given ForkDigest into the local node's enr
-func (en *LocalEthereumNode) SetForkDigest(forkDigest string) {
-	// TODO: parse to see if it's a valid ForkDigets (len, blabla)
-	en.addEntries(NewEth2DataEntry(forkDigest))
+func (en *LocalEthereumNode) SetForkDigest(forkDigest string) error {
+	// Normalize the input
+	forkDigest = strings.TrimSpace(forkDigest)
+	
+	// If only the 4-byte fork digest is provided, we need the full eth2 data
+	if len(strings.TrimPrefix(forkDigest, "0x")) == FORK_DIGEST_HEX_LENGTH {
+		log.Warnf("Fork digest is only 4 bytes: %s", forkDigest)
+		return fmt.Errorf("incomplete fork digest: need full 16-byte eth2 data, got only 4-byte fork digest")
+	}
+	
+	// Validate length (should be 32 hex chars for 16 bytes)
+	hexStr := strings.TrimPrefix(forkDigest, "0x")
+	if len(hexStr) != ETH2_DATA_HEX_LENGTH {
+		log.Warnf("Non-standard fork digest length: expected %d hex chars, got %d", ETH2_DATA_HEX_LENGTH, len(hexStr))
+		return fmt.Errorf("invalid eth2 data length: expected %d hex chars, got %d", ETH2_DATA_HEX_LENGTH, len(hexStr))
+	}
+	
+	// Validate hex format
+	if _, err := hex.DecodeString(hexStr); err != nil {
+		log.Warnf("Invalid hex format for fork digest: %v", err)
+		return fmt.Errorf("invalid hex format: %v", err)
+	}
+	
+	// Create the entry with validation
+	entry, err := NewEth2DataEntry(forkDigest)
+	if err != nil {
+		return fmt.Errorf("failed to create eth2 data entry: %v", err)
+	}
+	
+	// Validate that the entry can be deserialized
+	if _, err := entry.Eth2Data(); err != nil {
+		return fmt.Errorf("invalid eth2 data format: %v", err)
+	}
+	
+	// Add to ENR
+	en.addEntries(entry)
+	log.Debugf("Set fork digest in ENR: %s", forkDigest)
+	
+	return nil
 }
 
 // SetAttNetworks adds any given set of Attnets into the local node's enr
-func (en *LocalEthereumNode) SetAttNetworks(networks string) {
-	// TODO: parse to see if it's a valid ForkDigets (len, blabla)
-	en.addEntries(NewAttnetsENREntry(networks))
+func (en *LocalEthereumNode) SetAttNetworks(networks string) error {
+	// Normalize the input
+	networks = strings.TrimSpace(networks)
+	hexStr := strings.TrimPrefix(networks, "0x")
+	
+	// Validate length (typically 16 hex chars for 8 bytes)
+	if len(hexStr) == 0 {
+		return fmt.Errorf("empty attestation networks")
+	}
+	
+	// Allow variable length but warn if not standard
+	if len(hexStr) != ATTNETS_HEX_LENGTH {
+		log.Warnf("Non-standard attnets length: expected %d hex chars, got %d", 
+			ATTNETS_HEX_LENGTH, len(hexStr))
+	}
+	
+	// Validate hex format
+	decoded, err := hex.DecodeString(hexStr)
+	if err != nil {
+		return fmt.Errorf("invalid hex format: %v", err)
+	}
+	
+	// Create the entry with validation
+	entry, err := NewAttnetsENREntry(networks)
+	if err != nil {
+		return fmt.Errorf("failed to create attnets entry: %v", err)
+	}
+	
+	// Add to ENR
+	en.addEntries(entry)
+	
+	// Log the attestation subnet participation
+	bitCount := CountBits(decoded)
+	log.Debugf("Set attestation networks in ENR: %s (%d subnets)", networks, bitCount)
+	
+	return nil
 }
 
 // AddEntries modifies the local Ethereum Node's ENR adding a new entry to the Key-Value
