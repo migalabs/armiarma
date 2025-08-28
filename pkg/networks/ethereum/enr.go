@@ -2,7 +2,6 @@ package ethereum
 
 import (
 	"crypto/ecdsa"
-	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"math/bits"
