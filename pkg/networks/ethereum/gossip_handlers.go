@@ -105,12 +105,13 @@ func (s *EthMessageHandler) SubnetMessageHandler(msg *pubsub.Message) (gossipsub
 		return nil, err
 	}
 
+	arrivalTime := time.Now()
 	trackedAttestation := &TrackedAttestation{
 		MsgID:       msg.ID,
-		ArrivalTime: msg.ArrivalTime,
+		ArrivalTime: arrivalTime,
 		Subnet:      subnet,
 		Slot:        int64(attestation.Data.Slot),
-		TimeInSlot:  GetTimeInSlot(s.genesisTime, msg.ArrivalTime, int64(attestation.Data.Slot)),
+		TimeInSlot:  GetTimeInSlot(s.genesisTime, arrivalTime, int64(attestation.Data.Slot)),
 		Sender:      msg.ReceivedFrom,
 		ValPubkey:   "",
 	}
@@ -147,11 +148,12 @@ func (mh *EthMessageHandler) BeaconBlockMessageHandler(msg *pubsub.Message) (gos
 		return nil, err
 	}
 
+	arrivalTime := time.Now()
 	trackedBlock := &TrackedBeaconBlock{
 		MsgID:       msg.ID,
 		Sender:      msg.ReceivedFrom,
-		ArrivalTime: msg.ArrivalTime,
-		TimeInSlot:  GetTimeInSlot(mh.genesisTime, msg.ArrivalTime, int64(bblock.Message.Slot)),
+		ArrivalTime: arrivalTime,
+		TimeInSlot:  GetTimeInSlot(mh.genesisTime, arrivalTime, int64(bblock.Message.Slot)),
 		ValIndex:    int64(bblock.Message.ProposerIndex),
 		Slot:        int64(bblock.Message.Slot),
 	}

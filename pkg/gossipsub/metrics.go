@@ -51,9 +51,11 @@ func (gs *GossipSub) peersPerTopic() *metrics.IndvMetrics {
 	}
 
 	updateFn := func() (interface{}, error) {
-		summary := gs.PubsubService.TopicsPerPeer()
-		for top, value := range summary {
-			PeersPerTopic.WithLabelValues(top).Set(float64(value))
+		summary := make(map[string]int)
+		for topicName := range gs.TopicArray {
+			peerCount := len(gs.PubsubService.ListPeers(topicName))
+			summary[topicName] = peerCount
+			PeersPerTopic.WithLabelValues(topicName).Set(float64(peerCount))
 		}
 		return summary, nil
 	}
