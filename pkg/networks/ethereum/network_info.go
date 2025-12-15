@@ -37,6 +37,8 @@ var (
 	HoleskyCapellaKey string = "HoleskyCapella"
 	// Deneb
 	DenebCancunKey string = "DenebCancun"
+	// Fulu
+	FuluKey string = "FuluOsaka"
 
 	ForkDigests = map[string]string{
 		AllForkDigest: "all",
@@ -47,6 +49,7 @@ var (
 		CapellaKey:   "0xbba4da96",
 		DenebKey:     "0x6a95a1a9",
 		ElectraKey:   "0xad532ceb",
+		FuluKey:      "0xcb0d1acc",
 		// Gnosis
 		GnosisPhase0Key:    "0xf925ddc5",
 		GnosisBellatrixKey: "0x56fdb5e0",
