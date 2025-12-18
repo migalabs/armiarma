@@ -1,17 +1,15 @@
-version: "3.7" 
-
 networks:
         cluster:
 
 services:
         db:
-                image: postgres:latest
+                image: postgres:14
                 restart: unless-stopped
                 environment:
                         - POSTGRES_USER=user
                         - POSTGRES_PASSWORD=password
                         - POSTGRES_DATABASE=armiarmadb
-                volumes: 
+                volumes:
                         - type: bind
                           source: ./app-data/init-armiarma.sql
                           target: /docker-entrypoint-initdb.d/docker_postgres_init.sql
@@ -39,7 +37,7 @@ services:
                         - '--web.console.libraries=/usr/share/prometheus/console_libraries'
                         - '--web.console.templates=/usr/share/prometheus/consoles'
                 networks: [ cluster ]
-                ports: 
+                ports:
                         - "127.0.0.1:9090:9090"
 
         grafana:
@@ -48,7 +46,7 @@ services:
                 environment:
                         - Datasource=Armiarma
                 networks: [ cluster ]
-                ports: 
+                ports:
                         - "127.0.0.1:3000:3000"
 
         eth_crawler:
@@ -66,11 +64,11 @@ services:
                         --subnet=${CRAWLER_SUBNET}
                         --persist-connevents=${CRAWLER_PERSIST_CONNEVENTS}
                 restart: unless-stopped
-                depends_on: 
+                depends_on:
                   db:
                     condition: service_healthy
                 networks: [ cluster ]
-                ports: 
+                ports:
                         - "${CRAWLER_PORT}:9020"
                         - "127.0.0.1:${CRAWLER_METRICS_PORT}:9080"
                         - "${CRAWLER_SSE_PORT}:9099"
