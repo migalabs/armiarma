@@ -39,6 +39,8 @@ var (
 	DenebCancunKey string = "DenebCancun"
 	// Fulu
 	FuluKey string = "FuluOsaka"
+	FuluBPO1Key string = "FuluOsakaBPO1"
+	FuluBPO2Key string = "FuluOsakaBPO2"
 
 	ForkDigests = map[string]string{
 		AllForkDigest: "all",
@@ -49,7 +51,9 @@ var (
 		CapellaKey:   "0xbba4da96",
 		DenebKey:     "0x6a95a1a9",
 		ElectraKey:   "0xad532ceb",
-		FuluKey:      "0xcb0d1acc",
+		FuluKey:      "0x82fae541",
+		FuluBPO1Key:  "0xcb0d1acc",
+		FuluBPO2Key:  "0x8c9f62fe",
 		// Gnosis
 		GnosisPhase0Key:    "0xf925ddc5",
 		GnosisBellatrixKey: "0x56fdb5e0",
